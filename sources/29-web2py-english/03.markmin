@@ -173,7 +173,8 @@ Now the action returns a dictionary defining a ``message``. When an action retur
 If web2py does not find the requested view, it uses the "generic.html" view that comes with every application.
 
 -------
-If an extension other than "html" is specified ("json" for example), and the view file "[controller]/[function].json" is not found, web2py looks for the view "generic.json". web2py comes with generic.html, generic.json, generic.xml, and generic.rss. These generic views can be modified for each application individually, and additional views can be added easily.
+``Mac Mail``:inxx ``Google Maps``:inxx ``jsonp``:inxx
+If an extension other than "html" is specified ("json" for example), and the view file "[controller]/[function].json" is not found, web2py looks for the view "generic.json". web2py comes with generic.html, generic.json, generic.jsonp, generic.xml, generic.rss, generic.ics (for Mac Mail Calendar), generic.map (for embedding Google Mpas), and generic.pdf (based on fpdf). These generic views can be modified for each application individually, and additional views can be added easily.
 -------
 
 -------
@@ -611,7 +612,7 @@ def index():
     return dict(images=images)
 
 def show():
-    image = db(db.image.id==request.args(0)).select().first()
+    image = db(db.image.id==request.args(0,cast=int)).select().first()
     db.comment.image_id.default = image.id
     form = SQLFORM(db.comment)
     if form.process().accepted:
@@ -632,8 +633,12 @@ URL('show', args=image.id)
 ``:code
 
 in "default/index.html", can be accessed as:
-``request.args(0)``
-from the "show" action.
+
+``request.args(0,cast=int)``
+
+from the "show" action. The ``cast=int`` argument is optional but very important. It attempts to cast the string value passed in the PATH_INFO into an int. On failure it raise a proper exception instead of causing a ticket. One can also specify a redirect in case of failure to cast:
+
+``request.args(0,cast=int,otherwise=URL('error'))``
 
 The "download" action expects a filename in ``request.args(0)``, builds a path to the location where that file is supposed to be, and sends it back to the client. If the file is too large, it streams the file without incurring any memory overhead.
 
@@ -708,7 +713,7 @@ Here, we rewrite the previous "show" action using crud and making some more impr
 
 ``
 def show():
-    image = db.image(request.args(0)) or redirect(URL('index'))
+    image = db.image(request.args(0,cast=int)) or redirect(URL('index'))
     db.comment.image_id.default = image.id
     form = crud.create(db.comment,
                        message='your comment is posted',
@@ -720,7 +725,7 @@ def show():
 First of all notice we have used the syntax
 
 ``
-db.image(request.args(0)) or redirect(...)
+db.image(request.args(0,cast=int)) or redirect(...)
 ``:code
 
 to fetch the required record. Since ```table(id)`` returns None if the record is not found, we can use ``or redirect(...)`` in this case in one line.
@@ -752,7 +757,7 @@ We can now decorate the functions that we want to restrict, for example:
 ``
 @auth.requires_login()
 def show():
-    image = db.image(request.args(0)) or redirect(URL('index'))
+    image = db.image(request.args(0,cast=int)) or redirect(URL('index'))
     db.comment.image_id.default = image.id
     form = crud.create(db.comment, next=URL(args=image.id),
                      message='your comment is posted')
@@ -925,7 +930,7 @@ def create():
 
 def show():
      "shows a wiki page"
-     this_page = db.page(request.args(0)) or redirect(URL('index'))
+     this_page = db.page(request.args(0,cast=int)) or redirect(URL('index'))
      db.comment.page_id.default = this_page.id
      form = crud.create(db.comment) if auth.user else None
      pagecomments = db(db.comment.page_id==this_page.id).select()
@@ -934,7 +939,7 @@ def show():
 @auth.requires_login()
 def edit():
      "edit an existing wiki page"
-     this_page = db.page(request.args(0)) or redirect(URL('index'))
+     this_page = db.page(request.args(0,cast=int)) or redirect(URL('index'))
      form = crud.update(db.page, this_page,
                         next=URL('show',args=request.args))
      return dict(form=form)
@@ -942,7 +947,7 @@ def edit():
 @auth.requires_login()
 def documents():
      "browser, edit all documents attached to a certain page"
-     page = db.page(request.args(0)) or redirect(URL('index'))
+     page = db.page(request.args(0,cast=int)) or redirect(URL('index'))
      db.document.page_id.default = page.id
      db.document.page_id.writable = False
      grid = SQLFORM.grid(db.document.page_id==page.id,args=[page.id])
@@ -972,7 +977,8 @@ def callback():
 
 Lines 2-6 provide a comment for the index action. Lines 4-5 inside the comment are interpreted by python as test code (doctest). Tests can be run via the admin interface. In this case the tests verify that the index action runs without errors.
 
-Lines 18, 27, and 35 try to fetch a ``page`` record with the id in ``request.args(0)``.
+Lines 18, 27, and 35 try to fetch a ``page`` record with the id in 
+``request.args(0)``.
 
 Lines 13, 20 define and process create forms for a new page and a new comment and.
 

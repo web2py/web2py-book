@@ -3,7 +3,7 @@
 
 ### Dependencies
 
-web2py comes with a Database Abstraction Layer (DAL), an API that maps Python objects into database objects such as queries, tables, and records. The DAL dynamically generates the SQL in real time using the specified dialect for the database back end, so that you do not have to write SQL code or learn different SQL dialects (the term SQL is used generically), and the application will be portable among different types of databases. At the time of this writing, the supported databases are SQLite (which comes with Python and thus web2py), PostgreSQL, MySQL, Oracle, MSSQL, FireBird, DB2, Informix, and Ingres and (partially) the Google App Engine (SQL and NoSQL). Experimentally we support more databases. Please check on the web2py web site and mailing list for more recent adapters. Google NoSQL is treated as a particular case in Chapter 13.
+web2py comes with a Database Abstraction Layer (DAL), an API that maps Python objects into database objects such as queries, tables, and records. The DAL dynamically generates the SQL in real time using the specified dialect for the database back end, so that you do not have to write SQL code or learn different SQL dialects (the term SQL is used generically), and the application will be portable among different types of databases. At the time of this writing, the supported databases are SQLite (which comes with Python and thus web2py), PostgreSQL, MySQL, Oracle, MSSQL, FireBird, DB2, Informix, Ingres, the Google App Engine (SQL and NoSQL) and MongoDB. Experimentally we support more databases. Please check on the web2py web site and mailing list for more recent adapters. Google NoSQL is treated as a particular case in Chapter 13.
 
 The Windows binary distribution works out of the box with SQLite and MySQL. The Mac binary distribution works out of the box with SQLite.
 To use any other database back-end, run from the source distribution and install the appropriate driver for the required back end.
@@ -11,20 +11,28 @@ To use any other database back-end, run from the source distribution and install
 
 Once the proper driver is installed, start web2py from source, and it will find the driver. Here is a list of drivers:
 
+``DAL``:inxx ``SQLite``:inxx ``MySQL``:inxx ``PostgresSQL``:inxx ``Oracle``:inxx ``MSSQL``:inxx ``FireBird``:inxx ``DB2``:inxx ``Informix``:inxx ``Sybase``:inxx ``Teradata``:inxx ``MongoDB``:inxx ``CouchDB``:inxx ``SAPDB``:inxx ``Cubrid``:inxx
+
 ----------
-database | driver (source)
+database | drivers (source)
 SQLite | sqlite3 or pysqlite2 or zxJDBC ``zxjdbc``:cite  (on Jython)
-PostgreSQL | psycopg2 ``psycopg2``:cite  or zxJDBC ``zxjdbc``:cite  (on Jython)
+PostgreSQL | psycopg2 ``psycopg2``:cite  or pg8000 ``pg8000``:cite or zxJDBC ``zxjdbc``:cite  (on Jython)
 MySQL | pymysql ``pymysql``:cite or MySQLdb ``mysqldb``:cite
 Oracle | cx_Oracle ``cxoracle``:cite
 MSSQL | pyodbc ``pyodbc``:cite
-FireBird | kinterbasdb ``kinterbasdb``:cite
+FireBird | kinterbasdb ``kinterbasdb``:cite or fdb or pyodbc
 DB2 | pyodbc ``pyodbc``:cite
 Informix | informixdb ``informixdb``:cite
 Ingres | ingresdbi ``ingresdbi``:cite
+Cubrid | cubriddb ``cubriddb``:cite ``cubrid``:cite
+Sybase | Sybase ``Sybase``:cite
+Teradata | pyodbc ``Teradata``:cite 
+SAPDB    | sapdb ``SAPDB``:cite
+MongoDB | pymongo ``pymongo``:cite
+IMAP | imaplib ``IMAP``:cite 
 ---------
 
-(``pymysql`` ships with web2py)
+``sqlite3``, ``pymysql``, ``pg8000``, and ``imaplib`` ship with web2py. Support of MongoDB is experimental. The IMAP option allows to use DAL to access IAMP.
 
 web2py defines the following classes that make up the DAL:
 
@@ -104,7 +112,13 @@ A connection with the database is established by creating an instance of the DAL
 **Oracle**     | ``oracle://username/password@test``
 **DB2**        | ``db2://username:password@test``
 **Ingres**     | ``ingres://username:password@localhost/test``
+**Sybase**     | ``sybase://username:password@localhost/test``
 **Informix**   | ``informix://username:password@test``
+**Teradata**   | ``teradata://DSN=dsn;UID=user;PWD=pass;DATABASE=database``
+**Cubrid**     | ``cubrid://username:password@localhost/test``
+**SAPDB**      | ``sapdb://username:password@localhost/test``
+**IMAP**       | ``imap://user:password@server:port``
+**MongoDB**    | ``mongodb://username:password@localhost/test``
 **Google App Engine/SQL** | ``google:sql``
 **Google App Engine/NoSQL** | ``google:datastore``
 -------------
@@ -187,7 +201,6 @@ The best way to understand the DAL API is to try each function yourself. This ca
 
 Start by creating a connection. For the sake of example, you can use SQLite. Nothing in this discussion changes when you change the back-end engine.
 
-``DAL``:inxx ``SQLite``:inxx ``MySQL``:inxx ``PostgresSQL``:inxx ``Oracle``:inxx ``MSSQL``:inxx ``FireBird``:inxx ``DB2``:inxx ``Informix``:inxx
 ``
 >>> db = DAL('sqlite://storage.db')
 ``:code
@@ -265,7 +278,7 @@ Field(name, 'string', length=None, default=None,
       writable=True, readable=True, update=None, authorize=None,
       autodelete=False, represent=None, compute=None,
       uploadfolder=os.path.join(request.folder,'uploads'),
-      uploadseparate=None)
+      uploadseparate=None,uploadfs=None)
 ``:code
 
 Not all of them are relevant for every field. "length" is relevant only for fields of type "string". "uploadfield" and "authorize" are relevant only for fields of type "upload". "ondelete" is relevant only for fields of type "reference" and "upload".
@@ -292,9 +305,14 @@ Not all of them are relevant for every field. "length" is relevant only for fiel
 ``list:string`` | ``None``
 ``list:integer`` | ``None``
 ``list:reference <table>`` | ``IS_IN_DB(db,table.field,format,multiple=True)``
+``bigint`` | ``None``
+``big-id`` | ``None``
+``big-reference`` | ``None``
 ---------
 
 Decimal requires and returns values as ``Decimal`` objects, as defined in the Python ``decimal`` module. SQLite does not handle the ``decimal`` type so internally we treat it as a ``double``. The (n,m) are the number of digits in total and the number of digits after the decimal point respectively.
+
+The ``big-id`` and, ``big-reference`` are only supported by some of the database engines and are experimental. They are not normally used as field types unless for legacy tables, however, the DAL constructor has a ``bigint_id`` argument that when set to ``True`` makes the ``id`` fields and ``reference`` fields ``big-id`` and ``big-referece`` respectively.
 
 The ``list:`` fields are special because they are designed to take advantage of certain denormalization features on NoSQL (in the case of Google App Engine NoSQL, the field types ``ListProperty`` and ``StringListProperty``) and back-port them all the other supported relational databases. On relational databases lists are stored as a ``text`` field. The items are separated by a ``|`` and each ``|`` in string item is escaped as a ``||``. They are discussed in their own section.
 
@@ -310,6 +328,7 @@ Notice that ``requires=...`` is enforced at the level of forms, ``required=True`
 - ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
 - ``uploadfolder`` defaults to the application's "uploads/" folder. If set to a different path, files will uploaded to a different folder. For example, uploadfolder=os.path.join(request.folder,'static/temp') will upload files to the web2py/applications/myapp/static/temp folder.
 - ``uploadseparate`` if set to True will upload files under different subfolders of the ''uploadfolder'' folder. This is optimized to avoid too many files under the same folder/subfolder. ATTENTION: You cannot change the value of ``uploadseparate`` from True to False without breaking the system. web2py either uses the separate subfolders or it does not. Changing the behavior after files have been uploaded will prevent web2py from being able to retrieve those files. If this happens it is possible to move files and fix the problem but this is not described here.
+- ``uploadfs`` allows you specify a different filessystem where to upload files, including an Amazon S3 storage or a remote FTP storage. This option requires PyFileSystem installed. ``uploadfs`` must point to ``PyFileSystem``. ``PyFileSystem``:inxx ``uploadfs``:idxx
 - ``widget`` must be one of the available widget objects, including custom widgets, for example: ``SQLFORM.widgets.string.widget``. A list of available widgets will be discussed later. Each field type has a default widget.
 - ``label`` is a string (or something that can be serialized to a string) that contains the label to be used for this field in autogenerated forms.
 - ``comment``  is a string (or something that can be serialized to a string) that contains a comment associated with this field, and will be displayed to the right of the input field in the autogenerated forms.
@@ -588,6 +607,24 @@ the same as those returned when applying **.as_list()** to a normal select.
 [{field1: value1, field2: value2}, {field1: value1b, field2: value2b}]
 ``:code
 
+executesql have an optional ``fields`` argument.
+If not None, the   
+results cursor returned by the DB driver will be converted to a            
+DAL Rows object using the ``db._adapter.parse()`` method. This requires        
+specifying the "fields" argument as a list of DAL Field objects            
+that match the fields returned from the DB. The Field objects should       
+be part of one or more Table objects defined on the DAL object.            
+        
+The ``fields`` list can include one or more DAL Table objects in addition    
+to or instead of including Field objects, or it can be just a single       
+table (not in a list). In that case, the Field objects will be             
+extracted from the table(s).
+
+The field names will be extracted from the Field objects, or optionally,
+a list of field names can be provided (in tablename.fieldname format)      
+via the ``colnames`` argument. Note, the fields and colnames must be in      
+the same order as the fields in the results cursor returned from the DB.
+
 #### ``_lastsql``
 
 Whether SQL was executed manually using executesql or was SQL generated by the DAL, you can always find the SQL code in ``db._lastsql``. This is useful for debugging purposes:
@@ -664,6 +701,7 @@ Note that currently this is only available for DB2, MS-SQL, Ingres and Informix,
 At the time of writing, we cannot guarantee that the ``primarykey`` attribute works with every existing legacy table and every supported database backend.
 For simplicity, we recommend, if possible, creating a database view that has an auto-increment id field.
 
+
 ### Distributed transaction
 ``distributed transactions``:inxx
 
@@ -687,18 +725,30 @@ On failure, this function rolls back and raises an ``Exception``.
 
 In controllers, when one action returns, if you have two distinct connections and you do not call the above function, web2py commits them separately. This means there is a possibility that one of the commits succeeds and one fails. The distributed transaction prevents this from happening.
 
-### Manual uploads
+### More on uploads
 
 Consider the following model:
 ``
->>> db.define_table('myfile', Field('image', 'upload'))
+>>> db.define_table('myfile',
+    Field('image', 'upload', default='path/'))
 ``:code
+
+In the case of an 'upload' field, the default value can optionally be set to a path (an absolute path or a path relative to the current app folder) and the default image will be set to a copy of the file at the path. A new copy is made for each new record that does not specify an image.
 
 Normally an insert is handled automatically via a SQLFORM or a crud form (which is a SQLFORM) but occasionally you already have the file on the filesystem and want to upload it programmatically. This can be done in this way:
 ``
 >>> stream = open(filename, 'rb')
 >>> db.myfile.insert(image=db.myfile.image.store(stream, filename))
 ``:code
+
+It is also possible to insert a file in a simpler way and have the insert method call store automatically:
+
+``
+>>> stream = open(filename, 'rb')
+>>> db.myfile.insert(image=stream)
+``:code
+
+In this case the filename is obtained from the stream object if available.
 
 The ``store`` method of the upload field object takes a file stream and a filename. It uses the filename to determine the extension (type) of the file, creates a new temp name for the file (according to web2py upload mechanism) and loads the file content in this new temp file (under the uploads folder unless specified otherwise). It returns the new temp name, which is then stored in the ``image`` field of the ``db.myfile`` table.
 
@@ -711,6 +761,7 @@ Note, if the file is to be stored in an associated blob field rather than the fi
 >>> db.myfile.insert(image=db.myfile.image.store(stream, filename),
         image_file=stream.read())
 ``:code
+
 
 The opposite of ``.store`` is ``.retrieve``:
 
@@ -929,47 +980,47 @@ Apparently similar to ``db.mytable[id]`` the above syntax is more flexible and s
 #### Recursive ``select``s
 ``recursive selects``:inxx
 
-Consider the previous table person and a new table "dog" referencing a "person":
+Consider the previous table person and a new table "thing" referencing a "person":
 ``
->>> db.define_table('dog', Field('name'), Field('owner','reference person'))
+>>> db.define_table('thing', Field('name'), Field('owner','reference person'))
 ``:code
 
 and a simple select from this table:
 ``
->>> dogs = db(db.dog).select()
+>>> things = db(db.thing).select()
 ``:code
 
 which is equivalent to
 
 ``
->>> dogs = db(db.dog._id>0).select()
+>>> things = db(db.thing._id>0).select()
 ``:code
 
-where ``._id`` is a reference to the primary key of the table. Normally ``db.dog._id`` is the same as ``db.dog.id`` and we will assume that in most of this book. ``_id``:inxx
+where ``._id`` is a reference to the primary key of the table. Normally ``db.thing._id`` is the same as ``db.thing.id`` and we will assume that in most of this book. ``_id``:inxx
 
 
-For each Row of dogs it is possible to fetch not just fields from the selected table (dog) but also from linked tables (recursively):
+For each Row of things it is possible to fetch not just fields from the selected table (thing) but also from linked tables (recursively):
 ``
->>> for dog in dogs: print dog.name, dog.owner.name
+>>> for thing in things: print thing.name, thing.owner.name
 ``:code
 
-Here ``dog.owner.name`` requires one database select for each dog in dogs and it is therefore inefficient. We suggest using joins whenever possible instead of recursive selects, nevertheless this is convenient and practical when accessing individual records.
+Here ``thing.owner.name`` requires one database select for each thing in things and it is therefore inefficient. We suggest using joins whenever possible instead of recursive selects, nevertheless this is convenient and practical when accessing individual records.
 
-You can also do it backwards, by selecting the dogs referenced by a person:
+You can also do it backwards, by selecting the things referenced by a person:
 
 ``
 person =  db.person(id)
-for dog in person.dog.select(orderby=db.dog.name):
-    print person.name, 'owns', dog.name
+for thing in person.thing.select(orderby=db.thing.name):
+    print person.name, 'owns', thing.name
 ``:code
 
-In this last expressions ``person.dog`` is a shortcut for
+In this last expressions ``person.thing`` is a shortcut for
 
 ``
-db(db.dog.owner==person.id)
+db(db.thing.owner==person.id)
 ``:code
 
-i.e. the Set of ``dog``s referenced by the current ``person``. This syntax breaks down if the referencing table has multiple references to the referenced table. In this case one needs to be more explicit and use a full Query.
+i.e. the Set of ``thing``s referenced by the current ``person``. This syntax breaks down if the referencing table has multiple references to the referenced table. In this case one needs to be more explicit and use a full Query.
 
 
 #### Serializing ``Rows`` in views
@@ -1196,7 +1247,7 @@ You can count records in a set:
 3
 ``:code
 
-Notice that ``count`` takes an optional ``distinct`` argument which defaults to False, and it works very much like the same argument for ``select``.
+Notice that ``count`` takes an optional ``distinct`` argument which defaults to False, and it works very much like the same argument for ``select``. ``count`` has also a ``cache`` argument that works very much like the equivalent argument of the ``select`` method.
 
 Sometimes you may need to check is a table is empty. A more efficient way than counting is using the ``isempty`` method:
 
@@ -1600,54 +1651,54 @@ Mind that virtual fields do not have the same attributes as the other fields (de
 ### One to many relation
 ``one to many``:inxx
 
-To illustrate how to implement one to many relations with the web2py DAL, define another table "dog" that refers to the table "person" which we redefine here:
+To illustrate how to implement one to many relations with the web2py DAL, define another table "thing" that refers to the table "person" which we redefine here:
 ``
 >>> db.define_table('person',
                     Field('name'),
                     format='%(name)s')
->>> db.define_table('dog',
+>>> db.define_table('thing',
                     Field('name'),
                     Field('owner', 'reference person'),
                     format='%(name)s')
 ``:code
 
-Table "dog" has two fields, the name of the dog and the owner of the dog. When a field type is another table, it is intended that the field reference the other table by its id. In fact, you can print the actual type value and get:
+Table "thing" has two fields, the name of the thing and the owner of the thing. When a field type is another table, it is intended that the field reference the other table by its id. In fact, you can print the actual type value and get:
 ``
->>> print db.dog.owner.type
+>>> print db.thing.owner.type
 reference person
 ``:code
 
-Now, insert three dogs, two owned by Alex and one by Bob:
+Now, insert three things, two owned by Alex and one by Bob:
 ``
->>> db.dog.insert(name='Skipper', owner=1)
+>>> db.thing.insert(name='Boat', owner=1)
 1
->>> db.dog.insert(name='Snoopy', owner=1)
+>>> db.thing.insert(name='Chair', owner=1)
 2
->>> db.dog.insert(name='Puppy', owner=2)
+>>> db.thing.insert(name='Shoes', owner=2)
 3
 ``:code
 
 You can select as you did for any other table:
 ``
->>> for row in db(db.dog.owner==1).select():
+>>> for row in db(db.thing.owner==1).select():
         print row.name
-Skipper
-Snoopy
+Boat
+Chair
 ``:code
 
-Because a dog has a reference to a person, a person can have many dogs, so a record of table person now acquires a new attribute dog, which is a Set, that defines the dogs of that person. This allows looping over all persons and fetching their dogs easily:
+Because a thing has a reference to a person, a person can have many things, so a record of table person now acquires a new attribute thing, which is a Set, that defines the things of that person. This allows looping over all persons and fetching their things easily:
 
 ``referencing``:inxx
 ``
 >>> for person in db().select(db.person.ALL):
         print person.name
-        for dog in person.dog.select():
-            print '    ', dog.name
+        for thing in person.thing.select():
+            print '    ', thing.name
 Alex
-     Skipper
-     Snoopy
+     Boat
+     Chair
 Bob
-     Puppy
+     Shoes
 Carl
 ``:code
 
@@ -1657,12 +1708,12 @@ Another way to achieve a similar result is by using a join, specifically an INNE
 
 ``Rows``:inxx ``inner join``:inxx ``join``:inxx
 ``
->>> rows = db(db.person.id==db.dog.owner).select()
+>>> rows = db(db.person.id==db.thing.owner).select()
 >>> for row in rows:
-        print row.person.name, 'has', row.dog.name
-Alex has Skipper
-Alex has Snoopy
-Bob has Puppy
+        print row.person.name, 'has', row.thing.name
+Alex has Boat
+Alex has Chair
+Bob has Shoes
 ``:code
 
 Observe that web2py did a join, so the rows now contain two records, one from each table, linked together. Because the two records may have fields with conflicting names, you need to specify the table when extracting a field value from a row. This means that while before you could do:
@@ -1670,139 +1721,139 @@ Observe that web2py did a join, so the rows now contain two records, one from ea
 row.name
 ``:code
 
-and it was obvious whether this was the name of a person or a dog, in the result of a join you have to be more explicit and say:
+and it was obvious whether this was the name of a person or a thing, in the result of a join you have to be more explicit and say:
 ``
 row.person.name
 ``:code
 
 or:
 ``
-row.dog.name
+row.thing.name
 ``:code
 
 There is an alterantive syntax for INNER JOINS:
 ``
->>> rows = db(db.person).select(join=db.dog.on(db.person.id==db.dog.owner))
+>>> rows = db(db.person).select(join=db.thing.on(db.person.id==db.thing.owner))
 >>> for row in rows:
-    print row.person.name, 'has', row.dog.name
-Alex has Skipper
-Alex has Snoopy
-Bob has Puppy
+    print row.person.name, 'has', row.thing.name
+Alex has Boat
+Alex has Chair
+Bob has Shoes
 ``:code
 
 While the output is the same, the generated SQL in the two cases can be different. The latter syntax removes possible ambiguities when the same table is joined twice and aliased:
 
 ``
->>> db.define_table('dog',
+>>> db.define_table('thing',
         Field('name'),
         Field('owner1','reference person'),
         Field('owner2','reference person'))
 >>> rows = db(db.person).select(
-    join=[db.person.with_alias('owner1').on(db.person.id==db.dog.owner1).
-          db.person.with_alias('owner2').on(db.person.id==db.dog.owner2)])
+    join=[db.person.with_alias('owner1').on(db.person.id==db.thing.owner1).
+          db.person.with_alias('owner2').on(db.person.id==db.thing.owner2)])
 ``
 
 The value of ``join`` can be list of ``db.table.on(...)`` to join.
 
 #### Left outer join
 
-Notice that Carl did not appear in the list above because he has no dogs. If you intend to select on persons (whether they have dogs or not) and their dogs (if they have any), then you need to perform a LEFT OUTER JOIN. This is done using the argument "left" of the select command. Here is an example:
+Notice that Carl did not appear in the list above because he has no things. If you intend to select on persons (whether they have things or not) and their things (if they have any), then you need to perform a LEFT OUTER JOIN. This is done using the argument "left" of the select command. Here is an example:
 
 ``Rows``:inxx ``left outer join``:inxx ``outer join``:inxx
 ``
 >>> rows=db().select(
-        db.person.ALL, db.dog.ALL,
-        left=db.dog.on(db.person.id==db.dog.owner))
+        db.person.ALL, db.thing.ALL,
+        left=db.thing.on(db.person.id==db.thing.owner))
 >>> for row in rows:
-        print row.person.name, 'has', row.dog.name
-Alex has Skipper
-Alex has Snoopy
-Bob has Puppy
+        print row.person.name, 'has', row.thing.name
+Alex has Boat
+Alex has Chair
+Bob has Shoes
 Carl has None
 ``:code
 
 where:
 ``
-left = db.dog.on(...)
+left = db.thing.on(...)
 ``:code
 
-does the left join query. Here the argument of ``db.dog.on`` is the condition required for the join (the same used above for the inner join). In the case of a left join, it is necessary to be explicit about which fields to select.
+does the left join query. Here the argument of ``db.thing.on`` is the condition required for the join (the same used above for the inner join). In the case of a left join, it is necessary to be explicit about which fields to select.
 
 Multiple left joins can be combined by passing a list or tuple of ``db.mytable.on(...)`` to the  ``left`` attribute.
 
 #### Grouping and counting
 
-When doing joins, sometimes you want to group rows according to certain criteria and count them. For example, count the number of dogs owned by every person. web2py allows this as well. First, you need a count operator. Second, you want to join the person table with the dog table by owner. Third, you want to select all rows (person + dog), group them by person, and count them while grouping:
+When doing joins, sometimes you want to group rows according to certain criteria and count them. For example, count the number of things owned by every person. web2py allows this as well. First, you need a count operator. Second, you want to join the person table with the thing table by owner. Third, you want to select all rows (person + thing), group them by person, and count them while grouping:
 
 ``grouping``:inxx
 ``
 >>> count = db.person.id.count()
->>> for row in db(db.person.id==db.dog.owner).select(
+>>> for row in db(db.person.id==db.thing.owner).select(
         db.person.name, count, groupby=db.person.name):
         print row.person.name, row[count]
 Alex 2
 Bob 1
 ``:code
 
-Notice the count operator (which is built-in) is used as a field. The only issue here is in how to retrieve the information. Each row clearly contains a person and the count, but the count is not a field of a person nor is it a table. So where does it go? It goes into the storage object representing the record with a key equal to the query expression itself.
+Notice the count operator (which is built-in) is used as a field. The only issue here is in how to retrieve the information. Each row clearly contains a person and the count, but the count is not a field of a person nor is it a table. So where does it go? It goes into the storage object representing the record with a key equal to the query expression itself. The count method of the Field object has an optional ``distinct`` argument. When set to ``True`` it specifies that only distinct values of the field in question are to be counted.
 
 ### Many to many
 ``many-to-many``:inxx
-In the previous examples, we allowed a dog to have one owner but one person could have many dogs. What if Skipper was owned by Alex and Curt? This requires a many-to-many relation, and it is realized via an intermediate table that links a person to a dog via an ownership relation.
+In the previous examples, we allowed a thing to have one owner but one person could have many things. What if Boat was owned by Alex and Curt? This requires a many-to-many relation, and it is realized via an intermediate table that links a person to a thing via an ownership relation.
 
 Here is how to do it:
 ``
 >>> db.define_table('person',
                     Field('name'))
->>> db.define_table('dog',
+>>> db.define_table('thing',
                     Field('name'))
 >>> db.define_table('ownership',
                     Field('person', 'reference person'),
-                    Field('dog', 'reference dog'))
+                    Field('thing', 'reference thing'))
 ``:code
 
 the existing ownership relationship can now be rewritten as:
 ``
->>> db.ownership.insert(person=1, dog=1) # Alex owns Skipper
->>> db.ownership.insert(person=1, dog=2) # Alex owns Snoopy
->>> db.ownership.insert(person=2, dog=3) # Bob owns Puppy
+>>> db.ownership.insert(person=1, thing=1) # Alex owns Boat
+>>> db.ownership.insert(person=1, thing=2) # Alex owns Chair
+>>> db.ownership.insert(person=2, thing=3) # Bob owns Shoes
 
 ``:code
 
-Now you can add the new relation that Curt co-owns Skipper:
+Now you can add the new relation that Curt co-owns Boat:
 ``
->>> db.ownership.insert(person=3, dog=1) # Curt owns Skipper too
+>>> db.ownership.insert(person=3, thing=1) # Curt owns Boat too
 
 ``:code
 
 Because you now have a three-way relation between tables, it may be convenient to define a new set on which to perform operations:
 ``
->>> persons_and_dogs = db(
+>>> persons_and_things = db(
         (db.person.id==db.ownership.person) \
-        & (db.dog.id==db.ownership.dog))
+        & (db.thing.id==db.ownership.thing))
 ``:code
 
-Now it is easy to select all persons and their dogs from the new Set:
+Now it is easy to select all persons and their things from the new Set:
 ``
->>> for row in persons_and_dogs.select():
-        print row.person.name, row.dog.name
-Alex Skipper
-Alex Snoopy
-Bob Puppy
-Curt Skipper
+>>> for row in persons_and_things.select():
+        print row.person.name, row.thing.name
+Alex Boat
+Alex Chair
+Bob Shoes
+Curt Boat
 ``:code
 
-Similarly, you can search for all dogs owned by Alex:
+Similarly, you can search for all things owned by Alex:
 ``
->>> for row in persons_and_dogs(db.person.name=='Alex').select():
-        print row.dog.name
-Skipper
-Snoopy
+>>> for row in persons_and_things(db.person.name=='Alex').select():
+        print row.thing.name
+Boat
+Chair
 ``:code
 
-and all owners of Skipper:
+and all owners of Boat:
 ``
->>> for row in persons_and_dogs(db.dog.name=='Skipper').select():
+>>> for row in persons_and_things(db.thing.name=='Boat').select():
         print row.person.name
 Alex
 Curt
@@ -1917,8 +1968,9 @@ For the sake of the example, you can log events with the same event_time but wit
 3
 ``:code
 
-#### ``like``, ``startswith``, ``contains``, ``upper``, ``lower``
-``like``:inxx ``startswith``:inxx
+#### ``like``, ``regexp``, ``startswith``, ``contains``, ``upper``, ``lower``
+
+``like``:inxx ``startswith``:inxx ``regexp``:inxx
 ``contains``:inxx ``upper``:inxx ``lower``:inxx
 
 Fields have a like operator that you can use to match strings:
@@ -1930,6 +1982,13 @@ port scan
 ``:code
 
 Here "port%" indicates a string starting with "port". The percent sign character, "%", is a wild-card character that means "any sequence of characters".
+
+The like operator is case insisite but it can be made case sensitive with
+
+``
+db.mytable.myfield.like('value',case_sensitive=True)
+``:code
+
 
 web2py also provides some shortcuts:
 
@@ -1957,6 +2016,7 @@ or any value from the list
 db.mytable.myfield.contains(['value1','value2'], all=false)
 ``
 
+There is a also a ``regexp`` method that works like the ``like`` method but allows regular expression syntax for the look-up expression. It is only supported by PostgreSQL and SQLite.
 
 The ``upper`` and ``lower`` methods allow you to convert the value of the field to upper or lower case, and you can also combine them with the like operator:
 
@@ -2004,9 +2064,19 @@ xss injection
 unauthorized login
 ``:code
 
-#### ``sum``, ``min``, ``max`` and ``len``
+In those cases where a nested select is required and the loop-up field is a reference we can also use a query as argument. For example:
 
-``sum``:inxx ``min``:inxx ``max``:inxx
+``
+db.define_table('person',Field('name'))
+db.define_table('thing',Field('owner'),Field('owner','reference thing'))
+db(db.thing.owner.belongs(db.person.name=='Johnathan')).select()
+``:cite
+
+In this case it is obvious that the next select only needs the field referenced by the ``db.thing.owner` field so we do not need the more verbose ``_select`` notation.
+
+#### ``sum``, ``avg``, ``min``, ``max`` and ``len``
+
+``sum``:inxx ``avg``:inxx ``min``:inxx ``max``:inxx
 Previously, you have used the count operator to count records. Similarly, you can use the sum operator to add (sum) the values of a specific field from a group of records. As in the case of count, the result of a sum is retrieved via the store object:
 ``
 >>> sum = db.log.severity.sum()
@@ -2014,7 +2084,7 @@ Previously, you have used the count operator to count records. Similarly, you ca
 6
 ``:code
 
-You can also use ``min`` and ``max`` to the mininum and maximum value for the selected records
+You can also use ``avg``, ``min``, and ``max`` to the average, mininum, and maximum value respectively for the selected records. For example:
 
 ``
 >>> max = db.log.severity.max()
@@ -2033,10 +2103,10 @@ Expressions can be combined to form more complex expressions. For example here w
 
 #### Substrings
 
-One can build an expression to refer to a substring. For example, we can group dogs whose name starts with the same three characters and select only one from each group:
+One can build an expression to refer to a substring. For example, we can group things whose name starts with the same three characters and select only one from each group:
 
 ``
-db(db.dog).select(dictinct = db.dog.name[:3])
+db(db.thing).select(dictinct = db.thing.name[:3])
 ``:code
 
 
@@ -2117,12 +2187,12 @@ serialized in CSV:
 
 ``csv``:inxx
 ``
->>> rows = db(db.person.id==db.dog.owner).select()
+>>> rows = db(db.person.id==db.thing.owner).select()
 >>> print rows
-person.id,person.name,dog.id,dog.name,dog.owner
-1,Alex,1,Skipper,1
-1,Alex,2,Snoopy,1
-2,Bob,3,Puppy,2
+person.id,person.name,thing.id,thing.name,thing.owner
+1,Alex,1,Boat,1
+1,Alex,2,Chair,1
+2,Bob,3,Shoes,2
 ``:code
 
 You can serialize a single table in CSV and store it in a file "test.csv":
@@ -2179,14 +2249,14 @@ db = DAL('sqlite:memory:')
 db.define_table('person',
     Field('name'),
     format='%(name)s')
-db.define_table('dog',
+db.define_table('thing',
     Field('owner', 'reference person'),
     Field('name'),
     format='%(name)s')
 
 if not db(db.person).count():
     id = db.person.insert(name="Massimo")
-    db.dog.insert(owner=id, name="Snoopy")
+    db.thing.insert(owner=id, name="Chair")
 ``:code
 
 Each record is identified by an ID and referenced by that ID. If you
@@ -2211,19 +2281,19 @@ db.define_table('person',
     Field('name'),
     format='%(name)s')
 
-db.define_table('dog',
+db.define_table('thing',
     Field('uuid', length=64, default=lambda:str(uuid.uuid4())),
     Field('modified_on', 'datetime', default=now),
     Field('owner', length=64),
     Field('name'),
     format='%(name)s')
 
-db.dog.owner.requires = IS_IN_DB(db,'person.uuid','%(name)s')
+db.thing.owner.requires = IS_IN_DB(db,'person.uuid','%(name)s')
 
 if not db(db.person.id).count():
     id = uuid.uuid4()
     db.person.insert(name="Massimo", uuid=id)
-    db.dog.insert(owner=id, name="Snoopy")
+    db.thing.insert(owner=id, name="Chair")
 ``:code
 
 -------
@@ -2287,9 +2357,9 @@ DALRows objects also have an ``xml`` method (like helpers) that serializes it to
     <tr>
       <th>person.id</th>
       <th>person.name</th>
-      <th>dog.id</th>
-      <th>dog.name</th>
-      <th>dog.owner</th>
+      <th>thing.id</th>
+      <th>thing.name</th>
+      <th>thing.owner</th>
     </tr>
   </thead>
   <tbody>
@@ -2297,7 +2367,7 @@ DALRows objects also have an ``xml`` method (like helpers) that serializes it to
       <td>1</td>
       <td>Alex</td>
       <td>1</td>
-      <td>Skipper</td>
+      <td>Boat</td>
       <td>1</td>
     </tr>
     ...
