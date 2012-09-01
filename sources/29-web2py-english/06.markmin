@@ -228,6 +228,9 @@ Do not declare a field called "id", because one is created by web2py anyway. Eve
 ``named id field``:inxx
 Optionally you can define a field of ``type='id'`` and web2py will use this field as auto-increment id field. This is not recommended except when accessing legacy database tables. With some limitation, you can also use different primary keys and this is discussed in the section on "Legacy databases and keyed tables".
 
+----------
+Because usually in web2py models are executed before controllers, it is possible that some table are defined even if not needed. It is therefore necessary to speed up the code by making table definitions lazy. This is done by setting the ``DAL(...,lazy_tables=True)`` attributes. Tables will be actually created only when accessed.
+----------
 
 ### Record representation
 
@@ -928,7 +931,7 @@ Apparently similar to ``db.mytable[id]`` the above syntax is more flexible and s
 
 Consider the previous table person and a new table "dog" referencing a "person":
 ``
->>> db.define_table('dog', Field('name'), Field('owner',db.person))
+>>> db.define_table('dog', Field('name'), Field('owner','reference person'))
 ``:code
 
 and a simple select from this table:
@@ -1471,7 +1474,7 @@ Virtual fields can also access recursive fields as in
 >>> db.define_table('item',
         Field('unit_price','double'))
 >>> db.define_table('order_item',
-        Field('item',db.item),
+        Field('item','reference item'),
         Field('quantity','integer'))
 >>> class MyVirtualFields(object):
         def total_price(self):
@@ -1487,7 +1490,7 @@ They can also act on the result of a JOIN
 >>> db.define_table('item',
         Field('unit_price','double'))
 >>> db.define_table('order_item',
-        Field('item',db.item),
+        Field('item','reference item'),
         Field('quantity','integer'))
 >>> rows = db(db.order_item.item==db.item.id).select()
 >>> class MyVirtualFields(object):
@@ -1604,7 +1607,7 @@ To illustrate how to implement one to many relations with the web2py DAL, define
                     format='%(name)s')
 >>> db.define_table('dog',
                     Field('name'),
-                    Field('owner', db.person),
+                    Field('owner', 'reference person'),
                     format='%(name)s')
 ``:code
 
@@ -1692,8 +1695,8 @@ While the output is the same, the generated SQL in the two cases can be differen
 ``
 >>> db.define_table('dog',
         Field('name'),
-        Field('owner1',db.person),
-        Field('owner2',db.person))
+        Field('owner1','reference person'),
+        Field('owner2','reference person'))
 >>> rows = db(db.person).select(
     join=[db.person.with_alias('owner1').on(db.person.id==db.dog.owner1).
           db.person.with_alias('owner2').on(db.person.id==db.dog.owner2)])
@@ -1754,8 +1757,8 @@ Here is how to do it:
 >>> db.define_table('dog',
                     Field('name'))
 >>> db.define_table('ownership',
-                    Field('person', db.person),
-                    Field('dog', db.dog))
+                    Field('person', 'reference person'),
+                    Field('dog', 'reference dog'))
 ``:code
 
 the existing ownership relationship can now be rewritten as:
@@ -2177,7 +2180,7 @@ db.define_table('person',
     Field('name'),
     format='%(name)s')
 db.define_table('dog',
-    Field('owner', db.person),
+    Field('owner', 'reference person'),
     Field('name'),
     format='%(name)s')
 
@@ -2354,15 +2357,25 @@ The select method also takes a cache argument, which defaults to None. For cachi
 
 In the following example, you see a controller that caches a select on the previously defined db.log table. The actual select fetches data from the back-end database no more frequently than once every 60 seconds and stores the result in cache.ram. If the next call to this controller occurs in less than 60 seconds since the last database IO, it simply fetches the previous data from cache.ram.
 
-``cache select``:inxx
+``cache select``:inxx 
 ``
 def cache_db_select():
     logs = db().select(db.log.ALL, cache=(cache.ram, 60))
     return dict(logs=logs)
 ``:code
 
+``cacheable``:inxx
+
+The ``select`` method has an optional ``cacheable`` argument, normally set to ``False``. When a select is cached, ``cacheable`` is set to ``True``. This makes a simple ``Rows`` result which is serializable but The ``Row``s lack ``update_record`` and ``delete_record`` methods.
+
+If you do not need these methods you can speed up selects even if you do not plan to cache then by setting the cacheable attribute:
+
+``
+rows = db(query).select(cacheable=True)
+``:code
+
 -------
-The results of a ``select`` are complex, un-pickleable objects; they cannot be stored in a session and cannot be cached in any other way than the one explained here.
+The results of a ``select`` are normally complex, un-pickleable objects; they cannot be stored in a session and cannot be cached in any other way than the one explained here unless the ``cache`` attribute is set or ``cacheable=True``.
 -------
 
 ### Self-Reference and aliases
@@ -2373,8 +2386,8 @@ It is possible to define tables with fields that refer to themselves although th
 ``
 db.define_table('person',
     Field('name'),
-    Field('father_id', db.person),
-    Field('mother_id', db.person))
+    Field('father_id', 'reference person'),
+    Field('mother_id', 'reference person'))
 ``:code
 
 The solution consists of using an alternate notation
