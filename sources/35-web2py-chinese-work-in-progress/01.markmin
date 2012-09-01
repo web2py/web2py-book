@@ -1,0 +1,431 @@
+## 引言
+
+web2py``web2py``:cite  是一种免费的、开源的web开发框架，用于敏捷地开发安全的、数据库驱动的web应用；web2py采用Python``python``:cite  语言编写，并且可以使用Python编程。web2py是一个完整的堆栈框架，也就是说它包含了开发完整功能的web应用所需的所有组件。
+
+web2py被设计来指导web开发人员遵循良好的软件工程实践，如使用模型(Model)、视图(View)、控制器(Controller)(MVC)模式。web2py将数据表达（the model）从数据表示（the view）和应用逻辑及工作流（the controller）中分开。web2py提供的库可以帮助开发者分别设计、实施和测试MVC中的每一部分，并能使它们一起工作。
+
+web2py是为了安全而构建的。这意味着遵循成熟的方法，它能自动处理许多可能导致安全漏洞的问题。例如，web2py验证所有输入（防止注入攻击），转义所有输出（防止跨站点脚本攻击），重命名上传文件（防止目录遍历攻击）。在与安全有关的方面，web2py没有留给应用程序开发人员选择的余地。
+
+web2py中包含数据库抽象层(DAL)，它能够动态写入SQL``sql:w``:cite  ，因此开发人员不需要自己写。DAL知道如何透明地生成支持SQLite``sqlite``:cite ，MySQL``mysql``:cite ，PostgreSQL``postgres``:cite ，MSSQL``mssql``:cite ，FireBird``firebird``:cite , Oracle``oracle``:cite ，IBM DB2``db2``:cite ，Informix``informix``:cite 以及Ingres``ingresdb``:cite 的SQL语句。当在谷歌App Engine (GAE)[gae]上运行时，DAL也能生成函数调用Google Datastore。实验时，我们支持更多的数据库。请查看web2py网站和邮件列表，获取最新的支持。一旦有一个或多个数据库表被定义，web2py也能生成一个全功能的基于web的数据库管理接口来访问数据库和表。
+
+web2py与其它web框架的不同之处在于，它是唯一全面支持web2.0范例的框架，在这里web就是计算机。实际上，web2py不需要安装或配置，它能在任何支持Python的体系结构（Windows,，Windows CE，Mac OS X，iOS ，Unix/Linux）上运行，应用程序的开发、部署和维护可以通过本地或远程web接口完成。web2py支持CPython（C语言实现）或Jython（Java语言实现），虽然官方声称仅支持2.5版本，但实际支持的版本包括2.4，2.5，2.6，2.7，这保证了应用程序的后向兼容性。
+
+web2py提供了一个票据系统。如果出现错误，系统会发出一个票据给用户，并记录错误信息供管理员查看。
+
+web2py是开源的，在LGPL版本3许可证下发布。
+
+web2py的另一个特点是开发者承诺在未来版本中保持后向兼容性。从2007年10月web2py首次发布至今，我们一直都是这样做的。尽管web2py增加了新功能，修复了错误，然而如果一个程序在web2py1.0上能运行，那么它现在还能运行。
+
+下面给出一些web2py语句的例子来展示它的功能和简洁性。代码如下：
+``
+db.define_table('person', Field('name'), Field('image', 'upload'))
+``:code
+
+以上代码创建了一个“person”数据库表，该表包含两个字段，即”name”字符串和”image”， image是需要上传的图片（实际图片）。如果该表已经存在，但是与上述定义不匹配，则该表将会被妥善更改。
+
+给定上述定义表，代码如下：
+``
+form = crud.create(db.person)
+``:code
+
+创建了一个插入表单，该表允许用户上传图片。它还会验证提交的表单，以安全的方式重命名上传的图片，并将图片存储到文件中。同时，向数据库中插入相应记录，以防止重复提交。如果用户提交的数据未能通过验证，将通过添加错误信息来修改表单。
+
+代码如下：
+``
+@auth.requires_permission('read','person')
+def f(): ....
+``:code
+
+上述代码将阻止访问者进入函数f，除非访问者所在的组有权限读取”person”中的记录。如果访问者未登录，他将被定向到登陆页面（由web2py默认提供）。
+
+下面的代码将嵌入页面组件：
+``
+{{=LOAD('other_controller','function.load',ajax=True, ajax_trap=True)}}
+``:code
+
+上述代码指示web2py以视图形式加载其它控制函数生成的内容（适用于任何函数）。它通过Ajax加载内容，并将内容嵌入当前网页（使用当前布局而不是其它控制函数布局），这样就能捕获加载内容中的所有表单，这样不需要重新加载网页也能通过Ajax提交表单。它也能LOAD非web2py应用的内容。
+
+LOAD帮助对象允许应用程序的模块化设计；本书最后一章将对此进行论述。
+
+### 原则
+
+Python编程通常遵循以下基本原则：
+- 不重复自己（DRY）。
+- 仅有一种实现方式。
+- 明确比含蓄更好。
+
+在web2py中，通过强制开发者使用可靠成熟的软件工程实践，遏制代码重复，保证完全遵守前两条原则。web2py能指导开发者完成几乎所有web应用开发中的常见任务（创建和处理表单，管理会话，小甜饼“cookie”，错误等等）。
+
+``request``:inxx
+
+web2py对第3个原则的处理与其它框架有所不同，有时与前两个原则相冲突。尤其是web2py不会导入用户应用，而是在预定义的情况下执行。这会暴露Python和web2py关键字。
+
+对某些人来说，这看起来就像魔术，但它不是这样的。简单地说，在实践中有些模块已经自动导入了，而不需要开发者导入。web2py试图避免其它框架下存在的令人讨厌的特征，即开发者需要在每个模型和控制器的顶部导入相同的模块。
+
+web2py通过导入自有模块节约了时间，避免了错误，这遵循了不重复自己和仅有一种实现方式的精髓。
+
+如果开发者想使用其它Python模块或第三方模块，这些模块必须明确导入，就像开发任何其它Python程序一样。
+
+### Web框架
+``PHP``:inxx ``ASP``:inxx ``JSP``:inxx
+
+在其最基本的层面上，web应用包含了一组程序（或者函数），当用户访问相应的URL时，该程序将被执行。同时，程序的输出返回给用户，并呈现在浏览器中。
+
+web框架是为了让开发者更快、更简便、无差错的开发新应用。它通过提供API和开发工具，以减少代码编写量。
+
+开发web应用的两个经典方法是：
+- 通过编程生成HTML``html:w,html:o``:cite  代码。
+- 将代码嵌入HTML页面中。
+
+早期的CGI脚本遵循第一种模型。下列脚本遵循第二种模型，例如PHP[php]（代码用PHP编写，类似C语言）、ASP（代码用Visual Basic编写）以及JSP（代码用Java编写）脚本。
+
+这里举一个PHP程序的例子，执行时，从数据库中获得数据，并返回一个显示选中记录的HTML页面。
+``
+<html><body><h1>Records</h1><?
+  mysql_connect(localhost,username,password);
+  @mysql_select_db(database) or die( "Unable to select database");
+  $query="SELECT * FROM contacts";
+  $result=mysql_query($query);
+  mysql_close();
+  $i=0;
+  while ($i < mysql_numrows($result)) {
+    $name=mysql_result($result,$i,"name");
+    $phone=mysql_result($result,$i,"phone");
+    echo "<b>$name</b><br>Phone:$phone<br /><br /><hr /><br />";
+    $i++;
+  }
+?></body></html>
+``:code
+
+这种方法的问题在于，程序代码嵌入到HTML中，但是这个程序在生成额外的HTML的同时，还要生成SQL语句查询数据库，应用的不同层次交织在一起，代码变得难以阅读和难以维护。对于Ajax应用程序，情况就更糟了，随着应用页数（文件）的增加，复杂性也增加。
+
+上述例子的功能，在web2py中可用两行Python代码来表达：
+``
+def index():
+    return HTML(BODY(H1('Records'), db().select(db.contacts.ALL)))
+``:code
+
+在这个简单的例子中，页面结构由HTML，BODY和H1对象程序化表示；通过select语句查询数据库db；最后，所有结果都被序列化成HTML代码。注意db不是关键字，而是一个用户定义的变量。为了避免混淆，我们将始终使用db这一术语来指代数据库连接。
+
+web框架通常分为两种类型：一种是“胶水”框架，通过组合（粘合）几个第三方组件来构造。另一种是“全功能栈”框架，通过创建特别设计的紧密整合和协作工作的组件来构造。
+
+web2py是一个全堆栈框架。几乎所有组件都是从头构建的，并被设计成协同工作，但是这些组件在web2py框架之外同样能发挥功能。例如，数据库抽象层(DAL)或模板语言都能独立于web2py框架使用，只要将gluon.dal或gluon.template导入你的Python应用即可。gluon是包含系统库的web2py模块的名称。一些web2py库依赖web2py的其它部分，例如，建立和处理来自数据库表格的表单。web2py也能够同第三方Python库配合使用，包括其它模板语言和DAL，但它们之间的结合没有原配组件那么紧密。
+
+### 模型-视图-控制器（Model-View-Controller）
+``Model-View-Controller``:inxx
+
+web2py鼓励开发人员将数据表达（Model）、数据表示（View）和应用工作流（Controller）分离。让我们再考虑前面的例子，看看如何围绕该例建立一个web2py应用。下面是一个web2py MVC编辑界面的例子。
+
+[[image @///image/en0.png center 480px]]
+
+web2py中一个请求的典型工作流描述如下：
+
+[[image @///image/en100.png center 480px]]
+
+在图中：
+- 服务器可以是web2py内置服务器或第三方服务器，例如Apache。服务器可以处理多线程。
+- "main"是主要的WSGI应用。它负责处理所有常见任务和封装用户应用。它处理cookies、sessions、transactions、URL地址解析及反向地址解析和分发。如果web服务器没有处理的话，它能服务和流静态文件。
+- Model、View、Controller组件构成了用户应用。
+- 同一个web2py实例可以承载多个应用。
+- 虚线箭头表示与数据库引擎的通信。数据库查询可以使用SQL语言（不推荐）或使用web2py DAL语言（推荐），这样web2py应用代码不依赖于特定数据库引擎。
+- 分发器将请求的URL映射成控制器中的函数调用。函数的输出可以是字符串或符号字典（哈希表）。字典中的数据将被呈现成视图。如果用户请求HTML页面（默认情况），字典将被呈现成HTML页面。如果用户以XML请求同一页面，web2py将会尝试找到一个能将字典呈现成XML格式的视图。开发人员可以创建视图将页面呈现成任何已经支持的协议(HTML、XML、JSON、RSS、CSV、RTF)或者另外的自定义协议。
+- 所有的调用都被封装到一个事务(transaction)之中，并且任何未捕获到的异常都将导致事务回滚。如果请求成功，事务将被提交。
+- web2py还能自动处理sessions和session cookies，并且当事务被提交的时候，相应的session也被保存，除非有另有指明。
+- 还能注册经常性的任务（通过cron）以定时和/或在特定的任务完成(action)之后执行。用这种方式将可能在后台运行耗时长的、计算量大的任务，而不影响用户浏览。
+
+这里给出一个最小的、完整的MVC应用，它由3个文件组成：
+
+-----
+"db.py"是模型：
+-----
+
+``
+db = DAL('sqlite://storage.sqlite')
+db.define_table('contact',
+   Field('name'),
+   Field('phone'))
+``:code
+
+它连接数据库（在本例中是指存储在storage.sqlite文件中的一个SQLite数据库），并定义了一个名为contact的表。如果该表不存在，web2py将在后台透明的创建它，并生成适用于特定数据库引擎的SQL语句。开发人员可以看到生成的SQL，如果用MySQL、PostgreSQL、MSSQL、FireBird、Oracle、DB2、Informix、Interbase、Ingres或谷歌App Engine（SQl和NoSQL）数据库代替默认数据库SQLite，就不需要修改数据库后台的代码。
+
+当表格被定义并创建好之后，web2py还会生成一个功能完整的基于web的数据库管理界面，该界面称作appadmin，通过它访问数据库和表。
+
+-----
+"default.py"是控制器：
+-----
+
+``
+def contacts():
+    grid=SQLFORM.grid(db.contact, user_signature=False)
+    return locals()
+``:code
+
+在web2py中，URL被映射成Python模块和函数调用。在本例中，控制器仅包含一个名为contacts的函数（或“action”）。Action可能返回字符串（返回的网页）或Python字典（一组对应的键和值）或一组局部变量（如同本例）。如果函数返回字典，它将被传送给视图，该视图与控制器/函数同名，并返回一个网页。在本例中，函数contacts 生成一个表db.contact的选择（select）/搜索（search）/创建（create）/更新（update）/删除（delete）网格，并将该网格返回给视图。
+
+-----
+"default/contacts.html"是视图。
+-----
+
+``
+{{extend 'layout.html'}}
+<h1>Manage My Contacts</h1>
+{{=grid}}
+``:code
+
+在相应的控制器函数（action）被执行后，web2py会自动调用视图。该视图的作用是将返回字典中的变量呈现成HTML。视图文件是用HTML语言编写的，并用分隔符{{and}}分隔嵌入的Python代码。这完全不同于PHP代码，因为嵌入到HTML中的码是“表示层”码。"layout.html"文件由web2py提供，并在视图文件的开始被引用，该文件构成了所有web2py应用的基本布局。该布局文件可以很容易地被修改或替换。
+
+### 为什么选择web2py
+
+web2py是众多web应用框架中的一种，但是它有引人注目的、独特的功能。web2py最初被开发成一种教学工具，最初的开发动机如下：
+- 在不牺牲功能的前提下，方便用户学习服务器端web开发。为此，web2py被设计成无需安装、无需配置，无依赖性（除了源代码的发行版要求Python2.5和它的标准库模块外），绝大部分功能可以通过Web接口访问。
+- web2py从刚推出起一直到今天都保持稳定，因为它遵循自上而下的设计原则，即在它被编写以前所有编程接口（API）都已经被设计好。甚至加入了新功能，它的后向兼容性也不会被破坏。即便将来增加了新功能，也能实现兼容。
+- web2py前瞻性地解决许多重要的安全问题，这些问题困扰着许多现代Web应用，将在下面开放Web软件安全工程[owasp]中介绍。
+- web2py是轻量级的。其核心库，包括数据库抽象层、模板语言和所有帮助对象加在一起只有1.4MB。整个源代码包括示例应用和图像在内，也只有10.4MB。
+- web2py占用资源少，运行速度快。它使用由Timothy Farrell开发的Rocket``rocket``:cite  WSGI服务器。它与采用mod_wsgi的Apache一样快。我们的测试表明，在一台普通的PC上，不访问数据库的动态网页平均响应时间大约10ms。DAL开销小，通常小于3％。
+- web2py在模块、控制器和视图中采用Python句法，但并不导入模块和控制器（其余Python框架采用导入方式），而是去执行它们。这意味着不必重启web服务器即可进行应用的安装、卸载和修改，不同的应用可以共存而不会导致模块的互相干扰。
+- web2py使用数据库抽象层取代对象关系映射(ORM)。从概念角度来说，这意味着不同的数据库表被映射成不同的Table类实例，而不是不同的类，同时记录被映射成Row类的实例，而不是相应的Table类的实例。从实用的角度来看，这意味着SQL句法与DAL句法几乎一一对应，DAL在引擎盖下没有复杂的元类（metaclass）编程，这与流行的ORM不同，复杂的编程将增加延迟。
+
+WSGI ``wsgi:w,wsgi:o``:cite （Web服务器网关接口）是一种新兴的Web服务器和Python应用之间通信的Python标准。
+
+下面是web2py主要管理（admin）界面的截图：
+
+[[image @///image/en200.png center 480px]]
+
+
+### 安全性
+``security``:inxx
+
+开放Web应用安全工程``owasp``:cite  （OWASP的）是一个自由和开放的全球社区，专注于改善应用软件的安全性。
+
+OWASP列出了web应用安全方面的十大问题。在这里给出该列表，并陈述web2py是如何解决这些问题的：
+- “跨站点脚本攻击(XSS)：当应用获取用户提交的数据并返回web浏览器时，如果不首先进行验证或编码，XSS漏洞就可能出现。XSS允许攻击者在受害者浏览器中执行脚本，从而劫持用户会话，毁损网站，还可能引入蠕虫。”在默认情况下，web2py将会转意呈现在视图中的所有变量，防止跨站点脚本攻击。 
+- “注入攻击（Injection Flaws）：注入攻击在Web应用中非常普遍，特别是SQL注入。当用户提交的数据被作为命令或查询的一部分发送到解释器时，注入攻击就可能发生。攻击者的恶意数据欺骗解释器执行异常的命令或更改数据。” web2py通过采用数据库抽象层使得SQL注入攻击不可能发生。通常情况下，SQL语句并不是由开发人员编写的，而是由DAL动态生成的，从而确保所有插入的数据都被适当地转意。
+- “执行恶意文件”（Malicious File Execution）：脆弱的远程文件包含的代码（RFI）可能被攻击者加入恶意代码和数据，造成毁灭性的攻击，例如服务器瘫痪。” web2py只允许运行对外暴露的函数，从而防止恶意文件的执行。导入的函数绝不会被暴露；暴露的仅有行为（action）。web2py采用了基于WEB的管理接口，使得非常容易跟踪暴露的行为。
+- “不安全的直接对象引用：（Insecure Direct Object Reference）：当开发者把内部引用对象，例如文件、目录、数据库记录或密钥，作为URL地址或表单的参数时，不安全的直接对象引用攻击就可能发生。攻击者能够操控这些引用，在未经授权的情况下访问其它对象。” web2py没有暴露任何内部对象；此外，web2py还会验证所有的URL，从而防止目录遍历攻击。web2py还提供了一个使用简单的机制，以创建自动验证所有输入的表单。
+- “跨站点请求伪造（Cross Site Request Forgery）：CSRF攻击迫使一个已经登录的受害者的浏览器，向脆弱的网络应用发送一个预先验证的请求，该请求又迫使受害者的浏览器执行有利于攻击者的敌意行为。web应用有多强大，CSRF就有多强大。” web2py通过在表单中加入一次性随机令牌，防止CSRF攻击和偶然的表单重复提交。另外web2py对会话cookie使用了UUID。
+- “信息泄露和错误处理不当（Information Leakage and Improper Error Handling）：应用可能无意中泄露它们的配置、内部运作的信息，或者在各种应用中侵犯隐私。攻击者可以通过该缺陷窃取获得敏感数据或发起更严重的攻击。” web2py中包含一个票据系统。任何错误都不会导致代码暴露给用户。所有的错误都被记录，框架会发送一个票据给用户，用来进行错误追踪。只有系统管理员才能访问错误和源代码。
+- “验证和会话管理中断（Broken Authentication and Session Management）：用户账户信息和会话令牌常常没有被妥善加以保护。攻击者通过获取用户密码、密钥或者验证令牌冒用其它用户的身份。” web2py提供了内置的管理员验证机制，它能为每一个应用独立地管理会话。当客户端不是"localhost"时，管理接口也能够强制使用安全的会话cookie。对于应用来说，web2py框架提供了功能强大的基于角色的接入控制API。
+- “不安全加密存储（Insecure Cryptographic Storage）：Web应用程序很少使用合理的加密算法保护数据和凭证。攻击者利用加密不足的数据进行身份盗用和其它犯罪，例如信用卡诈骗。” web2py使用MD5或HMAC+SHA-512哈希算法来保护用户存储的密码。当然，也可以采用其它算法。
+- “不安全通信（Insecure Communications）：当需要保护敏感通信时，应用常常不能加密网络数据流。” web2py包含支持SSL[ssl]的Rocket WSGI 服务器，它也能使用Apache或Lighttpd和mod─ssl进行通信SSL加密。
+- “未能限制URL访问”（Failure to Restrict URL Access）：应用经常仅仅通过不显示敏感的链接或URL来阻止未授权用户，以保护敏感功能。攻击者正是利用这一漏洞，通过直接接入这些URL来进行未授权的操作。” web2py将URL请求映射到Python模块和函数。web2py包含了一套验证机制，可以定义那些函数是公有的，那些是需要经过验证和授权才能访问的。基于角色的接入控制API允许开发者采用登录、会员群或接入许可群来限制访问函数。权限是可以细化的，例如，通过结合CRUD能够让用户接入指定的表和/或记录。基于登录或组群权限来限制用户的访问。例如，，权限的设置甚至能够细化到哪些用户能够访问哪些表和记录。web2py还支持数字签名的URL，并且提供了API对ajax回调进行数字签名。
+
+对web2py的安全性评论，你可以在参考文献 ``pythonsecurity``:cite中找到评论性结果。
+
+### 框架内容
+
+你可以通过官方网站下载web2py：
+
+``
+http://www.web2py.com
+``:code
+
+web2py由如下组件构成：
+- 库(libraries)：提供web2py核心功能，可通过编程访问。
+- web服务器：Rocket WSGI web服务器。
+- 管理(admin)应用：用于创建、设计和管理其它web2py应用。admin提供了一个完整的基于web的集成开发环境（IDE），用于开发web2py应用。它还包括其它功能，如基于web的测试和shell。
+- 示例(examples)应用：包含文档和交互示例。应用示例是官方网站web2py.com的副本，并包含epydoc文档。
+- 欢迎(welcome)应用：是其它应用的基本构建模板。默认时，它包含一个纯CSS层叠菜单和用户认证（在第九章讨论）。
+
+web2py以源代码或二进制形式发行，适用于微软windows或Mac OS X操作系统。
+
+源代码发行版可以在任何支持Python的平台上运行，并且包含了上述所有组件。为了运行源代码，你需要预先安装Python 2.5。同时，还需要安装一种支持的数据库引擎。为了测试和轻量级需求的应用，你可以使用内置于Python 2.5中的SQLite数据库。
+
+web2py的二进制版本（适用于Windows和Mac OS X）包含Python2.5解释器和SQLite数据库。从技术上讲，这两个部分并不是web2py的组件。将它们包含在二进制发行版中，是为了使您能够直接运行web2py。
+
+下图描绘了web2py的整体结构：
+
+[[image @///image/en300.png center 480px]]
+
+### 授权
+``license``:inxx
+
+web2py在LGPL版本3许可证下授权。关于该许可证的全部内容，请参阅参考文献``lgpl3``:cite。
+
+依照LGPL许可，用户可以：
+
+- 将web2py与您的应用一起重新发行（包括官方web2py二进制版本）
+- 在您希望的任何许可证下，发布你开发的使用官方web2py库文件的应用
+
+与此同时，您必须遵守：
+
+- 在文档中明确表示，您的应用使用了web2py
+- 依照LGPLv3许可证，发布对web2py库的任何修改
+
+LGPLv3许可证包含以下声明：
+
+在适用法律允许的范围内，本程序没有担保。除另有书面注明外，版权持有人和/或其它方按现状提供程序，没有任何形式的明示或暗示的担保，包括但不仅限于针对特定用途的适销性和适用性暗示担保。程序的质量和性能的全部风险由你承担。如果程序证明有缺陷，你承担所有必要的维修、修理或更正的费用。
+
+除非适用法律要求或书面同意，按照上述允许修改和/或传达程序的任何版权持有人或任何其它方都不承担损害赔偿责任，包括因为使用或没有能力使用程序而产生的任何一般的、特殊的、偶然或必然损害（包括但不仅限于数据丢失、数据呈现不准确、由您或第三方遭受的损失或程序未能与任何其它程序协作），即使持有人或其它方已被告知此类损害的可能性。
+
+**早期版本**
+
+web2py的早期版本1.0.*-1.90.*在GPL2许可下发布，商业授权例外，为了实用目的，它非常类似于当前的LGPLv3。
+
+**第三方软件**
+
+在gluon/contrib/文件夹、各种JavaScript和 CSS文件中，web2py包含第三方软件。在文件中声明的原许可证下，这些文件与web2py一起发布。
+
+### 致谢
+
+web2py最初由Massimo Di Pierro开发并拥有版权。 2007年10月发行第一个版本（1.0）。此后，web2py被许多用户使用，其中一些用户也贡献了相关的错误报告、测试、调试、补丁和本书的校对。
+
+按照名字的字母顺序，一些主要贡献者如下：
+
+Alexey Nezhdanov,
+Alvaro Justen,
+Andrew Willimott,
+Angelo Compagnucci,
+Anthony Bastardi,
+Antonio Ramos,
+Arun K. Rajeevan,
+Attila Csipa,
+Bill Ferret,
+Boris Manojlovic,
+Branko Vukelic,
+Brian Meredyk,
+Bruno Rocha,
+Carlos Galindo,
+Carsten Haese,
+Chris Clark,
+Chris Steel,
+Christian Foster Howes,
+Christopher Smiga,
+CJ Lazell,
+Cliff Kachinske,
+Craig Younkins,
+Daniel Lin,
+David Harrison,
+David Wagner,
+Denes Lengyel,
+Douglas Soares de Andrade,
+Eric Vicenti,
+Falko Krause,
+Farsheed Ashouri,
+Fran Boon,
+Francisco Gama,
+Fred Yanowski,
+Gilson Filho,
+Graham Dumpleton,
+Gyuris Szabolcs,
+Hamdy Abdel-Badeea,
+Hans Donner,
+Hans Murx,
+Hans C. v. Stockhausen,
+Ian Reinhart Geiser,
+Ismael Serratos,
+Jan Beilicke,
+Jonathan Benn,
+Jonathan Lundell,
+Josh Goldfoot,
+Jose Jachuf,
+Josh Jaques,
+José Vicente de Sousa,
+Keith Yang,
+Kenji Hosoda,
+Kyle Smith,
+Limodou,
+Lucas D'Ávila,
+Marcel Leuthi,
+Marcel Hellkamp,
+Marcello Della Longa,
+Mariano Reingart,
+Mark Larsen,
+Mark Moore,
+Markus Gritsch,
+Martin Hufsky,
+Martin Mulone,
+Mateusz Banach,
+Miguel Lopez,
+Michael Willis,
+Michele Comitini,
+Nathan Freeze,
+Niall Sweeny,
+Niccolo Polo,
+Nicolas Bruxer,
+Olaf Ferger,
+Omi Chiba,
+Ondrej Such,
+Ovidio Marinho Falcao Neto,
+Pai,
+Paolo Caruccio,
+Patrick Breitenbach,
+Phyo Arkar Lwin,
+Pierre Thibault,
+Ramjee Ganti,
+Robin Bhattacharyya,
+Ross Peoples,
+Ruijun Luo,
+Ryan Seto,
+Scott Roberts,
+Sergey Podlesnyi,
+Sharriff Aina,
+Simone Bizzotto,
+Sriram Durbha,
+Sterling Hankins,
+Stuart Rackham,
+Telman Yusupov,
+Thadeus Burgess,
+Tim Michelsen,
+Timothy Farrell,
+Yair Eshel,
+Yarko Tymciurak,
+Younghyun Jo,
+Vidul Nikolaev Petrov,
+Vinicius Assef,
+Zahariash.
+
+若有遗漏，我表示抱歉。
+
+我特别感谢Jonathan, Mariano, Bruno, Martin, Nathan, Simone, Thadeus, Tim, Iceberg, Denes, Hans, Christian, Fran 和 Patrick对web2py作出的重大贡献。感谢Anthony, Alvaro, Bruno, Denes, Felipe, Graham, Jonathan, Hans, Kyle, Mark, Michele, Richard, Robin, Roman, Scott, Shane, Sharriff, Sriram, Sterling, Stuart, Thadeus对本书所做的校对。他们的贡献是无价的。如果你在本书中发现任何错误，责任完全归咎于我。错误可能是由于是编辑匆忙造成的。我还要感谢Wiley Custom Learning Solutions的Ryan Steffen 帮助我出版了这本书的第一版。
+
+web2py中包含以下作者的代码，在此我也表示感谢：
+
+Guido van Rossum for Python``python``:cite, Peter Hunt, Richard Gordon, Timothy Farrell for the Rocket``rocket``:cite  web server, Christopher Dolivet for EditArea``editarea``:cite, Bob Ippolito for simplejson``simplejson``:cite, Simon Cusack and Grant Edwards for pyRTF``pyrtf``:cite, Dalke Scientific Software for pyRSS2Gen``pyrss2gen``:cite, Mark Pilgrim for feedparser``feedparser``:cite, Trent Mick for markdown2``markdown2``:cite, Allan Saddi for fcgi.py, Evan Martin for the Python memcache module``memcache``:cite, John Resig for jQuery``jquery``:cite.
+
+本书封面由Young Designers的Peter Kirchner设计。
+
+感谢Helmut Epp（DePaul University教务长）、David Miller（the College of Computing and Digital Media of DePaul University院长）和Estia Eichten（MetaCryption LLC会员）对我的一直的信赖和支持。
+
+最后，我想感谢我的妻子Claudia和儿子Marco，他们体谅我花了许多时间来开发web2py、与用户和合作者交换电子邮件及撰写本书。这本书是献给他们的。
+
+### 关于本书
+
+除引言外，本书还包含以下章节：
+- 第2章简要介绍了Python。假定读者具有编程的基本知识和面向对象编程的基本概念，例如循环、条件转移、函数调用和类。本章主要包括Python的基本句法和本书所用的Python模块的例子。如果您已经熟悉Python语言，可以跳过该章。
+- 第3章展示如何启动web2py，介绍了管理界面，引导读者熟悉了以下复杂性不断增加的例子：返回字符串应用、计数器应用、图片日志、完善的wiki应用，该应用允许上传图片、用户评论，提供验证、授权、web服务和RSS订阅。阅读本章时，你可能需要参考第2章有关Python句法和后面章节中所用函数的详细介绍。
+- 第4章系统化介绍web2py的核心结构和库文件： URL映射、请求、响应、会话、缓存、cron、全局化和一般工作流程。
+- 第5章介绍用于创建视图的模板语言。展示了如何向HTML中嵌入Python代码，演示了帮助对象的使用方法（能生成HTML的对象）。
+- 第6章介绍数据库抽象层或DAL。通过一系列的例子介绍了DAL句法。
+- 第7章介绍表单、表单验证和表单处理。FORM是低层次的用于创建表单的帮助对象。SQLFORM是高层次的用于创建表单的帮助对象。本章还讨论了创建/读取/更新/删除(CRUD)API。
+- 第8章介绍了与发送邮件和SMS有关的信息。
+- 第9章介绍web2py中的用户验证、用户授权和扩展的基于角色的访问控制机制。还介绍了用于用户验证的mail设置和CAPTCHA。在本书第3版中，我们增加了有关与第三方验证机制集成的内容，如OpenID、OAuth、Google、Facebook、LinkedIn等。
+- 第10章涉及web2py创建web服务的内容。我们提供了一些有关集成的例子，例如通过Pyjamas和Google Web Toolkit集成，通过PyAMF和Adobe Flash集成。
+- 第11章涉及web2py和jQuery使用的方法。web2py主要用于服务器端编程，但它包含jQuery，因为我们发现jQuery是最好的开源JavaScript库，能用于效果和Ajax。本章介绍如何有效地使用jQuery 和web2py。
+- 第12章介绍web2py组件和插件以及构建模块化应用的方法。我们给出了一个使用插件实现许多常用功能的例子，例如图表、注释、标注和wiki。 
+- 第13章涉及web2py应用的生产部署。我们主要陈述3种可能的生产场景：在一个Linux web服务器或一组服务器（我们考虑的主要替代部署），在微软的Windows环境下运行，在Google 应用引擎上部署。在本章中，我们还讨论了安全性和扩展性问题。
+- 第14章介绍了一些用于解决特定问题的方法，包括升级、地理编码、分页、Twitter API等等。
+
+本书只介绍web2py的基础功能及web2py附带的API。本书不对web2py appliances（即现成的应用）作介绍。
+
+您可以从相应的网站 ``appliances``:cite.下载web2py 应用范例。
+
+您可以在AlterEgo``alterego``:cite上找到讨论的其它主题，进行交互式web2py常见问题解答。
+
+本书的写作采用了markmin ``MARKMIN``:inxx 句法，它能自动转换成HTML、LaTeX 和PDF文档。
+
+### 样式的元素
+
+在使用Python编程时，PEP8``style``:cite  包含优良的样式实践。你会发现web2py并不总是遵循这些规范。这不是因为遗漏或疏忽；我们认为web2py的用户应该遵循这些规则，并且我们鼓励这样做。在定义web2py帮助对象时，我们选择不遵循PEP8的某些规则，以尽量减少用户自定义对象与帮助对象发生命名冲突的概率。
+
+例如，表示<div>的类被称为DIV，然而根据Python样式参考，它应该被称为Div。我们相信，对于这个具体的例子，使用全大写的"DIV"是一个更自然的选择。此外，如果程序员愿意的话，这种方法让他们自由选择创建一个称为“Div”的类。我们的句法能自然地映射成大多数浏览器（包括，例如，火狐）使用的DOM标记。
+
+根据Python的样式指南，常量的命名应使用全大写字符串，但变量的命名不能这么做。继续我们的例子，即使考虑到DIV是一个类，它也是一个用户不应该修改的特殊类，因为修改它会破坏其它的web2py应用。因此，我们认为DIV类应该被当做常量对待，进一步证明了我们选择的记号是合理的。
+
+总之，下列习惯应该被遵守：
+- HTML帮助对象和验证都采用大写（例如DIV, A, FORM, URL），这么做的理由前面已经讨论过了。
+- 转换对象T采用大写，尽管事实上它只是类的一个实例而不是一个类。从逻辑上说，转换(translator)对象执行的动作类似于HTML帮助对象，它会影响演示文稿的呈现。此外，在代码中需要对T方便的定位，它必须有一个简短的名称。
+- DAL类遵循的Python样式指南（首字母大写），例如Table、Field、Query、Row、Rows等等。
+
+对于所有其它情况，我们相信已尽可能多的遵循了Python样式指南（PEP8）。例如，所有的实例对象都是小写（request, response, session, cache），所有的内部类都是大写。
+
+在本书的所有例子中，web2py关键字都以粗体显示，字符串和注释都以斜体显示。

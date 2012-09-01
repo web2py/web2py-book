@@ -1,0 +1,993 @@
+
+## Componenti e plugin
+``component``:inxx
+``plugin``:inxx
+
+I componenti ed i plugin sono funzionalità relativamente nuove di web2py e c'è ancora disaccordo tra gli sviluppatori su cosa siano e cosa dovrebbero essere. La maggior parte della confusione è generata dall'uso che si fa di questi termini in altri progetti software e dal fatto che gli sviluppatori stiano ancora lavorando per definirne le specifiche. 
+
+Queste comunque sono funzionalità importanti di web2py ed è quindi necessario fornire una definizione che sebbene non definitiva sia consistente con gli schemi di programmazione discussi in questo capitolo e che affrontano le seguenti due problematiche:
+- Come costruire applicazioni modulari che riducano il carico del server e massimizzino il riutilizzo del codice.
+- Come distribuire parti di codice in un modo il più possibile immediato (''plugin''-and-play).
+
+I ''componenti'' affrontano il primo problema; i ''plugin'' affrontano il secondo.
+
+### Componenti
+``load``:inxx
+``LOAD``:inxx
+``Ajax``:inxx
+
+------
+Un **componente** è una parte funzionalmente autonoma di una pagina web.
+------
+
+Un componente può essere composto di moduli, controller e viste. Un componente non ha nessun prerequisito particolare, se non quello di poter essere inserito in un singolo tag di una pagina web (per esempio un DIV, uno SPAN o un IFRAME) dove esegue il suo compito indipendentemente dal resto della pagina. I componenti sono caricati nella pagina e comunicano con il controller tramite Ajax.
+
+Un esempio di componente è un "componente per i commenti" che è contenuto in un DIV e mostra i commenti degli utenti insieme ad un form per l'invio di un nuovo commento. Quando il form è compilato viene inviato al server tramite una chiamata Ajax, la lista viene aggiornata e il commento è memorizzato dal server nel database. Alla fine il contenuto del DIV è aggiornato senza ricaricare il resto della pagina.
+La funzione LOAD di web2py rende questo compito estremamente semplice da eseguire senza nessuna conoscenza della programmazione Javascript o Ajax.
+
+L'obiettivo è quello di riuscire a sviluppare un'applicazione web assemblando i componenti nelle pagine.
+
+Con una semplice applicazione "test" che estende l'applicazione di default con il seguente modello "models/db_comments.py":
+``
+db.define_table('comment',
+   Field('body','text',label='Your comment'),
+   Field('posted_on','datetime',default=request.now),
+   Field('posted_by',db.auth_user,default=auth.user_id))
+db.comment.posted_on.writable=db.comment.posted_on.readable=False 
+db.comment.posted_by.writable=db.comment.posted_by.readable=False 
+``:code
+
+e con un'azione nel "controllers/comments.py" definita come:
+``
+@auth.requires_login()
+def post():
+    return dict(form=crud.create(db.comment),
+                comments=db(db.comment.id>0).select())
+``:code
+
+e con la corrispondente vista in "views/comments/post.html":
+``
+{{extend 'layout.html'}}
+{{for comment in comments:}}
+<div class="comment">
+  on {{=comment.posted_on}} {{=comment.first_name}} 
+  says <span class="comment_body">{{=comment.body}}</span>
+</div>
+{{pass}}
+{{=form}}
+``:code
+
+si può accedere all'azione all'indirizzo:
+``
+http://127.0.0.1:8000/test/comments/post
+``:code
+
+[image]
+
+Per ora non c'è nulla di speciale in questa azione ma è possibile trasformarla in un componente semplicemente definendo una nuova vista con estensione ".load" che non estende il layout. Ecco il contenuto di "views/comments/post.load":
+``
+{{#extend 'layout.html' <- notice this is commented out!}}
+{{for comment in comments:}}
+<div class="comment">
+  on {{=comment.posted_on}} {{=comment.first_name}} 
+  says <span class="comment_body">{{=comment.body}}</span>
+</div>
+{{pass}}
+{{=form}}
+``:code
+
+E' possibile accedere a questa vista con l'URL:
+``
+http://127.0.0.1:8000/test/comments/post.load
+``:code
+
+e sarà visualizzata come:
+
+[image]
+
+Questo è un componente che può essere inserito in ogni altra pagina semplicemente con:
+``
+{{=LOAD('comments','post.load',ajax=True)}}
+``:code
+
+Per esempio si può aggiungere nel controller "controllers/default.py": 
+``
+def index():
+    return dict()
+``:code
+
+e nella vista corrispondente si può aggiungere il componente:
+``
+{{extend 'layout.html'}}
+<h1>{{='bla '*100}}</h1>
+{{=LOAD('comments','post.load',ajax=True)}}
+``:code
+
+Accedendo alla pagina
+``
+http://127.0.0.1:8000/test/default/index
+``:code
+
+sarà mostrato il contenuto normale e il componente dei commenti:
+
+[add image]
+
+Il componente ``{{=LOAD( ... )}}`` è visualizzato tramite il seguente HTML:
+``
+<script type="text/javascript"><!--
+web2py_component("/test/comment/post.load","c282718984176")
+//--></script><div id="c282718984176">loading...</div>
+``:code
+
+(il codice effettivamente generato dipende dalle opzioni passate alla funzione LOAD). La funzione ``web2py_component(url,id)`` è definita in "views/web2py_ajax.html" ed esegue tutte le operazioni necessarie: chiama la ``url`` tramite Ajax e inserisce la risposta nel DIV con l'``id`` corrispondente; intercetta ogni invio del form nel DIV e lo invia tramite Ajax. Il target Ajax è sempre lo stesso DIV.
+
+La sintassi completa dell'helper LOAD è il seguente:
+``
+LOAD(c=None, f='index', args=[], vars={},
+     extension=None, target=None,
+     ajax=False, ajax_trap=False,
+     url=None):
+``:code
+
+Dove:
+- i primi due argomenti ``c`` e ``f`` sono il controller e la funzione che si vuole chiamare. 
+- ``args`` e ``vars`` sono gli argomenti che si vuol passare alla funzione. Il primo è una lista, il secondo è un dizionario.
+- ``extension`` è una estensione opzionale. Notare che l'estensione può anche essere passata come parte della funzione (come, per esempio ``f='index.load'``).
+- ``target`` è l'``id`` del DIV. Se non è specificato verrà generato un ``id`` casuale.
+- ``ajax`` deve essere impostato a ``True`` se il DIV deve essere riempito tramite una chiamata Ajax e deve essere impostato a ``False`` se il DIV deve essere riempito prima che la pagina sia ritornata (evitando così la chiamata Ajax).
+- ``ajax_trap=True`` significa che ogni invio del form nel DIV deve essere catturato ed inviato tramite Ajax e che la risposta deve essere inserita nel DIV. ``ajax_trap=False`` significa che il form deve essere inviato normalmente, ricaricando l'intera pagina. ``ajax_trap`` è ignorato e considerato ``True`` nel caso che ``ajax=True``.
+- ``url``, se specificato, ignora i valori di ``c``, ``f``, ``args``, ``vars`` ed ``extension`` e carica il componente alla ``url`` indicata. Questo parametro è utilizzato per caricare un componente da un'altra applicazione (non necessariamente creata con web2py).
+Se non è specificata nessuna vista ``.load`` viene utilizzata la vista ``generic.load`` che visualizza senza layout il dizionario ritornato dall'azione. Questa vista generica funziona meglio se il dizionario contiene un singolo elemento.
+
+Se si carica un componente con estensione ``.load`` e la relativa azione reindirizza ad un'altra azione (per esempio per il login), l'estensione ``.load`` viene propagata alla nuova URL (quella a cui si viene reindirizzati) che viene caricata con l'estensione ``.load``.
+
+Quando un'azione di un componente è chiamata tramite Ajax web2py passa due header HTTP aggiuntivi con la richiesta:
+``
+web2py-component-location
+web2py-component-element
+``:code
+
+che possono essere acceduti nell'azione tramite le variabili:
+``
+request.env.http_web2py_component_location
+request.env.http_web2py_component_element
+``:code
+Il primo contiene la URL della pagina che ha chiamato l'azione del componente.
+Il secondo contiene l'``id`` del DIV che conterrà la risposta.
+
+L'azione del componente può anche memorizzare informazioni in due header speciali che saranno interpretati dalla pagina completa durante la risposta:
+``
+web2py-component-flash
+web2py-component-command
+``:code
+
+e possono essere acceduti tramite:
+``
+response.headers['web2py-component-flash']='....'
+response.headers['web2py-component-command']='...'
+``:code
+
+Il primo contiene del test che deve apparire nel messaggio alla risposta.
+Il secondo contiene codice Javascript che si vuole far eseguire alla risposta. Non può contenere il carattere di ritorno a capo.
+
+Come esempio ecco un componente per la richiesta di un form di contatti. L'azione in "controllers/contact/ask.py" consente all'utente di porre una domanda che il componente invierà all'amministratore tramite email. Infine visualizza il messaggio "thank you" e rimuove il componente dalla pagina:
+``
+def ask():
+    form=SQLFORM.factory(
+        Field('your_email',requires=IS_EMAIL()),
+        Field('question',requires=IS_NOT_EMPTY()))
+    if form.accepts(request.vars,session):
+        if mail.send(to='admin@example.com',
+                  subject='from %s' % form.vars.your_email,
+                  message = form.vars.question):
+            div_id = request.env.http_web2py_component_element
+            command="jQuery('#%s').hide()" % div_id
+            response.headers['web2py-component-command']=command
+            response.headers['web2py-component-flash']='thanks you'
+        else:
+            form.errors.your_email="Unable to send the email"
+    return dict(form=form)
+``:code
+
+Le prime quattro linee definiscono il form e lo validano. L'oggetto ``mail`` utilizzato per inviare la domanda è definito nell'applicazione di default. Le ultime quattro linee implementano tutta la logica specifica del componente leggendo i dati dagli header della richiesta HTTP ed impostando gli header HTTP nella risposta.
+
+Ora è possibile inserire questo form in qualsiasi pagina con:
+``
+{{=LOAD('contact','ask.load',ajax=True)}}
+``:code
+
+Notare che non è stata definita nessuna vista ``.load`` per il componente ``ask``. Questo non è necessario perchè il componente ritorna un solo oggetto (form) e per questo è sufficiente la vista "generic.load".
+
+Quando è usata la vista "generic.load" si può utilizzare la sintassi:
+
+``
+response.flash='...'
+``:code
+
+che è equivalente a:
+``
+response.headers['web2py-component-flash']='...'
+``:code
+
+### Plugin
+
+-------
+Un **plugin** è un sotto-insieme di qualsiasi file di un'applicazione.
+-------
+
+e si intende realmente "qualsiasi":
+
+- Un ''plugin'' non è un modulo, non è un modello, non è un controller e nemmeno una vista, ma può contenere moduli, modelli, controllers e viste. 
+- Un ''plugin'' non deve essere funzionalmente autonomo e può dipendere da altri plugin o codice specifico.
+- Un ''plugin'' non è un  ''sistema di plugin'' pertanto i plugin non sono nè "registrati" nè "isolati" sebbene esistano delle regole per mantenere un certo isolamento.
+- In questo capitolo si parla di plugin per l'applicazione non plugin per [[web2py http://web2py]].
+
+Perchè questa funzionalità è chiamata ''plugin''? Perchè rende disponibile un meccanismo per includere un sotto-insieme di un'applicazione in un'altra applicazione. Da questa prospettiva qualsiasi file di un'applicazione può essere considerato un plugin.
+
+Quando un'applicazione viene distribuita i suoi plugin sono "impacchettati" e distribuiti con essa.
+
+In pratica l'applicazione **admin** fornisce un'interfaccia per impacchettare e spacchettare i plugin separatamente dall'applicazione. I file e le cartelle dell'applicazione che hanno nomi che iniziano con ``plugin_``''name'' possono essere impacchettati insieme in un file chiamato:
+
+``web2py.plugin.``''name''``.w2p``
+
+e distribuiti insieme.
+
+[ADD IMAGE]
+
+I file che compongono un plugin non sono trattati da web2py in modo differente da ogni altro file tranne per il fatto che **admin** comprende (dai loro nomi) che devono essere distribuiti insieme e li visualizza in una pagina separata:
+
+[ADD IMAGE]
+
+Per la definizione di plugin data all'inizio di questo capitolo i plugin hanno un utilizzo più ampio oltre al fatto di essere riconosciuti dall'applicazione **admin**.
+
+In pratica in web2py si possono utilizzare due tipi di plugin:
+- ''plugin di componenti''. Sono plugin che contengono componenti, come definiti nella sezione precedente. Un plugin di componenti può contenerne uno o più di uno. Per esempio potrebbe esistere un ``plugin_comments`` che contiene il componente ''comments'' della sezione precedente. Un altro esempio potrebbe essere ``plugin_tagging`` che contiene un componente ''tagging'' ed un componente ''tag-cloud'' che condividono alcune tabelle di database definite dal plugin stesso.
+- ''plugin di layout''. Sono plugin che contengono le viste per un layout e i file statici necessari al layout stesso. Quando il plugin è applicato all'applicazione le dà un look differente.
+
+In base alle definizioni precedenti i componenti creati nella precedente sezione, come per esempio "controllers/contact.py", sono già considerati plugin. Possono essere spostati da un'applicazione ad un'altra per utilizzare i componenti che definiscono. Non sono però riconosciuti come plugin dall'applicazione **admin** perchè non c'è nulla che li etichetta come plugin. Ci sono quindi ancora due problemi da risolvere:
+
+- Utilizzare una convenzione per i nomi dei file che compongono il plugin in modo che l'applicazione **admin** possa riconoscerli come appartenenti allo stesso plugin.
+- Se il plugin ha file di modello stabilire una convenzione per impedire agli oggetti che sono definiti nel modello di mischiarsi nello stesso ''namespace'' dell'applicazione.
+
+Queste sono le regole che dovrebbe seguire un plugin chiamato ''name'':
+
+**Regola 1**:
+I plugin di tipo modello e di tipo controller dovrebbero essere chiamati rispettivamente:
+
+- ``models/plugin_``''name''``.py``
+- ``controllers/plugin_``''name''``.py``
+
+e quelli di tipo vista, modulo, statici e file privati dovrebbero essere chiamati:
+
+- ``views/plugin_``''name''``/``
+- ``modules/plugin_``''name''``/``
+- ``static/plugin_``''name''``/``
+- ``private/plugin_``''name''``/``
+
+**Regola 2**:
+I plugin di tipo modello possono definire solamente oggetti i cui nomi iniziano con:
+- ``plugin_``''name''
+- ``Plugin``''Name''
+- ``_``
+
+**Regola 3**:
+I plugin di tipo modello possono definire solamente variabili i cui nomi iniziano con:
+- ``session.plugin_``''name''
+- ``session.Plugin``''Name''
+
+**Regola 4**:
+I plugin dovrebbero includere la licenza e la documentazione che dovrebbero essere presenti in:
+- ``static/plugin_``''name''``/license.html``
+- ``static/plugin_``''name''``/about.html``
+
+**Regola 5**:
+Un plugin può fare affidamento solo sull'esistenza degli oggetti globali definiti nell'applicazione di base, come per esempio:
+- una connessione al database chiamata ``db``
+- una istanza di ``Auth`` chiamata ``auth``
+- una istanza di ``Crud`` chiamata ``crud``
+- una istanza di ``Service`` chiamata ``service``
+
+Alcuni plugin possono essere più complessi ed avere parametri di configurazione per il caso in cui esista più di una istanza di ``db``.
+
+**Regola 6**:
+Se un plugin necessita di parametri di configurazione questo dovrebbero essere aggiunti tramite **PluginManager**, come descritto in seguito.
+``PluginManager``:inxx
+
+Seguendo le regole sopra indicate si può essere sicuri che:
+- **admin** riconosce tutti i file e le cartelle ``plugin_``''name'' come facenti parte di una singola entità.
+- I plugin non interferiscono l'uno con l'altro.
+
+Queste regole non risolvono però il problema delle diverse versioni del plugin e delle sue dipendenze.
+
+#### Plugin di componenti
+``component plugin``:inxx
+
+I plugin di componenti sono plugin che definiscono dei componenti. I componenti solitamente accedono al database con i loro modelli.
+
+Ecco come trasformare il precedente componente ``comments`` in un plugin ``comments_plugin`` mantenendo lo stesso identico codice scritto precedentemente ma seguento tutte le regole dei plugin illustrate in precedenza.
+
+Creare, per prima cosa, un modello chiamato "models/plugin_comments.py":
+``
+db.define_table('plugin_comments_comment',
+   Field('body','text',label='Your comment'),
+   Field('posted_on','datetime',default=request.now),
+   Field('posted_by',db.auth_user,default=auth.user_id))
+db.plugin_comments_comment.posted_on.writable=False
+db.plugin_comments_comment.posted_on.readable=False 
+db.plugin_comments_comment.posted_by.writable=False
+db.plugin_comments_comment.posted_by.readable=False 
+
+def plugin_comments():
+    return LOAD('plugin_comments','post',ajax=True)
+``:code
+
+(le ultime due linee di codice definiscono una funzione che semplifica l'inserimento del plugin in un'applicazione).
+
+Definre quindi un controller "controllers/plugin_comments.py"
+``
+@auth.requires_login()
+def post():
+    comments = db.plugin_comments_comment
+    return dict(form=crud.create(comment),
+                comments=db(comment.id>0).select())
+``:code
+
+Creare, come terza cosa, una vista chiamata "views/plugin_comments/post.load":
+``
+{{for comment in comments:}}
+<div class="comment">
+  on {{=comment.posted_on}} {{=comment.first_name}} 
+  says <span class="comment_body">{{=comment.body}}</span>
+</div>
+{{pass}}
+{{=form}}
+``:code
+
+E' ora possibile utilizzare **admin** per prepare il plugin per la distribuzione. Il plugin sarà salvato da admin come:
+``
+web2py.plugin.comments.w2p
+``:code
+
+Il plugin può essere ora usato in qualsiasi vista semplicmente installandolo in **admin** tramite la pagina **edit** ed aggiungendolo ad una vista con:
+``
+{{=plugin_comments()}}
+``:code
+
+Ovviamente è possibile rendere il plugin più complesso con componenti che richiedono parametri e opzioni di configurazione. Più i plugin sono complessi più si deve far attenzione ad evitare collisioni di nomi. **Plugin Manager** è progettato per evitare questi problemi.
+
+#### Plugin Manager
+
+La classe ``PluginManager`` è definita in ``gluon.tools``. Prima di spiegare come funziona ecco come si utilizza.
+
+E' possibile migliorare il precedente plugin ``comments_plugin`` con la possibilità di aggiungere la personalizzazione di:
+``
+db.plugin_comments_comment.body.label
+``:code
+
+senza doverne modificare il codice.
+
+Prima di tutto, riscrivere il plugin "models/plugin_comments.py" nel seguente modo:
+``
+db.define_table('plugin_comments_comment',
+   Field('body','text',label=plugin_comments.comments.body_label),
+   Field('posted_on','datetime',default=request.now),
+   Field('posted_by',db.auth_user,default=auth.user_id))
+
+def plugin_comments()
+    from gluon.tools import PluginManager
+    plugins = PluginManager('comments',body_label='Your comment')
+
+    comment = db.plugin_comments_comment
+    comment.label=plugins.comments.body_label
+    comment.posted_on.writable=False
+    comment.posted_on.readable=False 
+    comment.posted_by.writable=False
+    comment.posted_by.readable=False 
+    return LOAD('plugin_comments','post',ajax=True)
+``:code
+
+Tutto il codice (tranne la definizione della tabella) è incapsulato in una singola funzione che crea un'istanza di ``PluginManager``.
+
+E' ora possibile configurare in ogni modello dell'applicazione (per esempio in "models/db.py") il plugin nel seguente modo:
+``
+from gluon.tools import PluginManager
+plugins = PluginManager()
+plugins.comments.body_label=T('Post a comment')
+``:code
+
+-----
+L'oggetto ``plugins`` è istanziato nell'applicazione di base in "models/db.py"
+-----
+
+L'oggetto PluginManager è un oggetto ''singleton'' di tipo Storage che contiene altri oggetti di tipo Storage con il blocco a livello del thread. Questo significa che si può istanziare tante volte quante è necessario all'interno di una applicazione, anche con nomi diversi, ma agisce come se fosse un'unica istanza di PluginManager.
+
+In particolare ogni file di plugin può definire il suo oggetto PluginManager e registrarlo, insieme ai suoi parametri di default, con:
+``
+plugins = PluginManager('name', param1='value', param2='value')
+``:code
+
+E' possibile modificare i parametri in altre parti del codice (per esempio in "models/db.py") con:
+``
+plugins = PluginManager()
+plugins.name.param1 = 'other value'
+``:code
+
+E' possibile inoltre configurare plugin diversi nello stesso codice:
+``
+plugins = PluginManager()
+plugins.name.param1 = '...'
+plugins.name.param2 = '...'
+plugins.name1.param3 = '...'
+plugins.name2.param4 = '...'
+plugins.name3.param5 = '...'
+``:code
+
+-----
+Quando il plugin è definito l'oggetto PluginManager deve avere due argomenti: il nome del plugin e degli argomenti opzionali con nome che sono i suoi parametri di default. Invece quando i plugin sono configurati il costruttore di PluginManager non deve avere argomenti. La configurazione deve precedere la definizione del plugin (per esempio deve essere in un modello che abbia un nome che alfabeticamente sia prima degli altri modelli).
+-----
+
+#### Plugin di layout
+``layout plugin``:inxx
+
+I plugin di layout sono più semplici dei plugin di componenti perchè solitamente non contengono codice ma solamente viste e file statici. Ci sono comunque delle regole da seguire:
+Primo, creare una cartella chiamata "static/plugin_layout_''name''/" (dove ''name'' è il nome del layout) e posizionare in essa tutti i file statici del plugin. 
+
+Secondo, creare un file di layout chiamato "views/plugin_layout_''name''/layout.html" che contiene il layout e i link alle immagini, ai file CSS e ai file JS in "static/plugin_layout_''name''/"
+
+Terzo, modificare la vista "views/layout.html" aggiungendo:
+``
+{{include 'plugin_layout_name/layout.html'}}
+``:code
+
+Il beneficio di questo design è che gli utenti di questo plugin possono installre più layout e scegliere quello da applicare all'applicazione semplicemente modificando il file "views/layout.html". Inoltre "views/layout.html" non verrà incluso da **admin** insieme al plugin in modo da non rischiare che un altro plugin sovrascriva il codice scritto dall'utente.
+
+### plugin_wiki
+``plugin_wiki``:inxx ``wiki``:inxx
+
+-----
+AVVISO: plugin_wiki è ancora in una fase iniziale di sviluppo e pertanto non ne è garantita la retro-compatibilità allo stesso livello delle funzioni centrali di web2py.
+-----
+
+**plugin_wiki** è un plugin "con gli steroidi". Infatti definisce diversi componenti e può cambiare il modo di sviluppare le applicazioni:
+
+E' possibile scaricarlo da:
+``
+http://web2py.com/examples/static/web2py.plugin.wiki.w2p
+``:code
+
+L'idea alla base di **plugin_wiki** è che la maggior parte delle applicazioni includono pagine semi-statiche. Si tratta di pagine che non includono una logica complessa e che contengono testo strutturato (come per esempio una pagina di help), immagini, audio, video, form CRUD o un insieme di componenti standard (commenti, tag, grafici, mappe, ecc.). Queste pagine possono essere pubbliche oppure richiedere un login o avere altre limitazione di autorizzazione. Possono essere raggiunte tramite un menu o da un modulo di autocomposizione. **plugin_wiki** mette a disposizione un modo semplice per aggiungere  ad una applicazione web2py pagine che rientrano in questa categoria.
+
+In particolare **plugin_wiki** mette a disposizione:
+``widget in plugin_wiki``:inxx
+
+- Un'interfaccia di tipo wiki che consente di aggiungere pagine alla propria applicazione e referenziarle con uno ''slug''. Queste pagine, chiamate pagine wiki, hanno una versione e sono memorizzate in un database.
+- Pagine pubbliche e pagine private (che richiedono l'autenticazione). Se una pagina richiede l'autenticazione può anche richiedere una particolare autorizzazione per un utente.
+- Tre livelli: 1, 2, 3. Al livello 1 le pagine possono includere solamente testo, immagini, audio e video. Al livello 2 le pagine possono anche includere dei widget (questi sono componenti, definiti nella sezione precedente che possono essere inclusi nelle pagine wiki). Al livello 3 le pagine possono anche includere codice di template di web2py.
+- La possibilità di modificare le pagine con la sintassi ''markmin'' o con tag HTML utilizzando un editor WYSIWYG (What you see is what you get).
+- Una raccolta di widget: implementati come componenti sono auto-documentati e possono essere inseriti nelle normali viste di web2py come componenti, o possono esser inclusi in una pagina wiki utilizzando una sintassi semplificata.
+- Un gruppo di pagine speciali (``meta-code``, ``meta-menu``, ecc.) che possono essere utilizzate per personalizzare il plugin (per esempio per definire codice che il plugin dovrebbe eseguire, per personalizzare il menu, ecc.).
+
+------
+L'applicazione **welcome** insieme al plugin **plugin_wiki** possono essere considerati come un ambiente di sviluppo utile per costruire semplici applicazioni web come, per esempio, un blog.
+------
+
+Nel resto del capitolo si presuppone che il plugin **plugin_wiki** sia stato applicato ad una copia dell'applicazione di base **welcome**.
+
+La prima cosa che si nota dopo aver installato il plugin è che è disponibile un nuovo menu chiamato ''pages''. 
+
+[ADD IMAGE]
+
+Cliccando sul menu ''pages'' si accede alle azioni del plugin:
+
+``
+http://127.0.0.1:8000/myapp/plugin_wiki/index
+``:code
+
+La pagina ''index'' del plugin elenca le pagine create con il plugin stesso e consente di creare nuove pagine scegliento uno ''slug''. Provare a creare una pagina ``home``. Si verrà rediretti a:
+``
+http://127.0.0.1:8000/myapp/plugin_wiki/page/home
+``:code
+
+Cliccare su ''create page'' per modificare il contenuto della pagina.
+
+[ADD IMAGE]
+
+-----
+Per default il plugin è a livello 3, che significa che è possibile inserire widget e codice nelle pagine. Per default è utilizzata la sintassi ''markmin'' per descrivere il contenuto della pagina.
+-----
+
+#### Sintassi di Markmin
+``markmin syntax``:inxx
+
+Ecco un tutorial per la sintassi markmin:
+
+------
+**markmin** | **html**
+``# titolo`` | ``<h1>titolo</h1>``
+``## sottotitolo`` | ``<h2>sottotitolo</h2>``
+``### sotto-sottotitolo`` | ``<h3>sotto-sottotitolo</h3>``
+``**grassetto**`` | ``<b>grassetto</b>``
+``''corsivo''`` | ``<i>corsivo</i>``
+``http://...com`` | ``<a href="http://...com">http:...com</a>``
+``[[name http://example.com]]`` | ``<a href="http://example.com">name</a>``
+``[[name http://...png left 200px]]`` | ``<img src="http://...png" alt="name"``
+`` `` | ``    align="left" width="200px" />``
+------
+
+E' possibile aggiungere collegamenti ad altre pagine
+``
+[[mylink name page:slug]]
+``:code
+
+Se la pagina non esiste verrà chiesto se la si vuole creare:
+
+[ADD IMAGE]
+
+La pagina di edit consente di aggiungere allegati alla pagina (per esempio file statici)
+
+[ADD IMAGE]
+
+che possono essere collegati con:
+``
+[[mylink name attachment:3.png]]
+``:code
+
+o inseriti direttamente nella pagina con:
+``
+[[myimage attachment:3.png center 200px]]
+``:code
+
+La dimensione (``200px``) è opzionale. ``center`` non è opzionale ma può essere sostituito con ``left`` or ``right``.
+
+SI può inserire testo quotato con:
+``
+-----
+this is blockquoted
+-----
+``:code
+
+è anche possibile inserire tabelle con:
+``
+-----
+0 | 0 | X
+0 | X | 0
+X | 0 | 0
+-----
+``:code
+
+e testo letterale con:
+``
+!`!!`!
+verbatim text
+!`!!`!
+``:code
+
+E' anche possibile aggiungere ``:class`` all'ultima stringa ``-----`` o ``!`!!`!``. Per il testo quotato e per le tabelle ``:class`` verrà trasformato nella classe del tag, per esempio:
+``
+-----
+test
+-----:abc
+``:code
+
+viene visualizzato come:
+``
+<blockquote class="abc">test</blockquote>
+``:code
+
+Per il testo letterale la classe può essere utilizzata per includere contenuto di tipo differente.
+
+E' possibile, per esempio, includere codice con la sintassi evidenziata specificando il linguaggio con ``:code_``''language''
+``
+!`!!`!
+def index(): return 'hello world'
+!`!!`!:code_python
+``:code
+
+E' anche possibile incorporare dei widget:
+``
+!`!!`!
+name: widget_name
+attribute1: value1
+attribute2: value2
+!`!!`!:widget
+``:code
+
+(vedere la prossima sezione per la lista dei widget)
+
+E' anche possibile incorporare codice nel linguaggio di template di web2py:
+``
+!`!!`!
+{{for i in range(10):}}<h1>{{=i}}</h1>{{pass}}
+!`!!`!:template
+``:code
+
+#### Permessi di pagina
+
+Quando si modifica una pagina sono presenti i seguenti campi:
+- **active** (default a ``True``). Se una pagina non è attiva non sarà accessibile agli utenti (anche se è una pagina pubblica).
+- **public** (default a ``True``). Se una pagina è definita come pubblica potrà essere acceduta dagli utenti senza la necessità di autenticarsi.
+- **Role** (default a ``None``). Se una pagina ha un ruolo potrà essere acceduta solamente dagli utenti che si sono autenticati e che sono membri del gruppo con il ruolo corrispondente.
+
+#### Pagine speciali
+``menu and plugin_wiki``:inxx
+
+**meta-menu** contiene il menu. Se questa pagina non esiste web2py utilizza l'oggetto ``response.menu`` definito in "models/menu.py". Il contenuto della pagina **meta-menu** sovrascrive l'oggetto menu. La sintassi è la seguente:
+``
+Item 1 Name http://link1.com
+   Submenu Item 11 Name http://link11.com
+   Submenu Item 12 Name http://link12.com
+   Submenu Item 13 Name http://link13.com
+Item 2 Name http://link1.com
+   Submenu Item 21 Name http://link21.com
+      Submenu Item 211 Name http://link211.com
+      Submenu Item 212 Name http://link212.com
+   Submenu Item 22 Name http://link22.com
+   Submenu Item 23 Name http://link23.com
+``:code 
+
+dove l'indentazione determina la struttura del sotto-menu. Ogni riga è composta del testo del menu seguito da un link. Un link può essere ``page:``''slug''. Un link può essere ``None`` se quel menu non punta a nessuna pagina. Gli spazi in più sono ignorati.
+
+Ecco un altro esempio:
+``
+Home             page:home
+Search Engines   None
+   Yahoo         http://yahoo.com
+   Google        http://google.com
+   Bing          http://bing.com
+Help             page:help
+``:code
+
+Che viene visualizzato come:
+
+[ADD IMAGE]
+
+``meta-menu``:inxx ``meta-code``inxx ``meta-header``:inxx ``meta-sidebar``:inxx ``meta-footer``:inxx
+**meta-code** è un'altra pagina speciale e deve contenere codice web2py. Questa pagina può essere considerata come un'estensione del modello in quanto in essa è possibile aggiungere codice di modello. E' eseguita insieme a "models/plugin_wiki.py". In **meta-code** è possibile definire delle tabelle. Si può, per esempio, creare una semplice tabella ``friends`` inserendo il seguente codice in **meta-code**:
+``
+db.define_table('friend',Field('name',requires=IS_NOT_EMPTY()))
+``:code
+
+e si può creare una pagina di gestione della tabella ''friend'' inserendo in una qualsiasi pagina il seguente codice:
+``jqGrid``:inxx ``CRUD``:inxx
+
+``
+## List of friends
+!`!!`!
+name: jqgrid
+table: friend
+!`!!`!:widget
+
+## New friend
+!`!!`!
+name: create
+table: friend
+!`!!`!:widget
+
+``:code
+
+Questa pagina ha due intestazioni (che iniziano con #): "List of friends" e "New friend". Contiene inoltre due widget (nelle rispettive intestazioni): un widget ``jqgrid`` che elenca tutti i record e un widget ``CRUD`` per aggiungere un nuovo record.
+
+[ADD IMAGE]
+
+``meta-header``, ``meta-footer``, ``meta-sidebar`` non sono utilizzate nel layout di default "welcome/views/layout.html". Se si vogliono utilizzare si deve modificare la pagina "layout.html" tramite **admin** (o da linea di comando) ed inserire i seguenti tag nella posizione appropriata:
+``
+{{=plugin_wiki.embed_page('meta-header') or ''}}
+{{=plugin_wiki.embed_page('meta-sidebar') or ''}}
+{{=plugin_wiki.embed_page('meta-footer') or ''}}
+``:code
+
+In questo modo il contenuto di quelle pagine sarà mostrato nell'intestazione, nella barra laterale e nel piè di pagina del layout.
+
+#### Configurare plugin_wiki
+
+Come con qualsiasi altro plugin è possibile inserire il codice seguente in "models/db.py":
+``
+from gluon.tools import PluginManager
+plugins = PluginManager
+plugins.wiki.editor = auth.user.email==mail.settings.sender
+plugins.wiki.level = 3
+plugins.wiki.mode = 'markmin' or 'html'
+plugins.wiki.theme = 'ui-darkness'
+``
+
+dove:
+- **editor** è True se l'utente collegato è autorizzato a modificare le pagine del plugin
+- **level** è il permesso: 1 - per modificare pagine standard, 2 - per includere widget, 3 - per inserire codice
+- **mode** determina se utilizzare l'editor "markmin" oppure l'editory "html" WYSIWYG.``WYSIWYG``:inxx
+- **theme** è il nome del tema UI di jQuery richiesto. Per default è installato solo il tema senza colori "ui-darkness".
+
+E' possibile aggiungere temi in:
+``
+static/plugin_wiki/ui/%(theme)s/jquery-ui-1.8.1.custom.css
+``:code
+
+#### Widget
+
+Ciascun widget può essere incorporato sia nelle pagine di plugin che nei normali template di web2py.
+
+Per esempio il seguente codice server ad incorporare un video di YouTube in una pagina di plugin:
+``
+!`!!`!
+name: youtube
+code: l7AWnfFRc7g
+!`!!`!:widget
+``
+
+o per incorporare lo stesso widget in una vista web2py si può utilizzare il seguente codice:
+``
+{{=plugin_wiki.widget('youtube',code='l7AWnfFRc7g')}}
+``:code
+
+Gli argomenti del widget che non hanno un valore di default sono obbligatori.
+
+Ecco la lista dei widget attualmente disponibili:
+``
+read(table,record_id=None)
+``:code
+
+Legge e visualizza un record
+- ``table`` è il nome della tabella
+- ``record_id`` è il numero del record
+
+``
+create(table,message='',next='',readonly_fields='',
+       hidden_fields='',default_fields='')
+``:code
+
+Visualizza un form di creazione di un record
+- ``table`` è il nome della tabella
+- ``message`` è il messaggio da visualizzare dopo la creazione del record
+- ``next`` è dove reindirizzare dopo la creazione, per esempio a "page/index/[id]"
+- ``readonly_fields`` è una lista di campi in sola lettura, separati dalla virgola
+- ``hidden_fields`` è una lista di campi nascosti, separati dalla virgola
+- ``default_fields`` è una lista dei campi con i valori di default ("fieldname=value")
+
+``
+update(table,record_id='',message='',next='',
+       readonly_fields='',hidden_fields='',default_fields='')
+``:code
+
+Visualizza un form di aggiornamento di un record
+- ``table`` è il nome della tabella
+- ``record_id`` è il record da aggiornare oppure {{=request.args(-1)}}
+- ``message`` è il messaggio da visualizzare dopo l'aggiornamento del record
+- ``next`` è dove reindirizzare dopo l'aggiornamento, per esempio a "page/index/[id]"
+- ``readonly_fields`` è una lista di campi in sola lettura, separati dalla virgola
+- ``hidden_fields`` è una lista di campi nascosti, separati dalla virgola
+- ``default_fields`` è una lista dei campi con i valori di default ("fieldname=value")
+
+``
+select(table,query_field='',query_value='',fields='')
+``:code
+
+Elenca i record nella tabella
+- ``table`` è il nome della tabella
+- ``query_field`` e ``query_value`` se presenti filtreranno la tabella con query_field==query_value 
+- ``fields`` è una lista dei campi da visualizzare, separati dalla virgola
+
+``
+search(table,fields='')
+``:code
+
+E' un widget per selezionare i record
+- ``table`` è il nome della tabella
+- ``fields`` è una lista dei campi da visualizzare, separati dalla virgola
+
+``jqGrid``:inxx
+
+``
+jqgrid(table,fieldname=None,fieldvalue=None,col_widths='',
+       _id=None,fields='',col_width=80,width=700,height=300)
+``:code
+
+Incorpora un plugin di tipo jqGrid 
+- ``table`` è il nome della tabella
+- ``fieldname``, ``fieldvalue`` sono campi di filtro opzionali (dove fieldname==fieldvalue)
+- ``_id`` è l'id del DIV che contiene l'oggetto jqGrid
+- ``columns`` è la lista dei nomi delle colonne da visualizzare
+- ``col_width`` è la larghezza di ciascuna colonna (default) 
+- ``height`` è l'altezza dell'oggetto jqGrid
+- ``width`` è la larghezza dell'oggetto jqGrid
+
+``latex``:inxx
+
+``
+latex(expression)
+``:code
+
+Usa le API dei grafici di Google per incorporare un oggetto LaTeX 
+
+``pie chart``:inxx
+
+``
+pie_chart(data='1,2,3',names='a,b,c',width=300,height=150,align='center')
+``:code
+
+Incorpora un grafico a torta 
+- ``data`` è una lista di valori, separati da virgola 
+- ``names`` è una lista di etichette, separate da virgola (una per ogni elemento)
+- ``width`` è la larghezza dell'immagine
+- ``height`` è l'altezza dell'immagine
+- ``align`` determina l'allineamento dell'immagine
+
+``bar chart``:inxx
+
+``
+bar_chart(data='1,2,3',names='a,b,c',width=300,height=150,align='center')
+``:code
+
+Usa le API dei grafici di Google per incorporare un grafico a barre
+- ``data`` è una lista di valori, separati da virgola 
+- ``names`` è una lista di etichette, separate da virgola (una per ogni elemento)
+- ``width`` è la larghezza dell'immagine
+- ``height`` è l'altezza dell'immagine
+- ``align`` determina l'allineamento dell'immagine
+
+``slideshow``:inxx
+
+``
+slideshow(table,field='image',transition='fade',width=200,height=200)
+``:code
+
+Incorpora uno ''slideshow''. Le immagini sono recuperate da una tabella
+Embeds a slideshow. It gets the images from a table.
+
+- ``table`` è il nome della tabella
+- ``field`` è il campo di upload della tabella che contiene le immagini
+- ``transition`` determina il tipo di transizione
+- ``width`` è la larghezza dell'immagine
+- ``height`` è l'altezza dell'immagine
+
+``YouTube``:inxx
+
+``
+youtube(code,width=400,height=250)
+``:code
+
+Incorpora un video di YouTube (tramite codice)
+- ``code`` è il codice del video
+- ``width`` è la larghezza dell'immagine
+- ``height`` è l'altezza dell'immagine
+
+``Vimeo``:inxx
+
+``
+vimeo(code,width=400,height=250)
+``:code
+
+Incorpora un video di Vimeo (tramite codice)
+- ``code`` è il codice del video
+- ``width`` è la larghezza dell'immagine
+- ``height`` è l'altezza dell'immagine
+
+``flash mediaplayer``:inxx
+
+``
+mediaplayer(src,width=400,height=250)
+``:code
+
+Incorpora un file multimediale (come un video Flash o un file audio mp3)
+- ``src`` è il collegamento al video
+- ``width`` è la larghezza dell'immagine
+- ``height`` è l'altezza dell'immagine
+
+``comments``:inxx
+
+``
+comments(table='None',record_id=None)
+``:code
+
+Incorpora i commenti in una pagina. I commenti possono essere collegati ad una tabella e/o ad un record
+- ``table`` è il nome della tabella 
+- ``record_id`` è l'id del record
+
+``tags``:inxx
+
+``
+tags(table='None',record_id=None)
+``:code
+
+Incorpora dei tag in una pagina. I tag possono essere collegati ad una tabella e/o ad un record
+- ``table`` è il nome della tabella 
+- ``record_id`` è l'id del record
+
+``tag cloud``:inxx
+
+``
+tag_cloud()
+``:code
+
+Inserisce una nuvola di tag (''tag cloud'')
+
+``Google map``:inxx
+
+``
+map(key='....', table='auth_user', width=400, height=200)
+``:code
+
+Incorpora una mappa di Google
+Prende i punti di una mappa da una tabella
+- ``key`` è la chiave delle API di Google Map (default 127.0.0.1)
+- ``table`` è il nome della tabella
+- ``width`` è la larghezza della mappa
+- ``height`` è l'altezza della mappa
+
+``
+La tabella deve avere le seguenti colonne: latidude, longitude e map_popup.
+Quando si seleziona un punto appare il messaggio memorizzato in map_popup.
+``:code
+
+``
+iframe(src, width=400, height=300)
+``:code
+
+Incorpora una pagina nei tag ``<iframe> ... </iframe>``
+
+``
+load_url(src)
+``:code
+
+Carica il contenuto della URL utilizzando la funzione LOAD
+
+``
+load_action(action, controller='', ajax=True)
+``:code
+
+Carica il contenuto della URL(request.application, controller, action) utilizzando la funzione LOAD
+
+#### Estendere i widget
+
+Per aggiungere un widget a **plugin_wiki** si deve creare un nuovo modello chiamato "models/plugin_wiki_"''name'' dove ''name'' è un nome arbitrario. Il file deve contenere:
+``
+class PluginWikiWidgets(PluginWikiWidgets):
+    @staticmethod
+    def my_new_widget(arg1, arg2='value', arg3='value'):
+        """
+        document the widget
+	"""
+        return "body of the widget"
+``:code
+
+La prima linea dichiare che si sta estendendo la lista dei widget. ALl'interno della classe si possono definire quante funzioni si vuole. Ogni funzione statica che non inizia con il carattere di underscore (_) è un nuovo widget. La funzione può avere un numero qualsiasi di argomenti che possono avere un valore di default. La ''docstring'' della funzione deve documentare l'utilizzo della funzione con la sintassi markmin.
+
+Quando i widget sono incorporati nelle pagine di plugin gli argomenti saranno passati al widget come stringhe. Per questo il widget deve essere in grado di ricevere stringhe per ogni argomento ed eventualmente convertirlo nella rappresentazione appropriata che deve essere adeguatamente documentata nella ''docstring''.
+
+Il widget può restituire una stringa o helper di web2py che verranno serializzati con ``.xml()``.
+
+Il nuovo widget può accedere a qualsiasi variabile dichiarata nel namespace globale.
+
+Ecco, come esempio, un widget che visualizza il form "contact/ask" creato all'inizio di questo capitolo. Il widget è contenuto in "models/plugin_wiki_contact":
+``
+class PluginWikiWidgets(PluginWikiWidgets):
+    @staticmethod
+    def ask(email_label='Your email', question_label='question'):
+        """
+	This plugin will display a contact us form that allows
+	the visitor to ask a question.
+	The question will be emailed to you and the widget will
+	disappear from the page.
+	The arguments are
+
+	- email_label: the label of the visitor email field
+	- question_label: the label of the question field	
+
+	"""
+        form=SQLFORM.factory(
+           Field('your_email',requires=IS_EMAIL(),label=email_label),
+           Field('question',requires=IS_NOT_EMPTY()),label=question_label)
+        if form.accepts(request.vars,session):
+           if mail.send(to='admin@example.com',
+                        subject='from %s' % form.vars.your_email,
+                        message = form.vars.question):
+               div_id = request.env.http_web2py_component_element
+               command="jQuery('#%s').hide()" % div_id
+	       response.headers['web2py-component-command']=command
+               response.headers['web2py-component-flash']='thanks you'
+        else:
+            form.errors.your_email="Unable to send the email"
+        return form.xml()
+``:code
+
+-------
+I widget di plugin non sono visualizzati dalla vista a meno che la funzione ``response.render(...)`` sia esplicitamente chiamata dal widget stesso.
+-------

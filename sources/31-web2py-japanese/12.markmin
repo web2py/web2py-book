@@ -1,0 +1,359 @@
+## その他のレシピ
+
+### アップグレード
+``upgrades``:inxx
+
+管理者インターフェースの"site"ページには、"update now"があります。実行できないか、動作しない場合 (例えば、ファイルロック問題のため)、web2pyの手動アップデートはとても簡単です。
+
+-------
+単に、新しいweb2pyを古いインストレーションへ解凍するだけです。
+-------
+
+**admin**, **examples**, **welcome**アプリケーションだけでなくライブラリも全てアプグレードします。それは、新しい空の"NEWINSTALL"ファイルを生成します。再起動時に、web2pyは、空のファイルを消去し、welcomeアプリケーションは 、新しい雛形アプリケーションとして使われる"welcome.w2p" の中に格納されます。
+
+web2pyは、他のファイルや既存のアプリケーションをアップグレードしません。
+
+### バイナリでアプリケーションを配布する方法
+
+web2pyのバイナリ形式の配布と一緒に独自のアプリケーションを同梱し、配布できます。web2pyをバンドルしている事をアプリケーションのライセンスに明確に記載している事、そして``web2py.com``へのリンクを追記していれば、web2pyのライセンスはこれを認めます。
+
+ここにWindows用の配布方法を説明します
+
+- いつも通りあなたのアプリを製作
+- **admin**を使い、アプリケーションをバイトコードにコンパイル (1クリック)
+- **admin**を使い、コンパイル済みアプリケーションをパック (もう1クリック)
+- "myapp"フォルダを生成
+- Windows用のweb2pyバイナリ配布をダウンロード
+- それを"myapp"フォルダに解凍し、起動 (2クリック)
+- **admin**を使いパックされたコンパイル済みアプリケーション名"init"をアップロード (1クリック)
+- "cd web2py; web2py.exe"と書かれた"myapp/start.bat"ファイルを作成
+- あなたのアプリケーション用のライセンスと、"distributed with an unmodified copy of web2py from web2py.com"である明言に念を押させることを含んだ"myapp/license"ファイルを作成
+- myappフォルダを"myapp.zip"ファイルに圧縮
+- "myapp.zip"を配布及び/または販売
+
+ユーザーが"myapp.zip"を解凍し"run"をクリックしたときに、彼らは"welcome"アプリケーションの代わりにあなたのアプリケーションを目にするでしょう。
+事前にPythonをインストールしてもらうことさえ、ユーザ側には何も要求しません。
+
+Mac用のバイナリを生成する過程も同じですが、"bat"ファイルは要りません。
+
+### 外部URLをフェッチ
+``fetch``:inxx
+
+Pythonには、URLフェッチするためのライブラリ``urllib``が同梱されています。
+``
+import urllib
+page = urllib.urlopen('http://www.web2py.com').read()
+``:code
+
+多くの場合は大丈夫ですが、``urllib``モジュールは、Google App Engine上では動作しません。Googleは、GAE用に、URLをダウンロードするための異なるAPIを提供します。あなたのコードを移植しやすくするために、web2pyは、他のPython環境だけでなくGAEでも動く``fetch``関数を同梱しています:
+``
+from google.tools import fetch
+page = fetch('http://www.web2py.com')
+``:code
+
+### 便利な日時表現(Pretty dates)
+``prettydate``:inxx
+
+しばしば、日付を"2009-07-25 14:34:56"と表記するのではなく、"one years ago"と表記したほうが便利です。このため、web2pyは便利な関数を提供します:
+``
+import datetime
+d = datetime.datetime(2009,7,25,14,34,56)
+from gluon.tools import prettydate
+pretty_d = prettydate(d,T)
+``:code
+
+第2引数 (T) は出力用の国際化が許可されたものを通過されなければいけません。
+
+### ジオコーディング
+``geocode``:inxx
+
+もし、住所(例: "243 S Wabash Ave, Chicago, IL, USA")を地理座標(緯度と経度)に変換する必要があるなら、web2pyはそのように動作する関数を提供します。
+``
+from gluon.tools import geocode
+address = '243 S Wabash Ave, Chicago, IL, USA'
+(latitude, longitude) = geocode(address)
+``:code
+
+``geocode``関数はネットワーク接続が必要で、ジオコーディング用の Google geocodingサービスに接続します。関数は失敗した場合に``(0,0)``を返却します。Google geocodingサービスはリクエスト回数に上限を定めることに注意し、あなたはそれらのサービス同意書を確認すべきです。``geocode``関数は``fetch``関数上で実装されているためGAEでも動作します。
+
+### ページネーション
+``pagination``:inxx
+
+このレシピは、ページネーション場合にデータベースのアクセス最小化することに対して役立つ技術です。例えば、データベースから行のリストを表示する必要があるが複数のページにまたがる場合です。
+
+まず、データベースに1000個の素数を1番目から格納する**primes**アプリケーションを製作することから始めましょう。
+
+``db.py``モデル:
+``
+Here is the model db.py:
+
+db = DAL('sqlite://primes.db')
+db.define_table('prime',Field('value','integer'))
+def isprime(p):
+    for i in range(2,p):
+        if p%i==0: return False
+    return True
+if len(db().select(db.prime.id))==0:
+   p=2
+   for i in range(1000):
+       while not isprime(p): p+=1
+       db.prime.insert(value=p)
+       p+=1
+``:code
+
+そしてこのように、"default.py"コントローラにデータベースを読む``list_item``アクションを作ります。
+``
+def list_items():
+    if len(request.args): page=int(request.args[0])
+    else: page=0
+    items_per_page=20
+    limitby=(page*items_per_page,(page+1)*items_per_page+1)
+    rows=db().select(db.prime.ALL,limitby=limitby)
+    return dict(rows=rows,page=page,items_per_page=items_per_page)
+``:code
+
+このコードは必要な個数より1つ多いアイテムを選択することに注意してください(20+1)。範囲外の要素は次のページがあるかどうかを示します。
+
+"default/list_items.html"ビュー:
+``
+Here is the "default/list_items.html" view:
+
+{{extend 'layout.html'}}
+
+{{for i,row in enumerate(rows):}}
+{{if i==items_per_page: break}}
+{{=row.value}}<br />
+{{pass}}
+
+{{if page:}}
+<a href="{{=URL(args=[page-1])}}">previous</a>
+{{pass}}
+
+{{if len(rows)>items_per_page:}}
+<a href="{{=URL(args=[page+1])}}">next</a>
+{{pass}}
+``:code
+
+この方法で1選択あたりのアクションでページネーションができ、1つの選択だけで必要な行だけを選んでくれます。
+
+
+### httpserver.logとログファイルフォーマット
+``httpserver.log``:inxx
+
+web2pyのwebサーバーはファイルへのリクエストをweb2pyのルートディレクトに置かれている:
+``
+httpserver.log
+``:code
+
+へ全て記録します。ファイル名やロケーションをweb2pyのコマンドラインオプションを使い指定できます。
+
+新しいエントリーは、リクエストが処理されるたびにファイル末尾へ追加されます。それぞれの行はこのようになります:
+``
+127.0.0.1, 2008-01-12 10:41:20, GET, /admin/default/site, HTTP/1.1, 200, 0.270000
+``:code
+
+フォーマットは:
+``
+ip, timestamp, method, path, protocol, status, time_taken
+``:code
+
+各要素について
+- ipはリクエストしてきたクライアントのIPアドレス
+- timestampはリクエストの日付と時間、ISO8601フォーマット(YYYY-MM-DDT HH:MM:SS)で記述
+- methodはPOSTかGETのどちらか
+- pathはクライアントがリクエストしたパス
+- protocolはクライアントへの送信に使用されたHTTPプロトコル、たいていはHTTP/1.1
+- ``status``:citeはHTTPのステータスコード91
+- time_takenはサーバーがリクエストプロセスに掛けた時間の統計、単位は秒、アップロード/ダウンロードにかかる時間は含まれません
+
+アプリケーションのリポジトリ``appliances``:citeから、ログ解析のアプリケーションを利用できます。
+
+このロギングは、mod_wsgi使用時にログがApacheログと同じになるため、デフォルトでは有効になりません。
+
+### ダミーデータをデータベースに登録
+
+テスト用目的にダミーデータをデータベーステーブルに登録できれば便利です。この目的に合う読解可能なダミーテキスを学習させたベイズ分類器を、web2pyはすでに含んでいます。
+
+簡単な使い方:
+``
+from gluon.contrib.populate import populate
+populate(db.mytable,100)
+``:code
+
+100個のダミーレコードをdb.mytableに挿入します。stringフィールド用の短文、textフィールド用の長文、integer、double、date、datetime、time、boolean、その他のフィールドを知的に生成します。バリデータで指定された必要条件を尊重しようとします。フィールドに単語"name"が含まれているとダミーの名前を生成しようとします。リファレンスフィールドにより妥当なリファレンスを生成します。
+
+もしBがAを参照する2つのテーブル(AとB)があるとき、Aから先に登録し、次にBを登録します。
+
+登録作業はトランザクション中に終了し、とりわけリファレンスが含まれると、一度にたくさんのレコードを登録しようとはしません。その代わりに、その時に100個を登録し、コミット、ループします。
+``
+for i in range(10):
+    populate(db.mytable,100)
+    db.commit()
+``:code
+
+ベイズ分類器にいくつかの文章を学習させ、学習データと似ているが無意味なダミーテキストを生成できます。
+``
+from gluon.contrib.populate import Learner, IUP
+ell=Learner()
+ell.learn('some very long input text ...')
+print ell.generate(1000,prefix=None)
+``:code
+
+### SMS送信
+``SMS``:inxx
+web2pyアプリケーションからSMSメッセージを送信するには、受信者へリレーできるサードパーティサービスが必要です。大抵こういったサービスは無料ではありませんし、国ごとに事情が変わってきます。いくつかのサービスを利用してみましたがほとんど上手くいきませんでした。結局のところ、これらのサービスがスパムの資源として使われるため、電話会社がEメールをブロックします。
+
+より良い方法は電話会社自身にSMSをリレーしてもらうことです。どの電話会社も全ての携帯電話と関連づいている独自のEメールアドレスを持っていて、SMSをその電話番号へEメールとして送信できます。
+
+web2pyにはこのプロセスを助けてくれるモジュールがあります:
+``
+from gluon.contrib.sms_utils import SMSCODES, sms_email
+email = sms_email('1 (111) 111-1111','T-Mobile USA (tmail)')
+mail.sent(to=email,subject='test',message='test')
+``:code
+
+SMSCODESは有名な電話会社名をEメールアドレスに付加したものとを照合する辞書です。``sms_email``関数は(文字列の)電話番号と電話会社の名前を引数に取り、その電話のEメールアドレスを返します。
+
+### クレジットカード払いの承認
+web2pyはクレジットカード払いの承認をあなたのアプリケーションへ組み込むための様々な方法を提供します。例えば:
+
+**Google Checkout Plugin**
+
+``
+http://web2py.com/plugins/static/web2py.plugin.google_checkout.w2p
+``:code
+
+**PayPal**
+
+``
+http://www.web2pyslices.com/main/slices/take_slice/9
+``:code
+
+**Authorize.Net**
+
+最初の2つの仕組みは外部のサービスへの受け取り人を証明するプロセスを上層に委任します。これがセキュリティにとって最良の方法であると同時に(あなたのアプリケーションは全てにおいてクレジットカード情報を取り扱わない)、それは面倒なプロセス(ユーザーは2回ログインする必要がある; 例えば、1度目はあなたのアプリケーション、もう1回はGoogleに)を生成しあなたのアプリケーションが自動化された方法で繰り返し支払処理するのを許可しません。
+
+さらに制御が必要な場合があります。このため私たちはAuthorize.Net API(モジュールはJohn Condeによって開発され若干修正されています)との統合を既定で提供しています。ここに全ての変数を公開したワークフローの例を示します:
+``
+from gluon.contrib.AuthorizeNet import AIM
+payment = AIM(login='cnpdev4289',
+              transkey='SR2P8g4jdEn7vFLQ',
+              testmod=True)
+payment.setTransaction(creditcard, expiration, total, cvv, tax, invoice)
+payment.setParameter('x_duplicate_window', 180) # three minutes duplicate windows
+payment.setParameter('x_cust_id', '1324')       # customer ID
+payment.setParameter('x_first_name', 'Agent')
+payment.setParameter('x_last_name', 'Smith')
+payment.setParameter('x_company', 'Test Company')
+payment.setParameter('x_address', '1234 Main Street')
+payment.setParameter('x_city', 'Townsville')
+payment.setParameter('x_state', 'NJ')
+payment.setParameter('x_zip', '12345')
+payment.setParameter('x_country', 'US')
+payment.setParameter('x_phone', '800-555-1234')
+payment.setParameter('x_description', 'Test Transaction')
+payment.setParameter('x_customer_ip', socket.gethostbyname(socket.gethostname()))
+payment.setParameter('x_email', 'you@example.com')
+payment.setParameter('x_email_customer', False)
+
+payment.process()
+if payment.isApproved():
+    print 'Response Code: ', payment.response.ResponseCode
+    print 'Response Text: ', payment.response.ResponseText
+    print 'Response: ', payment.getResultResponseFull()
+    print 'Transaction ID: ', payment.response.TransactionID
+    print 'CVV Result: ', payment.response.CVVResponse
+    print 'Approval Code: ', payment.response.AuthCode
+    print 'AVS Result: ', payment.response.AVSResponse
+elif payment.isDeclined():
+    print 'Your credit card was declined by your bank'
+elif payment.isError():
+    print 'It did not work'
+print 'approved',payment.isApproved()
+print 'declined',payment.isDeclined()
+print 'error',payment.isError()
+``:code
+
+コードの上部はダミー用テストアカウントを使用されていることに注意してください。Authorize.Netに登録(無料ではありません)し、あなたのlogin、transkey、testmode=TrueかFalseをAIMコンストラクタに渡す必要があります。
+
+### Twitter API
+
+ツイートを送信/取得する方法の手軽な例を示します。TwitterはシンプルなRESTful APIを利用するため、サードパーティのライブラリを必要としません。
+
+ツイートを送信する方法の例を示します:
+``
+def post_tweet(username,password,message):
+    import urllib, urllib2, base64
+    import gluon.contrib.simplejson as sj
+    args= urllib.urlencode([('status',message)])
+    headers={}
+    headers['Authorization'] = 'Basic '+base64.b64encode(
+        username+':'+password)
+    req = urllib2.Request(
+        'http://twitter.com/statuses/update.json', 
+        args, headers)
+    return  sj.loads(urllib2.urlopen(req).read())
+``:code
+
+ツイートを受信する方法の例です:
+``
+def get_tweets():
+    user='web2py'
+    import urllib
+    import gluon.contrib.simplejson as sj
+    page = urllib.urlopen('http://twitter.com/%s?format=json' % user).read()
+    tweets=XML(sj.loads(page)['#timeline'])
+    return dict(tweets=tweets)
+``:code
+
+より多くの複雑な操作には、Twitter APIドキュメントを参照してください。
+
+### 仮想ファイルのストリーミング
+``streaming``:inxx
+
+悪意ある攻撃者にとってwebサイトが脆弱かどうかをスキャンするのはよくあることです。彼らはNessusといったセキュリティスキャナを使いスクリプトに脆弱性があるかを知ることで標的となるウェブサイトを探索します。スキャンされたマシンからのwebサーバログや既知の脆弱性の多く示すNessusデータベースでの直接の解析はPHPスクリプトやASPスクリプトにおけるものです。我々はweb2pyを稼動させて以降も、それらの脆弱性が無いにもかかわらず、彼らから未だにスキャンされます。迷惑なので、これらの脆弱性に対応し、攻撃者に彼らの時間を空費することを理解させるのが望ましいです。
+
+1つの方法は攻撃に対抗して.php、.asp、疑わしいダミーアクションへの全リクエストをリダイレクトすることで、攻撃者を長時間忙しくさせ続けることです。そのうち攻撃者はあきらめ、私たちをを二度とスキャンしないでしょう。
+
+このレシピは2つの部品を必要とします。
+
+次のように"default.py"コントローラに**jammer**という専用のアプリケーションを作成します:
+``
+class Jammer():
+   def read(self,n): return 'x'*n
+def jam(): return response.stream(Jammer(),40000)
+``:code
+
+このアクションが呼ばれたときに、一度に40000文字の"x"で満たされた無限のデータストリームを返します。
+
+2つ目の要素は.php、.aps(大文字、小文字どちらも)などで終わるどのようなリクエストもこのコントローラにリダイレクトする"route.py"ファイルです。
+``
+route_in=(
+ ('.*\.(php|PHP|asp|ASP|jsp|JSP)','jammer/default/jam'),
+)
+``:code
+
+一度目に攻撃を受けた際には小さなオーバヘッドしかないかもしれませんが、私たちの経験からして同じ攻撃者は2度と攻撃してきません。
+
+### Jython
+``Jython``:inxx
+
+web2pyは普段CPython(C言語で実装されたPythonインタプリタ)で稼動しますが、Jython(Java言語で実装されPythonインタプリタ)でも動作します。これはweb2pyをJavaの基盤で稼働させることを許可します。
+
+web2pyはJythonですぐに実行するにもかかわらず、ややこしいJythonのセットアップやzxJDBC(Jythonのデータベースアダプタ)のセットアップで複雑でトリッキーなことがあります。以下はその手順です:
+
+- ``Jython.org``から "jython_installer-2.5.0.jar" (または 2.5.x) をダウンロード
+- それをインストール:
+``
+java -jar jython_installer-2.5.0.jar
+``:code
+- ``jdbcsource``:citeから"zxJDBC.jar"をダウンロード
+- ``jdbcjar``:citeから"sqlitejdbc-v056.jar"ファイルをダウンロードしインストール
+- zxJDBCとsqlitejdbcをjavaのCLASSPATHに追加
+- web2pyをJythonで起動
+
+``
+/path/to/jython web2py.py
+``:code
+
+執筆時点で、Jythonでは``sqlite``と``postgres``のみサポートされています。

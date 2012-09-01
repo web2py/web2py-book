@@ -1,0 +1,342 @@
+
+## Altre ''ricette''
+
+### Aggiornamenti
+``upgrades``:inxx
+
+Nella pagina "site" dell'interfaccia amministrativa è presente un pulsante "upgrade now". In caso che questa opzione non funzioni (per esempio a causa di un lock su un file) l'aggiornamento manuale di web2py è comunque estremamente semplice:
+
+-------
+Decomprimere l'ultima versione di web2py sull'installazione precedente.
+-------
+
+In questo modo saranno aggiornate tutte le librerie e le applicazioni **admin**, **examples**, **welcome**. Verrà anche creato un nuovo file vuoto chiamato "NEWINSTALL". 
+Al riavvio web2py cancellerà questo file e comprimerà l'applicazione **welcome** in "welcome.w2p". Questo file sarà utilizzato per creare le nuove applicazioni.
+
+web2py non aggiorna nessun file nelle altre applicazioni esistenti.
+
+### Come distribuire le applicazioni in codice binario
+
+E' possibile allegare un'applicazione alla distribuzione binaria di web2py e distribuirle contemporaneamente. La licenza di web2py consente di fare questo purchè nella licenza dell'applicazione venga chiaramente indicato che questa è "in bundle" con web2py e venga fornito un link al sito ``web2py.com``. Ecco come fare su Windows:
+- Creare l'applicazione (nel solito modo)
+- Tramite **admin**, compilare l'applicazione (un click)
+- Tramite **admin** comprimere l'applicazione appena compilata (un altro click)
+- Creare la cartella "myapp"
+- Scaricare la distribuzione binaria di web2py per Windows
+- Decomprimere la distribuzione binaria di web2py in "myapp" ed avviarla (due click)
+- Tramite **admin** caricare l'applicazione precedentemente compilata e compressa con il nome "init" (un click)
+- Creare il file "myapp/start.bat" contenente i comandi "cd web2py; web2py.exe"
+- Creare il file "myapp/license" contentente la licenza dell'applicazione ed assicurarsi che contenga la frase "distribuita con una copia non modificata di web2py da web2py.com" ("distributed with an unmodified copy of web2py from web2py.com")
+- Comprimere la cartella myapp nel file "myapp.zip"
+- Distribuire e/o vendere "myapp.zip"
+
+Quando gli utenti decomprimeranno "myapp.zip" e selezioneranno "run" vedranno l'applicazione "init" invece che l'applicazione "welcome". Non è necessario nessun prerequisito da parte dell'utente, non è neanche necessario che Python sia pre-installato. 
+
+Per Mac OS X il processo è simile ma non c'è necessità di creare il file ".bat".
+
+### Recuperare una URL esterna
+``fetch``:inxx
+
+Python include la libreria ``urllib`` per recuperare URL esterne:
+``
+import urllib
+page = urllib.urlopen('http://www.web2py.com').read()
+``:code
+
+Questa libreria funziona bene, ma il modulo ``urllib`` non funziona su GAE. Google rende disponibile una differente API per il download delle URI. Questa API funziona solo su Google App Engine. Per rendere il codice portabile web2py include una funzione ``fetch`` che funziona sia su GAE che sulle altre installazioni di Python:
+``
+from google.tools import fetch
+page = fetch('http://www.web2py.com')
+``:code
+
+### Date descrittive
+``prettydate``:inxx
+
+E' spesso utile rappresentare un ''datetime'' non nel formato "2009-07-25 14:34:56" ma come una stringa descrittiva del tipo "un anno fa". web2py mette a disposizione una funzione di utilità per fare questo:
+``
+d = datetime.datetime(2009,7,25,14,34,56)
+from google.tools import prettydate
+pretty_d = prettydate(d,T)
+``:code
+Il secondo argomento (T) deve essere passato per consentire l'internazionalizzazione dell'output.
+
+### Geocodifica
+``geocode``:inxx
+
+E' possibile convertire un indirizzo (per esempio "243 S Wabash Ave, Chicago, IL, USA") in coordinate geografiche (latitudine e longitudine):
+``
+from gluon.tools import geocode
+address = '243 S Wabash Ave, Chicago, IL, USA'
+(latitude, longitude) = geocode(address)
+``:code
+
+La funzione ``geocode`` richiede l'accesso ad Internet e si connette al servizio di geocodifica di Google. La funzione ritorna ``(0,0)`` in caso d'errore. Notare che il servizio di geocodifica di Google pone un limite al numero di richieste, come indicato nell'accordo di utilizzo del servizio. La funzione ``geocode`` è costruita utilizzando la funzione ``fetch`` e pertanto funziona con GAE.
+
+### Paginazione
+``pagination``:inxx
+
+Questa ricetta è un comodo trucco per minimizzare l'accesso al database in caso di paginazione, come nel caso in cui sia necessario visualizzare una lista di righe di un database e si vuole che queste siano distribuite su più pagine web.
+
+Creare un'applicazione **primes** che memorizza i primi mille numeri primi in un database.
+
+Ecco il modello ``db.py``:
+``
+db=DAL('sqlite://primes.db')
+db.define_table('prime',Field('value','integer'))
+def isprime(p):
+    for i in range(2,p):
+        if p%i==0: return False
+    return True
+if len(db().select(db.prime.id))==0:
+   p=2
+   for i in range(1000):
+       while not isprime(p): p+=1
+       db.prime.insert(value=p)
+       p+=1
+``:code
+
+Creare ora un'azione ``list_items`` nel controller "default.py" simile alla seguente:
+``
+def list_items():
+    if len(request.args): page=int(request.args[0])
+    else: page=0
+    items_per_page=20
+    limitby=(page*items_per_page,(page+1)*items_per_page+1)
+    rows=db().select(db.prime.ALL,limitby=limitby)
+    return dict(rows=rows,page=page,items_per_page=items_per_page)
+``:code
+
+Notare che questo codice recupera dal database un elemento in più del dovuto (20 + 1). L'elemento extra, se presente, indica alla vista che c'è almeno un altra pagina da visualizzare.
+
+Ecco la vista "default/list_items.html":
+``
+{{extend 'layout.html'}}
+
+{{for i,row in enumerate(rows):}}
+{{if i==items_per_page: break}}
+{{=row.value}}<br />
+{{pass}}
+
+{{if page:}}
+<a href="{{=URL(args=[page-1])}}">previous</a>
+{{pass}}
+
+{{if len(rows)>items_per_page:}}
+<a href="{{=URL(args=[page+1])}}">next</a>
+{{pass}}
+``:code
+
+In questo modo è stata ottenuta la paginazione con una singola SELECT per ogni chiamata all'azione, e quella SELECT recupera solo una riga in più del dovuto.
+
+### httpserver.log e il formato di file del log
+``httpserver.log``:inxx
+
+Il server web di web2py memorizza tutte le richieste in un file chiamato:
+``
+httpserver.log
+``:code
+nella cartella d'installazione di web2py. Un nome di file e una posizione alternativa possono essere specificati tramite opzioni della linea di comando.
+
+Delle nuove linee sono aggiunte alla fine del file ogni volta che una richiesta è eseguita. Ogni linea è simile alla seguente:
+``
+127.0.0.1, 2008-01-12 10:41:20, GET, /admin/default/site, HTTP/1.1, 200, 0.270000
+``:code
+Il formato è:
+``
+ip, timestamp, method, path, protocol, status, time_taken
+``:code
+
+Dove:
+- ip è l'indirizzo IP del client che ha inviato la richiesta
+- timestamp è la data e l'ora della richiesta in formato ISO 8601 (YYYY-MM-DDT HH:MM:SS)
+- method può essere GET oppure POST
+- path è il percorso richiesto dal client
+- protocol è il protocollo utilizzato per la risposta, solitamente HTTP/1.1
+- status è uno dei codici di status HTTP``status``:cite
+- time_taken è il tempo impiegato dal server per processare la richiesta, in secondi, escluso il tempo di upload/download.
+
+Nel sito delle applicazioni già pronte di web2py``appliances``:cite è possibile trovare un'applicazione per l'analisi del log.
+Questo log è disabilitato per default quando si utilizza mod_wsgi in quanto sarebbe lo stesso di quello generato da Apache.
+
+### Popolare il database con dati fittizi
+
+Per testare un'applicazione potrebbe essere conveniente popolare le tabelle di database con dati fittizi. web2py include un classificatore Bayesiano già addestrato per generare dati fittizi ma leggibili per questo scopo.
+
+Ecco il modo più semplice di utilizzarlo:
+``
+from gluon.contrib.populate import populate
+populate(db.mytable,100)
+``:code
+
+Questo codice inserirà 100 record fittizi in db.mytable. Tenterà di farlo in modo intelligente generando un testo breve per i campi stringa, un testo più lungo per i campi testo, numeri interi, doppi, date, orari, booleani, ecc. per i corrispondenti campi. Tenterà inoltre di rispettare i vincoli imposti dai validatori. Per i campi contenenti la parola "name" tenterà di generare dei nomi fittizi. Per i campi di riferimento genererà delle referenze valide.
+
+Se si hanno due tabelle (A e B) dove B fa riferimento ad A, assicurarsi di popolare prima A e poi B.
+Poichè il popolamento è eseguito in una transazione non tentare di popolare troppi record in una volta sola, in particolare se sono presenti referenze. Eseguire invece un ciclo di 100 record fittizi per volta.
+``
+for i in range(10):
+    populate(db.mytable,100)
+    db.commit()
+``:code
+
+E' possibile addestrare il classificatore Bayesiano per imparare da un testo e generare testo fittizio simile ma senza significato:
+``
+from gluon.contrib.populate import Learner, IUP
+ell=Learner()
+ell.learn('some very long input text ...')
+print ell.generate(1000,prefix=None)
+``:code
+
+### Invio degli SMS
+``SMS``:inxx
+L'invio di messaggi SMS da un'applicazione web2py richiede un servizio di terze parti in grado di consegnare il messaggio al destinatario. Questo tipo di servizi solitamente non è gratuito, ma la situazione cambia da paese a paese. Non è stato possibile testare molti servizi di questo tipo poichè le compagnie telefoniche bloccano le email di richiesta di invio SMS perchè potrebbero essere fonte di spam.
+
+Un modo migliore è quello di usare direttamente le compagnie telefoniche per inviare gli SMS. Ogni compagnia telefonica ha un indirizzo email associato con ogni numero di telefono e l'SMS può essere spedito come una email associata a quel numero.
+
+web2py disponde di un modulo per questo processo:
+``
+from gluon.contrib.sms_utils import SMSCODES, sms_email
+email = sms_email('1 (111) 111-1111','T-Mobile USA (tmail)')
+mail.sent(to=email,subject='test',message='test')
+``:code
+
+SMSCODES è un dizionario che mappa i nomi delle principali compagnie telefoniche al dominio dell'email del numero di telefono. La funzione ``sms_email`` richiede un numero di telefono (come una stringa) e il nome della compagnia telefonica e restituisce l'indirizzo email del telefono.
+
+### Accettare pagamenti con carta di credito
+
+web2py mette a disposizione diversi modi per accettare i pagamenti con carta di credito nelle applicazioni come, per esempio
+
+- **Google Checkout Plugin**
+``
+http://web2py.com/plugins/static/web2py.plugin.google_checkout.w2p
+``:code
+
+- **Paypal**
+
+``
+http://www.web2pyslices.com/main/slices/take_slice/9
+``:code
+
+- **Authorize.Net**
+
+I primi due meccanismi delegano il processo di autenticazione dell'utente ad un servizio esterno. Sebbene questo sia il modo migliore per la sicurezza (l'applicazione non gestisce alcuna informazione sulle carte di credito) rende il processo di pagamento complicato (l'utente deve collegarsi due volte, una all'applicazione e l'altra, per esempio, a Google) e non consente all'applicazione di gestire i pagamenti ricorrenti in modo automatico.
+
+A volte è necessario avere più controllo. Per questo motivo web2py fornisce l'integrazione con le API di Authorize.Net (il modulo è stato sviluppato da John Conde e leggermente modificato). Ecco un esempio di un workflow e di tutte le variabili che sono esposte:
+``
+from gluon.contrib.AuthorizeNet import AIM
+payment = AIM(login='cnpdev4289',
+              transkey='SR2P8g4jdEn7vFLQ',
+              testmod=True)
+payment.setTransaction(creditcard, expiration, total, cvv, tax, invoice)
+payment.setParameter('x_duplicate_window', 180) # three minutes duplicate windows
+payment.setParameter('x_cust_id', '1324')       # customer ID
+payment.setParameter('x_first_name', 'Agent')
+payment.setParameter('x_last_name', 'Smith')
+payment.setParameter('x_company', 'Test Company')
+payment.setParameter('x_address', '1234 Main Street')
+payment.setParameter('x_city', 'Townsville')
+payment.setParameter('x_state', 'NJ')
+payment.setParameter('x_zip', '12345')
+payment.setParameter('x_country', 'US')
+payment.setParameter('x_phone', '800-555-1234')
+payment.setParameter('x_description', 'Test Transaction')
+payment.setParameter('x_customer_ip', socket.gethostbyname(socket.gethostname()))
+payment.setParameter('x_email', 'you@example.com')
+payment.setParameter('x_email_customer', False)
+
+payment.process()
+if payment.isApproved():
+    print 'Response Code: ', payment.response.ResponseCode
+    print 'Response Text: ', payment.response.ResponseText
+    print 'Response: ', payment.getResultResponseFull()
+    print 'Transaction ID: ', payment.response.TransactionID
+    print 'CVV Result: ', payment.response.CVVResponse
+    print 'Approval Code: ', payment.response.AuthCode
+    print 'AVS Result: ', payment.response.AVSResponse
+elif payment.isDeclined():
+    print 'Your credit card was declined by your bank'
+elif payment.isError():
+    print 'It did not work'
+print 'approved',payment.isApproved()
+print 'declined',payment.isDeclined()
+print 'error',payment.isError()
+``:code
+
+Questo codice utilizza un account di test fittizio. E' necessario registrarsi con Authorize.Net (non si tratta di un servizio gratuito). e fornire al costruttore AIM il proprio login, la propria transkey e impostare testmode a True o a False.
+
+### API per Twitter
+
+Ecco degli esempi veloci su come inviare e ricevere dei tweet. Non è necessaria nessuna libreria di terze parti, poichè Twitter utilizza delle semplici API di tipo REST.
+
+Ecco un esempio di come inviare un tweet:
+``
+def post_tweet(username,password,message):
+    import urllib, urllib2, base64
+    import gluon.contrib.simplejson as sj
+    args= urllib.urlencode([('status',message)])
+    headers={}
+    headers['Authorization'] = 'Basic '+base64.b64encode(username+':'+password)
+    request = urllib2.Request('http://twitter.com/statuses/update.json', args, headers)
+    return  sj.loads(urllib2.urlopen(req).read())
+``:code
+
+Ecco un esempio di come ricevere i tweet:
+``
+def get_tweets():
+    user='web2py'
+    import urllib
+    import gluon.contrib.simplejson as sj
+    page = urllib.urlopen('http://twitter.com/%s?format=json' % user).read()
+    tweets=XML(sj.loads(page)['#timeline'])
+    return dict(tweets=tweets)
+``:code
+
+Per operazioni più complesse fare riferimento alla documentazione delle API di Twitter.
+
+### Streaming di file virtuali
+``streaming virtual file``:inxx
+
+E' comune, in caso di attacco, subire una scansione del sito alla ricerca delle possibili vulnerabilità. Gli attaccanti utilizzano scanner di sicurezza (come Nessus) per esplorare i siti alla ricerca di script che contengono vulnerabilità note. Un'analisi dei log del server web attaccato o direttamente del database di Nessus rivela che la maggior parte delle vulnerabilità conosciute sono presenti negli script PHP e ASP. Sebbene web2py non abbia queste vulnerabilità potrebbe subire ugualmente una scansione di questo tipo. Per far capire agli attaccanti che stanno perdendo il loro tempo è possibile rispondere a questi attacchi.
+
+Una possibilità è quella di redirigere tutte le richieste di tipo .php e .asp (e ogni altra richiesta sospetta) ad una azione fittizia che risponderà all'attaccante tenendolo occupato per un notevole lasso di tempo. A quel punto l'attaccante abbandonerà l'attacco e probabilmente non lo ripeterà.
+
+Questa ricetta richiede due parti.
+
+La prima è un'applicazione dedicata chiamata **jammer** con il seguente controller "default.py":
+``
+class Jammer():
+   def read(self,n): return 'x'*n
+def jam(): return response.stream(Jammer(),40000)
+``:code
+
+Quando questa azione viene chiamata risponde con uno stream di dati composto da caratteri "x", 40.000 caratteri alla volta.
+
+La seconda parte è il file "route.py" che reindirizza qualsiasi richiesta che finisce in .php, .asp, ecc. (sia maiuscolo che minuscolo) al controller appena definito.
+``
+route_in=(
+ ('.*\.(php|PHP|asp|ASP|jsp|JSP)','jammer/default/jam'),
+)
+``:code
+
+La prima volta che un attaccante prova ad attaccare il sito si potrebbe avere un leggero sovraccarico ma solitamente gli attacchi vengono interrotti e non si ripetono.
+
+### Jython
+``Jython``:inxx
+
+web2py normalmente è eseguito con CPython (l'interprete Python scritto in C) ma può anche essere eseguito con Jython (l'interprete Python scritto in Java). In questo modo web2py può essere eseguito all'interno di un'infrastruttura Java.
+
+web2py può essere eseguito in Jython direttamente, anche se ci sono alcuni passi da eseguire per impostare Jython e zxJDBC (l'adattatore di database di Jython):
+- Scaricare il file "jython_installer-2.5.0.jar" (o 2.5.x) da ``Jython.org``
+- Installarlo con:
+``
+java -jar jython_installer-2.5.0.jar
+``:code
+- Scaricare ed installare "zxJDBC.jar" da ``jdbcsource``:cite
+- Scaricare ed installare "sqlitejdbc-v056.jar" da ``jdbcjar``:cite
+- Aggiungere zxJDBC e sqlitejdbc al CLASSPATH di Java
+- Avviare web2py con Jython
+
+``
+/path/to/jython web2py.py
+``:code
+
+Al momento della scrittura di questo manuale sono supportati sy Jython solamente gli adattatori di database per ``sqlite`` e ``postgres``.

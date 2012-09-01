@@ -1,0 +1,1796 @@
+## ビュー
+``views``:inxx ``template language``:inxx ``HTML``:inxx
+
+web2pyはモデル、コントローラ、ビューのためにPythonを使用しています。ただし、ビューにおいては若干修正したPython構文を用いています。これにより、適切なpythonの利用に制約をかけることなく、より可読性のあるコードが書けるようになります。
+
+ビューの目的は、HTMLドキュメント内にPythonコードを埋め込むことです。これは一般的に、幾つかの問題を引き起こします：
+- 埋め込まれたコードは、エスケープすべきか？
+- インデントはPythonかHTMLのどちらのルールに基づいてされるべきか？
+
+web2py は``{{...}}``をHTMLに埋め込んだPythonコードをエスケープするために使用しています。中括弧を山括弧の代わりに用いる利点は、全ての一般的なHTMLエディタにおいて分かりやすいからです。これによりそれらのエディタでweb2pyのビューを作成することが可能になります。
+
+開発者はHTMLにPythonコードを埋め込むので、ドキュメントはPythonのルールでなく、HTMLのルールに従ってインデントされる必要があります。そのため、web2pyでは、``{{ ... }}``のタグの中でインデント不要のPythonを書けるようにしています。Pythonは通常、コードのブロックを区切るためインデントを使用していますが、ここでは別の方法が要求されます。このような理由で、web2pyのテンプレート言語はPythonキーワードの``pass``を活用しています。
+
+-------
+コードブロックは、コロンで終わる行から始まり、``pass``で始まる行で終わります。キーワード``pass``は、ブロックの終わりがコンテキストで明白な場合は必要ありません。
+-------
+
+これはその例です:
+
+``
+{{
+if i == 0:
+response.write('i is 0')
+else:
+response.write('i is not 0')
+pass
+}}
+``:code
+
+``pass``はPythonのキーワードで、web2pyのキーワードではないことに注意してください。Emacsなどの幾つかのPythonエディタは、``pass``キーワードを用いてブロックの区切りを示し、自動的でコードを再インデントします。
+
+web2pyのテンプレート言語は、Pythonと全く同じ動きをします。次のような記述は：
+
+``
+<html><body>
+{{for x in range(10):}}{{=x}}hello<br />{{pass}}
+</body></html>
+``:code
+
+テンプレート言語により、次のようなプログラムに変換されます：
+``
+response.write("""<html><body>""", escape=False)
+for x in range(10):
+    response.write(x)
+    response.write("""hello<br />""", escape=False)
+response.write("""</body></html>""", escape=False)
+``:code
+
+``response.write``は、``response.body``に書き込みます。
+
+web2pyのビューにエラーがある場合、エラーレポートには、開発者が書いた実際のビューではなく、生成されたコードを表示します。これにより、実行された実際のコードをハイライトするため、コードをデバッグすることが容易になります(そのコードはHTMLエディタやブラウザのDOMインスペクタを使用して、デバッグすることができるものです)。
+
+また注意する点として：
+``
+{{=x}}
+``:code
+
+これは以下のものを生成します
+``response.write``:inxx ``escape``:inxx
+``
+response.write(x)
+``:code
+
+このようにHTMLに注入された変数は、デフォルトでエスケープされます。もし``x``が``XML``オブジェクトなら、escapeを``True``にしても、エスケープは無視されます。
+
+ここで示すのは、``H1``ヘルパーの利用例です：
+``
+{{=H1(i)}}
+``:code
+
+これは、以下のものに変換されます：
+``
+response.write(H1(i))
+``:code
+
+上記の解釈は、``H1``オブジェクトとその要素は再帰的にシリアライズされ、さらにエスケープし、response.bodyに書かれます。``H1``と内部HTMLによって生成されたタグはエスケープされません。この仕組みによって、Webページ上に表示される全てのテキスト--そしてテキストのみ--が、常にエスケープされ、それによりXSS脆弱性を防ぐことを保証します。同時に、コードはシンプルでデバッグし易いものとなります。
+
+``response.write(obj, escape=True)``メソッドは、記述するオブジェクトとエスケープするかどうか(デフォルトは``True``)という2つの引数を取ります。``obj``が``.xml()``メソッドを持つ場合、メソッドが呼び出され、結果がresponseのbodyに書かれます(``エスケープ``引数は無視されます)。それ以外の場合は、オブジェクトの``__str__``メソッドがシリアライズするのに用いられ、エスケープ引数が``True``ならばエスケープされます。全ての組み込みのヘルパーオブジェクト(``H1``など)は、``.xml()``メソッドを介して自分自身をシリアライズする方法を知っています。
+
+これは、全て透過的に行われます。``response.write``メソッドを明示的に呼び出す必要は決してありません(呼び出すべきではないです)。
+
+### 基本構文
+
+web2pyのテンプレート言語は、全てのPythonの制御構造をサポートしています。ここでは、それぞれの例を示します。それらは通常のプログラミングのプラクティスに準じてネストさせることができます。
+
+#### ``for...in``
+``for``:inxx
+
+テンプレートでは、どの反復可能オブジェクトに対してループを回すことができます：
+``
+{{items = ['a', 'b', 'c']}}
+<ul>
+{{for item in items:}}<li>{{=item}}</li>{{pass}}
+</ul>
+``:code
+
+これは次のようになります：
+``
+<ul>
+<li>a</li>
+<li>b</li>
+<li>c</li>
+</ul>
+``:code
+
+ここで``item``は、任意の反復可能オブジェクトです。これは、Pythonのリスト、Pythonのタプル、Rowsオブジェクト、イテレータとして実装された任意のオブジェクトなどです。表示されるオブジェクトは初めにシリアライズされ、エスケープされます。
+
+#### ``while``
+``while``:inxx
+
+whileキーワードを用いてループを作成できます：
+``
+{{k = 3}}
+<ul>
+{{while k > 0:}}<li>{{=k}}{{k = k - 1}}</li>{{pass}}
+</ul>
+``:code
+
+これは次のようになります：
+``
+<ul>
+<li>3</li>
+<li>2</li>
+<li>1</li>
+</ul>
+``:code
+
+#### ``if...elif...else``
+``if``:inxx ``elif``:inxx ``else``:inxx
+
+条件句を使用できます：
+``
+{{
+import random
+k = random.randint(0, 100)
+}}
+<h2>
+{{=k}}
+{{if k % 2:}}is odd{{else:}}is even{{pass}}
+</h2>
+``:code
+
+これは次のようになります：
+``
+<h2>
+45 is odd
+</h2>
+``:code
+
+``else``が最初の``if``ブロックを閉じることは明らかなため、ここでは``pass``文は必要なく、使用は不適切です。しかし``else``ブロックは、``pass``文とともに明示的に閉じなければなりません。
+
+Pythonでは"else if"を``elif``と書くことに留意して、次の例を見てください：
+``
+{{
+import random
+k = random.randint(0, 100)
+}}
+<h2>
+{{=k}}
+{{if k % 4 == 0:}}is divisible by 4
+{{elif k % 2 == 0:}}is even
+{{else:}}is odd
+{{pass}}
+</h2>
+``:code
+
+これは次のようになります：
+``
+<h2>
+64 is divisible by 4
+</h2>
+``:code
+
+#### ``try...except...else...finally``
+``try``:inxx ``except``:inxx ``else``:inxx ``finally``:inxx
+
+``try...except``文をビューの中で使用することもできます。ただし一つ注意があります。次の例を考えてください：
+``
+{{try:}}
+Hello {{= 1 / 0}}
+{{except:}}
+division by zero
+{{else:}}
+no division by zero
+{{finally}}
+<br />
+{{pass}}
+``:code
+
+これは次のような出力を生成します：
+``
+Hello
+division by zero
+<br />
+``:code
+
+この例は、例外が発生する前の全ての出力が、tryブロック内でレンダリングされること示しています(例外の前の出力もレンダリングされます)。"Hello"は例外の前にあるので出力されます。
+
+#### ``def...return``
+``def``:inxx ``return``:inxx
+
+web2pyのテンプレート言語では、任意のPythonオブジェクトやtext/html文字列を返す関数を定義し実装することができます。ここでは、2つの例を考えます:
+
+``
+{{def itemize1(link): return LI(A(link, _href="http://" + link))}}
+<ul>
+{{=itemize1('www.google.com')}}
+</ul>
+``:code
+
+これは次のような出力を生成します：
+``
+<ul>
+<li><a href="http:/www.google.com">www.google.com</a></li>
+</ul>
+``:code
+
+関数``itemize1``は、関数が呼び出された箇所に挿入するヘルパーオブジェクトを返します。
+
+次のコードを考えてみてください：
+``
+{{def itemize2(link):}}
+<li><a href="http://{{=link}}">{{=link}}</a></li>
+{{return}}
+<ul>
+{{itemize2('www.google.com')}}
+</ul>
+``:code
+
+これは上記と全く同じ出力を生成します。このケースの関数``itemize2``は、関数が呼ばれた場所でweb2pyのタグが置換されることになるHTMLの一部を表現します。``itemize2``の呼び出しの手前に'='がないことに注意してください。これは、関数が文字列を返すのではなく、直接レスポンスに書き込んでいるからです。
+
+1つ注意点として、ビュー内で定義された関数はreturn文で終了しなければなりません。そうでないと、自動インデントが失敗します。
+
+### HTMLヘルパー
+``helpers``:inxx
+
+次のようなビューのコードを考えます：
+``
+{{=DIV('this', 'is', 'a', 'test', _id='123', _class='myclass')}}
+``:code
+
+これは次のようにレンダリングされます：
+``
+<div id="123" class="myclass">thisisatest</div>
+``:code
+
+``DIV``はヘルパークラスです。つまり、HTMLをプログラムで構築するために使われるものです。これは、HTMLの``<div>``タグに対応します。
+
+固定引数は、開始タグと終了タグの間に含まれるオブジェクトとして解釈されます。アンダースコアで始まる名前付き引数は、HTMLタグの(アンダースコアなしの)属性として解釈されます。幾つかのヘルパーは、アンダースコアで始まらない名前付き数を持ち、それらの引数はタグ固有のものです。
+
+名前なし引数のセットの代わりに、ヘルパーは``*``表記を用いた、単一のリストまたはタプルをコンポーネントのセットとして受け取ることもできます。さらに``**``を用いて、単一の辞書を属性のセットとして受け取ることも可能です。以下はその例です:
+``
+{{
+contents = ['this','is','a','test']
+attributes = {'_id':'123', '_class':'myclass'}
+=DIV(*contents,**attributes)
+}}
+``:code
+(これは前述したものと同じ出力を生成します)
+
+以下のヘルパーのセットは：
+
+``A``,  ``B``,  ``BEAUTIFY``,  ``BODY``,  ``BR``,  ``CAT``,  ``CENTER``,  ``CODE``,  ``COL``, ``COLGROUP``, ``DIV``,  ``EM``,  ``EMBED``,  ``FIELDSET``,  ``FORM``,  ``H1``,  ``H2``,  ``H3``,  ``H4``,  ``H5``,  ``H6``,  ``HEAD``,  ``HR``,  ``HTML``,  ``I``,  ``IFRAME``,  ``IMG``,  ``INPUT``,  ``LABEL``,  ``LEGEND``,  ``LI``,  ``LINK``,  ``MARKMIN``,  ``MENU``,  ``META``,  ``OBJECT``,  ``ON``,  ``OL``,  ``OPTGROUP``,  ``OPTION``,  ``P``,  ``PRE``,  ``SCRIPT``,  ``SELECT``,  ``SPAN``,  ``STYLE``,  ``TABLE``,  ``TAG``,  ``TBODY``,  ``TD``,  ``TEXTAREA``,  ``TFOOT``,  ``TH``,  ``THEAD``,  ``TITLE``,  ``TR``,  ``TT``, ``UL``,   ``URL``,  ``XHTML``,  ``XML``,  ``embed64``,  ``xmlescape``
+
+XML``xml:w``:cite ``xml:o``:cite へとシリアライズできる複雑な表現を構築するのに使用することができます。例えば：
+``
+{{=DIV(B(I("hello ", "<world>"))), _class="myclass")}}
+``:code
+
+これは次のようにレンダリングされます：
+``
+<div class="myclass"><b><i>hello &lt;world&gt;</i></b></div>
+``:code
+
+ヘルパーはまた、``__str__``または``xml``メソッドを用いて、同様に文字列にシリアライズすることができます。 
+``
+>>> print str(DIV("hello world"))
+<div>hello world</div>
+>>> print DIV("hello world").xml()
+<div>hello world</div>
+``:code
+
+``Document Object Model (DOM)``:inxx
+web2pyのヘルパーの仕組みは、文字列の連結なしにHTMLを生成するシステム以上のものです。これは、サーバーサイドのドキュメントオブジェクトモデル(DOM)表現を提供します。
+
+ヘルパーのコンポーネントはその位置によって参照できます。またヘルパーは、それらコンポーネントに対してリストのように機能します。
+``
+>>> a = DIV(SPAN('a', 'b'), 'c')
+>>> print a
+<div><span>ab</span>c</div>
+>>> del a[1]
+>>> a.append(B('x'))
+>>> a[0][0] = 'y'
+>>> print a
+<div><span>yb</span><b>x</b></div>
+``:code
+
+ヘルパーの属性は名前で参照することができ、ヘルパーはそれら属性に対して辞書のように機能します：
+``
+>>> a = DIV(SPAN('a', 'b'), 'c')
+>>> a['_class'] = 's'
+>>> a[0]['_class'] = 't'
+>>> print a
+<div class="s"><span class="t">ab</span>c</div>
+``:code
+
+全てのコンポーネントのセットは、``a.components``というリストを介してアクセスすることができます。また、全ての属性のセットは ``a.attributes``という辞書を介してアクセスすることができます。そうすると、``a[i]``は``i``が整数のとき``a.components[i]``と等価になります。また、``a[s]``は``s``が文字列のとき``a.attributes[s]``と等価になります。
+
+なお、ヘルパーの属性は、キーワード引数としてヘルパーに渡すことができます。しかし場合によっては、属性の名前がPythonの識別子で許可されていない特殊文字を含むことがあり(例えば、ハイフンなど)、これらはキーワード引数の名前として利用することができません。例えば、:
+
+``
+DIV('text', _data-role='collapsible')
+``:code
+
+この場合、"_data-role"がハイフンを含むため動作せず、Pythonのシンタックスエラーが発生します。
+
+このような場合、辞書とPythonの``**``関数引数の表記を、代わりに利用できます。この表記は、(キー:バリュー)ペアの辞書をキーワード引数のセットにマッピングします。
+
+``
+>>> print DIV('text', **{'_data-role': 'collapsible'})
+<div data-role="collapsible">text</div>
+``:code
+
+また、特殊なTAGを動的に作成することもできます。
+
+``
+>>> print TAG['soap:Body']('whatever',**{'_xmlns:m':'http://www.example.org'})
+<soap:Body xmlns:m="http://www.example.org">whatever</soap:Body>
+``:code
+
+#### ``XML``
+``XML``:inxx
+
+``XML``はエスケープされるべきでないテキストを、カプセル化するために使用するオブジェクトです。テキストは有効なXMLが含まれる場合もあれば、そうでない場合もあります。例えば、JavaScriptを含むことができます。
+
+次の例のテキストはエスケープされますが：
+``
+>>> print DIV("<b>hello</b>")
+&lt;b&gt;hello&lt;/b&gt;
+``:code
+
+次のように``XML``を使用してエスケープを防ぐことができます：
+``
+>>> print DIV(XML("<b>hello</b>"))
+<b>hello</b>
+``:code
+
+時々、変数に格納されたHTMLをレンダリングしたい場合があります。しかし、HTMLはスクリプトなどの安全でないタグが含まれている可能性があります：
+``
+>>> print XML('<script>alert("unsafe!")</script>')
+<script>alert("unsafe!")</script>
+``:code
+
+このようなエスケープされてない実行可能な入力(例えば、ブログのコメント本文への入力)は、安全ではありません。これを利用して、そのページの他の訪問者に対してクロスサイトスクリプティング(XSS)攻撃を生成し、利用することができるからです。
+
+``sanitize``:inxx
+
+web2pyの``XML``ヘルパーはインジェクションを防ぐためにテキストを無害化することができ、明示的に許可しているものを除き全てのタグをエスケープします。これはその例です:
+``
+>>> print XML('<script>alert("unsafe!")</script>', sanitize=True)
+&lt;script&gt;alert(&quot;unsafe!&quot;)&lt;/script&gt;
+``:code
+
+``XML``のコンストラクタはデフォルトでは、幾つかのタグの中身とそれらの幾つかの属性が安全であると想定します。このデフォルトは、``permitted_tags``と``allowd_attributes``というオプション引数で上書きすることができます。以下に示すのは、``XML``ヘルパーのオプション引数のデフォルトの値です。
+``
+XML(text, sanitize=False,
+    permitted_tags=['a', 'b', 'blockquote', 'br/', 'i', 'li',
+       'ol', 'ul', 'p', 'cite', 'code', 'pre', 'img/'],
+    allowed_attributes={'a':['href', 'title'],
+       'img':['src', 'alt'], 'blockquote':['type']})
+``:code
+
+#### 組み込みヘルパー
+
+##### ``A``
+
+このヘルパーは、リンクを生成するために使用されます。
+
+``A``:inxx
+``
+>>> print A('<click>', XML('<b>me</b>'),
+            _href='http://www.web2py.com')
+<a href='http://www.web2py.com'>&lt;click&gt;<b>me/b></a>
+``:code
+
+``_href``の代わりに、``callback``引数を用いてURLを渡すことができます。例えばビューの中で:
+
+``
+{{=A('click me', callback=URL('myaction'))}}
+``:code
+
+とすると、リンクを押したときの挙動はリダイレクトではなく"myaction"へのajax呼び出しになります。この場合、``target``と``delete``という2つの引数を任意に指定することができます:
+``
+{{=A('click me', callback=URL('myaction'), target="t")}}
+<div id="t"><div>
+``:code
+
+こうすると、ajaxコールバックのレスポンスは、"t"と一致するidのDIVに格納されます。
+
+``
+<div id="b">{{=A('click me', callback=URL('myaction'), delete='div#b")}}</div>
+``:code
+また上記のレスポンスでは、"div#b"にマッチする最も近いタグが削除されます。この例では、ボタンが消されます。
+典型的なアプリケーションは次のようなものです:
+
+``
+{{=A('click me', callback=URL('myaction'), delete='tr")}}
+``:code
+これはテーブル内です。ボタンを押すと、コールバックが実行され、テーブルの行が消されます。
+
+``callback``と``delete``は組み合わせることができます。
+
+Aヘルパーは``cid``という特殊な引数を取ります。これは次のように動作します：
+
+``
+{{=A('linked page', _href='http://example.com', cid='myid')}}
+<div id="myid"></div>
+``:code
+
+リンクをクリックすると、そのdivに中身がロードされるようになります。これは同様なものですが、ページのコンポーネントをリフレッシュするように設計されているため、上の構文よりも強力です。``cid``の応用については第12章のコンポーネントで、詳しく説明します。
+
+上記のajaxの機能を利用するにはjQueryと"static/js/web2py_ajax.js"が必要です。これらは``{{include 'web2py_ajax.html'}}``をレイアウトのheadに置くことで自動的にインクルードされます。"views/web2py_ajax.html"は、``request``に基づいて幾つかの変数を定義し、必要な全てのjsとcssファイルをインクルードします。
+
+
+##### ``B``
+``B``:inxx
+
+このヘルパーは、その中身を太字にします。
+``
+>>> print B('<hello>', XML('<i>world</i>'), _class='test', _id=0)
+<b id="0" class="test">&lt;hello&gt;<i>world</i></b>
+``:code
+
+##### ``BODY``
+``BODY``:inxx
+このヘルパーは、ページのbodyを作成します。
+``
+>>> print BODY('<hello>', XML('<b>world</b>'), _bgcolor='red')
+<body bgcolor="red">&lt;hello&gt;<b>world</b></body>
+``:code
+
+##### ``BR``
+``BR``:inxx
+
+このヘルパーは改行を作成します。
+``
+>>> print BR()
+<br />
+``:code
+
+##### ``CAT`` (1.98.1 and up)
+``CAT``:inxx
+
+このヘルパーは他のヘルパーを連結します。これは、TAG['']と同じです。
+``
+>>> print CAT('Here is a ', A('link',_href=URL()), ', and here is some ', B('bold text'), '.')
+Here is a <a href="/app/default/index">link</a>, and here is some <b>bold text</b>.
+``:code
+
+##### ``CENTER``
+``CENTER``:inxx
+
+このヘルパーは、その中身を中央に配置します。
+``
+>>> print CENTER('<hello>', XML('<b>world</b>'),
+>>>              _class='test', _id=0)
+<center id="0" class="test">&lt;hello&gt;<b>world</b></center>
+``:code
+
+##### ``CODE``
+``CODE``:inxx
+
+このヘルパーは、Python、C、C++、HTML、そして、web2pyのコードでの構文のハイライトを実現します。これはコードリストに対して、``PRE``を使うよりも望ましいです。``CODE``はまた、web2pyのAPIドキュメントへのリンクを作成する機能があります。
+
+ここでは、Pythonコードのセクションをハイライトする例を示します：
+``
+>>> print CODE('print "hello"', language='python').xml()
+<table><tr valign="top"><td style="width:40px; text-align: right;"><pre style="
+        font-size: 11px;
+        font-family: Bitstream Vera Sans Mono,monospace;
+        background-color: transparent;
+            margin: 0;
+            padding: 5px;
+            border: none;
+        background-color: #E0E0E0;
+        color: #A0A0A0;
+    ">1.</pre></td><td><pre style="
+        font-size: 11px;
+        font-family: Bitstream Vera Sans Mono,monospace;
+        background-color: transparent;
+            margin: 0;
+            padding: 5px;
+            border: none;
+            overflow: auto;
+    "><span style="color:#185369; font-weight: bold">print </span>
+    <span style="color: #FF9966">"hello"</span></pre></td></tr>
+</table>
+``:code
+
+HTMLに対して同様の例を示します。
+``
+>>> print CODE(
+>>>   '<html><body>{{=request.env.remote_add}}</body></html>',
+>>>   language='html')
+``:code
+``
+<table>...<code>...
+<html><body>{{=request.env.remote_add}}</body></html>
+...</code>...</table>
+``:code
+
+以下に示すのは``CODE``ヘルパーのデフォルトの引数です：
+``
+CODE("print 'hello world'", language='python', link=None, counter=1, styles={})
+``:code
+
+``language``引数でサポートされている値は、"python"、"html_plain"、"c"、"cpp"、"web2py"、"html"です。"html"言語では、{{及び}}のタグ は"web2py"のコードとして解釈されます。一方、"html_plain"ではそのように解釈されません。
+
+``link``の値が指定される場合、例えば"/examples/global/vars/"とされている場合、コード内のweb2pyのAPIレファレンスがそのリンクURLのドキュメントへ関係付けられます。例えば"request"は、"/examples/global/vars/request"へ関係付けられます。上記の例ではリンクURLは、"global.py"コントローラの"vars"アクションによって処理されます。"global.py"は、web2pyの"examples"アプリケーションの一部として配布されています。
+
+``counter``引数は行番号のために使用されます。これは3種類の値の、いずれかを設定できます。``None``にすると行番号は表示されません。数値で開始番号を指定できます。counterに文字列を設定した場合、プロンプトとして解釈され、行番号は表示されません。
+
+``styles``引数は少し変わっています。上記のように生成されたHTMLを見ると、2つの列からなるテーブルがあり、各列はCSSを用いてインラインで宣言された独自のスタイルを持つことが分かります。``styles``属性は、これら2つのCSSスタイルを上書きできるようにします。例えば次のようにします:
+
+``
+{{=CODE(...,styles={'CODE':'margin: 0;padding: 5px;border: none;'})}}
+``:code
+
+``styles``属性は辞書である必要があり、2つのキーを取りえます: ``CODE``は実際のコードのスタイル、``LINENUMBERS``は行番号を格納する左の列のスタイルです。これらのスタイルは、単純に足すのではなく、デフォルトのスタイルを完全に置き換えることに留意してください。
+
+##### ``COL``
+``COL``:inxx
+
+``
+>>> print COL('a','b')
+<col>ab</col>
+``:code
+
+##### ``COLGROUP``
+``COLGROUP``:inxx
+
+``
+>>> print COLGROUP('a','b')
+<colgroup>ab</colgroup>
+``:code
+
+##### ``DIV``
+``XML``以外の全てのヘルパーは``DIV``から派生し、その基本メソッドを継承しています。
+
+``DIV``:inxx
+``
+>>> print DIV('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<div id="0" class="test">&lt;hello&gt;<b>world</b></div>
+``:code
+
+##### ``EM``
+
+中身を強調します。
+
+``EM``:inxx
+``
+>>> print EM('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<em id="0" class="test">&lt;hello&gt;<b>world</b></em>
+``:code
+
+##### ``FIELDSET``
+``FIELDSET``:inxx
+
+入力フィールドをラベルと共に作成するために使用されます。
+``
+>>> print FIELDSET('Height:', INPUT(_name='height'), _class='test')
+<fieldset class="test">Height:<input name="height" /></fieldset>
+``:code
+
+##### ``FORM``
+``FORM``:inxx
+
+これは最も重要なヘルパーの1つです。単純なフォームでは``<form>...</form>``タグを作り出すだけですが、ヘルパーはオブジェクトであり、そして含まれているものの情報を持っているので、フォームの投稿処理を行うことができます(例えば、フィールドの検証など)。詳細は第7章で説明します。
+``
+>>> print FORM(INPUT(_type='submit'), _action='', _method='post')
+<form enctype="multipart/form-data" action="" method="post">
+<input type="submit" /></form>
+``:code
+
+"enctype"はデフォルトでは"multipart/form-data"です。
+
+``hidden``:inxx
+``FORM``と``SQLFORM``のコンストラクタは、``hidden``という特別な引数を取ることができます。辞書が``hidden``として渡される場合、その項目は"隠し"INPUTフィールドへと変換されます。例えば次のようになります:
+``
+>>> print FORM(hidden=dict(a='b'))
+<form enctype="multipart/form-data" action="" method="post">
+<input value="b" type="hidden" name="a" /></form>
+``:code
+
+##### ``H1``, ``H2``, ``H3``, ``H4``, ``H5``, ``H6``
+``H1``:inxx
+
+これらのヘルパーは、段落の見出しと小見出しに利用します：
+``
+>>> print H1('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<h1 id="0" class="test">&lt;hello&gt;<b>world</b></h1>
+``:code
+
+##### ``HEAD``
+
+HTMLページのHEADをタグ付けに利用します。
+
+``HEAD``:inxx
+``
+>>> print HEAD(TITLE('<hello>', XML('<b>world</b>')))
+<head><title>&lt;hello&gt;<b>world</b></title></head>
+``:code
+
+##### ``HTML``
+``HTML``:inxx ``XHTML``:inxx
+
+このヘルパーは少し異なります。``<html>``タグの作成に加えて、doctype文字列をタグの前に付加します``xhtml:w,xhtml:o,xhtml:school``:cite。
+``
+>>> print HTML(BODY('<hello>', XML('<b>world</b>')))
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                      "http://www.w3.org/TR/html4/loose.dtd">
+<html><body>&lt;hello&gt;<b>world</b></body></html>
+``:code
+
+HTMLヘルパーは、幾つかの追加のオプション引数を取り、次のようなデフォルト値を持ちます：
+``
+HTML(..., lang='en', doctype='transitional')
+``:code
+
+doctypeは 'strict'、'transitional'、'frameset'、'html5'、または、完全なdoctype文字列にすることができます。
+
+##### ``XHTML``
+``XHTML``:inxx
+
+XHTMLはHTMLに似ていますが、代わりにXHTMLのdoctypeを作成します。
+``
+XHTML(..., lang='en', doctype='transitional', xmlns='http://www.w3.org/1999/xhtml')
+``:code
+
+doctypeは、'strict'、'transitional'、'frameset'、または、完全なdoctype文字列にすることができます。
+
+##### ``HR``
+``HR``:inxx
+
+このヘルパーは、水平ラインをHTMLページに作成します。
+``
+>>> print HR()
+<hr />
+``:code
+
+##### ``I``
+``I``:inxx
+
+このヘルパーはその中身をイタリックにします。
+``
+>>> print I('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<i id="0" class="test">&lt;hello&gt;<b>world</b></i>
+``:code
+
+##### ``INPUT``
+``INPUT``:inxx
+
+``<input.../>``タグを作成します。inputタグは、他のタグを含まないので、``>``ではなく、``/>``で閉じられます。inputタグは、オプション属性``_type``を持ち、"text" (デフォルト)や、"submit"、"checkbox",、"radio" といった値を設定できます。
+``
+>>> print INPUT(_name='test', _value='a')
+<input value="a" name="test" />
+``:code
+
+これはまた、"value"という"_value"とは異なる特殊なオプション引数を取ります。後者は、inputフィールドに対してデフォルト値を設定します。一方、前者は現在の値を設定します。"text"タイプの入力の場合、前者は後者を上書きします：
+``
+>>> print INPUT(_name='test', _value='a', value='b')
+<input value="b" name="test" />
+``:code
+
+ラジオボタンでは``INPUT``は、選択の"checked"属性を設定します：
+
+``radio``:inxx
+``
+>>> for v in ['a', 'b', 'c']:
+>>>     print INPUT(_type='radio', _name='test', _value=v, value='b'), v
+<input value="a" type="radio" name="test" /> a
+<input value="b" type="radio" checked="checked" name="test" /> b
+<input value="c" type="radio" name="test" /> c
+``:code
+
+チェックボックスでも同様です：
+
+``checkbox``:inxx
+``
+>>> print INPUT(_type='checkbox', _name='test', _value='a', value=True)
+<input value="a" type="checkbox" checked="checked" name="test" />
+>>> print INPUT(_type='checkbox', _name='test', _value='a', value=False)
+<input value="a" type="checkbox" name="test" />
+``:code
+
+##### ``IFRAME``
+
+このヘルパーは、現在のページに別のWebページを取り込みます。他のページのURLは"_src"属性で指定します。
+
+``IFRAME``:inxx
+``
+>>> print IFRAME(_src='http://www.web2py.com')
+<iframe src="http://www.web2py.com"></iframe>
+``:code
+
+##### ``IMG``
+``IMG``:inxx
+
+HTMLに画像を埋め込むために使用できます：
+
+``
+>>> IMG(_src='http://example.com/image.png',_alt='test')
+<img src="http://example.com/image.ong" alt="rest" />
+``:code
+
+次に示すのは、AとIMGとURLのヘルパーを組み合わせて、リンク付きの静止画像を取り込んだものです：
+
+``
+>>> A(IMG(_src=URL('static','logo.png'), _alt="My Logo"),
+      _href=URL('default','index'))
+<a href="/myapp/default/index">
+  <img src="/myapp/static/logo.png" alt="My Logo" />
+</a>
+``:code
+
+##### ``LABEL``
+
+INPUTフィールド用のLABELタグを作成するために使用されます。
+
+``LABEL``:inxx
+``
+>>> print LABEL('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<label id="0" class="test">&lt;hello&gt;<b>world</b></label>
+``:code
+
+##### ``LEGEND``
+
+フォームの中のフィールドに対するLEGENDタグを作成するために使用されます。
+
+``LEGEND``:inxx
+``
+>>> print LEGEND('Name', _for='myfield')
+<legend for="myfield">Name</legend>
+``:code
+
+##### ``LI``
+
+リスト項目を作成します。``UL``まはた``OL``タグの中に含めるべきです。
+
+``LI``:inxx
+``
+>>> print LI('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<li id="0" class="test">&lt;hello&gt;<b>world</b></li>
+``:code
+
+##### ``META``
+
+``HTML``のheadで、``META``タグを作成するために使用します。例:
+
+``META``:inxx
+``
+>>> print META(_name='security', _content='high')
+<meta name="security" content="high" />
+``:code
+
+##### ``MARKMIN``
+
+markminのwiki構文を実装します。下の例ではmarkminのルールに従って、記述されたテキスト入力をhtml出力に変換します：
+
+``MARKMIN``:inxx
+``
+>>> print MARKMIN("this is **bold** or ''italic'' and this [[a link http://web2py.com]]")
+<p>this is <b>bold</b> or <i>italic</i> and
+this <a href="http://web2py.com">a link</a></p>
+``:code
+
+markminの構文は、web2pyに付属している次のファイルで説明しています：
+``
+http://127.0.0.1:8000/examples/static/markmin.html
+``:code
+
+幾つかの例は、第12章のMARKMINを多用するplugin_wikiの説明で示します。
+
+markminを用いて、HTML、LateX、PDFドキュメントを生成することができます。
+
+``
+m = "Hello **world** [[link http://web2py.com]]"
+from gluon.contrib.markmin.markmin2html import markmin2html
+print markmin2html(m)
+from gluon.contrib.markmin.markmin2latex import markmin2latex
+print markmin2latex(m)
+from gluon.contrib.markmin.markmin2pdf import markmin2pdf
+print markmin2pdf(m) # requires pdflatex
+``:code
+
+(``MARKMIN``ヘルパーは``markmin2html``のショートカットです)
+
+以下に基本構文の初歩を示します:
+
+--------------------------------------------------
+**SOURCE**                 | **OUTPUT**
+``# title``                | **title**
+``## section``             | **section**
+``### subsection``         | **subsection**
+``**bold**``               | **bold**
+``''italic''``             | ''italic''
+``!`!`verbatim`!`!``       | ``verbatim``
+``http://google.com``      | http://google.com
+``http://...`` | ``<a href="http://...">http:...</a>``
+``http://...png`` | ``<img src="http://...png" />``
+``http://...mp3`` | ``<audio src="http://...mp3"></audio>``
+``http://...mp4`` | ``<video src="http://...mp4"></video>``
+``qr:http://...`` | ``<a href="http://..."><img src="qr code"/></a>``
+``embed:http://...`` | ``<iframe src="http://..."></iframe>``
+``[[click me #myanchor]]`` | [[click me #myanchor]]
+``$````$\int_a^b sin(x)dx$````$``  | $$\int_a^b sin(x)dx$$
+---------------------------------------------------
+
+画像やビデオ、音声ファイルへのマークアップなしのリンクを単純に含めると、対応する画像、ビデオ、音声ファイルが自動的に組み込まれます(音声とビデオにはHTMLの<audio>と<video>タグを使用します)。
+
+リンクに``qr:``プレフィックスを次のように追加すると、
+
+``
+qr:http://web2py.com
+``
+
+対応するQRコードが埋め込まれ、指定したURLへリンクするようになります。
+
+リンクに``embed:``プレフィックスを次のように追加すると、
+
+``
+embed:http://www.youtube.com/embed/x1w8hKTJ2Co
+`` 
+
+埋め込まれたページが表示されます。この場合は、youtubeのビデオが埋め込まれます。
+
+画像はまた、次のような構文で埋め込むことができます。
+
+``
+[[image-description http://.../image.png right 200px]]
+``
+
+順序がないリストは次のように書きます:
+``
+- one
+- two
+- three
+``
+
+順序付きリストは次のように書きます:
+``
++ one
++ two
++ three
+``
+
+テーブルは次のように書きます:
+``
+----------
+ X | 0 | 0
+ 0 | X | 0
+ 0 | 0 | 1
+----------
+``
+
+MARKMIN構文はまた、blockquotesや、HTML5のaudio、videoタグ、画像の位置調整、カスタムCSSをサポートし、拡張することができます:
+
+``
+MARKMIN("!`!!`!abab!`!!`!:custom", extra=dict(custom=lambda text: text.replace('a','c'))
+``:code
+
+これは次のものを生成します。
+
+``'cbcb'``:code
+
+カスタムブロックは``!`!!`!...!`!!`!:<key>``によって区切られ、そしてMARKMINの特別な辞書引数の対応するキーの値として、渡される関数によってレンダリングされます。関数は、XSSを防ぐために出力をエスケープする必要があるかもしれないことに注意してください。
+
+##### ``OBJECT``
+
+HTMLにオブジェクト(例えば、flashプレーヤーなど)を埋め込むために使用します。
+
+``OBJECT``:inxx
+``
+>>> print OBJECT('<hello>', XML('<b>world</b>'),
+>>>              _src='http://www.web2py.com')
+<object src="http://www.web2py.com">&lt;hello&gt;<b>world</b></object>
+``:code
+
+##### ``OL``
+
+順序付きリストを表します。リストはLIタグを含める必要があります。``LI``オブジェクトでない``OL``の引数は、自動的に``<li>...</li>``タグで囲まれます。
+
+``OL``:inxx
+``
+>>> print OL('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<ol id="0" class="test"><li>&lt;hello&gt;</li><li><b>world</b></li></ol>
+``:code
+
+##### ``ON``
+
+これは後方互換のためにあり、単に``True``の別名となります。チェックボックスで利用されますが、``True``の方がよりPython的ですので、非推奨になっています。
+
+``ON``:inxx
+``
+>>> print INPUT(_type='checkbox', _name='test', _checked=ON)
+<input checked="checked" type="checkbox" name="test" />
+``:code
+
+##### ``OPTGROUP``
+
+SELECT内の複数のオプションをグループ化することを可能にします。CSSでフィールドをカスタマイズするのに便利です。
+
+``OPTGROUP``:inxx
+``
+>>> print SELECT('a', OPTGROUP('b', 'c'))
+<select>
+  <option value="a">a</option>
+  <optgroup>
+    <option value="b">b</option>
+    <option value="c">c</option>
+  </optgroup>
+</select>
+``:code
+
+##### ``OPTION``
+
+SELECT/OPTIONの組み合わせの一部としてのみ使用されるものです。
+This should only be used as part of a SELECT/OPTION combination.
+
+``OPTION``:inxx
+``
+>>> print OPTION('<hello>', XML('<b>world</b>'), _value='a')
+<option value="a">&lt;hello&gt;<b>world</b></option>
+``:code
+
+``INPUT``の場合と同じようにweb2pyは、"_value"(OPTIONの値)と"value"(SELECTボックスの現在の値)を区別することができます。もしそれらが等しい場合、オプションは"selected"になります。
+
+``selected``:inxx
+``
+>>> print SELECT('a', 'b', value='b'):
+<select>
+<option value="a">a</option>
+<option value="b" selected="selected">b</option>
+</select>
+``:code
+
+##### ``P``
+``P``:inxx
+
+段落のタグ付けに利用します。
+``
+>>> print P('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<p id="0" class="test">&lt;hello&gt;<b>world</b></p>
+``:code
+
+##### ``PRE``
+``PRE``:inxx
+
+整形済みテキストを表示するための``<pre>...</pre>``タグを生成します。``CODE``ヘルパーのほうが、コードリストには一般に望ましいです。
+``
+>>> print PRE('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<pre id="0" class="test">&lt;hello&gt;<b>world</b></pre>
+``:code
+
+##### ``SCRIPT``
+``SCRIPT``:inxx
+
+JavaScriptなどのスクリプトを組み込む、または、リンクします。タグに包まれる内容は、実際に古いブラウザのために、HTMLのコメントとしてレンダリングされます。
+``
+>>> print SCRIPT('alert("hello world");', _language='javascript')
+<script language="javascript"><!--
+alert("hello world");
+//--></script>
+``:code
+
+##### ``SELECT``
+``SELECT``:inxx
+
+``<select>...</select>``タグを作成します。これは、``OPTION``ヘルパーとともに使用されます。``OPTION``オブジェクト以外の``SELECT``引数は、自動的にoptionに変換されます。
+``
+>>> print SELECT('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<select id="0" class="test">
+   <option value="&lt;hello&gt;">&lt;hello&gt;</option>
+   <option value="&lt;b&gt;world&lt;/b&gt;"><b>world</b></option>
+</select>
+``:code
+
+##### ``SPAN``
+``SPAN``:inxx
+
+``DIV``と似ていますが、(ブロックよりも)インラインのコンテンツをタグ付けするのに使用されます。
+``
+>>> print SPAN('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<span id="0" class="test">&lt;hello&gt;<b>world</b></span>
+``:code
+
+##### ``STYLE``
+``STYLE``:inxx
+
+scriptと似ていますが、CSSコードを組み込む、もしくは、リンクするために使用されます。次に示すのは、CSSを組み込んだ例です：
+``
+>>> print STYLE(XML('body {color: white}'))
+<style><!--
+body { color: white }
+//--></style>
+``:code
+
+また、リンクする例です：
+``
+>>> print STYLE(_src='style.css')
+<style src="style.css"><!--
+//--></style>
+``:code
+
+##### ``TABLE``, ``TR``, ``TD``
+``TABLE``:inxx ``TR``:inxx ``TD``:inxx
+
+これらのタグは(オプション的な``THEAD``、``TBODY``、``TFOOTER``ヘルパーとともに)HTMLテーブルを作成するために使用されます。
+``
+>>> print TABLE(TR(TD('a'), TD('b')), TR(TD('c'), TD('d')))
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+``TR``は``TD``が来ることを想定しています。つまり、``TD``オブジェクトでない引数は自動的に変換されます：
+``
+>>> print TABLE(TR('a', 'b'), TR('c', 'd'))
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+
+Python配列からHTMLテーブルへはPythonの``*``関数引数の表記を使用すると、リスト要素が関数引数の位置にマッピングされるため、容易に変換することができます。
+
+次の例では、行単位で実行しています：
+``
+>>> table = [['a', 'b'], ['c', 'd']]
+>>> print TABLE(TR(*table[0]), TR(*table[1]))
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+
+次の例では、一度に全ての行で実行しています：
+``
+>>> table = [['a', 'b'], ['c', 'd']]
+>>> print TABLE(*[TR(*rows) for rows in table])
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+
+##### ``TBODY``
+``TBODY``:inxx
+
+テーブルのボディーに含む行集合を、タグ付けするのに使用されます。ヘッダーやフッターの行集合と対称です。これは任意なものです。
+``
+>>> print TBODY(TR('<hello>'), _class='test', _id=0)
+<tbody id="0" class="test"><tr><td>&lt;hello&gt;</td></tr></tbody>
+``:code
+
+##### ``TEXTAREA``
+``TEXTAREA``:inxx
+
+``<textarea>...</textarea>``タグを作成するヘルパーです。
+``
+>>> print TEXTAREA('<hello>', XML('<b>world</b>'), _class='test')
+<textarea class="test" cols="40" rows="10">&lt;hello&gt;<b>world</b></textarea>
+``:code
+
+唯一の注意点は、オプションの"value"が、その内容(内部HTML)を上書きすることです。
+``
+>>> print TEXTAREA(value="<hello world>", _class="test")
+<textarea class="test" cols="40" rows="10">&lt;hello world&gt;</textarea>
+``:code
+
+##### ``TFOOT``
+``TFOOT``:inxx
+
+テーブルのフッターの行集合をタグ付けするのに使用されます。
+``
+>>> print TFOOT(TR(TD('<hello>')), _class='test', _id=0)
+<tfoot id="0" class="test"><tr><td>&lt;hello&gt;</td></tr></tfoot>
+``:code
+
+##### ``TH``
+``TH``:inxx
+
+テーブルのヘッダーにおいて、``TD``の代わりに使用されます。
+``
+>>> print TH('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<th id="0" class="test">&lt;hello&gt;<b>world</b></th>
+``:code
+
+##### ``THEAD``
+``THEAD``:inxx
+
+テーブルのヘッダーの行集合をタグ付けするために使用されます。
+``
+>>> print THEAD(TR(TH('<hello>')), _class='test', _id=0)
+<thead id="0" class="test"><tr><th>&lt;hello&gt;</th></tr></thead>
+``:code
+
+##### ``TITLE``
+``TITLE``:inxx
+
+HTMLヘッダーにて、ページのタイトルをタグ付けするのに使用されます。
+``
+>>> print TITLE('<hello>', XML('<b>world</b>'))
+<title>&lt;hello&gt;<b>world</b></title>
+``:code
+
+##### ``TR``
+``TR``:inxx
+
+テーブルの行をタグ付けします。テーブルの内部でレンダリングされ、かつ、``<td>...</td>``タグを含む必要があります。``TD``オブジェクトでない``TR``の引数は、自動でに変換されます。
+``
+>>> print TR('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<tr id="0" class="test"><td>&lt;hello&gt;</td><td><b>world</b></td></tr>
+``:code
+
+##### ``TT``
+``TT``:inxx
+
+タイプライタ(固定幅)テキストとしてのテキストをタグ付けします。
+``
+>>> print TT('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<tt id="0" class="test">&lt;hello&gt;<b>world</b></tt>
+``:code
+
+##### ``UL``
+
+順序のないリストを示します。LIの項目を含める必要があります。中身がLIとしてタグ付けされていない場合は、ULが自動で変換します。
+
+``UL``:inxx
+``
+>>> print UL('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<ul id="0" class="test"><li>&lt;hello&gt;</li><li><b>world</b></li></ul>
+``:code
+
+##### ``embed64``
+
+``embed64(filename=None, file=None, data=None, extension='image/gif')``は与えられた(バイナリ)データをbase64にエンコードします。
+
+filename: 指定された場合、このファイルを'rb'モードで開き、読み出します。
+file: 指定された場合、このファイルを読みだします。
+data: 指定された場合、指定されたデータを使用します。
+
+``embed64``:inxx
+
+##### ``xmlescape``
+
+``xmlescape(data, quote=True)``は指定されたデータのエスケープされた文字列を返します。
+
+``xmlescape``:inxx
+``
+>>> print xmlescape('<hello>')
+&lt;hello&gt;
+``:code
+
+#### カスタム・ヘルパー
+
+##### ``TAG``
+``TAG``:inxx
+
+独自のXMLタグを生成したい場合があるかもしれません。web2pyは、普遍的なタグ生成機能として``TAG``を提供しています。
+``
+{{=TAG.name('a', 'b', _c='d')}}
+``:code
+
+これは、次のようなXMLを生成します。
+``
+<name c="d">ab</name>
+``:code
+
+引数"a"、"b"、"d"は自動的にエスケープされます。この挙動を抑えるには``XML``ヘルパーを用いてください。``TAG``を使用し、APIに提供されていないHTML/XMLタグを生成することができます。TAGはネストさせることができ、``str()``によってシリアライズすることができます。同等の構文は次の通りです：
+``
+{{=TAG['name']('a', 'b', c='d')}}
+``:code
+
+TAGオブジェクトが空の名前で作成された場合、囲むためのタグを挿入せずに、複数文字列及びHTMLヘルパーを連結するために使用することができます。しかしこのような用途は、非推奨になりました。代わりに``CAT``を使用してください。
+
+なお``TAG``はオブジェクトで、``TAG.name``または``TAG['name']``は、一時的なヘルパークラスを返す関数です。
+
+##### ``MENU``
+``MENU``:inxx
+
+MENUヘルパーは、(第4章で説明している)``response.menu``の、リストのリストまたはリストのタプルを取り、メニューを表現する順序のないリストを用いてツリー型の構造を生成します。例えば次のようになります:
+``
+>>> print MENU([['One', False, 'link1'], ['Two', False, 'link2']])
+<ul class="web2py-menu web2py-menu-vertical">
+  <li><a href="link1">One</a></li>
+  <li><a href="link2">Two</a></li>
+</ul>
+``:code
+
+各メニュー項目は、ネストするサブメニューを第4引数に持つことができます(同じように再帰的に続きます)：
+``
+>>> print MENU([['One', False, 'link1', [['Two', False, 'link2']]]])
+<ul class="web2py-menu web2py-menu-vertical">
+  <li class="web2py-menu-expand">
+     <a href="link1">One</a>
+     <ul class="web2py-menu-vertical">
+        <li><a href="link2">Two</a></li>
+     </ul>
+  </li>
+</ul>
+``:code
+
+MENUヘルパーは次のオプション引数を取ります：
+- ``_class``: 外側のUL要素のクラスを設定します。デフォルトは"web2py-menu web2py-menu-vertical"です。
+- ``ul_class``: 内側のUL要素のクラスを設定します。デフォルトは "web2py-menu-vertical"です。
+- ``li_class``: 内側のLI要素のクラスを設定します。デフォルトは"web2py-menu-expand"です。
+
+``mobile``:inxx
+
+``MENU``は``mobile``というオプション引数を取ります。``True``が設定された場合、再帰的な``UL``メニュー構造を生成するのに代わり、``SELECT``ドロップダウンを返します。これは、全てのメニューオプションを持ち、選択オプションに対応したページにリダイレクトする``onchange``属性を持ちます。これは電話のような小さなモバイルデバイスで、ユーザービリティを向上させる代替メニュー表示のために設計されています。
+
+通常メニューは、次の構文でレイアウトに使用されます。
+
+``
+{{=MENU(response.menu, mobile=request.user_agent().is_mobile)}}
+``
+
+このようにモバイルデバイスは自動で検知され、それに従ってメニューはレンダリングされます。
+
+### ``BEAUTIFY``
+``BEAUTIFY``は、リストやタプル、辞書を含む、複合的なオブジェクトのHTML表現を構築するために使用されます：
+``
+{{=BEAUTIFY({"a": ["hello", XML("world")], "b": (1, 2)})}}
+``:code
+``BEAUTIFY``はXMLへとシリアライズされるXMLのようなオブジェクトを、コンストラクタの引数の見栄えの良い表現とともに返します。この場合、次のようなXML表現は：
+``
+{"a": ["hello", XML("world")], "b": (1, 2)}
+``:code
+
+次のようにレンダリングされます：
+``
+<table>
+<tr><td>a</td><td>:</td><td>hello<br />world</td></tr>
+<tr><td>b</td><td>:</td><td>1<br />2</td></tr>
+</table>
+``:code
+
+### サーバーサイドの''DOM''と構文解析
+``element``:inxx ``elements``:inxx
+
+#### ``elements``
+
+DIVヘルパーと全ての派生ヘルパーは、検索メソッドの``element``と``elements``を提供します。
+
+``element``は、指定した条件にマッチする最初の子供要素を返します(マッチするものがない場合、Noneを返します)。
+
+``elements``は、マッチした全ての子供のリストを返します。
+
+**element**と**elements**はマッチ条件を指定するのにも同じ構文を用います。この構文は、次のように使用の許された３種のタイプがあり、混合してマッチングに使用可能です：jQueryのような表現と、正確に属性値と照合するもの、正規表現を使用して照合するものです。
+
+ここでは簡単な例を示します：
+``
+>>> a = DIV(DIV(DIV('a', _id='target',_class='abc')))
+>>> d = a.elements('div#target')
+>>> d[0][0] = 'changed'
+>>> print a
+<div><div><div id="target" class="abc">changed</div></div></div>
+``:code
+
+無名引数の``elements``は、次のものを含む文字列です：タグの名前、ポンド記号が前に付くタグのID、ドットが前に付くクラス、角括弧内にある属性の明示的な値です。
+
+ここでは、前述のタグをIDで検索するための4つの同等な方法を示します：
+``
+>>> d = a.elements('#target')
+>>> d = a.elements('div#target')
+>>> d = a.elements('div[id=target]')
+>>> d = a.elements('div',_id='target')
+``:code
+
+ここでは、前述のタグをクラスで検索するための4つの同等な方法を示します：
+``
+>>> d = a.elements('.abc')
+>>> d = a.elements('div.abc')
+>>> d = a.elements('div[class=abc]')
+>>> d = a.elements('div',_class='abc')
+``:code
+
+任意の属性は、要素の場所を特定するのに用いることができます(``id``や``class``だけではありません)。複数の属性(element関数は複数の名前付き引数を取ることができます)を用いることができますが、最初にマッチした要素だけを返します。
+
+jQueryの構文"div#target"を用いて、スペースで区切られた複数の検索条件を指定することも可能です：
+``
+>>> a = DIV(SPAN('a', _id='t1'),DIV('b',_class='c2'))
+>>> d = a.elements('span#t1, div#c2')
+``:code
+
+または次のように書けます
+``
+>>> a = DIV(SPAN('a', _id='t1'),DIV('b',_class='c2'))
+>>> d = a.elements('span#t1','div#c2')
+``:code
+
+属性の値が名前付き引数で指定されている場合、文字列か正規表現を取ることができます：
+``
+>>> a = DIV(SPAN('a', _id='test123'), DIV('b',_class='c2'))
+>>> d = a.elements('span', _id=re.compile('test\d{3}')
+``:code
+
+DIV(とその派生)ヘルパーの特別な名前付き引数は``find``です。これは、タグのテキスト内容に対する、検索値、または、検索の正規表現を指定するために用いられます。例えば次のようになります:
+``
+>>> a = DIV(SPAN('abcde'), DIV('fghij'))
+>>> d = a.elements(find='bcd')
+>>> print d[0]
+<span>abcde</span>
+``:code
+
+または
+``
+>>> a = DIV(SPAN('abcde'), DIV('fghij'))
+>>> d = a.elements(find=re.compile('fg\w{3}'))
+>>> print d[0]
+<div>fghij</div>
+``:code
+
+#### ``components``
+html文字列の全ての要素を列挙する例を示します：
+``
+html = TAG('<a>xxx</a><b>yyy</b>')
+for item in html.components: print item
+``:code
+
+#### ``parent``
+``parent``は、現在の要素の親を返します。
+``
+>>> a = DIV(SPAN('a'),DIV('b'))
+>>> d = a.element('a').parent()
+>>> d['_class']='abc'
+>>> print a
+<div class="abc"><span>a</span><div>b</div></div>
+``:code
+
+#### ``flatten``
+
+flattenメソッドは、再帰的に、与えられた要素の子要素の中身を標準の(タグなし)テキストにシリアライズします：
+``
+>>> a = DIV(SPAN('this', DIV('is', B('a'))), SPAN('test'))
+>>> print a.flatten()
+thisisatest
+``:code
+
+flattenでは、オプション引数の``render``を渡すことができます。すなわち、異なるプロトコルを使用して中身をレンダリング/フラット化する関数です。次に示すのは、幾つかのタグをMarkminのwiki構文へとシリアライズする例です：
+``
+>>> a = DIV(H1('title'), P('example of a ', A('link', _href='#test')))
+>>> from gluon.html import markmin_serializer
+>>> print a.flatten(render=markmin_serializer)
+## titles
+
+example of [[a link #test]]
+``:code
+
+書き込む際には、``markmin_serializer``と``markdown_serializer``が用意されています。
+
+#### 構文解析
+
+TAGオブジェクトはXML/HTMLの構文解析器でもあります。テキストを読み込んで、ヘルパーのツリー構造へと変換することができます。これにより、上記のAPIを利用した操作を可能にします：
+``
+>>> html = '<h1>Title</h1><p>this is a <span>test</span></p>'
+>>> parsed_html = TAG(html)
+>>> parsed_html.element('span')[0]='TEST'
+>>> print parsed_html
+<h1>Title</h1><p>this is a <span>TEST</span></p>
+``:code
+
+### ページレイアウト
+``page layout``:inxx ``layout.html``:inxx ``extent``:inxx ``include``:inxx
+
+ビューはツリー状の構造中に、拡張や他のビューを取り込むことができます。
+
+例えば、"layout.html"を拡張し、"body.html"を取り込んだ"index.html"というビューを考えることができます。同時に、"layout.html"は、"header.html"や"footer.html"を取り込むこともあります。
+
+ツリーのルートは、レイアウトビューと呼ばれます。他のTHMLテンプレートファイルと同様に、web2pyの管理インタフェースを用いてそれを編集することができます。ファイル名"layout.html"は単なる慣例です。
+
+ここでは、"layout.html"ビューを拡張し、"page.html"ビューを取り込んだ最小のページを示します：
+
+``
+{{extend 'layout.html'}}
+<h1>Hello World</h1>
+{{include 'page.html'}}
+``:code
+
+この拡張したレイアウトファイルは、次のように、``{{include}}``ディレクティブを必ず含まなければなりません：
+``
+<html>
+  <head>
+    <title>Page Title</title>
+  </head>
+  <body>
+    {{include}}
+  </body>
+</html>
+``:code
+
+
+ビューが呼び出されると、拡張した(レイアウト)ビューが呼び出され、呼び出したビューはレイアウト内部の``{{include}}``ディレクティブを置換します。この処理は再帰的に、全ての``extend``と``include``ディレクティブの処理が終わるまで行われます。そして、結果のテンプレートは、Pythonコードに変換されます。ただし、アプリケーションがバイトコードにコンパイルされている場合、コンパイルされているのはPythonコードであり、オリジナルのビューファイル自身ではありません。したがって、提供されたビューのバイトコードにコンパイルされたされたバージョンは、オリジナルのビューファイルだけでなく、拡張とインクルードしたビューの全体ツリーの、Pythonコードを含む単一の.pycファイルになります。
+
+-------
+``extend``、``include``、``block``、``super``、はテンプレート固有のディレクティブで、Pythonのコマンドではありません。
+-------
+
+``{{extend ...}}``ディレクティブの前にある、どのコンテンツまたはコードも、拡張したビューのコンテンツ/コードの始まりの前に挿入(したがって実行)されます。実際、HTMLコンテンツを、拡張ビューのコンテンツの前に挿入することは稀です。しかし拡張したビューで利用可能にする、変数や関数を定義するのに便利です。例えば、次のような"index.html"ビューを考えます:
+``
+{{sidebar_enabled=True}}
+{{extend 'layout.html'}}
+<h1>Home Page</h1>
+``:code
+
+そして、次のような"layout.html"の抜粋を考えます。
+``
+{{if sidebar_enabled:}}
+    <div id="sidebar">
+        Sidebar Content
+    </div>
+{{pass}}
+``:code
+
+"index.html"における``extend``の前の``sidebar_enabled``の指定によって、"layout.html"が始まる前にその行が挿入され、"layout.html"のコード内のどの場所でも``sidebar_enabled``が有効になります(この洗練されたバージョンが**welcome**アプリにおいて使用されています)。
+
+なおコントローラの関数から返された変数は、その関数のメインのビューだけでなく、全ての拡張あるいはインクルードしたビュー中でも利用可能です。
+
+``extend``または``include``の引数(つまり拡張もしくはインクルードしたビューの名前)は、python変数(python式ではありません)にすることができます。しかし、これには制約があります。 -- ``extend``または``include``命令文に変数を使用するビューは、バイトコードにコンパイルすることはできません。前述したとおり、バイトコードにコンパイルされたビューは、拡張及びインクルードしたビューの全体ツリーを含んでいます。このため拡張及びインクルードされた指定のビューは、コンパイル時点で判明している必要があります。ビューの名前が変数の場合、これが不可能です(その値はランタイム時まで決定できないからです)。バイトコードにコンパイルされているビューは大幅な速度向上が期待できるため、``extend``や``include``に変数を使用するのは、一般に可能な限り避けたほうがよいでしょう。
+
+場合によっては、``include``の変数を用いる代わりに、通常の``{{include ...}}``ディレクティブを``if...else``ブロックの中に単に置くこともできます。
+
+``
+{{if some_condition:}}
+{{include 'this_view.html'}}
+{{else:}}
+{{include 'that_view.html'}}
+{{pass}}
+``:code
+
+上記のコードでは変数を含んでいないので、バイトコードのコンパイルに関する問題は生じません。ただしバイトコードにコンパイルしたビューは、"this_view.html"と"that_view.html"の両方のPythonコードを、``some_condition``の値によって片方しか実行されない場合でも含んでいます。
+
+注意として、これは``include``に対してのみ機能します。 -- ``{{extend ...}}``指示文は``if...else``ブロックの中に置くことはできません。
+
+``response.menu``:inxx ``menu``:inxx ``response.meta``:inxx ``meta``:inxx
+
+レイアウトは、ページの共通性(ヘッダー、フッター、メニュー)をカプセル化するために使用されます。それらは必須ではないですが、アプリケーションを書きやすく、保守しやすくします。とりわけコントローラで設定することのできる、次の変数を活用するレイアウトを書くことを推奨します。これらのよく知られた変数を用いることは、レイアウトを交換可能にするのに役立ちます：
+``
+response.title
+response.subtitle
+response.meta.author
+response.meta.keywords
+response.meta.description
+response.flash
+response.menu
+response.files
+``:code
+
+``menu``と``files``を除いて、これらの全ての文字列と意味は明らかです。
+
+``response.menu``のメニューは、3-タプル、または、4-タプルからなるリストです。その3つの要素は、リンクの名前、リンクがアクティブ(現在のリンク)かどうかを示すブール値、リンク先のページのURLです。例えば次のようになります:
+``
+response.menu = [('Google', False, 'http://www.google.com',[]),
+                 ('Index',  True,  URL('index'), [])]
+``:code
+
+``sub-menu``:inxx
+第4のタプル要素は、オプションのサブメニューです。
+
+``response.files``は、ページで必要とするCSSとJSファイルのリストです。
+
+同様に、次のものをHTMLのheadで使用することを推奨しています：
+
+``
+{{include 'web2py_ajax.html'}}
+``:code
+
+これによって特殊効果やAjaxのための、jQueryライブラリと幾つかの後方互換があるJavaScript関数の定義が組み込まれます。"web2py_ajax.html"は、ビューの``response.meta``タグや、jQeuryのベース、カレンダーの日付選択機能、そして必要な全ての``response.files``のCSSとJSを含みます。
+
+#### デフォルトのページのレイアウト
+``superfish``:inxx ``ez.css``:inxx
+
+ここで示すのは、web2pyの雛形アプリケーション**welcome**に付属する最小の"views/layout.html"です(付属のパーツは省いています)。新規のアプリケーションはどれも、同様のデフォルトレイアウトを持っています：
+
+``
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8" />
+  <title>{{=response.title or request.application}}</title>
+
+  <!-- http://dev.w3.org/html5/markup/meta.name.html -->
+  <meta name="application-name" content="{{=request.application}}" />
+
+  <script src="{{=URL('static','js/modernizr.custom.js')}}"></script>
+
+  <!-- include stylesheets -->
+  {{
+  response.files.append(URL('static','css/skeleton.css'))
+  response.files.append(URL('static','css/web2py.css'))
+  response.files.append(URL('static','css/superfish.css'))
+  response.files.append(URL('static','js/superfish.js'))
+  }}
+
+  {{include 'web2py_ajax.html'}}
+
+  <script type="text/javascript">
+    jQuery(function(){ jQuery('ul.sf-menu').supersubs({minWidth:12,maxWidth:30,extraWidth:3}).superfish(); });
+  </script>
+
+  {{
+  # using sidebars need to know what sidebar you want to use
+  left_sidebar_enabled = globals().get('left_sidebar_enabled',False)
+  right_sidebar_enabled = globals().get('right_sidebar_enabled',False)
+  middle_columns = {0:'sixteen',1:'twelve',2:'eight'}[
+     (left_sidebar_enabled and 1 or 0)+(right_sidebar_enabled and 1 or 0)]
+  }}
+
+</head>
+<body>
+  <div class="wrapper"><!-- for sticky footer -->
+
+    <div class="topbar">
+      <div class="container">
+        <div class="sixteen columns">
+          <div id="navbar">
+            {{='auth' in globals() and auth.navbar(separators=(' ',' | ',''))}}
+          </div>
+          <div id="menu">
+            {{=MENU(response.menu, 
+                    _class='mobile-menu' if is_mobile else 'sf-menu',
+                    mobile=request.user_agent().is_mobile)}}
+          </div>
+        </div>
+      </div>
+    </div><!-- topbar -->
+
+    <div class="flash">{{=response.flash or ''}}</div>
+
+    <div class="header">
+      <div class="container">
+        <div class="sixteen columns">
+          <h1 class="remove-bottom" style="margin-top: .5em;">
+          {{=response.title or request.application}}
+          </h1>
+          <h5>{{=response.subtitle or ''}}</h5>
+        </div>
+
+        <div class="sixteen columns">
+          <div class="statusbar">
+            {{block statusbar}}
+            <span class="breadcrumbs">{{=request.function}}</span>
+            {{end}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="container">
+        {{if left_sidebar_enabled:}}
+        <div class="four columns left-sidebar">
+          {{block left_sidebar}}
+          <h3>Left Sidebar</h3>
+          <p></p>
+          {{end}}
+        </div>
+        {{pass}}
+
+        <div class="{{=middle_columns}} columns center">
+          {{block center}}
+          {{include}}
+          {{end}}
+        </div>
+
+        {{if right_sidebar_enabled:}}
+        <div class="four columns">
+          {{block right_sidebar}}
+          <h3>Right Sidebar</h3>
+          <p></p>
+          {{end}}
+        </div>
+        {{pass}}
+
+      </div><!-- container -->
+    </div><!-- main -->
+
+    <div class="push"></div>
+  </div><!-- wrapper -->
+
+  <div class="footer">
+    <div class="container header">
+      <div class="sixteen columns">
+        {{block footer}} <!-- this is default footer -->
+        <div class="footer-content" >
+          {{=T('Copyright')}} &#169; 2011
+          <div style="float: right;">
+            <a href="http://www.web2py.com/">
+            <img style="padding-bottom: 0;" 
+                 src="{{=URL('static','images/poweredby.png')}}"/>
+            </a>
+          </div>
+        </div>
+        {{end}}
+      </div>
+    </div><!-- container -->
+  </div><!-- footer -->
+
+</body>
+</html>
+
+``:code
+
+このデフォルトのレイアウトにはちょっとした特徴があり、非常に使いやすく、カスタマイズしやすいようになっています：
+
+- HTML5で書かれ、``modernizr``を用いてます。``modernizr``:cite は後方互換性のためのライブラリです。実際のレイアウトではIEで必要とされる追加の条件文を含みますが、簡潔にするため無視します。
+- モデルで設定することのできる``response.title``と``response.subtitle``を表示します。設定されていない場合は、アプリケーションの名前がタイトルとなります。
+- ``web2py_ajax.html``ファイルをヘッダーに組み込みます。これは、全てのリンクおよびスクリプトのインポート命令文を生成します。
+- "skeleton"の修正版を使用しています。``skeleton``:cite 柔軟なレイアウトのためのライブラリで、モバイルデバイス上で機能し、小さなスクリーンにフィットするようにコラム（列）を再配置します。
+- "superfish.js"を動的なカスケードメニューのために使用します。superfishのカスケードメニューを有効にするための明示的なスクリプトが用意されおり、不要な場合は削除することができます。
+- ``{{=auth.navbar(...)}}``は、現在のユーザーへのあいさつ文を表示すると共に、login、logout、register、change passwordなどのauth関数へのリンクを、内容に応じて表示します。これはヘルパーのファクトリーで、その出力は他のヘルパーと同様に操作することができます。authが定義されていないときのために、``{{try:}}...{{except:pass}}``の中に設置されています。
+- ``{{=MENU(response.menu)``は、``<ul>...</ul>``のようにメニュー構造を表示します。
+- ``{{include}}``は、ページがレンダリングされるときに、拡張先のビューの内容に置き換えられます。
+- デフォルトでは、条件付きの3カラムです(左、右のサイドバーは拡張先のビューで消すことができます)。
+- 次のようなクラスを用いています: header, main, footer
+- 次のようなブロックを用いています: statusbar, left_sidebar, center, right_sidebar, footer
+
+ビューは次のようにサイドバーを有効にし、中身を定義することができます。
+
+``
+{{left_sidebar_enable=True}}
+{{extend 'layout.html'}}
+
+This text goes in center
+
+{{block left_sidebar}}
+This text goes in sidebar
+{{end}}
+``:code
+
+#### デフォルトレイアウトのカスタマイズ
+
+``CSS``:inxx
+
+編集なしにデフォルトレイアウトをカスタマイズするのは、とても簡単です。CSSファイルが、よくドキュメント化されているからです。
+
+- "skeleton.css"はリセット、グリッドレイアウト、フォームのスタイルを含みます。
+- "web2py.css"はweb2py固有のスタイルを含みます。
+- "superfish.css"はメニューのスタイルを含みます。
+
+色や背景画像を変更するには、単に次のようなコードを"web2py.css"に追加してください:
+
+``
+body { background: url('images/background.png') repeat-x #3A3A3A; }
+a { color: #349C01; }
+.header h1 { color: #349C01; }
+.header h2 { color: white; font-style: italic; font-size: 14px;}
+.statusbar { background: #333333; border-bottom: 5px #349C01 solid; }
+.statusbar a { color: white; }
+.footer { border-top: 5px #349C01 solid; }
+``:code
+
+メニューでは色の指定は特に行っていませんが、同様に変更することができます。
+
+もちろん、"layout.html"や"web2py.css"ファイルを、独自のものに完全に置き換えることも可能です。
+
+#### モバイル開発
+
+デフォルトのlayout.htmlはモバイルデバイスに親和性があるように設計されていますが、十分とは言えません。一つは、ページがモバイルデバイスによって訪問されたときに、異なるビューを使用する必要があるかもしれません。
+
+デスクトップとモバイルデバイスの開発を容易にするため、web2pyは``@mobilize``デコレータを用意しています。このデコレータは、通常のビューとモバイルビューを持たなければいけないアクションに対して適用されます。ここでは、その利用例を示します:
+
+``
+from gluon.contrib.user_agent_parser import mobilize 
+@mobilize
+def index():
+   return dict()
+``:code
+
+デコレータはコントローラで使用する前に、インポートされている必要があります。
+"index"関数が通常のブラウザ(デスクトップコンピュータ)から呼ばれるときは、web2pyは"[controller]/index.html"のビューを用いて、返される辞書をレンダリングします。しかしモバイルデバイスから呼ばれるときは、その辞書は"[controller]/index.mobile.html"によってレンダリングされます。すなわち、モバイルのビューは"mobile.html"拡張子を持つことになります。
+
+代わりに、次のようなロジックを適用して、全てのビューをモバイルフレンドリーにすることができます。
+
+``
+if request.user_agent().is_mobile:
+    response.view.replace('.html','.mobile.html')
+``
+
+"*.mobile.html"ビューを作成するタスクは開発者に残されますが、そのタスクをとても簡単にする"jQuery Mobile"プラグインを使用することを強く推奨します。
+
+### ビュー内の関数
+
+次の"layout.html"を考えます：
+
+``
+<html>
+  <body>
+    {{include}}
+    <div class="sidebar">
+      {{if 'mysidebar' in globals():}}{{mysidebar()}}{{else:}}
+        my default sidebar
+      {{pass}}
+    </div>
+  </body>
+</html>
+``:code
+
+そして、次の拡張ビューも考えます。
+
+``
+{{def mysidebar():}}
+my new sidebar!!!
+{{return}}
+{{extend 'layout.html'}}
+Hello World!!!
+``:code
+
+ここで、関数が``{{extend...}}``文の前に定義されていることに注意してください。 -- これによりその関数は"layout.html"コードが実行される前に作成され、その関数は"layout.html"内の任意の場所、例えば``{{include}}``の前でも呼び出すことができます。また、関数が、拡張元のビューにおいて ``=`` プレフィックスが付かずに組み込まれていることに注意してください。
+
+このコードは次のような出力を生成します：
+
+``
+<html>
+  <body>
+    Hello World!!!
+    <div class="sidebar">
+        my new sidebar!!!
+    </div>
+  </body>
+</html>
+``:code
+この関数がHTML(これはまたPythonコードを含むことができます)の中で定義されることで、``response.write``が内容を書くために使用されていることに注意してください(関数は内容を返しません)。レイアウトで``{{=mysidebar()}}``ではなく``{{mysidebar()}}``を用いてビュー関数を呼び出している理由は、ここにあります。このような方法で定義された関数は、引数を取ることができます。
+
+### ビュー内のブロック
+``block``:inxx
+
+ビューをよりモジュール化するためのもう1つの方法は``{{block...}}``を用いることです。この仕組は、上記のセクションで説明した仕組みの代替案になります。
+
+次の"layout.html"を考えます：
+
+``
+<html>
+  <body>
+    {{include}}
+    <div class="sidebar">
+      {{block mysidebar}}
+        my default sidebar
+      {{end}}
+    </div>
+  </body>
+</html>
+``:code
+
+そして、次の拡張先ビューも考えます。
+
+``
+{{extend 'layout.html'}}
+Hello World!!!
+{{block mysidebar}}
+my new sidebar!!!
+{{end}}
+``:code
+
+これは次のような出力を生成します：
+
+``
+<html>
+  <body>
+    Hello World!!!
+    <div class="sidebar">
+        my new sidebar!!!
+    </div>
+  </body>
+</html>
+``:code
+
+ブロックは複数定義することができます。拡張元のビューにブロックがあるが、拡張先のビューにはない場合、拡張元のビューの内容が使用されます。また関数と異なり、``{{extend ...}}``の前にブロックを定義する必要はありません。 -- ``extend``の後で定義されても、拡張元ビュー中の任意の場所で置換できます。
+
+``super``:inxx
+
+ブロックの内部では、``{{super}}``という式を使用して、親の内容を組み込むことができます。例えば、上記の拡張先ビューを次のように置換する場合:
+
+``
+{{extend 'layout.html'}}
+Hello World!!!
+{{block mysidebar}}
+{{super}}
+my new sidebar!!!
+{{end}}
+``:code
+
+以下が得られます:
+
+``
+<html>
+  <body>
+    Hello World!!!
+    <div class="sidebar">
+        my default sidebar
+        my new sidebar!!!
+    </div>
+  </body>
+</html>
+``:code
+
+##### 第3版 - 翻訳: 細田謙二　レビュー: Omi Chiba
+##### 第4版 - 翻訳: 細田謙二　レビュー: Hitoshi Kato

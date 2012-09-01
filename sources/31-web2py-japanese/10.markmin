@@ -1,0 +1,545 @@
+## Ajaxレシピ
+``Ajax``:inxx
+
+web2pyは主にサーバーサイドの開発向けですが、**welcome**雛形アプリケーションはjQueryの基本ライブラリ``jquery``:cite、jQuery calendars(date picker、 datetime picker と clock)、"superfish.js"のメニュー、jQueryで利用可能な追加のJavaScriptを利用することができます。
+
+Prototype、ExtJSやYUIといったそれ以外のAjax``ajax:w``:citeライブラリもweb2pyでは制限無く使うことができますが、jQueryを同梱することに決めた理由は他の同等なライブラリに比べて利用が簡単でかつ強力であるからです。また機能的で簡潔であれというweb2py精神に忠実だと感じているからです。
+
+### web2py_ajax.html
+
+雛形web2pyアプリケーションの"welcom"には以下のファイルがあります。
+``
+views/web2py_ajax.html
+``:code
+
+このファイルはデフォルトの"layout.html"のヘッダー(HEAD)にあり、次のようなサービスを提供します：
+- ``static/jquery.js``の読み込み。
+- ``static/calendar.js``か``static/calendar.css``があれば読み込み。
+- ``ajax``関数の定義（jQuery $.ajaxに基づく）。
+- "error"クラスのDIVや"flash"クラスのタグオブジェクトをスライドダウンさせる。
+- "integer"クラスのINPUTフィールドで無効な整数入力をエラーにする。
+- "doubles"クラスのINPUTフィールドで無効な浮動少数入力をエラーにする。
+- "date"タイプのINPUTフィールドとpopup date pickerを関連づける。
+- "datetime"タイプのINPUTフィールドとpopup datetime pickerを関連づける。
+- "time"タイプのINPUTフィールドとpopup time pickerを関連づける。
+- 13章で説明されている``web2py_ajax_component``という重要なツールを定義する。
+
+また下位互換性のために``popup``、``collapse``、``fade``関数を読み込んでいます。
+
+これはエフェクトがどのように上手く連携しているかの例です。
+
+testアプリケーションの次のモデルを考えてみましょう：
+``
+db = DAL("sqlite://db.db")
+db.define_table('child',
+     Field('name'),
+     Field('weight', 'double'),
+     Field('birth_date', 'date'),
+     Field('time_of_birth', 'time'))
+
+db.child.name.requires=IS_NOT_EMPTY()
+db.child.weight.requires=IS_FLOAT_IN_RANGE(0,100)
+db.child.birth_date.requires=IS_DATE()
+db.child.time_of_birth.requires=IS_TIME()
+``:code
+
+コントローラーの"default.py":
+``
+def index():
+    form = SQLFORM(db.child)
+    if form.accepts(request.vars, session):
+        response.flash = 'record inserted'
+    return dict(form=form)
+``:code
+
+ビューの"default/index.html":
+``
+{{extend 'layout.html}}
+{{=form}}
+``:code
+
+"index"アクションは次のフォームを作成します：
+
+[[image @///image/en7600.png center 480px]]
+
+もし無効なフォームが送信されると、サーバーはエラーメッセージを含む修正されたフォームを持つページを返します。エラーメッセージは"error"クラスのDIVです。上記のweb2py_ajaxコードによって、スライドダウンのエフェクトとともにエラーが表示されます。：
+
+[[image @///image/en7700.png center 480px]]
+
+エラーの色は"layout.html"のCSSコードで指定されています。
+
+web2py_ajaxコードは入力フィールドへの無効な値の入力を防ぎます。これはサーバーサイドのバリデーションの前に発生し、追加ではあるが、サーバーサイドのそれを置き換えるものではありません。
+
+web2py_ajaxコードは"date"クラスのINPUTフィールドにdate pickerを表示し、"datetime"クラスのINPUTフィールドにdatetime pickerを表示します。例を挙げると：
+
+[[image @///image/en7800.png center 480px]]
+
+またweb2py_ajaxコードは"time"クラスのINPUTフィールドを編集時に次のtime pickerを表示します：
+
+[[image @///image/en7900.png center 480px]]
+
+送信時に、コントローラーアクションはresponse flashに"record inserted"のメッセージをセットします。デフォルトレイアウトはid="flash"のDIVにこのメッセージをレンダリングします。web2py_ajaxコードはページ送信時のDIVの表示、非表示の役割を担っています：
+
+[[image @///image/en8000.png center 480px]]
+
+これらのサービスやそれ以外のエフェクトはビューの中で、また、コントローラーのヘルパー経由でプログラム的にアクセスできます。
+
+### jQuery Effects
+``effects``:inxx
+
+ここで述べている基本的なエフェクトは追加のファイルを特に必要としません；必要なものは既にweb2py_ajax.htmlに含まれています。
+
+HTML/XHTMLオブジェクトはそれらのタイプ（例：DIV）、クラス、idによって識別することができます。例を挙げると：
+``
+<div class="one" id="a">Hello</div>
+<div class="two" id="b">World</div>
+``:code
+
+これらはそれぞれ"one"と"two"というクラスに属しています。idはそれぞれ"a"と"b"という値です。
+
+They belong to class "one" and "two" respectively. They have ids equal to "a" and "b" respectively.
+
+jQueryでは前者を次のようなCSSに似た表記で参照できます。
+``
+jQuery('.one')    // address object by class "one"
+jQuery('#a')      // address object by id "a"
+jQuery('DIV.one') // address by object of type "DIV" with class "one"
+jQuery('DIV #a')  // address by object of type "DIV" with id "a"
+``:code
+
+後者は次のように参照できます
+``
+jQuery('.two')
+jQuery('#b')
+jQuery('DIV.two')
+jQuery('DIV #b')
+``:code
+
+両者を参照するには次のようにします
+``
+jQuery('DIV')
+``:code
+
+タグオブジェクトは"onclick"などのイベントに連携してます。jQueryはこれらのイベントとエフェクトをリンクできます。"slideToggle"の例を挙げます：
+``
+<div class="one" id="a" onclick="jQuery('.two').slideToggle()">Hello</div>
+<div class="two" id="b">World</div>
+``:code
+
+このとき、"Hello"をクリックすると"World”が消えます。もう一度クリックすると、"World"が再度表示されます。hiddenクラスを付与するとタグをデフォルトで非表示にできます：
+``
+<div class="one" id="a" onclick="jQuery('.two').slideToggle()">Hello</div>
+<div class="two hidden" id="b">World</div>
+``:code
+
+タグ自身の外部でアクションとイベントをリンクすることもできます。前のコードは次のように書き換えることができます：
+``
+<div class="one" id="a">Hello</div>
+<div class="two" id="b">World</div>
+<script>
+jQuery('.one').click(function(){jQuery('.two').slideToggle()});
+</script>
+``:code
+
+エフェクトは呼び出しオブジェクトを返すので、それらをチェインさせることができます。
+
+クリック時に呼び出されるコールバック関数を``click``にセットする時にです。``change``、``keyup``、``keydown``、``mouseover``などでも同様です。
+
+全体のドキュメントがロードされた後だけJavaScriptを実行したいことがよくあります。これは通常BODYのonload属性で実現されますが、jQueryはレイアウトを編集する必要のない別の方法を提供します：
+``
+<div class="one" id="a">Hello</div>
+<div class="two" id="b">World</div>
+<script>
+jQuery(document).ready(function(){
+   jQuery('.one').click(function(){jQuery('.two').slideToggle()});
+});
+</script>
+``:code
+
+この無名関数の本体はドキュメントが完全にロードされ準備ができた時にだけ実行されます。
+
+便利なイベント名の一覧です：
+
+##### フォームイベント
+- onchange: 要素変更時にスクリプトが実行される
+- onsubmit: フォーム送信時にスクリプトが実行される
+- onreset: フォームリセット時にスクリプトが実行される
+- onselect: 要素選択時にスクリプトが実行される
+- onblur: 要素がフォーカスを失った時にスクリプトが実行される
+- onfocus: 要素がフォーカスされた時にスクリプトが実行される
+
+##### キーボードイベント
+- onkeydown: キーが押された時にスクリプトが実行される
+- onkeypress: キーが押されて離された時にスクリプトが実行される
+- onkeyup: キーが離された時にスクリプトが実行される
+
+##### マウスイベント
+- onclick: マウスクリック時にスクリプトが実行される
+- ondblclick: マウスダブルクリック時にスクリプトが実行される
+- onmousedown: マウスボタンが押された時にスクリプトが実行される
+- onmousemove: マウスポインタが動いたときにスクリプトが実行される
+- onmouseout: マウスポインタが要素の外に動いた時にスクリプトが実行される
+- onmouseover: マウスポインタが要素上を動いた時にスクリプトが実行される
+- onmouseup: マウスボタンが離された時にスクリプトが実行される
+
+jQueryで定義されている便利なエフェクトの一覧です：
+
+##### エフェクト
+- jQuery(...).attr(name): jQuery属性値の名前を返します
+- jQuery(...).attr(name, value): 属性名に値をセットします
+- jQuery(...).show(): オブジェクトを表示します
+- jQuery(...).hide(): オブジェクトを非表示にします
+- jQuery(...).slideToggle(speed, callback): オブジェクトをスライドアップ・ダウンします
+- jQuery(...).slideUp(speed, callback): オブジェクトをスライドアップします
+- jQuery(...).slideDown(speed, callback): オブジェクトをスライドダウンします
+- jQuery(...).fadeIn(speed, callback): オブジェクトをフェードインします
+- jQuery(...).fadeOut(speed, callback): オブジェクトをフェードアウトします
+
+speed引数は通常"slow"、"fast"もしくは省略（デフォルト）されます。callbackはエフェクト処理が完了した際に実行されるオプション的な関数です：
+
+jQueryエフェクトはヘルパーに簡単に埋め込むことができます。ビューの例を挙げます：
+``
+{{=DIV('click me!', _onclick="jQuery(this).fadeOut()")}}
+``:code
+
+jQueryはとてもコンパクトで簡潔なAjax libraryです；そのためweb2pyはjQueryの上層部に追加の抽象化レイヤ（後述するする``ajax``関数を除く）を必要としません。jQuery APIはそのネイティブな形式で必要な時にアクセスでき、手軽に利用できます。
+
+エフェクトやjQuery APIについての詳細はドキュメンテーションを参考にしてください。
+
+jQueryライブラリはプラグインとユーザーインターフェースのウィジェットを使って拡張することができます。このトピックはここでは割愛します；参照``jquery:ui``:citeに詳細があります。
+
+#### フォームの条件付フィールド
+
+典型的なjQueryエフェクトのアプリケーションはフィールドの値によって外観を変えるフォームです。
+
+web2pyではSQLFROMヘルパーが"CSS friendly"なフォームを作成するので簡単に実現できます。フォームにはrowsを含むテーブルがあります。それぞれのrowはラベル、入力フィールド、オプション的な第3のカラムからなります。フォームの項目はテーブル名とフィールド名で厳密に指定されたidを持ちます。
+
+規約として、全ての入力フィールドは``テーブル名_フィールド名``というidを持ち、``テーブル名_フィールド名_row``というidを持つrowの一部になります。
+
+例として、既婚者の場合のみ、納税者の名前とその扶養者の名前を入力するフォームを作成します。
+
+次のモデルを持つテストアプリケーションを作成します：
+``
+db = DAL('sqlite://db.db')
+db.define_table('taxpayer',
+    Field('name'),
+    Field('married', 'boolean'),
+    Field('spouse_name'))
+``:code
+
+コントローラーの"default.py":
+``
+def index():
+    form = SQLFORM(db.taxpayer)
+    if form.accepts(request.vars, session):
+        response.flash = 'record inserted'
+    return dict(form=form)
+``:code
+
+ビューの"default/index.html":
+``
+{{extend 'layout.html'}}
+{{=form}}
+<script>
+jQuery(document).ready(function(){
+   jQuery('#taxpayer_spouse_name__row').hide();
+   jQuery('#taxpayer_married').change(function(){
+        if(jQuery('#taxpayer_married').attr('checked'))
+            jQuery('#taxpayer_spouse_name__row').show();
+        else jQuery('#taxpayer_spouse_name__row').hide();});
+});
+</script>
+``:code
+
+ビューのスクリプトは扶養者名を含むrowを非表示にするエフェクトを持ちます：
+
+[[image @///image/en8100.png center 480px]]
+
+納税者が"married"チェックボックスをチェックすると、扶養者名フィールドが再表示されます：
+
+[[image @///image/en8200.png center 480px]]
+
+"taxpayer_married"は"taxpayer"テーブルの"married"という"boolean"フィールドに関連しているチェックボックスです。"taxpayer_spouse_name__row"は"taxpayer"テーブルの"spouse_name"という入力フィールドを含むrowです。
+
+#### 確認と削除
+``confirmation``:inxx
+
+もう一つの便利なアプリケーションは編集フォーム上の削除チェックボックスのように、"delete"チェックボックスをチェックしたときに確認を要求するものです。
+
+上記の例に次のコントローラーアクションを追加してみましょう：
+``
+def edit():
+    row = db.taxpayer[request.args(0)]
+    form = SQLFORM(db.taxpayer, row, deletable=True)
+    if form.accepts(request.vars, session):
+        response.flash = 'record updated'
+    return dict(form=form)
+``:code
+
+対応する"default/edit.html"
+``
+{{extend 'layout.html'}}
+{{=form}}
+``:code
+
+``deletable``:inxx
+SQLFORMコンストラクタの``deletable=True``引数は、web2pyが編集画面上に"delete"チェックボックスを表示するようにします。デフォルトは``False``です。
+
+web2pyの"web2py_ajax.html"は次のコードを含みます：
+``
+jQuery(document).ready(function(){
+   jQuery('input.delete').attr('onclick',
+     'if(this.checked) if(!confirm(
+        "{{=T('Sure you want to delete this object?')}}"))
+      this.checked=false;');
+});
+``:code
+
+規約として、このチェックボックスは"delete"と同じクラスを持ちます。上記のjQueryコードはチェックボックスのonclickイベントと確認ダイアログ（JavaScript標準）を関連付け、納税者が承認しない場合はチェックボックスのチェックを外します：
+
+[[image @///image/en8300.png center 480px]]
+
+### ajax 関数
+
+web2py_ajax.htmlで、web2pyは``ajax``という関数を定義しています。これは、jQuery関数の``$.ajax``を基にしていますが、それと混同しないでください。後者は前者より強力で、その使用方法については参照``jquery``:citeと参照``jquery:b``:citeを見てください。その一方で、前者は多くの複雑なタスクをこなすのに十分な機能を持ち、簡単に使用できます。
+
+``ajax``関数はJavaScriptの関数で次のような構文になります：
+``
+ajax(url, [id1, id2, ...], target)
+``:code
+
+この関数は、url（最初の引数）を非同期的に呼び出し、リスト（二つ目の引数）に含まれるidと同じ値のidを持つフィールドの値を渡し、そしてターゲット（3つ目の引数）と同じ値のidを持つタグの内部HTMLに結果を保存します。
+
+defaultコントローラーの例です：
+``
+def one():
+    return dict()
+
+def echo():
+    return request.vars.name
+``:code
+
+対応する"default/one.html"ビュー：
+``
+{{extend 'layout.html'}}
+<form>
+   <input name="name" onkeyup="ajax('echo', ['name'], 'target')" />
+</form>
+<div id="target"></div>
+``:code
+
+入力フィールドに何かタイプして、キーを離す（onkeyup)と同時に、``ajax``関数が呼ばれ、``name="name"``フィールドの値が"echo"アクションに渡されます。このアクションはそのテキストをビューに送り返します。``ajax``関数はその結果を受け取り"target"DIVにechoの結果を表示します。
+
+#### Evalターゲット
+
+``ajax``関数の3つ目の引数には":eval"ストリングを指定できます。これは、サーバーから返された文字列がドキュメント内に埋め込まれずに、代わりに評価されることを意味します。
+
+``default``コントローラーの例：
+``
+def one():
+    return dict()
+
+def echo():
+    return "jQuery('#target').html(%s);" % repr(request.vars.name)
+``:code
+
+対応する"default/one.html"ビューの例：
+``
+{{extend 'layout.html'}}
+<form>
+   <input name="name" onkeyup="ajax('echo', ['name'], ':eval')" />
+</form>
+<div id="target"></div>
+``:code
+
+こうすることで複数のターゲットを更新できるより複雑な結果を返せるようになります。
+
+#### 自動補完
+
+web2pyにはFormsの章で説明したように組み込みの自動補完ウィジェットがあります。ここでは簡単なものを最初から作成してみます。
+
+上記の``ajax``関数のもう一つの応用は自動補完です。月の名前を入力する入力フィールドを作成し、訪問者が不完全な名前をタイプすると、Ajaxリクエスト経由で自動補完を実施するようにします。応答すると、入力フィールドの下に自動補完のドロップボックスが現れます。
+
+次の``default``コントローラで実現できます：
+``
+def month_input():
+    return dict()
+
+def month_selector():
+    if not request.vars.month: return ''
+    months = ['January', 'February', 'March', 'April', 'May',
+              'June', 'July', 'August', 'September' ,'October',
+              'November', 'December']
+    month_start = request.vars.month.capitalize()
+    selected = [m for m in months if m.startswith(month_start)]
+    return DIV(*[DIV(k,
+                     _onclick="jQuery('#month').val('%s')" % k,
+                     _onmouseover="this.style.backgroundColor='yellow'",
+                     _onmouseout="this.style.backgroundColor='white'"
+                     ) for k in selected])
+``:code
+
+対応する"default/month_input.html"ビュー：
+``
+{{extend 'layout.html'}}
+<style>
+#suggestions { position: relative; }
+.suggestions { background: white; border: solid 1px #55A6C8; }
+.suggestions DIV { padding: 2px 4px 2px 4px; }
+</style>
+
+<form>
+ <input type="text" id="month" name="month" style="width: 250px" /><br />
+ <div style="position: absolute;" id="suggestions"
+      class="suggestions"></div>
+</form>
+<script>
+jQuery("#month").keyup(function(){
+      ajax('month_selector', ['month'], 'suggestions')});
+</script>
+``:code
+
+訪問者が"month"入力フィールドに何かタイプするたびにビューのjQueryスクリプトがAjaxリクエストを実行します。入力フィールドの値はAjaxリクエストによって"month_selector"アクションに送信されます。このアクションは送信された（選択された）テキストで始まる月の名前のリストを検索し、DIVのリスト（それぞれが候補の月の名前を含む）を作成し、シリアライズされたDIVの文字列を返します。ビューは返されたHTMLを"suggestions"DIVに表示します。"month_selector"アクションは候補とDIVに埋め込まれたJavaScriptコードの両方を作成します。JavaScriptコードは訪問者がそれぞれの候補をクリックするたびに実行されます。例えば、訪問者が"Ma"とタイプすると、コールバックアクションは次の結果を返します：
+``
+<div onclick="jQuery('#month').val('February')"
+     onmouseout="this.style.backgroundColor='white'"
+     onmouseover="this.style.backgroundColor='yellow'">February</div>
+``:code
+
+最終的なエフェクトは：
+
+[[image @///image/en8400.png center 480px]]
+
+もし月の名前が次のようにデータベーステーブルに保存されている場合は：
+``
+db.define_table('month', Field('name'))
+``:code
+
+シンプルに``month_selector``アクションを次のように置き換えるだけです：
+``
+def month_input():
+    return dict()
+
+def month_selector():
+    it not request.vars.month:
+        return "
+    pattern = request.vars.month.capitalize() + '%'
+    selected = [row.name for row in db(db.month.name.like(pattern)).select()]
+    return ".join([DIV(k,
+                 _onclick="jQuery('#month').val('%s')" % k,
+                 _onmouseover="this.style.backgroundColor='yellow'",
+                 _onmouseout="this.style.backgroundColor='white'"
+                 ).xml() for k in selected])
+``:code
+
+jQueryは追加機能を持つオプション的な自動補完プラグインをもちますが、ここでは説明しません。
+
+#### Ajaxフォーム送信
+``asynchronous``:inxx
+
+ページ全体をリロードしないでAjaxを利用してメッセージを送信することができるページを考えてみましょう。13章で後述しますが、LOADヘルパーを利用することで、web2pyはここで説明する内容よりもより良い仕組みを提供しています。ここではjQueryを使ったシンプルなやり方をお見せします。
+
+"myform"フォームと"target"DIVがあります。フォームが送信されると、サーバーはそれを許可（そしてデータベースへの挿入を実行する）するか、拒否（バリデーションをパスしなかったので）します。対応するメッセージがAjaxレスポンスで返されて"target"DIVに表示されます。
+
+次のモデルを持つtestアプリケーションを作成してください：
+``
+db = DAL('sqlite://db.db')
+db.define_table('post', Field('your_message', 'text'))
+db.post.your_message.requires = IS_NOT_EMPTY()
+``:code
+
+それぞれの投稿は"your_message"という入力必須の単一フィールドを持つ点に注意してください。
+
+``default.py``コントローラを編集して次の二つのアクションを書いてください：
+``
+def index():
+    return dict()
+
+def new_post():
+    form = SQLFORM(db.post)
+    if form.accepts(request.vars, formname=None):
+        return DIV("Message posted")
+    elif form.errors:
+        return TABLE(*[TR(k, v) for k, v in form.errors.items()])
+``:code
+
+最初のアクションは単にviewを返すだけです。
+
+二つ目のアクションはAjaxのコールバックです。これは、``request.vars``内のフォーム変数を待ち、それらを処理して、成功時には``DIV("Message posted")``を返し、失敗時にはエラーメッセージの``TABLE``を返すものです。
+
+"default/index.html"ビューを次のように編集してください：
+``
+{{extend 'layout.html'}}
+
+<div id="target"></div>
+
+<form id="myform">
+  <input name="your_message" id="your_message" />
+  <input type="submit" />
+</form>
+
+<script>
+jQuery('#myform').submit(function() {
+  ajax('{{=URL('new_post')}}',
+       ['your_message'], 'target');
+  return false;
+});
+</script>
+``:code
+
+この例はHTMLを利用して手動でフォームが作成されていますが、フォームを表示しているのとは異なるアクションのSQLFORMで処理されている点に注意してください。SQLFORMオブジェクトはHTMLにシリアライズされることはありません。この場合は``SQLFORM.accepts``はセッションを受け取らず``formname=None``をセットします、これは手動のHTMLフォームにおいてフォーム名とフォームキーをセットしないようにしたからです。
+
+ビューの下部にあるスクリプトは"myform"送信ボタンとインラインの関数を関連付けています。インラインの関数は、web2pyの``ajax``関数を利用して``id="your_message"``を持つ入力フィールドを送信し、``id="target"``を持つDIVの中にその答えを表示します。
+
+#### 投票と評価
+
+もう一つのAjaxアプリケーションはページにおいてアイテムへ投票または評価するものです。投稿された画像に投票できるアプリケーションを考えてみます。そのアプリケーションは投票結果に応じてソートされた画像を表示する単一のページからなります。ここでは、訪問者が複数回投票できるようになっています。ただし、訪問者が認証されていればこの動きを変えるのは簡単です。データベースの個人の投票数をトラックして投票者の``request.env.remote_addr``に関連付ければいいのです。
+
+シンプルなモデルを示します：
+``
+db = DAL('sqlite://images.db')
+db.define_table('item',
+    Field('image', 'upload'),
+    Field('votes', 'integer', default=0))
+``:code
+
+``default``コントローラ：
+``
+def list_items():
+    items = db().select(db.item.ALL, orderby=db.item.votes)
+    return dict(items=items)
+
+def download():
+    return response.download(request, db)
+
+def vote():
+    item = db.item[request.vars.id]
+    new_votes = item.votes + 1
+    item.update_record(votes=new_votes)
+    return str(new_votes)
+``:code
+
+downloadアクションは、list_itemsビューが"uploads"フォルダに保存されている画像をダウンロードできるようにするために必要です。voteアクションはAjaxのコールバックで使用されます。
+
+"default/list_items.html"ビュー：
+``
+{{extend 'layout.html'}}
+
+<form><input type="hidden" id="id" name="id" value="" /></form>
+{{for item in items:}}
+<p>
+<img src="{{=URL('download', args=item.image)}}"
+     width="200px" />
+<br />
+Votes=<span id="item{{=item.id}}">{{=item.votes}}</span>
+[<span onclick="jQuery('#id').val('{{=item.id}}');
+       ajax('vote', ['id'], 'item{{=item.id}}');">vote up</span>]
+</p>
+{{pass}}
+``:code
+
+訪問者が"[vote up"]をクリックすると、JavaScriptコードはitem.idの値を隠し"id"入力フィールドに保存し、Ajaxリクエストでサーバーに値を送信します。サーバーは対応するレコードの投票数を増やし、新しい投票数を文字列で返します。そしてこの値がターゲットの``item{{=item.id}}`` SPANに挿入されます。
+
+-------
+Ajaxのコールバックはバックグラウンドで計算を実行するのに利用できますが、**cron**か（4章で説明した）バックグラウンド処理を使用するのを推奨します。webサーバーはスレッドを強制的にタイムアウトするからです。もし計算に時間がかかり過ぎると、webサーバーは処理を中断します。タイムアウト値のセット方法はあなたのwebサーバーのパラメータを参照してください。
+-------

@@ -1,0 +1,271 @@
+## EmailとSMS
+``Mail``:inxx
+
+### メールの設定
+
+web2pyは、web2pyを使用して簡単にメール送信を行うために、 ``gluon.tools.Mail`` クラスを提供しています。メーラは次のように定義できます。
+``
+from gluon.tools import Mail
+mail = Mail()
+mail.settings.server = 'smtp.example.com:25'
+mail.settings.sender = 'you@example.com'
+mail.settings.login = 'username:password'
+``:code
+
+アプリケーションが ``Auth`` を使用している場合（Authについては次章で取り上げます）、 ``auth`` オブジェクトは専用メーラ ``auth.settings.mailer`` を持っています。このため代わりに、次のように定義することも可能です。
+``
+mail = auth.settings.mailer
+mail.settings.server = 'smtp.example.com:25'
+mail.settings.sender = 'you@example.com'
+mail.settings.login = 'username:password'
+``:code
+
+使用するSMTPサーバ用に、mail.settings で適切なパラメータ値を設定します。SMTPサーバが認証を必要としない場合は、 ``mail.settings.login=False`` と設定します。
+
+``email logging``:inxx
+
+--------
+デバッグ用には次のように設定します。
+``
+mail.settings.server = 'logging'
+``:code
+この場合メールは送信しません。その代わりコンソールにログが出力されます。
+-------
+
+#### Google App Engine でのメール設定
+``email from GAE``:inxx
+Google App Engineでのメール送信設定は次のようになります。
+
+``
+mail.settings.server = 'gae'
+``:code
+
+現時点でのweb2pyは、Google App Engine上での添付ファイルと暗号化メールはサポートしていません。
+
+#### x509 と PGP 暗号化
+``PGP``:inxx ``x509``:inxx
+
+x509 (SMIME) 暗号化メールを送信するには、次のように設定します。
+``
+mail.settings.cipher_type = 'x509'
+mail.settings.sign = True
+mail.settings.sign_passphrase = 'your passphrase'
+mail.settings.encrypt = True
+mail.settings.x509_sign_keyfile = 'filename.key'
+mail.settings.x509_sign_certfile = 'filename.cert'
+mail.settings.x509_crypt_certfiles = 'filename.cert'
+``:code
+
+PGP 暗号化メールを送信するには、次のように設定します。
+``
+from gpgme import pgp
+mail.settings.cipher_type = 'gpg'
+mail.settings.sign = True
+mail.settings.sign_passphrase = 'your passphrase'
+mail.settings.encrypt = True
+``:code
+
+後者の設定（PGP 暗号化メール送信）では、python-pyme パッケージが必要です。
+
+### メール送信
+``mail.send``:inxx ``email html``:inxx ``email attachments``:inxx
+
+``mail`` の設定が完了している場合、次のようにメールの送信が可能です。
+``
+mail.send(to=['somebody@example.com'],
+          subject='hello',
+          # If reply_to is omitted, then mail.settings.sender is used
+          reply_to='us@example.com',
+          message='hi there')
+``:code
+
+メール送信が成功すると Mail は ``True`` を返します。そうでなければ、 ``False`` を返します。 ``mail.send()`` の全ての引数は次の通りです。
+
+``
+send(self, to, subject='None', message='None', attachments=1,
+     cc=1, bcc=1, reply_to=1, encoding='utf-8',headers={})
+``:code
+
+``to`` ``cc`` そして ``bcc`` はメールアドレスのリスト値を指定します。
+
+``headers`` は送信するメールのヘッダー情報を、次のように辞書型で指定します。
+
+``
+headers = {'Return-Path' : 'bounces@example.org'}
+``:code
+
+以下、 ``mail.send()`` の追加の使用例です。
+
+#### テキストメール
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  'Plain text body of the message')
+``:code
+
+#### HTML メール
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  '<html>html body</html>')
+``:code
+
+メール本文が ``<html>`` で始まり ``</html>`` で終わった場合、HTMLメールとして送信します。
+
+#### テキストとHTMLの混在メール
+
+メール本文をタプルで指定できます（テキスト, html）。
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  ('Plain text body', '<html>html body</html>'))
+``:code
+
+#### ``cc`` と ``bcc`` を使用したメール
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  'Plain text body',
+  cc=['other1@example.com', 'other2@example.com'],
+  bcc=['other3@example.com', 'other4@example.com'])
+``:code
+
+#### 添付ファイル
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  '<html><img src="cid:photo" /></html>',
+  attachments = Mail.Attachment('/path/to/photo.jpg', content_id='photo'))
+``:code
+
+#### 複数の添付ファイル
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  'Message body',
+  attachments = [Mail.Attachment('/path/to/fist.file'),
+                 Mail.Attachment('/path/to/second.file')])
+``:code
+
+### SMS メッセージの送信
+``SMS``:inxx
+
+web2pyアプリケーションからSMSメッセージを送るには、受信者にメッセージを中継することのできるサードパーティのサービスが必要です。通常はこのサービスは無料ではありません。しかしこれは国によって違います。幾つかのサービスを試してみましたが、ほとんど成功しませんでした。電話会社は結局スパムと判断し、これらのサービスからのオリジナルのメールをブロックしました。
+
+より良い方法は、SMSを中継する電話会社のサービスを使用することです。各電話会社が独自に携帯電話番号に関連付けられたメールアドレスを持っているので、SMSメッセージを電話番号へ、メールとして送信することができます。
+
+web2pyには、この処理を支援するモジュールが付属しています。
+``
+from gluon.contrib.sms_utils import SMSCODES, sms_email
+email = sms_email('1 (111) 111-1111','T-Mobile USA (tmail)')
+mail.sent(to=email, subject='test', message='test')
+``:code
+
+SMSCODESは、主要な電話会社のメールアドレスの後に付加する名前のマッピング辞書です。 `` sms_email`` 関数は、電話番号（文字列）と電話会社の名前を受け取り、携帯電話のメールアドレスを返します。
+
+### メッセージ作成で使用するテンプレートシステム
+``emails``:inxx
+
+メール作成にテンプレートシステムを使用することが可能です。例えば、次のようなデータベーステーブルを使用します。
+``
+db.define_table('person', Field('name'))
+``:code
+
+データベースに登録されている人に、ビュー・ファイル "message.html" に保存した次のメッセージを送信します。
+``
+Dear {{=person.name}},
+You have won the second prize, a set of steak knives.
+``:code
+
+次のように実行します。
+``
+for person in db(db.person).select():
+    context = dict(person=person)
+    message = response.render('message.html', context)
+    mail.send(to=['who@example.com'],
+              subject='None',
+              message=message)
+``:code
+
+大抵の処理は、次の命令で行われます。
+``
+response.render('message.html', context)
+``:code
+
+"context"辞書に定義されている変数を使用し、ビュー"message.html"をレンダリングします。そしてレンダリングしたメールテキストを文字列で返します。context は、テンプレートファイルで表示する変数を含んだ辞書オブジェクトです。
+
+メッセージが ``<html>`` で始まり ``</html>`` で終わる場合、HTMLメールになります。
+
+HTMLメールにウェブサイトのリンクを入れる時は、 ``URL`` 関数を利用できます。しかしデフォルトの ``URL`` 関数が生成する相対URLは、メールからは動作しません。絶対URLを生成するには、URL関数の引数 ``scheme`` と ``host`` を指定することが必要です。この設定例です。
+``
+<a href="{{=URL(..., scheme=True, host=True)}}">Click here</a>
+``:code
+
+もしくは
+
+``
+<a href="{{=URL(..., scheme='http', host='www.site.com')}}">Click here</a>
+``:code
+
+SMSメッセージや他のテンプレートベースのメッセージ生成でも、メールテキスト生成で使われるメカニズムと同じものが使用されています。
+
+### バックグラウンドタスクを使用したメッセージ送信
+
+接続の可能性があるリモートSMTPサーバへのログインと通信処理のため、メールメッセージ送信の動作に数秒かかることがあります。
+この間、ユーザは処理が完了するまで待機状態になるため、バックグラウンドタスクによって、メールを後で送信するキューを使う方が望ましい場合があります。４章での説明にのように、手製のタスクキューの設定や、web2pyスケジューラを使用することが可能です。ここではタスクキューを使用した例を紹介します。
+
+最初に、メールキューを格納するデータベースモデルを、アプリケーションのモデルファイルに定義します。
+``
+db.define_table('queue',
+    Field('status'),
+    Field('email'),
+    Field('subject'),
+    Field('message'))
+``:code
+
+コントローラからメッセージを送信するため、次のようにキューに入れます。
+``
+db.queue.insert(status='pending',
+                email='you@example.com',
+                subject='test',
+                message='test')
+``:code
+
+次に、バックグラウンドプロセスのスクリプトで、キューを読むと共にメール送信を行うことが必要です。
+``
+## in file /app/private/mail_queue.py
+import time
+while True:
+    rows = db(db.queue.status=='pending').select()
+    for row in rows:
+        if mail.send(to=row.email,
+            subject=row.subject,
+            message=row.message):
+            row.update_record(status='sent')
+        else:
+            row.update_record(status='failed')
+        db.commit()
+    time.sleep(60) # check every minute
+``:code
+
+最後に、第4章で説明したように、アプリケーションの環境下で mail_queue.py スクリプトを実行する必要があります
+``
+python web2py.py -S app -M -N -R applications/app/private/mail_queue.py
+``:code
+
+ここで、``-S app`` はweb2pyの"app"環境下で"mail_queue.py"を動かす、``-M`` はweb2pyのモデル定義を読み込む、``-N`` はweb2pyのクーロンを動かさない、という意味です。
+
+mail_queue.py"で参照している ``mail`` オブジェクトは、モデルファイルて定義しています。これは ``-M`` オプションにより、"mail_queue.py"スクリプトで参照可能になる、ということが前提になっています。さらにまた、他のプロセスに対してデータベースロックの影響を及ぼさないよう、できるだけ早く変更をコミットすることも重要です。
+
+第4章でも説明しましたが、このタイプのバックグラウンドプロセスはクーロンでは動かすべきではありません（@rebootクーロンは除きます）。理由は、同時に複数のインスタンスが実行されていないことを確認する必要があるからです。
+
+バックグラウンドプロセスでメール送信することの欠点は、メール送信が失敗した場合にユーザへのフィードバックが困難なことです。メールをコントローラ機能から直接送信した場合は、各種エラーを受け取り、すぐにユーザに返すことが可能です。バックグラウンドプロセスを使用した場合は、コントローラ機能がレスポンスを返した後に、メールは非同期で送信されます。これによりエラーをユーザに知らせるのは、より複雑になります。
+
+##### 第3版 - 翻訳: 中垣健志　レビュー: 細田謙二
+##### 第4版 - 翻訳: Hitoshi Kato　レビュー: Mitsuhiro Tsuda

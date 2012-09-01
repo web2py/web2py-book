@@ -1,0 +1,1275 @@
+## Access Control
+``Auth``:inxx ``Access Control``:inxx ``RBAC``:inxx ``DAC``:inxx ``MAC``:inxx
+
+web2pyには、パワフルでカスタマイズ可能なロールベースのアクセス制御メカニズム（RBAC）が含まれています。
+
+Wikipediaでの定義を以下に示します：
+
+「ロールベースアクセス制御（英: Role-based access control, RBAC）は、権限のあるユーザーに対してシステムアクセスを制限する手法の一種。強制アクセス制御 (MAC) や任意アクセス制御 (DAC) に対するより新しい代替手法である。RBACはロールベースのセキュリティとして参照されることもある。
+
+RBAC は、政策的に中立で、柔軟にアクセス制御できる技術であり、DACやMACもシミュレート可能である。逆にMACは、ロールの構造が半順序ロール階層(Partially ordered role Hierarchy)ではなく、ツリーに制限されている場合に限り、RBACをシミュレートできる。
+
+RBAC が開発されるまで、アクセス制御のモデルとして知られていたのは MAC と DAC しかなかった。従って、モデルがMACでないなら DAC を、DAC でないならMAC であると考えられていた。90年代後半の研究では、RBAC はそのどちらにも分類されていない。
+
+組織において、ロール（役割）は仕事上の機能のために作られる。ある操作を実行する許可（パーミッション）は、特定のロールに対して割り当てられる。従業員(またはシステムユーザー)には特定のロールが割り当てられ、そのロールの割り当てを通して特定のシステム機能を実行するパーミッションが与えられる。コンテキストベースアクセス制御 (CBAC) とは異なり、RBAC はメッセージのコンテキスト（コネクションがどこから起動されているかなど）を考慮しない。
+
+ユーザーに対して直接パーミッションが与えられるわけではなく、ロールを通して与えられるため、各人のアクセス権の管理はユーザーへのロールの適切な割り当てに単純化される。つまり、これによりユーザーの追加やユーザーの部門の異動などの共通の操作が単純化される。
+
+RBAC は従来の任意アクセス制御システムで用いられているアクセス制御リスト (ACL) とも異なる。ACL は低レベルのデータオブジェクトに対してパーミッションを与えるが、RBACｈ組織において意味のある特定の操作に対してパーミッションを与える。例えば、一つのアクセス制御リストは特定のシステムファイルへの書き込みを許可/拒否するために用いられるが、そのファイルがどのように変更できるかは規定しない。」
+
+web2pyには、RBACを実装したAuthクラスがあります。
+
+Authは下記のテーブルが必要です（そして定義を行います）。
+- ``auth_user``　ユーザーの名前、メールアドレス、パスワード、ステータス（登録、保留、許可、禁止）が保存される
+- ``auth_group``　多対多の構造においてユーザーに対するグループまたはロールが保存される。デフォルトでは各ユーザーは自分自身のグループに属している。しかし、１人のユーザーを複数のグループに所属させることも、各グループに複数のユーザーを含めることもできる。グループは、ロールと説明文で識別される
+- ``auth_membership`` 多対多の構造においてユーザーとグループを結ぶ
+- ``auth_permission`` グループとパーミッションを結ぶ。パーミッションは名前（テーブルとレコードが含まれることもある）で識別される。例えば、特定のグループのメンバーは、特定のテーブルの特定のレコードの"更新"のパーミッションが与えられる
+- ``auth_event`` これ以外の他のテーブルに対する変更や、RBACにより制御されたオブジェクトへのCRUDを介して成立したアクセスを記録する
+
+原則として、ロールの名前とパーミッションの名前に制限はありません。つまり、開発者は組織内のロールやパーミッションに合わせてそれらを作成することができます。一度これらのテーブルが作成されると、web2pyは、ユーザーがログインしているかどうか、グループに属しているかどうか、および／または必要なパーミッションを持つグループの一つに属しているかどうかを確認するAPIを提供します。
+
+web2pyは、ログイン、メンバシップ、パーミッションに基づいて任意の関数へのアクセスを制限するデコレータも提供しています。
+
+web2pyはまた、いくつかの特別なパーミッション、すなわち、CRUDメソッド（削除、読み込み、更新、作成）に対応した名前を持つパーミッションに対応しており、デコレータを使用しなくても自動的にそのパーミッションを強制することができます。
+
+この章では、RBACのそれぞれの構成要素を一つ一つ解説していきます。
+
+### Authentication
+
+RBACを使用するためには、ユーザーが識別される必要があります。これは、ユーザーが登録を行い（あるいは事前に登録されている状態で）、ログインする必要があることを意味しています。
+
+**Auth**は複数のログイン用メソッドを提供します。デフォルトのメソッドは、ローカルの'auth_user'テーブルに基づいてユーザーを識別します。代わりに、サードパーティの認証システムやシングルサインオンを提供するプロバイダ（Google、PAM、LDAP、Facebook、LinkedIn、OpenID、OAuth、その他）に対してユーザーをログインさせることができます。
+
+``Auth``の使用を開始するには、少なくとも以下のコードをmodelファイルに用意する必要があります。このコードはまた、web2pyの"welcome"アプリケーションで提供され、``db``接続オブジェクトを利用しています：
+``
+from gluon.tools import Auth
+auth = Auth(globals(), db)
+auth.define_tables(username=False)
+``:code
+
+もしユーザーをメールアドレスではなくログイン時のユーザー名で認証したい場合、``username=True``と設定します。
+
+**Auth**を公開するには、次のような関数をコントローラに用意する必要があります（"default.py"にサンプルがあります）:
+``
+def user(): return dict(form=auth())
+``:code
+
+-------
+``auth``オブジェクトと``user``関数の両方は雛形アプリケーションですでに定義されています。
+-------
+
+web2pyにはまた、適切にこの関数をレンダリングするための次のようなサンプルビュー"welcome/views/default/user.html"が含まれています：
+``
+{{extend 'layout.html'}}
+<h2>{{=request.args(0)}}</h2>
+{{=form}}
+{{if request.args(0)=='login':}}
+<a href="{{=URL(args='register')}}" >register</a><br />
+<a href="{{=URL(args='request_reset_password')}}" >lost password</a><br />
+{{pass}}
+``:code
+
+この関数は``form``を単純に表示しています。ですので、標準のフォームカスタマイズ用の構文を使ってカスタマイズすることが可能です。唯一の注意点は表示されているフォームが``request.args(0)``に依存していることです。つまり以下のビューのようにif文を利用する必要があります:
+
+``
+{{if request.args(0)=='login':}}...custom login form...{{pass}}
+``:code
+
+上記のコントローラは、複数のアクションを公開しています：
+``
+http://.../[app]/default/user/register
+http://.../[app]/default/user/login
+http://.../[app]/default/user/logout
+http://.../[app]/default/user/profile
+http://.../[app]/default/user/change_password
+http://.../[app]/default/user/verify_email
+http://.../[app]/default/user/retrieve_username
+http://.../[app]/default/user/request_reset_password
+http://.../[app]/default/user/reset_password
+http://.../[app]/default/user/impersonate
+http://.../[app]/default/user/groups
+http://.../[app]/default/user/not_authorized
+``:code
+- **register**はユーザーの登録を行います。CAPTCHAも統合されていますが、デフォルトでは無効になっています。
+- **login**は事前に登録されたユーザーのログインを許可します（検証が通るか必要ない場合に、承認が通るか必要ない場合に、ブロックされていない場合に許可します）。
+- **logout**は期待通りの動きをしますが、その他のメソッドのように、イベントのログを記録し、他のイベントのトリガーとして使用することもできます。
+- **profile**は、ユーザーにプロファイルを編集することを許可します。プロファイルとは``auth_user``テーブルに登録された情報です。このテーブルは固定された構造を持っておらず、カスタマイズができることに注意してください。
+- **change_password**は、ユーザーにフェイルセーフな方法でパスワードを変更させることができます。
+- **verify_email**。電子メール検証が有効な場合、登録処理を行ったユーザーは、その電子メール情報を検証するためのリンクを含むメールを受け取ります。このリンクはこのアクションを指し示します。
+- **retrieve_username**。デフォルトでは、 **Auth**は電子メールとパスワードを使用してログインしますが、電子メールの代わりにユーザー名を使うこともできます。後者のケースでは、もしユーザーがユーザー名を忘れた場合、``retrieve_username``メソッドによって、ユーザーにメールアドレスを入力させ、そのアドレスに送られたメールからユーザー名を取得することが可能になります。
+- **request_reset_password**。このメソッドでは、自分のパスワードを忘れてしまったユーザーが新しいパスワードを要求できます。ユーザーは、**reset_password**を指し示す確認メールを受け取ることになります。
+- **impersonate**は、あるユーザーを別の"偽装ユーザー"にすることができます。これは、デバッグと、サポートにとって重要な機能です。``request.args[0]``が偽装されたユーザーIDになります。このメソッドは、``has_permission('impersonate', db_auth_user, user_id)``として指定されたユーザーでログインした時のみ有効となります。
+- **groups**は、現在ログオンしているユーザーが所属しているグループが一覧表示されます。
+- **not_authorized**は、ユーザーが権限のないページを表示しようとした時に、エラーメッセージを表示します。
+- **navbar**は、ログインやユーザー登録を行うリンクを含むバーを生成するヘルパーです。
+
+logout、profile、ch​​ange_password、impersonate、groupsは、ログインしている必要があります。
+
+デフォルトではこれらはすべて公開されますが、それらのアクションの一部のみにアクセスを制限することも可能です。
+
+上記のすべてのメソッドは、**Auth**のサブクラスを作成することで、拡張したり置き換えたりすることが可能です。
+
+ログインした訪問者のみ関数にアクセスできるよう制限するためには、以下のサンプルのように関数にデコレータを指定します``
+@auth.requires_login()
+def hello():
+    return dict(message='hello %(first_name)' % auth.user)
+``:code
+
+全ての関数はデコレータを指定できます。公開されているものだけではありません。もちろんこれは、アクセスコントロールの非常に単純な例です。より複雑な例については後述します。
+``auth.user``:inxx ``auth.user_id``:inxx
+
+-----
+``auth.user``は、現在ログインしているユーザーに該当する``db.auth_user``のレコードのコピーか、``None``を格納しています。またauth.user_idは``auth.user.id``と同じ値（すなわち、現在ログインしているユーザーのID）か``None``になります。
+-----
+
+#### 登録の制限
+
+訪問者が登録を行うことはできるが、管理者によって承認されるまでログインできないようにする場合：
+``
+auth.settings.registration_requires_approval = True
+``:code
+
+appadminインターフェイスを介して、登録を承認することができます。``auth_user``テーブルを見てください。保留中の登録情報は、``registration_key``フィールドに"pending"が設定されています。登録を承認するには、このフィールドを空白に設定します。
+
+appadminインターフェイスを介して、ユーザーをログインできないようにすることもできます。``auth_user``から該当のユーザーを見つけて``registration_key``を"blocked"に設定します。"blocked"となったユーザーは、ログインができません。ただし、ログインしていないユーザーからのログインを防ぐことははできますが、既にログインしているユーザーを強制的にログアウトさせることはできません。"disabled"を"blocked"の代わりに使用することもできます。動きは全く同じです。
+
+また以下のステートメントを使用して完全に"登録"​​ページへのアクセスをブロックすることができます：
+``
+auth.settings.actions_disabled.append('register')
+``:code
+
+**Auth**の他のメソッドも同じ方法で制限することができます。
+
+#### Integration with OpenID, Facebook, etc.
+``Janrain``:inxx ``OpenID``:inxx ``Facebook``:inxx ``LinkedIn``:inxx ``Google``:inxx ``MySpace``:inxx ``Flickr``:inxx
+
+web2pyのロールベースのアクセス制御を使用して、OpenID、Facebook、LinkedIn、Google、MySpace、Flickr、などの外部サービスによる認証ができます。最も簡単な方法は、Janrain Engage（旧RPX）（Janrain.com）を使用することです。
+
+Janrain Engageはミドルウェアの認証を提供するサービスです。Janrain.comへの登録、そして使用するドメイン（あなたのアプリケーションの名前）と利用するURLの登録を行うことができます。そしてAPIキーが提供されます。
+
+では、あなたのweb2pyアプリケーションのモデルを編集して、以下の行を``auth``オブジェクトの定義より後ろに追加してください：
+
+``
+from gluon.contrib.login_methods.rpx_account import RPXAccount
+auth.settings.actions_disabled=['register','change_password','request_reset_password']
+auth.settings.login_form = RPXAccount(request,
+    api_key='...',
+    domain='...',
+    url = "http://localhost:8000/%s/default/user/login" % request.application)
+``:code
+
+最初の行では新しいログインメソッドをインポートしています。2行目は、ローカルユーザーの登録を無効にしています。3行目はweb2pyに対してRPXのログインメソッドを使用するように指示しています。Janrain.comによって提供される独自の``api_key``、登録する際に選択したドメイン、ログインページの外部``url``を挿入する必要があります
+
+[[image @///image/en7400.png center 300px]]
+
+新しいユーザーが最初にログインした時に、web2pyはそのユーザーに関連づけられた新規の``db.auth_user``のレコードを作成します。``registration_id``フィールドが、ユーザーを一意に識別するIDとして設定されます。ほとんどの認証方法は、ユーザー名、電子メール、名前と名字を提供しますが、必ず提供されるとは限りません。どのフィールドを提供しているかは、ユーザーによって選択されたloginメソッドに依存します。もし同じユーザーが異なる認証のメカニズムを使ってログインした場合（例えば、OpenIDでログインしたあとにFacebookでログインし直した）Janrainは、それらを同じユーザーとしては認識せず、それぞれの``registration_id``を発行します。
+
+Janrainによって提供されるデータと``db.auth_user``に保存されるデータとのマッピングは、カスタマイズすることができます。ここではFacebookを例として示します：
+``
+auth.settings.login_form.mappings.Facebook = lambda profile:\
+            dict(registration_id = profile["identifier"],
+                 username = profile["preferredUsername"],
+                 email = profile["email"],
+                 first_name = profile["name"]["givenName"],
+                 last_name = profile["name"]["familyName"])
+``:code
+
+ディクショナリ内のキーは、``db.auth_user``のフィールドです。そして値は、Janrainによって提供されるプロファイルオブジェクトに存在するデータエントリです。後者の詳細については、オンラインJanrainのマニュアルをご覧ください。
+
+Janrainはまた、ユーザーのログインに関する統計情報を保持します。
+
+このログインフォームは、web2pyのロールベースのアクセス制御と完全に統合されており、グループの作成、ユーザーのグループへの割り当て、権限の割り当て、ユーザーのブロック等を行うことができます。
+
+-----
+Janrainではなく、他のログインメソッド（LDAP、PAM、Google、OpenID、OAuth/Facebook、LinkedIn、など）を必要とする場合は、それを利用することもできます。そのためのAPIは、本章の後半で記載します。
+-----
+
+#### CAPTCHAとreCAPTCHA
+
+``CAPTCHA``:inxx ``reCAPTCHA``:inxx ``PIL``:inxx
+スパマーやボットによるあなたのサイトへの不要な登録を避けるため、登録用のCAPTHCAが必要になるときがあります。web2pyはreCAPTCHA``recaptcha``:citeをサポートしています。reCAPTCHAは、よく設計されていて、無料で、利便性がよく（訪問者が簡単に単語を読むことができる）、簡単に導入できて、その他のサードパーティー製のライブラリを必要としないからです。
+
+以下は、reCPATCHAを使う時に必要となることです。
+- reCPATCHA``recaptcha``:citeに登録を行い、登録アカウント用のパブリックキー, プライベートキーを入手してください。これらは単に二つの文字列です。
+- 次のコードを``auth``オブジェクトを定義した後にモデルに追加してください。
+``
+from gluon.tools import Recaptcha
+auth.settings.captcha = Recaptcha(request,
+    'PUBLIC_KEY', 'PRIVATE_KEY')
+``:code
+
+reCAPTCHAは、'localhost'や'127.0.0.1'というアドレスのサイトにアクセスした場合はうまく動かないかもしれません。外部に公開されたサイトでのみ動作するように登録されているからです。
+
+``Recaptcha``のコンストラクタは、二つの省略可能な引数をとります。
+``
+Recaptcha(..., use_ssl=True, error_message='invalid')
+``:code
+
+``use_ssl=False``が初期値となっています。
+
+もし、reCAPTCHAを必要としない場合は、"gluon/tools.py"の中の``Recaptcha``クラスを見てください。他のCAPTCHAシステムを利用するのは簡単だからです。
+
+#### ``Auth``のカスタマイズ
+
+以下の呼び出しについて
+``
+auth.define_tables()
+``:code
+
+この呼び出しは、まだ登録されていない**Auth**テーブルの定義を行います。つまり、独自の``auth_user``テーブルを定義することができるのです。以下に示すものと同様の構文に沿うことで、**Auth**テーブルをカスタマイズできます。
+
+以下は、ユーザーテーブルを定義するための適切な方法です。
+``
+## after
+## auth = Auth(globals(),db)
+
+db.define_table(
+    auth.settings.table_user_name,
+    Field('first_name', length=128, default=''),
+    Field('last_name', length=128, default=''),
+    Field('email', length=128, default='', unique=True),
+    Field('password', 'password', length=512,
+          readable=False, label='Password'),
+    Field('registration_key', length=512,
+          writable=False, readable=False, default=''),
+    Field('reset_password_key', length=512,
+          writable=False, readable=False, default=''),
+    Field('registration_id', length=512,
+          writable=False, readable=False, default=''))
+
+auth_table.first_name.requires = \
+  IS_NOT_EMPTY(error_message=auth.messages.is_empty)
+auth_table.last_name.requires = \
+  IS_NOT_EMPTY(error_message=auth.messages.is_empty)
+auth_table.password.requires = [IS_STRONG(), CRYPT()]
+auth_table.email.requires = [
+  IS_EMAIL(error_message=auth.messages.invalid_email),
+  IS_NOT_IN_DB(db, auth_table.email)]
+auth.settings.table_user = auth_table
+
+## before
+## auth.define_tables()
+``:code
+
+フィールドはいくつでも追加することは可能ですが、このサンプルにある必須フィールドを除くことはできません。
+
+"password", "registration_key", "reset_password_key", "registration_id"フィールドを``readable=False``と ``writable=False``に設定することは重要です。訪問者が不正にこれらの値を変更できるようなことがあってはならないからです。
+
+"username"というフィールドを追加した場合、これを"email"フィールドの代わりにログイン時に利用することができます。この場合、以下のようなバリデータを追加する必要があります。
+
+``
+auth_table.username.requires = IS_NOT_IN_DB(db, auth_table.username)
+``:code
+
+#### ``Auth``テーブルの名前変更
+
+``Auth``テーブルの実際の名前は、次のように格納されています。
+``
+auth.settings.table_user_name = 'auth_user'
+auth.settings.table_group_name = 'auth_group'
+auth.settings.table_membership_name = 'auth_membership'
+auth.settings.table_permission_name = 'auth_permission'
+auth.settings.table_event_name = 'auth_event'
+``:code
+
+これらの名前は``auth``オブジェクトの定義を行ってからAuthテーブルの定義を行うまでの間で再定義することにより変更できます。以下はその例です。 
+``
+auth = Auth(globals(),db)
+auth.settings.table_user_name = 'person'
+#...
+auth.define_tables()
+``:code
+
+実際のテーブルは以下のコードにより、その実際の名前とは独立して参照することができます。
+``
+auth.settings.table_user
+auth.settings.table_group
+auth.settings.table_membership
+auth.settings.table_permission
+auth.settings.table_event
+``:code
+
+#### その他のログイン方法とログインフォーム
+``LDAP``:inxx ``PAM``:inxx
+
+Authは複数のログイン方法と新しいログイン方法を作成するためのフックを提供します。サポートされている各ログイン方法は、次のフォルダ内の一つのファイルに対応しています。
+``
+gluon/contrib/login_methods/
+``:code
+
+各ログイン方法に関しては、ファイル自身に記述された説明を参照してください。ただし、ここではいくつかの例を用意します。
+
+まず、以下の二つの異なるタイプのログイン方法の違いを理解する必要があります。
+- web2pyのログインフォームを使ったログイン方法（ただし、認証情報はweb2pyの外で検証される）。例：LDAP
+- 外部のシングルサインオン用フォームを必要とするログイン方法（例：GoogleやFacebook）
+
+後者の場合は、web2pyはログイン用の認証情報を取得せず、サービスプロバイダから発行されたログイン用のトークンのみを取得します。このトークンは、 ``db.auth_user.registration_id``に保存されます。
+
+それでは、最初の例を見てみましょう。
+
+##### Basic
+
+例えば認証が必要なサービスを用意するとき、以下のようなURLを
+
+``
+https://basic.example.com
+``:code
+
+ベーシック認証により受け入れるようにします。これは、サーバが以下のようなヘッダ情報をフォームに持つHTTPを受けとることを意味します。
+
+``
+GET /index.html HTTP/1.0
+Host: basic.example.com
+Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
+``:code
+
+ここで、後半の文字列はbase64でエンコーディングされたユーザー名:パスワードの文字列です。このサービスは、ユーザーが認証に成功した場合は200 OKを、それ以外の場合は400, 401, 402, 403あるいは404を返します。
+
+基本的な``Auth``のログインフォームを使ってユーザー名とパスワードを入力させて、そのようなサービスに対して認証情報を検証したいとします。この場合は、単にアプリケーションに以下のコードを挿入するだけで十分です。
+``
+from gluon.contrib.login_methods.basic_auth import basic_auth
+auth.settings.login_methods.append(
+    basic_auth('https://basic.example.com'))
+``:code
+
+``auth.settings.login_methods``は、順番に実行される認証方法のリストです。
+デフォルでは以下のように設定されています。
+``
+auth.settings.login_methods = [auth]
+``:code
+
+代替の認証方法（例えば``basic_auth``）が追加された場合、**Auth** はまず``auth_user``の中身に基づいて訪問者の認証を試みます。認証に失敗した場合は、このリストに含まれる次の方法で認証を試みます。もし認証に成功して、かつ``auth.settings.login_methods[0]==auth``となるとき、**Auth**は以下の処理を実行します：
+- もし``auth_user``にユーザーが存在しない場合、新しいユーザーが作成され、username/emailとpasswordが保存されます。
+- もし``auth_user``にユーザーが存在するが、入力された新しいパスワードが古いパスワードと一致しない場合、古いパスワードは新しいものに置き換わります(特に指定しない限り、パスワードは常にハッシュ化されたものが保存されます)。
+
+新しいパスワードを``auth_user``に保存したくない場合は、ログイン方法の順番を変更すれば十分です。もしくは、``auth``をリストから削除します。以下はその例です:
+``
+from gluon.contrib.login_methods.basic_auth import basic_auth
+auth.settings.login_methods = \
+    [basic_auth('https://basic.example.com')]
+``:code
+
+ここで記載した他の全てのログイン方法についても同様です。
+
+##### SMTPとGmail
+``SMTP``:inxx ``Gmail``:inxx
+
+ログイン用の認証情報をリモートのSMTPサーバ（例えばGmail）を用いて検証することができます。すなわち、ユーザーの提供するemailとパスワードがGmailのSMTPサーバ (``smtp.gmail.com:587``)に正常にアクセスできる認証情報であればユーザーをログインさせることができます。これに必要なのは以下のコードだけです:
+``
+from gluon.contrib.login_methods.email_auth import email_auth
+auth.settings.login_methods.append(
+    email_auth("smtp.gmail.com:587", "@gmail.com"))
+``:code
+
+``email_auth``の最初の引数は、SMTPサーバの"address:port"です。二つ目の引数はメールのドメインです。
+
+これは、``TLS``認証を必要とする任意のSMTPサーバに対しても動作します。``TLS``:inxx
+
+##### PAM
+``PAM``:inxx
+
+Pluggable Authentication Modules(PAM)を使った認証は、前のケースと同様に機能します。これにより、オペレーティングシステムのアカウントを用いてユーザーの認証ができるようになります:
+``
+from gluon.contrib.login_methods.pam_auth import pam_auth
+auth.settings.login_methods.append(pam_auth())
+``:code
+
+##### LDAP
+``LDAP``:inxx
+
+LDAPを使った認証は、前のケースと全く同様に機能します。
+
+LDAPをMS Active Directoryとともに使用する方法です：``Active Directory``:inxx
+``
+from gluon.contrib.login_methods.ldap_auth import ldap_auth
+auth.settings.login_methods.append(ldap_auth(mode='ad',
+   server='my.domain.controller',
+   base_dn='ou=Users,dc=domain,dc=com'))
+``:code
+
+LDAPをLotus NotesとDominoとともに使用する方法です：``Lotus Notes``:inxx ``Domino``:inxx
+``
+auth.settings.login_methods.append(ldap_auth(mode='domino',
+   server='my.domino.server'))
+``:code
+
+LDAPをOpenLDAP（UIDによる）とともに使用する方法です：:``OpenLDAP``:inxx
+``
+auth.settings.login_methods.append(ldap_auth(server='my.ldap.server',
+   base_dn='ou=Users,dc=domain,dc=com'))
+``:code
+
+LDAPをOpenLDAP（CNによる）とともに方法です：
+``
+auth.settings.login_methods.append(ldap_auth(mode='cn',
+   server='my.ldap.server', base_dn='ou=Users,dc=domain,dc=com'))
+``:code
+
+##### Google App Engine
+``GAE login``:inxx
+
+Google App Engine上で動作しているアプリケーションでGoogleによる認証を行う場合には、web2pyのログインフォームによる認証は行わず、Googleのログインページにリダイレクトを行い、そして成功したら元のページに戻るようにします。前述の例とは動作が異なるため、APIは少し異なります。
+
+``
+from gluon.contrib.login_methods.gae_google_login import GaeGoogleAccount
+auth.settings.login_form = GaeGoogleAccount()
+``:code
+
+##### OpenID
+``OpenID``:inxx
+
+（OpenIDのサポートがある）Janrainの組み込みについて説明しましたが、これが最も簡単なOpenIDを使う方法です。しかし、サードパーティー製のサービスに頼るのではなく、OpenIDプロバイダにその利用者（あなたのアプリケーション）から直接アクセスしたいこともあります。
+
+これは、その例です。
+
+``
+from gluon.contrib.login_methods.openid_auth import OpenIDAuth
+auth.settings.login_form = OpenIDAuth(auth)
+``:code
+
+``OpenIDAUth`` requires the "python-open" installed separately.
+
+内部では、このログイン方法は次のようなテーブルを定義します。
+
+``
+db.define_table('alt_logins',
+    Field('username', length=512, default=''),
+    Field('type', length =128, default='openid', readable=False),
+    Field('user', self.table_user, readable=False))
+``:code
+
+このテーブルには、各ユーザーのopenidのユーザー名が保存されます。現在ログインしているユーザーのopenidを表示したい場合は、次のようにします。
+
+``
+{{=auth.settings.login_form.list_user_openids()}}
+``:code
+
+##### OAuth2.0とFacebook
+``OAuth``:inxx ``Facebook``:inxx
+
+（Facebookのサポートがある）Janrainの組み込みについて説明しましたが、サードパーティー製のサービスに頼るのではなく、OAuth2.0プロバイダ（例えばFacebook）にその利用者（あなたの作成するアプリケーション）から直接アクセスしたいこともあります。方法は以下の通りです。
+
+``
+from gluon.contrib.login_methods.oauth20_account import OAuthAccount                                                  
+auth.settings.login_form=OAuthAccount(globals(),YOUR_CLIENT_ID,YOUR_CLIENT_SECRET) 
+``:code
+
+自分自身のアプリケーションではなく、特定のFacebookアプリケーションにそのAPIにアクセスしようとログインするためにFacebook OAuth2.0を用いたい場合は、少し複雑になります。ここに、Facebook Graph APIにアクセスするための例を示します。
+
+始めに、"pyfacebook"モジュールをインストールする必要があります。
+
+そして、モデルに以下のコードを追加します。
+
+``
+## import required modules
+from facebook import GraphAPI
+from gluon.contrib.login_methods.oauth20_account import OAuthAccount
+## extend the OAUthAccount class
+class FaceBookAccount(OAuthAccount):
+    """OAuth impl for FaceBook"""
+    AUTH_URL="https://graph.facebook.com/oauth/authorize"
+    TOKEN_URL="https://graph.facebook.com/oauth/access_token"
+    def __init__(self, g):
+        OAuthAccount.__init__(self, g, 
+                              YOUR_CLIENT_ID,
+                              YOUR_CLIENT_SECRET,
+                              self.AUTH_URL,
+                              self.TOKEN_URL)
+        self.graph = None
+    # override function that fetches user info
+    def get_user(self):
+        "Returns the user using the Graph API"
+        if not self.accessToken():
+            return None
+        if not self.graph:
+            self.graph = GraphAPI((self.accessToken()))
+        try:
+            user = self.graph.get_object("me")
+            return dict(first_name = user['first_name'],
+                        last_name = user['last_name'],
+                        username = user['id'])
+        except GraphAPIError:
+            self.session.token = None
+            self.graph = None
+            return None
+## use the above class to build a new login form
+auth.settings.login_form=FaceBookAccount(globals())
+``:code
+
+##### LinkedIn
+``LinkedIn``:inxx
+
+（LinkedInのサポートがある）Janrainの組み込みについて説明しましたが、これが最も簡単なOAuthを使った方法です。しかし、サードパーティー製のサービスに頼るのではなく、Janrainプロバイダが提供するよりも多くの情報を得たいためにLinkedInに直接アクセスしたい場合もあります。
+
+方法は以下の通りです。
+
+``
+from gluon.contrib.login_methods.linkedin_account import LinkedInAccount
+auth.settings.login_form=LinkedInAccount(request,KEY,SECRET,RETURN_URL) 
+``:code
+
+``LinkedInAccount``は"python-linkedin" モジュールを別途インストールする必要があります。
+
+##### Multiple Login フォーム
+
+ログイン方法の中には、login_formを変更するものとしないものがあります。変更する場合は、他と共存することができないかもしれません。ただし、同じページに複数のログインフォームを提供することで共存させることができます。web2pyは、そのための方法を提供しています。ここに、通常のログイン(auth)とRPXログイン(janrain.com)を共存させる例を示します。
+
+``
+from gluon.contrib.login_methods.extended_login_form import ExtendedLoginForm
+other_form = RPXAccount(request, api_key='...', domain='...', url='...')
+auth.settings.login_form = ExtendedLoginForm(request,
+    auth, other_form, signals=['token'])
+``:code
+
+もしシグナルが設定され、リクエストに含まれるパラメータがいずれかのシグナルにマッチした場合、代わりに``other_form.login_form`` への呼び出しを返します。``other_form``は、特別な状況をハンドルします。例えば``other_form.login_form``に含まれるOpenIDの複数のステップです。
+
+そうでない場合は、``other_form``と共に通常のログインフォームが描画されます。
+
+### ``Auth``と``Mail``
+
+デフォルトでは、メールアドレスによる検証は無効になっています。メールアドレスの検証を有効にするには、以下のコードを``auth``定義してあるモデルに追加してください。
+``
+from gluon.tools import Mail
+mail = Mail(globals())
+mail.settings.server = 'smtp.example.com:25'
+mail.settings.sender = 'you@example.com'
+mail.settings.login = 'username:password'
+auth.settings.mailer = mail
+auth.settings.registration_requires_verification = False
+auth.settings.registration_requires_approval = False
+auth.settings.reset_password_requires_verification = True
+auth.messages.verify_email = 'Click on the link http://' + \
+    request.env.http_host + \
+    URL(r=request,c='default',f='user',args=['verify_email']) + \
+    '/%(key)s to verify your email'
+auth.messages.reset_password = 'Click on the link http://' + \
+    request.env.http_host + \
+    URL(r=request,c='default',f='user',args=['reset_password']) + \
+    '/%(key)s to reset your password'
+``:code
+
+mail.settingは、利用するSMTPサーバに対して適したパラメタに置き換える必要があります。SMTPサーバが認証を必要としない場合は、``mail.settings.login=False``と設定してください。
+
+以下の文字列...は、
+``
+'Click on the link ...'
+``:code
+
+``auth.messages.verify_email``にありますが、これを``verify_email``のアクションの正しい完全なURLに置き換える必要があります。 なぜなら、web2pyはプロキシの下にインストールされているかもしれず、自身の公開URLを確実に決定することができないからです。
+
+``mail.send``:inxx
+
+一旦``mail``定義されていれば, 以下のように明示的にメールを送ることもできます。
+``
+mail.send(to=['somebody@example.com'],
+          subject='hello',
+          message='hi there')
+``:code
+
+メールの送信に成功した時にはTrueを、失敗すればFalseを返します。
+
+#### メールのデバッグ
+``email logging``:inxx
+
+デバッグ目的のために、次のような設定を行うことができます。
+``
+mail.settings.server = 'logging'
+``:code
+
+このとき、メールは実際には送信されず、代わりにコンソールに表示されます。
+
+#### Google App Engineからメールを送信する
+``email from GAE``:inxx
+Google App Engineのアカウントからメールを送信するには次のようにします：
+
+``
+mail.settings.server = 'gae'
+``:code
+
+このマニュアルを書いている時点では、web2pyはGoogle App Engine上でのファイル添付や暗号化などをサポートしていません。
+
+#### その他のメール処理のサンプル
+``email html``:inxx ``email attachments``:inxx
+
+##### シンプルなテキストメール
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  'Plain text body of the message')
+``:code
+
+##### HTMLメール
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  <html>html body</html>)
+``:code
+
+メール本文が`<html>`で始まり`</html>`で終わる場合、HTMLメールとして送信されます。
+
+##### テキストとHTMLの混合メール
+
+メールのメッセージは、テキストとHTMLのタプルにすることができます。
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  ('Plain text body', <html>html body</html>))
+``:code
+
+##### CCとBCC
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  'Plain text body',
+  cc=['other1@example.com', 'other2@example.com'],
+  bcc=['other3@example.com', 'other4@example.com'])
+``:code
+
+##### 添付
+
+``
+mail.send('you@example.com',
+  'Message subject',
+  '<html><img src="cid:photo" /></html>',
+  attachments = Mail.Attachment('/path/to/photo.jpg' content_id='photo'))
+``:code
+
+##### 複数ファイルの添付
+
+``
+mail.send('you@example.com,
+  'Message subject',
+  'Message body',
+  attachments = [Mail.Attachment('/path/to/fist.file'),
+                 Mail.Attachment('/path/to/second.file')])
+``:code
+
+#### x509とPGPによる暗号化
+``PGP``:inxx ``x509``:inxx
+
+次の設定により、x509(SMIME)で暗号化されたメールを送信することができます。
+``
+mail.settings.cipher_type = 'x509'
+mail.settings.sign = True
+mail.settings.sign_passphrase = 'your passphrase'
+mail.settings.encrypt = True
+mail.settings.x509_sign_keyfile = 'filename.key'
+mail.settings.x509_sign_certfile = 'filename.cert'
+mail.settings.x509_crypt_certfiles = 'filename.cert'
+``:code
+
+次の設定により、PGPで暗号化されたメールを送信することができます。
+``
+from gpgme import pgp
+mail.settings.cipher_type = 'gpg'
+mail.settings.sign = True
+mail.settings.sign_passphrase = 'your passphrase'
+mail.settings.encrypt = True
+``:code
+
+後者は、python-pymeパッケージを必要とします。
+
+### 承認
+
+新しいユーザーが登録されると、そのユーザーを含む新しいグループが作成されます。新しいユーザーのロールは、慣例的に"user_[id]"となります。ここで、[id]の部分は新しいユーザーのidです。自動的にグループを作成したくない場合は、以下のようにします。
+``
+auth.settings.create_user_groups = False
+``:code
+
+ただし、このような設定は推奨していません。
+
+ユーザーはグループのメンバーシップを保持します。それぞれのグループは名前かロール名で特定されます。グループはパーミッションを保持します。従って、ユーザーも所属するグループのパーミッションを保持するになります。
+
+グループの作成とグループへのメンバーシップとパーミッションの割り当ては、**appadmin**を利用するか、以下のメソッドを使ってプログラム的に行うことができます。
+``
+auth.add_group('role', 'description')
+``:code
+
+これは、新しく作成したグループのidを返します。
+``
+auth.del_group(group_id)
+``:code
+
+これは、``group_id``を持つグループを削除します。
+``
+auth.del_group(auth.id_group('user_7'))
+``:code
+
+これは、 "user_7"のロールを持つグループ、つまり７番のユーザーに一意に関連付けられたグループを削除します。
+``
+auth.user_group(user_id)
+``:code
+
+これは、``user_id``で特定されるユーザーに一意に関連付けられたグループのidを返します。
+``
+auth.add_membership(group_id, user_id)
+``:code
+
+これは、``group_id``グループに属する``user_id``メンバーシップを与えます。``user_id``が指定されない場合、現在のログインユーザーが当てはめられます。
+``
+auth.del_membership(group_id, user_id)
+``:code
+
+これは、``group_id``グループに属する``user_id``メンバーシップを除きます。``user_id``が指定されない場合、現在のログインユーザーが当てはめられます。
+``
+auth.has_membership(group_id, user_id, role)
+``:code
+
+これは、``user_id``が、``group_id``グループ、もしくは、特定のロールを持つグループ、に属するメンバーシップがあるかどうかを確認します。``group_id`` か``role``の両方ではなく、どちらかのみ指定してください。``user_id``が指定されない場合、現在のログインユーザーが当てはめられます。
+``
+auth.add_permission(group_id, 'name', 'object', record_id)
+``:code
+
+これは、（独自に定義した）"object"というオブジェクトに対する（独自に定義した）"name"というパーミンションを、``group_id``グループに属するメンバーに与えます。"object"がテーブル名だった場合、``record_id``がゼロならばテーブル全体に対してパーミッションが与えられ、``record_id`` がゼロ以上の場合は特定のレコードにだけパーミッションが与えられます。パーミッションがテーブルに対して与えられた場合、('create', 'read', 'update', 'delete', 'select') の中からパーミッション名を利用するのが一般的です。これらのパーミッションは理解されていて、CRUDによって実施できるからです。
+``
+auth.del_permission(group_id, 'name', 'object', record_id)
+``:code
+
+これは、パーミッションを無効にします。
+``
+auth.has_permission('name', 'object', record_id, user_id)
+``:code
+
+これは``user_id``で特定されるユーザーが、要求されたパーミッションを持つグループのメンバーかどうかを確認します。
+``
+rows = db(accessible_query('read', db.mytable, user_id))\
+    .select(db.mytable.ALL)
+``:code
+
+これは、"mytable"テーブルのなかで、``user_id``ユーザーが"read"パーミッションを持つ行を全て返します。``user_id``が指定されない場合、現在のログインユーザーが当てはめられます。``accessible_query(...)``は他のクエリと組み合わてより複雑なものを作ることができます。``accessible_query(...)``はJOINを必要とする唯一の**Auth**のメソッドです。そのため、Google App Engineでは動作しません。
+
+以下の定義を前提として：
+``
+>>> from gluon.tools import Auth
+>>> auth = Auth(globals(), db)
+>>> auth.define_tables()
+>>> secrets = db.define_table('document', Field('body'))
+>>> james_bond = db.auth_user.insert(first_name='James',
+                                     last_name='Bond')
+``:code
+
+次の例を示します。
+``
+>>> doc_id = db.document.insert(body = 'top secret')
+>>> agents = auth.add_group(role = 'Secret Agent')
+>>> auth.add_membership(agents, james_bond)
+>>> auth.add_permission(agents, 'read', secrets)
+>>> print auth.has_permission('read', secrets, doc_id, james_bond)
+True
+>>> print auth.has_permission('update', secrets, doc_id, james_bond)
+False
+``:code
+
+#### デコレータ
+
+パーミッションを確認する最も一般的な方法は、上記のメソッドを明示的に呼び出すのではなく、関数にデコレータを指定して、ログインしている訪問者に対してパーミッションをチェックするようにします。以下に幾つかの例を示します。
+``
+def function_one():
+    return 'this is a public function'
+
+@auth.requires_login()
+def function_two():
+    return 'this requires login'
+
+@auth.requires_membership(agents)
+def function_three():
+    return 'you are a secret agent'
+
+@auth.requires_permission('read', secrets)
+def function_four():
+    return 'you can read secret documents'
+
+@auth.requires_permission('delete', 'any file')
+def function_five():
+    import os
+    for file in os.listdir('./'):
+        os.unlink(file)
+    return 'all files deleted'
+
+@auth.requires(auth.user_id==1 or request.client=='127.0.0.1')
+def function_six():
+    return 'you can read secret documents'
+
+@auth.requires_permission('add', 'number')
+def add(a, b):
+    return a + b
+
+def function_six():
+    return add(3, 4)
+``:code
+
+最初の一つ以外の全ての関数は、訪問者がパーミッションを持っているか持っていないかに基づいて実行が制限されています。
+
+訪問者がログインしていない場合、パーミッションの確認はできません。ログインページにリダイレクトされ、ログイン後にパーミッションが必要なページに戻ります。
+
+訪問者が指定した関数にアクセスするパーミッションを持っていない場合、以下のように定義されたURLにリダイレクトされます。
+
+``
+auth.settings.on_failed_authorization = \
+    URL('user',args='on_failed_authorization')
+``:code
+
+この変数を変更して、任意の場所へリダイレクトさせることが可能です。
+
+#### 権限要求の組み合わせ
+
+時には、権限要求を組み合わせることが必要になる場合があります。これは汎用的な``requires``デコレータによって行おうことができます。このデコレータは一つの引数、真か偽の条件、をとります。例えば、agentsにアクセス権限を与えたいが、火曜日だけにしたい場合は次のようにします：
+``
+@auth.requires(auth.has_membership(group_id=agents) \
+               and request.now.weekday()==1)
+def function_seven():
+    return 'Hello agent, it must be Tuesday!'
+``:code
+
+次のような書き方もできます。
+``
+@auth.requires(auth.has_membership(role='Secret Agent') \
+               and request.now.weekday()==1)
+def function_seven():
+    return 'Hello agent, it must be Tuesday!'
+``:code
+
+#### 権限とCRUD
+
+デコレータ、かつ/または、明示的なチェックを用いることは、アクセス制御を実装する一つの方法です。
+
+もう一つのアクセス制御を実装する方法は、データベースにアクセスする時に常に(``SQLFORM``ではなく)CRUDを使うようにして、データベースのテーブルやレコードに対するアクセス制御をCRUDから実施するようにすることです。これは、次の命令文を用いて``Auth``とCRUDを紐づけることで行うことができます。
+``
+crud.settings.auth = auth
+``:code
+
+これは、訪問者がログインしていて明示的なアクセス権を持っていない限り、いかなるCRUD関数へのアクセスも防ぎます。例えば、訪問者はコメントを投稿できるが、自分自身のコメントしか更新できないようにするには、次のようにします（crud、authおよびdb.commentが定義されているものとします）：
+``
+def give_create_permission(form):
+    group_id = auth.id_group('user_%s' % auth.user.id)
+    auth.add_permission(group_id, 'read', db.comment)
+    auth.add_permission(group_id, 'create', db.comment)
+    auth.add_permission(group_id, 'select', db.comment)
+
+def give_update_permission(form):
+    comment_id = form.vars.id
+    group_id = auth.id_group('user_%s' % auth.user.id)
+    auth.add_permission(group_id, 'update', db.comment, comment_id)
+    auth.add_permission(group_id, 'delete', db.comment, comment_id)
+
+auth.settings.register_onaccept = give_create_permission
+crud.settings.auth = auth
+
+def post_comment():
+   form = crud.create(db.comment, onaccept=give_update_permission)
+   comments = db(db.comment.id>0).select()
+   return dict(form=form, comments=comments)
+
+def update_comment():
+   form = crud.update(db.comment, request.args(0))
+   return dict(form=form)
+``:code
+
+（'read'権限を持つ)特定のレコードを選択することもできます。
+``
+def post_comment():
+   form = crud.create(db.comment, onaccept=give_update_permission)
+   query = auth.accessible_query('read', db.comment, auth.user.id)
+   comments = db(query).select(db.comment.ALL)
+   return dict(form=form, comments=comments)
+``:code
+
+以下で実施されるパーミッションの名前は
+
+``
+crud.settings.auth = auth
+``:code
+
+"read", "create", "update", "delete", "select", "impersonate"になります。
+
+#### 承認とダウンロード
+
+デコレータの使用や``crud.settings.auth``の使用でも、通常のダウンロード関数によるファイルのダウンロードに対する承認は実施されません。
+``
+def download(): return response.download(request, db)
+``:code
+
+そうしたい場合は、どの"upload"フィールドがダウンロードの際のアクセス制御を要求するファイルを含んでいるかを明示的に宣言しなければなりません。以下はその例です。
+``
+db.define_table('dog',
+   Field('small_image', 'upload')
+   Field('large_image', 'upload'))
+
+db.dog.large_image.authorization = lambda record: \
+   auth.is_logged_in() and \
+   auth.has_permission('read', db.dog, record.id, auth.user.id)
+``:code
+
+アップロードフィールドのauthorization属性は、Noneとするか（デフォルト）、関数にすることができます。関数は、ユーザーがログインしているかどうか、そして現在の行に対する'read'パーミッションを持っているかどうかを判断します。この例では、"small_image"フィールドにリンクされた画像のダウンロードには何の制限もかけられていませんが、"large_image"フィールドにリンクされた画像にはアクセス制御がかけられています。
+
+#### アクセス制御と基本認証
+
+時には、アクセス制御を必要とするデコレータを持つアクションをサービスとして公開しなければならない場合があります。すなわち、プログラムやスクリプトから呼ばれてもなお、権限のチェックをするための認証を行うことができるものです。
+
+**Auth**よってベーシック認証によるログインを可能にすることができます。
+``
+auth.settings.allow_basic_login = False
+``:code
+
+上記の設定とともに、以下のようなアクションを定義すると
+``
+@auth.requires_login()
+def give_me_time():
+    import time
+    return time.ctime()
+``:code
+
+次のようなシェルコマンドからそのアクションを呼び出すことができます。
+``
+wget --user=[username] --password=[password]
+    http://.../[app]/[controller]/give_me_time
+``:code
+
+ベーシック認証によるログインは、しばしば（次章で説明する）サービスに対する唯一のオプションとなります。しかしデフォルトは無効になっています。
+
+#### 設定とメッセージ
+
+以下に示すのは、**Auth**に対してカスタマイズを行うことのできる全てのパラメタの一覧です。
+
+次のパラメタには、``gluon.tools.Mail``オブジェクトを指定してください。これにより、``auth``によるメールの送信が可能になります。
+
+``
+auth.settings.mailer = None
+``:code
+
+次のパラメタには、``user``のアクションを定義するコントローラの名前を指定してください。
+
+``
+auth.settings.controller = 'default'
+``:code
+
+次のパラメタは、とても重要な設定です。
+
+``
+auth.settings.hmac_key = None
+``:code
+
+これには、"sha512:a-pass-phrase"のような設定をしてください。これは、``auth_user``テーブルの"password"フィールドに対するCRYPTバリデータへ渡されます。パスワードをハッシュ化するために使われるアルゴリズムとパスフレーズになります。
+
+アクションを無効にするのは、その名前を以下のリストに追加します。
+``
+auth.settings.actions_disabled = []
+``:code
+
+その例です。
+
+``
+auth.settings.actions_disabled.append('register')
+``:code
+
+これは、登録を無効にしています。
+
+登録の検証のためのメールを受け取りたい場合は、次を``True``にします。
+
+``
+auth.settings.registration_requires_verification = False
+``:code
+
+新規登録において承認を待ってからログインできるようにするには場合は、次を``True``にします
+
+``
+auth.settings.registration_requires_approval = False
+``:code
+
+承認を行うためには、appadminまたはプログラムから``registration_key==''``と設定します。
+
+各新規ユーザーに対して新規グループを作成しないようにするには、次を``False``にします
+
+``
+auth.settings.create_user_groups = True
+``:code
+
+次の設定は、前述したように、代替のログイン方法とログインフォームを決定します。
+
+``
+auth.settings.login_methods = [auth]
+auth.settings.login_form = auth
+``:code
+
+ベーシック認証を許可したいですか？
+
+``
+auth.settings.allows_basic_login = False
+``:code
+
+
+``login``アクション用のURLです。
+
+``
+auth.settings.login_url = URL('user', args='login')
+``:code
+
+既にログインしている状態でユーザー登録用のページを開こうとした場合には、次のURLにリダイレクトされます。
+
+``
+auth.settings.logged_url = URL('user', args='profile')
+``:code
+
+プロフィールにイメージがある場合には、ダウンロード用のURLを指定してください
+
+``
+auth.settings.download_url = URL('download')
+``:code
+
+以下のURLには様々な``auth``アクションが実行された後にリダイレクトされるURLを指定してください（参照先が無い場合に）。
+
+``
+auth.settings.login_next = URL('index')
+auth.settings.logout_next = URL('index')
+auth.settings.profile_next = URL('index')
+auth.settings.register_next = URL('user', args='login')
+auth.settings.retrieve_username_next = URL('index')
+auth.settings.retrieve_password_next = URL('index')
+auth.settings.change_password_next = URL('index')
+auth.settings.request_reset_password_next = URL('user', args='login')
+auth.settings.reset_password_next = URL('user', args='login')
+auth.settings.verify_email_next = URL('user', args='login')
+``:code
+
+認証に失敗した場合にリダイレクトされるURLです。
+
+``
+auth.settings.on_failed_authorization = \
+    URL('user',args='on_failed_authorization')
+``:code
+
+以下は、対応する各アクションに対する検証の後でかつ、どのデータベースのIO処理の前に実行されるコールバックのリストです。
+
+``
+auth.settings.login_onvalidation = []
+auth.settings.register_onvalidation = []
+auth.settings.profile_onvalidation = []
+auth.settings.retrieve_password_onvalidation = []
+auth.settings.reset_password_onvalidation = []
+``:code
+
+各コールバックは``form``オブジェクトを引数として取る必要があります。それにより、データベースのIO処理が行われる前に、そのフォームオブジェクトの属性を修正することができます。
+
+以下は、データベースのIO処理の後でかつ、リダイレクトが行われる前に実行されるコールバック関数の一覧です。
+
+``
+auth.settings.login_onaccept = []
+auth.settings.register_onaccept = []
+auth.settings.profile_onaccept = []
+auth.settings.verify_email_onaccept = []
+``:code
+
+その例です。
+
+``
+auth.settings.register_onaccept.append(lambda form:\
+   mail.send(to='you@example.com',subject='new user',
+             message="new user email is %s'%form.vars.email))
+``:code
+
+全ての``auth``アクションに対して、キャプチャを有効にできます。
+
+``
+auth.settings.captcha = None
+auth.settings.login_captcha = None
+auth.settings.register_captcha = None
+auth.settings.retrieve_username_captcha = None
+auth.settings.retrieve_password_captcha = None
+``:code
+
+``.captcha``が``gluon.tools.Recaptcha``を指すように設定されている場合、(``.login_captcha``のような)対応するオプションが``None``に設定されている全てのフォームは、キャプチャを持ちます。一方、``False``に設定されていたらキャプチャを持ちません。代わりにもし、``.captcha``が``None``に設定されている場合、対応するオプションに``gluon.tools.Recapcha``オブジェクトが設定されているフォームのみがキャプチャを持ち、それ以外では持ちません。
+
+次は、ログインセッションの失効時間です。
+
+``
+auth.settings.expiration = 3600  # seconds
+``:code
+
+パスワードフィールドの名前は変更することができます(例えばFirebirdでは"password"はキーワードであり、フィールドの名前として利用できません)。:
+
+``
+auth.settings.password_field = 'password'
+``:code
+
+
+通常は、ログインフォームはメールアドレスのバリデーションを試みます。以下の設定でこれを無効にできます。
+
+``
+auth.settings.login_email_validate = True
+``:code
+
+プロフィールの編集ページでレコードIDを表示したいですか？
+
+``
+auth.settings.showid = False
+``:code
+
+フォームのカスタマイズにおいて、自動的なエラー通知を行いたくない場合は次のようにします。
+
+``
+auth.settings.hideerror = False
+``:code
+
+また、フォームのカスタマイズにおいて、スタイルを変更したい場合は次のようにします。
+
+``
+auth.settings.formstyle = 'table3cols'
+``:code
+
+(it can be "table2cols", "divs" and "ul")
+
+デフォルトでは、"remember me"オプションによるログインを拡張するためのオプションがフォームに与えられています。以下の設定によって、その有効期限や、そのオプション自体を無効にすることができます。
+
+``
+auth.settings.long_expiration = 3600*30 # one month                       
+auth.settings.remember_me_form = True
+``:code
+
+次のメッセージをカスタマイズすることができます。その用途や場面は明らかでしょう。
+``
+auth.messages.submit_button = 'Submit'
+auth.messages.verify_password = 'Verify Password'
+auth.messages.delete_label = 'Check to delete:'
+auth.messages.function_disabled = 'Function disabled'
+auth.messages.access_denied = 'Insufficient privileges'
+auth.messages.registration_verifying = 'Registration needs verification'
+auth.messages.registration_pending = 'Registration is pending approval'
+auth.messages.login_disabled = 'Login disabled by administrator'
+auth.messages.logged_in = 'Logged in'
+auth.messages.email_sent = 'Email sent'
+auth.messages.unable_to_send_email = 'Unable to send email'
+auth.messages.email_verified = 'Email verified'
+auth.messages.logged_out = 'Logged out'
+auth.messages.registration_successful = 'Registration successful'
+auth.messages.invalid_email = 'Invalid email'
+auth.messages.unable_send_email = 'Unable to send email'
+auth.messages.invalid_login = 'Invalid login'
+auth.messages.invalid_user = 'Invalid user'
+auth.messages.is_empty = "Cannot be empty"
+auth.messages.mismatched_password = "Password fields don't match"
+auth.messages.verify_email = ...
+auth.messages.verify_email_subject = 'Password verify'
+auth.messages.username_sent = 'Your username was emailed to you'
+auth.messages.new_password_sent = 'A new password was emailed to you'
+auth.messages.password_changed = 'Password changed'
+auth.messages.retrieve_username = 'Your username is: %(username)s'
+auth.messages.retrieve_username_subject = 'Username retrieve'
+auth.messages.retrieve_password = 'Your password is: %(password)s'
+auth.messages.retrieve_password_subject = 'Password retrieve'
+auth.messages.reset_password = ...
+auth.messages.reset_password_subject = 'Password reset'
+auth.messages.invalid_reset_password = 'Invalid reset password'
+auth.messages.profile_updated = 'Profile updated'
+auth.messages.new_password = 'New password'
+auth.messages.old_password = 'Old password'
+auth.messages.group_description = \
+    'Group uniquely assigned to user %(id)s'
+auth.messages.register_log = 'User %(id)s Registered'
+auth.messages.login_log = 'User %(id)s Logged-in'
+auth.messages.logout_log = 'User %(id)s Logged-out'
+auth.messages.profile_log = 'User %(id)s Profile updated'
+auth.messages.verify_email_log = 'User %(id)s Verification email sent'
+auth.messages.retrieve_username_log = 'User %(id)s Username retrieved'
+auth.messages.retrieve_password_log = 'User %(id)s Password retrieved'
+auth.messages.reset_password_log = 'User %(id)s Password reset'
+auth.messages.change_password_log = 'User %(id)s Password changed'
+auth.messages.add_group_log = 'Group %(group_id)s created'
+auth.messages.del_group_log = 'Group %(group_id)s deleted'
+auth.messages.add_membership_log = None
+auth.messages.del_membership_log = None
+auth.messages.has_membership_log = None
+auth.messages.add_permission_log = None
+auth.messages.del_permission_log = None
+auth.messages.has_permission_log = None
+auth.messages.label_first_name = 'First name'
+auth.messages.label_last_name = 'Last name'
+auth.messages.label_username = 'Username'
+auth.messages.label_email = 'E-mail'
+auth.messages.label_password = 'Password'
+auth.messages.label_registration_key = 'Registration key'
+auth.messages.label_reset_password_key = 'Reset Password key'
+auth.messages.label_registration_id = 'Registration identifier'
+auth.messages.label_role = 'Role'
+auth.messages.label_description = 'Description'
+auth.messages.label_user_id = 'User ID'
+auth.messages.label_group_id = 'Group ID'
+auth.messages.label_name = 'Name'
+auth.messages.label_table_name = 'Table name'
+auth.messages.label_record_id = 'Record ID'
+auth.messages.label_time_stamp = 'Timestamp'
+auth.messages.label_client_ip = 'Client IP'
+auth.messages.label_origin = 'Origin'
+auth.messages.label_remember_me = "Remember me (for 30 days)"
+``:code
+``add|del|has``membershipのログには、"%(user_id)s" と"%(group_id)s"が使用できます。``add|del|has permission``ログには"%(user_id)s", "%(name)s", "%(table_name)s",  "%(record_id)s"が使用できます。
+
+### Central Authentication Service
+``CAS``:inxx ``Authentication``:inxx
+
+web2pyは、認証や承認機能のためのサポートをアプライアンスから提供しています。ここでは、Central Authentication Service (CAS)のための**cas**アプライアンスについて解説します。執筆時点では、CASは独特で、**Auth**と一緒に動作しません。これは将来修正する予定です。
+
+CASは分散認証を行うためのオープンなプロトコルで、次のように動作します：訪問者がWebサイトに着いたとき、アプリケーションはユーザーが既に認証されているかどうかをセッションを使ってチェックします（例えば、``session.token``オブジェクトを介して）。もし認証されていない場合、コントローラはCASアプライアンスからユーザーをリダイレクトします。リダイレクト先は、ユーザーが、ログイン、ユーザー登録、認証情報（名前、メールアドレス、パスワード）の管理ができるところです。
+ユーザー登録を行った場合、そのユーザーはメールを受け取り、ユーザーがそのメールに対応するまで登録は保留されます。いったん登録に成功し、ログインすると、CASアプライアンスはキーとともにユーザーをアプリケーションへリダイレクトします。アプリケーションではこのキーを使ってユーザーの認証情報を取得します。これは、内部ではCASサーバへのHTTPリクエストを介して行われます。
+
+この仕組みを使うと、複数のアプリケーションが一つのCASサーバを通じてシングルサインオンを使用することができます。認証を提供するサーバは、サービスプロバイダと呼ばれます。訪問者を認証しようとするアプリケーションは、サービスコンシューマと呼ばれます。
+
+CASはOpenIDと似ていますが、大きな違いが一つあります。OpenIDの場合、訪問者はサービスプロバイダを選択することができます。CASの場合は、アプリケーションがサービスプロバイダを選択します。そのため、CASはより安全です。
+
+コンシューマのみ、プロバイダのみ、または、両方を（単一または独立した複数のアプリケーションにおいて）実行することができます。
+
+CASをコンシューマとして実行させる場合、以下のファイルをダウンロードする必要があります。
+
+``
+https://www.web2py.com/cas/static/cas.py
+``:code
+
+そして、"cas.py"という名のモデルファイルとして保存します。さらに、認証を必要とするコントローラ（例えば"default.py"）の編集を行い、先頭に以下のコードを追加します。
+
+``
+CAS.login_url='https://www.web2py.com/cas/cas/login'
+CAS.check_url='https://www.web2py.com/cas/cas/check'
+CAS.logout_url='https://www.web2py.com/cas/cas/logout'
+CAS.my_url='http://127.0.0.1:8000/myapp/default/login'
+
+if not session.token and not request.function=='login':
+    redirect(URL('login'))
+def login():
+    session.token=CAS.login(request)
+    id,email,name=session.token
+    return dict()
+def logout():
+    session.token=None
+    CAS.logout()
+``:code
+
+上記のCASオブジェクトの属性を編集する必要があります。デフォルトでは、"https://mdp.cti.depaul.edu"で動作しているCASプロバイダを指しています。これは我々が主にテスト用として公開しているサービスです。``CAS.my_url``はこのコードで示すように、アプリケーションで定義されているログインアクションへの完全なURLにしてください。CASプロバイダが、このアクションへリダイレクトする必要があるからです。
+
+上記のCASオブジェクトの属性を編集する必要があります。デフォルトでは、"https://mdp.cti.depaul.edu"で動作しているCASプロバイダを指しています。これは我々が主にテスト用として公開しているサービスです。 CAS.my_url はこのコードで示すように、アプリケーションで定義されているログインアクションへの完全なURLにしてください。CASプロバイダが、このアクションへリダイレクトする必要があるからです。
+
+次のようなローカルURLに訪れた場合は、
+
+``
+/myapp/default/login
+``:code
+
+CASのログインページにリダイレクトされます。
+
+``
+https://mdp.cti.depaul.edu/cas/cas/login
+``:code
+
+このような感じです。
+
+[[image @///image/en7500.png center 300px]]
+
+サードパーティ製のCASサービスを使うこともできますが、上記の10行目を修正する必要があります。異なるCASプロバイダは異なる値を含むトークンを返します。詳細は、アクセスしたいそれぞれのCASサービスのドキュメントを確認してください。ほとんどのサービスは(id,username)を返します。
+
+ログインが成功した後は、ローカルのログインアクションにリダイレクトされます。ローカルのログインアクションのビューは、CASのログインが成功した後にだけ実行されます。
+
+CASプロバイダのアプライアンスは、ここ``cas``:citeからダウンロードできます。そして、あなた自身で実行できます。そうする場合、アプライアンスにある"email.py"モデルの最初の行を、利用するSMTPサーバを指すように編集する必要があります。
+
+ファイル名がかぶらない限り、CASアプライアンスのプロバイダのファイルを、あなたのアプリケーション（models以下にあるモデル）にマージすることができます。

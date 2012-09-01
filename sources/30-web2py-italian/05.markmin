@@ -1,0 +1,1430 @@
+
+## Le viste
+``views``:inxx ``template language``:inxx
+
+web2py utilizza Python per i modelli, i controller e le viste, sebbene per quest'ultime utilizzi una sintassi leggermente modificata per consentire di creare codice più leggibile senza imporre alcuna restrizione sul corretto utilizzo di Python.
+
+Lo scopo di una vista è di includere codice Python in un documento HTML. Questo pone due problemi di fondo:
+- Come dev'essere identificato il codice? 
+- L'indentazione dovrebbe essere basata sulle regole di Python o su quelle dell'HTML?
+
+web2py utilizza ``{{ ... }}`` per isolare il codice inserito nell'HTML. Il vantaggio dell'utilizzo di parentesi graffe invece che di parentesi angolari è che è sono trasparenti per i comuni editor HTML. Questo consente allo sviluppatore di utilizzare qualsiasi editor per creare le viste di web2py.
+
+Poichè lo sviluppatore sta inserendo codice Python nell'HTML il documento dovrebbe essere indentato secondo le regole dell'HTML e non secondo quelle di Python. Per questo è consentito l'utilizzo di codice Python non indentato all'interno dei tag ``{{ ... }}``. Poichè Python normalmente utilizza l'indentazione per delimitare i blocchi di codice è necessario un metodo diverso per delimitarli, questo è il motivo per cui il linguaggio di template di web2py fa uso della parola chiave Python ``pass``.
+
+-------
+Un blocco di codice inizia con una linea terminante con il carattere due punti (:) e termina con una linea che inizia con il comando ``pass``. La parola chiave ``pass`` non è necessaria quando la fine del blocco è evidente dal contesto.
+-------
+
+Ecco un esempio:
+
+``
+{{
+if i == 0:
+response.write('i is 0')
+else:
+response.write('i is not 0')
+pass
+}}
+``:code
+
+E' da notare che ``pass`` è una parola chiave di Python, non di web2py. Alcuni editor (come per esempio Emacs) utilizzano ``pass`` per dividere i blocchi e re-indentare il codice automaticamente.
+
+Il linguaggio di template di web2py funziona in questo modo. Quando trova qualcosa come:
+
+``
+<html><body>
+{{for x in range(10):}}{{=x}}hello<br />{{pass}}
+</body></html>
+``:code
+
+lo traduce in un programma:
+
+``
+response.write("""<html><body>""", escape=False)
+for x in range(10):
+    response.write(x)
+    response.write("""hello<br />""", escape=False)
+response.write("""</body></html>""", escape=False)
+``:code
+
+``response.write`` scrive in ``response.body``.
+
+In caso di errori in una vista di web2py il report dell'errore mostra il codice generato dalla vista, non il codice della vista scritto dallo sviluppatore. Lo sviluppatore è aiutato nel debug del codice dall'evidenziazione della parte di codice che ha causato l'errore (e che può essere controllato con un editor HTML o un analizzatore di DOM nel browser).
+
+Notare anche che:
+``
+{{=x}}
+``:code
+
+genera
+``response.write``:inxx ``escape``:inxx
+``
+response.write(x)
+``:code
+
+Le variabili iniettate nel codice HTML in questo modo sono già correttamente codificate.
+La codifica è ignorata nel caso in cui ``x`` sia un oggetto ``XML`` anche se ``escape`` è impostato a ``True``.
+
+Ecco un esempio che introduce la funzione helper ``H1``:
+``
+{{=H1(i)}
+``:code
+
+che è tradotto in:
+``
+response.write(H1(i))
+``:code
+
+durante la valutazione dell'espressione l'oggetto ``H1`` ed i suoi componenti sono serializzati ricorsivamente, codificati e scritti nel corpo della risposta. I tag generati da ``H1`` ed il codice HTML interno non sono codificati. Questo meccanismo garantisce che tutto il testo (e solamente il testo) visualizzato nella pagina web sia sempre correttamente codificato, prevenendo così vulnerabilità di tipo XSS. Allo stesso tempo il codice è semplice e facile da correggere.
+
+Il metodo ``response.write(obj, escape=True)`` richiede due argomenti: l'oggetto da scrivere e un argomento ``escape`` che indica se questo deve essere codificato (impostato a ``True`` di default). Se ``obj`` ha un metodo ``.xml()`` questo viene chiamato e il risultato è scritto nel corpo della risposta (e l'argomento ``escape`` viene ignorato). Altrimenti viene utilizzato il metodo ``__str__`` dell'oggetto per serializzarlo e se l'argomento ``escape`` è impostato a ``True`` viene codificato. Tutte le funzioni ausiliarie (come ``H1`` nell'esempio) sono oggetti che sono in grado di serializzarsi tramite il metodo ``.xml()``.
+
+Tutto questo è eseguito automaticamente. Non c'è mai necessità (e non dovrebbere essere fatto) di chiamare esplicitamente il metodo ``response.write``.
+
+### Sintassi di base
+
+Il linguaggio di template di web2py supporta tutte le strutture di controllo di Python. Di seguito sono illustrati alcuni esempi di tali strutture che possono essere nidificate secondo le normali tecniche di programmazione.
+
+#### for ... in
+``for``:inxx
+
+Nei template è possibile ciclare su ogni oggetto iterabile:
+``
+{{items = ['a', 'b', 'c']}}
+<ul>
+{{for item in items:}}<li>{{=item}}</li>{{pass}}
+</ul>
+``:code
+
+che genera:
+``
+<ul>
+<li>a</li>
+<li>b</li>
+<li>c</li>
+</ul>
+``:code
+
+In questo esempio ``item`` è un oggetto iterabile (come una lista, una tupla, un oggetto ``Rows`` o qualsiasi oggetto implementato come un iteratore). Gli elementi visualizzati sono serializzati e codificati.
+
+#### while
+``while``:inxx
+
+Si può creare un ciclo utilizzando la keyword ``while``:
+
+``
+{{k = 3}}
+<ul>
+{{while k > 0:}}<li>{{=k}}{{k = k - 1}}</li>{{pass}}
+</ul>
+``:code
+
+che genera:
+``
+<ul>
+<li>3</li>
+<li>2</li>
+<li>1</li>
+</ul>
+``:code
+
+#### if ... elif ... else
+``if``:inxx ``elif``:inxx ``else``:inxx
+
+E' possibile usare le clausole condizionali:
+``
+{{
+import random
+k = random.randint(0, 100)
+}}
+<h2>
+{{=k}}
+{{if k % 2:}}is odd{{else:}}is even{{pass}}
+</h2>
+``:code
+
+che genera:
+``
+<h2>
+45 is odd
+</h2>
+``:code
+
+Poichè è evidente che ``else`` chiude il primo blocco ``if`` non è necessario il comando ``pass`` ed il suo utilizzo sarebbe scorretto. E' tuttavia necessario chiudere esplicitamente il blocco ``else`` con il comando ``pass``.
+
+In Python "else if" è scritto ``elif`` come nel seguente esempio:
+
+``
+{{
+import random
+k = random.randint(0, 100)
+}}
+<h2>
+{{=k}}
+{{if k % 4 == 0:}}is divisible by 4
+{{elif k % 2 == 0:}}is even
+{{else:}}is odd
+{{pass}}
+</h2>
+``:code
+
+che genera:
+``
+<h2>
+64 is divisible by 4
+</h2>
+``:code
+
+#### try ... except ... else ... finally
+``try``:inxx ``except``:inxx ``else``:inxx ``finally``:inxx
+
+E' anche possibile utilizzare i comandi ``try ... except`` come nel seguente esempio:
+``
+{{try:}}
+Hello {{= 1 / 0}}
+{{except:}}
+division by zero
+{{else:}}
+no division by zero
+{{finally}}
+<br />
+{{pass}}
+``:code
+
+che produrrà il seguente output:
+
+``
+Hello
+division by zero
+<br />
+``:code
+
+Questo esempio evidenzia come tutto l'ouput generato prima di un'eccezione è visualizzato anche se è inserito all'interno del blocco ``try`` (incluso l'output che precede l'eccezione). "Hello" viene scritto perchè precede l'eccezione.
+
+#### def ... return
+``def``:inxx ``return``:inxx
+
+Il linguaggio di template di web2py consente allo sviluppatore di definire e di implementare funzioni che possono ritornare qualsiasi oggetto Python o una stringa. Ecco due esempi:
+
+``
+{{def itemize1(link): return LI(A(link, _href="http://" + link))}}
+<ul>
+{{=itemize1('www.google.com')}}
+</ul>
+``:code
+
+produrrà il seguente output:
+
+``
+<ul>
+<li><a href="http:/www.google.com">www.google.com</a></li>
+</ul>
+``:code
+
+La funzione ``itemize1`` ritorna un oggetto che è inserito nel punto in cui è chiamata la funzione.
+
+Con il seguente codice:
+``
+{{def itemize2(link):}}
+<li><a href="http://{{=link}}">{{=link}}</a></li>
+{{return}}
+<ul>
+{{itemize2('www.google.com')}}
+</ul>
+``:code
+
+viene prodotto esattamente lo stesso ouptut di prima. In questo caso la funzione ``itemize2`` rappresenta un pezzo di codice HTML che andrà a sostituire il tag in cui la funzione viene chiamata. E' da notare che nella chiamata della funzione ``itemize2`` non è presente il carattere di uguale (=) in quanto la funzione non ritorna del testo, ma lo scrive direttamente nel corpo della risposta.
+C'è un accorgimento da seguire: le funzioni definite all'interno di una vista devono terminare con il comando ``return`` altrimenti non funzionerà l'indentazione automatica.
+
+### Helper HTML
+``helpers``:inxx
+
+In una vista il seguente codice:
+
+``
+{{=DIV('this', 'is', 'a', 'test', _id='123', _class='myclass')}}
+``:code
+
+genera il seguente HTML: 
+``
+<div id="123" class="myclass">thisisatest</div>
+``:code
+
+``DIV`` è una classe helper, nel senso che è una classe che può essere utilizzata per costruire codice HTML da programma. Corrisponde al tag HTML ``<div>``.
+
+Gli argomenti posizionali sono interpretati come oggetti contenuti all'interno dei tag di apertura e chiusura. Gli argomenti con nome che iniziano con un underscore (_) sono interpretati come attributi del tag HTML (senza il carattere di underscore). Alcuni helper hanno argomenti con nome che non iniziano con un underscore e che sono specifici del tag.
+
+Gli helper ``A``,  ``B``,  ``BEAUTIFY``,  ``BODY``,  ``BR``,  ``CENTER``,  ``CODE``,  ``DIV``,  ``EM``,  ``EMBED``,  ``FIELDSET``,  ``FORM``,  ``H1``,  ``H2``,  ``H3``,  ``H4``,  ``H5``,  ``H6``,  ``HEAD``,  ``HR``,  ``HTML``,  ``I``,  ``IFRAME``,  ``IMG``,  ``INPUT``,  ``LABEL``,  ``LEGEND``,  ``LI``,  ``LINK``,  ``OL``,  ``UL``,  ``MARKMIN``,  ``MENU``,  ``META``,  ``OBJECT``,  ``ON``,  ``OPTION``,  ``P``,  ``PRE``,  ``SCRIPT``,  ``OPTGROUP``,  ``SELECT``,  ``SPAN``,  ``STYLE``,  ``TABLE``,  ``TAG``,  ``TD``,  ``TEXTAREA``,  ``TH``,  ``THEAD``,  ``TBODY``,  ``TFOOT``,  ``TITLE``,  ``TR``,  ``TT``,  ``URL``,  ``XHTML``,  ``XML``,  ``xmlescape``,  ``embed64`` possono essere usati per costruire espressioni complesse che possono essere serializate in XML``xml:w``:cite ``xml:o``:cite.
+
+Per esempio:
+
+``
+{{=DIV(B(I("hello ", "<world>"))), _class="myclass")}}
+``:code
+
+genera il seguente codice HTML:
+``
+<div class="myclass"><b><i>hello &lt;world&gt;</i></b></div>
+``:code
+
+``Document Object Model (DOM)``:inxx
+Gli helper in web2py sono più che un sistema per generare codice HTML senza concatenare le stringhe, sono una rappresentazione lato server del Modello ad oggetti del documento (DOM, ''Document Object Model'').
+Gli oggetti che compongono il DOM sono referenziati con la loro posizione, e gli helper si comportano come liste rispetto ai loro componenti:
+
+``
+>>> a = DIV(SPAN('a', 'b'), 'c')
+>>> print a
+<div><span>ab</span>c</div>
+>>> del a[1]
+>>> a.append(B('x'))
+>>> a[0][0] = 'y'
+>>> print a
+<div><span>yb</span><b>x</b></div>
+``:code
+
+mentre gli attributi degli helper sono referenziati con il loro nome e gli helper si comportano come dizionari rispetto ai loro attributi:
+
+``
+>>> a = DIV(SPAN('a', 'b'), 'c')
+>>> a['_class'] = 's'
+>>> a[0]['_class'] = 't'
+>>> print a
+<div class="s"><span class="t">ab</span>c</div>
+``:code
+
+#### XML
+``XML``:inxx
+``XML`` è un oggetto usato per incapsulare il testo che non deve essere codificato. Il testo può o non può contenere XML valido, potrebbe, per esempio contenere Javascript. 
+
+Il testo in questo esempio è codificato:
+``
+>>> print DIV("<b>hello</b>")
+&lt;b&gt;hello&lt;/b&gt;
+``:code
+
+utilizzando ``XML`` si può impedire la codifica:
+
+``
+>>> print DIV(XML("<b>hello</b>"))
+<b>hello</b>
+``:code
+
+A volte potrebbe essere necessario utilizzare il codice HTML memorizzato in una variabile, ma l'HTML può contenere tag non sicuri, come per esempio uno script:
+``
+>>> print XML('<script>alert("unsafe!")</script>')
+<script>alert("unsafe!")</script>
+``:code
+
+Un input eseguibile di questo tipo (come per esempio un commento inserito in un blog) non è sicuro perchè potrebbe essere utilizzato per generare attacchi di tipo XSS (''Cross Site Scripting'') contro gli altri visitatori della pagina.
+
+``sanitize``:inxx
+L'helper ``XML`` di web2py può verificare il testo per evitere l'inserimento di codice pericolo codificando tutti i tag tranne quelli esplicitamente consentiti. Per esempio:
+
+``
+>>> print XML('<script>alert("unsafe!")</script>', sanitize=True)
+&lt;script&gt;alert(&quot;unsafe!&quot;)&lt;/script&gt;
+``:code
+
+Il costruttore di ``XML`` di default considera alcuni tag e alcuni attributi sicuri. Questo comportamento può essere modificato utilizzando gli argomenti opzionali ``permitted_tags`` e ``allowed_attributes``. Questi sono i valori di default dei due argomenti:
+
+``
+XML(text, sanitize=False,
+    permitted_tags=['a', 'b', 'blockquote', 'br/', 'i', 'li',
+       'ol', 'ul', 'p', 'cite', 'code', 'pre', 'img/'],
+    allowed_attributes={'a':['href', 'title'],
+       'img':['src', 'alt'], 'blockquote':['type']})
+``:code
+
+#### Gli helper di web2py
+
+##### A
+
+Questo helper è utilizzato per costruire i link.
+
+``A``:inxx
+``
+>>> print A('<click>', XML('<b>me</b>'),
+            _href='http://www.web2py.com')
+<a href='http://www.web2py.com'>&lt;click&gt;<b>me/b></a>
+``:code
+
+##### B
+``B``:inxx
+
+Trasforma il testo in grassetto.
+
+``
+>>> print B('<hello>', XML('<i>world</i>'), _class='test', _id=0)
+<b id="0" class="test">&lt;hello&gt;<i>world</i></b>
+``:code
+
+##### BODY
+``BODY``:inxx
+
+Genera il corpo della pagina HTML.
+
+``
+>>> print BODY('<hello>', XML('<b>world</b>'), _bgcolor='red')
+<body bgcolor="red">&lt;hello&gt;<b>world</b></body>
+``:code
+
+##### CENTER
+``CENTER``:inxx
+
+Centra il testo nella pagina.
+
+``
+>>> print CENTER('<hello>', XML('<b>world</b>'),
+>>>              _class='test', _id=0)
+<center id="0" class="test">&lt;hello&gt;<b>world</b></center>
+``:code
+
+##### CODE
+``CODE``:inxx
+
+Questo helper esegue l'evidenziazione della sintassi per il codice Python, C, C++, HTML e web2py. E' preferibile utilizzare ``CODE`` piuttosto che ``PRE`` per la visualizzazione del codice. ``CODE`` è anche in grado di creare i corretti link per la documentazione delle API di web2py.
+
+Ecco un esempio con del codice Python:
+``
+>>> print CODE('print "hello"', language='python').xml()
+<table><tr valign="top"><td style="width:40px; text-align: right;"><pre style="
+        font-size: 11px;
+        font-family: Bitstream Vera Sans Mono,monospace;
+        background-color: transparent;
+            margin: 0;
+            padding: 5px;
+            border: none;
+        background-color: #E0E0E0;
+        color: #A0A0A0;
+    ">1.</pre></td><td><pre style="
+        font-size: 11px;
+        font-family: Bitstream Vera Sans Mono,monospace;
+        background-color: transparent;
+            margin: 0;
+            padding: 5px;
+            border: none;
+            overflow: auto;
+    "><span style="color:#185369; font-weight: bold">print </span>
+    <span style="color: #FF9966">"hello"</span></pre></td></tr>
+</table>
+``:code
+
+Questo è un esempio per il codice HTML:
+
+``
+>>> print CODE(
+>>>   '<html><body>{{=request.env.remote_add}}</body></html>',
+>>>   language='html')
+``:code
+``
+
+<table> ... <code> ...
+<html><body>{{=request.env.remote_add}}</body></html>
+... </code> ... </table>
+``:code
+
+Questi sono gli argomenti di default per l'helper ``CODE``:
+``
+CODE("print 'hello world'", language='python', link=None, counter=1, styles={})
+``:code
+
+I valori supportati per l'argomento ``language`` sono "python", "html_plain", "c", "cpp", "web2py" ed "html". Con "html" ``{{`` e ``}}`` sono interpretati come tag contenenti codice "web2py" mentre con "html_plain" non lo sono.
+
+Se l'argomento ``link`` specifica un valore, per esempio "/examples/global/vars/", le API di web2py referenziate nel codice sono collegate alla documentazione alla URL del link. Per esempio "request" sarebbe collegata a "/examples/global/vars/request". Nel precedente esempio la URL del link è gestita dall'azione "var" del controller "global.py" che è distribuito come parte dell'applicazione "examples".
+
+L'argomento ``counter`` è utilizzato per la numerazione delle linee. Può assumere tre differenti valori: ``None`` per disattivare la numerazione delle linee; un valore numerico da cui iniziare la numerazione delle linee; una stringa, intepretata come un prompt, senza numerazione.
+
+##### DIV
+
+Tutti gli helper (tranne ``XML``) sono derivati da ``DIV`` ed ereditano i suoi metodi di base.
+
+``DIV``:inxx
+``
+>>> print DIV('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<div id="0" class="test">&lt;hello&gt;<b>world</b></div>
+``:code
+
+##### EM
+
+Enfatizza il suo contenuto.
+
+``EM``:inxx
+``
+>>> print EM('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<em id="0" class="test">&lt;hello&gt;<b>world</b></em>
+``:code
+
+##### FIELDSET
+``FIELDSET``:inxx
+
+Usato per creare un campo di imput con la sua etichetta di testo.
+
+``
+>>> print FIELDSET('Height:', INPUT(_name='height'), _class='test')
+<fieldset class="test">Height:<input name="height" /></fieldset>
+``:code
+
+##### FORM
+``FORM``:inxx
+
+Questo è uno degli helper più importanti di web2py. Nella sua forma più semplice crea un tag ``<form> ... </form>`` ma, poichè gli helper sono oggetti in grado di analizzare il loro contenuto, ``FORM`` è in grado di analizzare i dati inseriti (per esempio per eseguirne la validazione). Questo sarà spiegato in dettaglio nel Capitolo 7.
+
+``
+>>> print FORM(INPUT(_type='submit'), _action=", _method='post')
+<form enctype="multipart/form-data" action="" method="post">
+<input type="submit" /></form>
+``:code
+
+L'attributo "enctype" è "multipart/form-data" per default.
+
+``hidden``:inxx
+Il costruttore di un ``FORM`` e di un ``SQLFORM`` può anche avere un argoment speciale chiamato ``hidden``. Quando un dizionario è passato come ``hidden`` i suoi oggetti sono trasformati in campi di ``INPUT`` nascosti. Per esempio:
+``
+>>> print FORM(hidden=dict(a='b'))
+<form enctype="multipart/form-data" action="" method="post">
+<input value="b" type="hidden" name="a" /></form>
+``:code
+
+##### H1, H2, H3, H4, H5, H6
+``H1``:inxx
+
+Questi helper servono per le intestazioni dei paragrafi e dei sotto-paragrafi:
+``
+>>> print H1('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<h1 id="0" class="test">&lt;hello&gt;<b>world</b></h1>
+``:code
+
+##### HEAD
+
+Serve ad indicare l'HEAD della pagina HTML.
+
+``HEAD``:inxx
+``
+>>> print HEAD(TITLE('<hello>', XML('<b>world</b>')))
+<head><title>&lt;hello&gt;<b>world</b></title></head>
+``:code
+
+##### HTML
+``HTML``:inxx ``XHTML``:inxx
+
+Questo helper si comporta in modo leggermente differente. Oltre a creare i tag <html> ... </html> lo fa precedere dalle stringhe ''doctype'' ``xhtml:w,xhtml:o,xhtml:school``:cite .
+``
+>>> print HTML(BODY('<hello>', XML('<b>world</b>')))
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                      "http://www.w3.org/TR/html4/loose.dtd">
+<html><body>&lt;hello&gt;<b>world</b></body></html>
+``:code
+
+L'helper HTML può avere anche alcuni argomenti opzionali che hanno i seguenti default:
+``
+HTML(..., lang='en', doctype='transitional')
+``:code
+
+dove doctype può assumere i valori 'strict', 'transitional', 'frameset', 'html5' o una stringa.
+
+##### XHTML
+``XHTML``:inxx
+
+XHTML è simile ad HTML ma crea un doctype di tipo XHTML.
+
+``
+XHTML(..., lang='en', doctype='transitional', xmlns='http://www.w3.org/1999/xhtml')
+``:code
+
+dove doctype può essere 'strict', 'transitional', 'frameset' o una stringa:
+
+##### INPUT
+``INPUT``:inxx
+
+Crea un tag di tipo ``<input ... />``. Questo tag può contenere altri tag ed è chiuso con ``/>`` invece di ``>``. Ha un attributo opzionale ``_type`` che può essere impostato a "text" (il default) , "submit", "checkbox" o "radio".
+``
+>>> print INPUT(_name='test', _value='a')
+<input value="a" name="test" />
+``:code
+
+Ha anche un altro argomento opzionale chiamato "value", distinto da "_value". Quest'ultimo imposta il valore di default per il campo di input; il primo imposta il suo valore corrente. Per un input di tipo "text" il primo ha la precedenza sul secondo:
+``
+>>> print INPUT(_name='test', _value='a', value='b')
+<input value="b" name="test" />
+``:code
+
+Per i pulsanti di tipo "radio" ``INPUT`` imposta l'attributo "checked" per il valore specificato in "value":
+
+``radio``:inxx
+``
+>>> for v in ['a', 'b', 'c']:
+>>>     print INPUT(_type='radio', _name='test', _value=v, value='b'), v
+<input value="a" type="radio" name="test" /> a
+<input value="b" type="radio" checked="checked" name="test" /> b
+<input value="c" type="radio" name="test" /> c
+``:code
+
+e allo stesso modo per le checkbox:
+
+``checkbox``:inxx
+``
+>>> print INPUT(_type='checkbox', _name='test', _value='a', value=True)
+<input value="a" type="checkbox" checked="checked" name="test" />
+>>> print INPUT(_type='checkbox', _name='test', _value='a', value=False)
+<input value="a" type="checkbox" name="test" />
+``:code
+
+##### IFRAME
+
+Questo helper include una pagina web nella pagina corrente. La URL dell'altra pagina è indicata nell'attributo "_src".
+
+``IFRAME``:inxx
+``
+>>> print IFRAME(_src='http://www.web2py.com')
+<iframe src="http://www.web2py.com"></iframe>
+``:code
+
+##### LABEL
+
+Utilizzato per creare una etichetta per un campo di input.
+
+``LABEL``:inxx
+``
+>>> print LABEL('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<label id="0" class="test">&lt;hello&gt;<b>world</b></label>
+``:code
+
+##### LI
+
+Crea un oggetto di una lista e dovrebbe essere contenuto in un tag UL o OL.
+
+``LI``:inxx
+``
+>>> print LI('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<li id="0" class="test">&lt;hello&gt;<b>world</b></li>
+``:code
+
+##### LEGEND
+
+Usato per creare un tag di legenda per un campo in un form.
+
+``LEGEND``:inxx
+``
+>>> print LEGEND('Name', _for='somefield')
+<legend for="somefield">Name</legend>
+``:code
+
+##### META
+
+Può essere usato per costruire dei tag di tipo META nell'HEAD dell'HTML. Per esempio:
+
+``META``:inxx
+``
+>>> print META(_name='security', _content='high')
+<meta name="security" content="high" />
+``:code
+
+##### MARKMIN
+
+Implementa la sintassi ''markmin'' per i wiki. Converte il testo in input in codice html seconde le regole della sintassi ''markmin'':
+
+``MARKMIN``:inxx
+``
+>>> print MARKMIN("'this is **bold** or ''italic'' and this [[a link http://web2py.com]]"')
+<p>this is <b>bold</b> or <i>italic</i> and
+this <a href="http://web2py.com">a link</a></p>
+``:code
+
+La sintassi ''markmin'' è descritta nel seguente file incluso in web2py:
+
+``
+http://127.0.0.1:8000/examples/static/markmin.html
+``:code
+
+##### OBJECT
+
+E' usato per incorporare oggetti (per esempio, un file di Flash) nell'HTML.
+
+``OBJECT``:inxx
+``
+>>> print OBJECT('<hello>', XML('<b>world</b>'),
+>>>     _src='http://www.web2py.com')
+<object src="http://www.web2py.com">&lt;hello&gt;<b>world</b></object>
+``:code
+
+##### OL
+Una lista ordinata. La lista dovrebbe contenere tag ``LI``. Gli argomenti di ``OL`` che non sono di tipo ``LI`` sono automaticamente racchiusi nei tag ``<li> ... </li>``.
+
+
+``OL``:inxx
+``
+>>> print OL('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<ol id="0" class="test"><li>&lt;hello&gt;</li><li><b>world</b></li></ol>
+``:code
+
+##### ON
+
+Questo helper esiste solo per mantenere la retro-compatibilità con le versioni precedenti di web2py ed è semplicemente un alias per ``True``. E' usato esclusivamente per le checkbox ed è deprecato in quanto l'utilizzo di ``True`` è più ''pythonico''.
+``ON``:inxx
+``
+>>> print INPUT(_type='checkbox', _name='test', _checked=ON)
+<input checked="checked" type="checkbox" name="test" />
+``:code
+
+##### OPTGROUP
+
+Consente di raggruppare le opzioni di una SELECT ed è utile per personalizzare i campi utilizzando i CSS.
+
+``OPTGROUP``:inxx
+``
+>>> print SELECT('a', OPTGROUP('b', 'c'))
+<select>
+  <option value="a">a</option>
+  <optgroup>
+    <option value="b">b</option>
+    <option value="c">c</option>
+  </optgroup>
+</select>
+``:code
+
+##### OPTION
+
+Questo helper va usato in combinazione con SELECT/OPTION.
+
+``OPTION``:inxx
+``
+>>> print OPTION('<hello>', XML('<b>world</b>'), _value='a')
+<option value="a">&lt;hello&gt;<b>world</b></option>
+``:code
+
+Come nel caso di ``INPUT``, web2py fa distinzione tra "_value" (il valore di OPTION), e "value" (il valore corrente della SELECT). L'opzione è selezionata quando i due valori sono uguali.
+
+``selected``:inxx
+``
+>>> print SELECT('a', 'b', value='b'):
+<select>
+<option value="a">a</option>
+<option value="b" selected="selected">b</option>
+</select>
+``:code
+
+##### P
+``P``:inxx
+
+Questo è il tag per definire un paragrafo.
+``
+>>> print P('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<p id="0" class="test">&lt;hello&gt;<b>world</b></p>
+``:code
+
+##### PRE
+``PRE``:inxx
+
+Genera un tag ``<pre> ... </pre>`` per visualizzare testo già formattato. Per la visualizzazione di codice è preferibile usare l'helper ``CODE``.
+``
+>>> print PRE('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<pre id="0" class="test">&lt;hello&gt;<b>world</b></pre>
+``:code
+
+##### SCRIPT
+``SCRIPT``:inxx
+
+Questo tag serve per includere uno script (come Javascript) o un link ad uno script. Il contenuto tra i tag è visualizzato come un commento per non creare problemi ai browser molto vecchi.
+
+``
+>>> print SCRIPT('alert("hello world");', _language='javascript')
+<script language="javascript"><!--
+alert("hello world");
+//--></script>
+``:code
+
+##### SELECT
+``SELECT``:inxx
+Crea un tag ``<select> ... </select>``. Questo è usato con l'helper ``OPTION``. Gli argomenti di ``SELECT`` che non sono oggetti ``OPTION`` sono automaticamente convertiti.
+
+``
+>>> print SELECT('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<select id="0" class="test">
+   <option value="&lt;hello&gt;">&lt;hello&gt;</option>
+   <option value="&lt;b&gt;world&lt;/b&gt;"><b>world</b></option>
+</select>
+``:code
+
+##### SPAN
+``SPAN``:inxx
+
+``SPAN`` è simile a ``DIV`` ma è utilizzato per il contenuto inline piuttosto che in un blocco.
+
+``
+>>> print SPAN('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<span id="0" class="test">&lt;hello&gt;<b>world</b></span>
+``:code
+
+##### STYLE
+``STYLE``:inxx
+
+E' simile a ``SCRIPT`` ma è usato per includere codice CSS o un link ad esso. Qui, per esempio, è incluso del codice CSS:
+
+``
+>>> print STYLE(XML('body {color: white}'))
+<style><!--
+body { color: white }
+//--></style>
+``:code
+
+e qui è definito un collegamento ad un foglio di stile CSS:
+``
+>>> print STYLE(_src='style.css')
+<style src="style.css"><!--
+//--></style>
+``:code
+
+##### TABLE, TR, TD
+``TABLE``:inxx ``TR``:inxx ``TD``:inxx
+
+Questi tag (insieme ai tag opzionali creati con gli helper ``THEAD``, ``TBODY`` e ``TFOOTER``) sono utilizzati per costruire tabelle HTML.
+
+``
+>>> print TABLE(TR(TD('a'), TD('b')), TR(TD('c'), TD('d')))
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+
+``TR`` si aspetta come contenuto degli oggetti di tipo ``TD``; gli argomenti che non sono oggetti ``TD`` sono convertiti automaticamente:
+
+``
+>>> print TABLE(TR('a', 'b'), TR('c', 'd'))
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+
+E' facile convertire un'array in Python in una tabella HTML usando la notazione * di Python per gli argomenti delle funzioni, che trasforma gli elementi di una lista in una serie di argomenti posizionali per la funzione.
+Ecco come fare:
+``
+>>> table = [['a', 'b'], ['c', 'd']]
+>>> print TABLE(TR(*table[0]), TR(*table[1]))
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+
+E' anche possibile utilizzare una sintassi più compatta:
+``
+>>> table = [['a', 'b'], ['c', 'd']]
+>>> print TABLE(*[TR(*rows) for rows in table])
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+
+##### TBODY
+``TBODY``:inxx
+
+Questo helper opzionale è utilizzato per le righe che contengono il corpo della tabella, per differenziarle dalle righe che compongono l'intestazione e la chiusura della tabella:
+``
+>>> print TBODY(TR('<hello>'), _class='test', _id=0)
+<tbody id="0" class="test"><tr><td>&lt;hello&gt;</td></tr></tbody>
+``:code
+
+##### TEXTAREA
+``TEXTAREA``:inxx
+
+Con questo helper è possibile creare il tag ``<textarea> ... </textarea>``.
+``
+>>> print TEXTAREA('<hello>', XML('<b>world</b>'), _class='test')
+<textarea class="test" cols="40" rows="10">&lt;hello&gt;<b>world</b></textarea>
+``:code
+
+L'unico accorgimento di cui tener conto è che utilizzando l'argomento "value" (che è opzionale) si sovrascrive il suo contenuto (l'HTML interno).
+
+``
+>>> print TEXTAREA(value="<hello world>", _class="test")
+<textarea class="test" cols="40" rows="10">&lt;hello world&gt;</textarea>
+``:code
+
+##### TFOOT
+``TFOOT``:inxx
+E' utilizzato per definire le righe di chiusura delle tabelle ed è opzionale:
+
+``
+>>> print TFOOT(TR(TD('<hello>')), _class='test', _id=0)
+<tfoot id="0" class="test"><tr><td>&lt;hello&gt;</td></tr></tfoot>
+``:code
+
+##### TH
+``TH``:inxx
+
+``TH`` è utilizzato al posto di ``TD`` nelle intestazioni delle tabelle.
+``
+>>> print TH('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<th id="0" class="test">&lt;hello&gt;<b>world</b></th>
+``:code
+
+##### THEAD
+``THEAD``:inxx
+
+Utilizzato per definire le righe di intestazione di una tabella.
+
+``
+>>> print THEAD(TR(TD('<hello>')), _class='test', _id=0)
+<thead id="0" class="test"><tr><td>&lt;hello&gt;</td></tr></thead>
+``:code
+
+##### TITLE
+``TITLE``:inxx
+
+Utilizzato per impostare il titolo di una pagina nell'header HTML.
+``
+>>> print TITLE('<hello>', XML('<b>world</b>'))
+<title>&lt;hello&gt;<b>world</b></title>
+``:code
+
+##### TR
+``TR``:inxx
+
+Questo tag identifica una riga di una tabella. Dovrebbe essere utilizzato all'interno di una tabella e dovrebbe contenere i tag ``<td> ... </td>``. Gli argomenti di ``TR`` che non sono oggetti di tipo ``TD`` sono automaticamente convertiti.
+
+``
+>>> print TR('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<tr id="0" class="test"><td>&lt;hello&gt;</td><td><b>world</b></td></tr>
+``:code
+
+##### TT
+``TT``:inxx
+
+Con questo tag è possibile utilizzare caratteri a spaziatura fissa:
+``
+>>> print TT('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<tt id="0" class="test">&lt;hello&gt;<b>world</b></tt>
+``:code
+
+##### UL
+``UL``:inxx
+Identifica una lista non ordinata e dovrebbe contenere oggetti di tipo ``LI``. Se il suo contenuto non è di tipo ``LI`` gli oggetti vengono convertiti automaticamente.
+
+``
+>>> print UL('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<ul id="0" class="test"><li>&lt;hello&gt;</li><li><b>world</b></li></ul>
+``:code
+
+#### Helper personalizzati
+``TAG``:inxx
+Potrebbe essere necessario generare dei tag XML personalizzati. web2py dispone dell'helper ``TAG``, un generatore di tag universale.
+``
+{{=TAG.name('a', 'b', _c='d')}}
+``:code
+
+genera il seguente codice XML:
+
+``
+<name c="d">ab</name>
+``:code
+
+Gli argomenti "a", "b" e "d" sono automaticamente codificati; per evitare questa codifica utilizzare l'helper ``XML``. Utilizzando ``TAG`` è possibile generare tag HTML/XML non previsti nell'API di web2py. I tag possono essere nidificati e sono serializzati con ``str().``
+
+Una sintassi equivalente è;
+``
+{{=TAG['name']('a', 'b', c='d')}}
+``:code
+
+E' da notare che ``TAG`` è un oggetto e che ``TAG.name`` o ``TAG['name']`` sono funzioni che ritornano una classe helper temporanea.
+
+##### MENU
+``MENU``:inxx
+
+L'helper ``MENU`` prende una lista di liste nella forma di ``response.menu`` (come descritto nel Capitolo 4) e genera una struttura ad albero utilizzando liste non ordinate che rappresenta il menu. Per esempio:
+
+``
+>>> print MENU([['One', False, 'link1'], ['Two', False, 'link2']])
+<ul class="web2py-menu web2py-menu-vertical">
+  <li><a href="link1">One</a></li>
+  <li><a href="link2">Two</a></li>
+</ul>
+``:code
+
+Ogni oggetto menu può avere un quarto elemento che rappresenta un sotto-menu nidificato (in modo ricorsivo):
+``
+>>> print MENU([['One', False, 'link1', [['Two', False, 'link2']]]])
+<ul class="web2py-menu web2py-menu-vertical">
+  <li class="web2py-menu-expand">
+     <a href="link1">One</a>
+     <ul class="web2py-menu-vertical">
+        <li><a href="link2">Two</a></li>
+     </ul>
+  </li>
+</ul>
+``:code
+
+L'helper ``MENU`` può avere i seguenti argomenti opzionali:
+
+- ``_class``: ha come default "web2py-menu web2py-menu-vertical" ed imposta la classe degli elementi ``UL`` esterni
+- ``ul_class``: ha come default "web2py-menu-vertical" ed imposta la classe degli elementi ``UL`` interni.
+- ``li_class``: ha come default "web2py-menu-expand" ed imposta la classe degli elementi ``LI`` interni.
+Il file "base.css" dell'applicazione di default comprende i seguenti tipi base di menu:
+"web2py-menu web2py-menu-vertical" e "web2py-menu web2py-menu-horizontal".
+
+### BEAUTIFY
+``BEAUTIFY`` è utilizzato per costruire rappresentazioni HTML di oggetti composti come le liste, le tuple ed i dizionari:
+``
+{{=BEAUTIFY({"a":["hello", XML("world")], "b":(1, 2)})}}
+``:code
+``BEAUTIFY`` ritorna un oggetto di tipo XML, serializzabile in XML, con una chiara rappresentazione dei suoi elementi. In questo caso a rappresentazione XML di:
+``
+{"a":["hello", XML("world")], "b":(1, 2)}
+``:code
+
+verrà visualizzata come:
+
+``
+<table>
+<tr><td>a</td><td>:</td><td>hello<br />world</td></tr>
+<tr><td>b</td><td>:</td><td>1<br />2</td></tr>
+</table>
+``:code
+
+### DOM server side e Parsing
+``element``:inxx ``elements``:inxx
+
+#### elements
+
+L'helper ``DIV`` è tutti gli helper derivati da esso dispongono di due metodi di ricerca: ``element`` and ``elements``. ``element`` ritorna il primo elemento figlio che corrisponde alla condizione di ricerca (oppure ``None`` se non c'e' nessuna corrisponenza trovata).  ``elements`` ritorna una lista di tutti gli elementi figli trovati.
+
+**element** and **elements** utilizzano la stessa sintassi per definire le condizioni di ricerca. Questa sintassi consente tre possibilità diverse che possono essere mischiate insieme: espressioni di tipo jQuery, ricerca per un valore esatto di un attributo e ricerca tramite espressioni regolari.
+
+Ecco un semplice esempio:
+``
+>>> a = DIV(DIV(DIV('a', _id='target',_class='abc')))
+>>> d = a.elements('div#target')
+>>> d[0] = 'changed'
+>>> print a
+<div><div><div id="target" class="abc">changed</div></div></div>
+``:code
+
+L'argomento senza nome del metodo ``elements`` è una stringa che può contenere: il nome di un tag, l'id di un tag preceduto dal simbolo cancelletto (#), la classe dell'elemento preceduta da un punto (.) o il valore esplicito di un attributo racchiuso in parentesi quadre.
+
+Ecco quattro modi equivalenti di cercare il tag precedente tramite ``id``:
+``
+>>> d = a.elements('#target')
+>>> d = a.elements('div#target')
+>>> d = a.elements('div[id=target]')
+>>> d = a.elements('div',_id='target')
+``:code
+
+Ecco quattro modi equivalenti di cercare il tag precedente tramite ``class``:
+
+``
+>>> d = a.elements('.abc')
+>>> d = a.elements('div.abc')
+>>> d = a.elements('div[class=abc]')
+>>> d = a.elements('div',_class='abc')
+``:code
+
+Qualsiasi attributo può essere usato per localizzare un elemento (non solamente ``id`` e ``class``), inclusi attributi multipli (la funzione ``element`` può avere più argomenti con nome) ma solo il primo elemento trovato verrà ritornato.
+
+Usando la sintassi di jQuery "div#target" è possibile specificare criteri di ricerca multipli separati da uno spazio:
+
+``
+>>> a = DIV(SPAN('a', _id='t1'),div('b',_class='c2'))
+>>> d = a.elements('span#t1, div#c2')
+``:code
+
+o, in modo equivalente:
+``
+>>> a = DIV(SPAN('a', _id='t1'),div('b',_class='c2'))
+>>> d = a.elements('span#t1','div#c2')
+``:code
+
+Se il valore di un attributo di ricerca è specificato utilizzando un argomento con nome, questo può essere una stringa o un'espressione regolare:
+
+``
+>>> a = DIV(SPAN('a', _id='test123'),div('b',_class='c2'))
+>>> d = a.elements('span',_id=re.compile('test\d{3}')
+``:code
+
+Uno speciale argomento con nome di ``DIV`` (e degli helper derivati) è ``find``. Questo argomento può essere usato per specificare un valore (o un'espressione regolare) da cercare nel testo contenuto nel tag. Per esempio:
+``
+>>> a = DIV(SPAN('abcde'),div('fghij'))
+>>> d = a.elements(find='bcd')
+>>> print d[0]
+<span>abcde</span>
+``:code
+
+oppure:
+``
+>>> a = DIV(SPAN('abcde'),div('fghij'))
+>>> d = a.elements(find=re.compile('fg\w{3}'))
+>>> print d[0]
+<div>fghij</div>
+``:code
+
+#### parent
+``parent`` ritorna il genitore dell'elemento corrente.
+``
+>>> a = DIV(SPAN('a'),DIV('b'))
+>>> d = a.element('a').parent()
+>>> d['_class']='abc'
+>>> print a
+<div class="abc"><span>a</span><div>b</div></div>
+``:code
+
+#### flatten
+
+Il metodo ``flatten`` serializza ricorsivamente in testo regolare (senza tag) il contenuto dei figli di un dato elemento:
+``
+>>> a = DIV(SPAN('this',DIV('is',B('a'))),SPAN('test'))
+>>> print a.flatten()
+thisisatest
+``:code
+
+Al metodo ``flatten`` può essere passato un argomento opzionale ``render`` che è una funzione che "appiattisce" il contenuto utilizzando un protocollo differente, Ecco un esempio di come serializzare alcuni tag nella sintassi dei wiki Markmin: 
+
+``
+>>> a = DIV(H1('title'),P('example of a ',A('link',_href='#test')))
+>>> from gluon.html import markmin_serializer
+>>> print a.flatten(render=markmin_serializer)
+## title
+
+example of [[a link #test]]
+``:code
+Al momento della scrittura di questo manuale sono disponibili solo due serializzatori: ``markmin_serializer`` e ``markdown_serializer``.
+
+#### Parsing
+L'oggetto ``TAG`` è anche un analizzatore XML/HTML. Può leggere del testo e convertirlo in una struttura ad albero composta di helper. Questo ne consente la manipolazione utilizzando le API sopra descritte:
+``
+>>> html = '<h1>Title</h1><p>this is a <span>test</span></p>'
+>>> parsed_html = TAG(html)
+>>> parsed_html.element('span')[0]='TEST'
+>>> print parsed_html
+<h1>Title</h1><p>this is a <span>TEST</span></p>
+``:code
+
+### Page Layout
+``page layout``:inxx ``layout.html``:inxx ``extend``:inxx ``include``:inxx
+
+Le viste possono essere estese ed includere altre viste in una struttura ad albero.
+
+Per esempio una vista chiamata "index.html" potrebbe estendere "layout.html" ed includere "body.html".
+Allo stesso tempo "layout.html" può includere un "header.html" ed un "footer.html".
+
+La radice dell'albero viene chiamata vista di layout. Proprio come ogni altro file di template HTML può essere modificata utilizzanto l'interfaccia amministrativa di web2py. Il nome "layout.html" è solamente una convenzione.
+
+Ecco una pagina minimale che estende "layout.html" ed include la vista "page.html":
+
+``
+{{extend 'layout.html'}}
+<h1>Hello World</h1>
+{{include 'page.html'}}
+``:code
+
+Il file di layout esteso deve contenere una direttiva ``{{include}}`` del tipo:
+``
+<html><head><title>Page Title</title></head>
+  <body>
+    {{include}}
+  </body>
+</head>
+``:code
+
+Quando la vista viene chiamata il layout esteso è caricato e la vista chiamante sostituisce la direttiva ``{{include}}`` nel layout. Il processo continua ricorsivamente fino a che tutte le direttive ``extend`` ed ``include`` sono state elaborate. Il template risultante è poi trasformato in codice Python.
+-------
+``extend`` ed ``include``  non sono comandi Python ma direttive speciali dei template di web2py.
+-------
+
+``response.menu``:inxx ``menu``:inxx ``response.meta``:inxx ``meta``:inxx
+
+I layout sono utilizzati per incapsulare funzionalità comuni delle pagine (intestazioni, piè di pagina, menu) e, sebbene non siano obbligatori, rendono le applicazioni più facili da scrivere e da mantenere. In particolare è bene scrivere layout che tengano conto delle seguenti variabili che possono essere impostate dal controller. Usando queste variabili note i layout potranno essere interscambiabili:
+``
+response.title
+response.subtitle
+response.meta.author
+response.meta.keywords
+response.meta.description
+response.flash
+response.menu
+response.files
+``:code
+
+Eccetto ``menu`` e ``files`` queste variabili contengono tutte stringhe ed il loro significato dovrebbe essere evidente.
+
+``response.menu`` è una lista di tuple di 3 o di 4 elementi. I tre elemeni sono: il nome del link, un valore booleano che indica se il link è attivo (è, cioè, la pagina corrente) e la URL della pagina. Per esempio:
+``
+response.menu = [('Google', False, 'http://www.google.com',[]),
+                 ('Index',  True,  URL('index'), [])]
+``:code
+
+``sub-menu``:inxx
+il quarto elemento della tupla è un sotto-menu ed è opzionale.
+
+``response.files`` è una lista di file CSS e JS che sono richiesti dalla pagina.
+
+E' bene inoltre di usare:
+
+``
+{{include 'web2py_ajax.html'}}
+``:code
+nell'intestazione dell'HTML, in quando questo file include le librerie jQuery e definisce alcune funzioni Javascript necessarie per la retro-compatibilità e per effetti speciali in Ajax. "web2py_ajax.html" include i tag ``response.meta`` nella vista, la base jQuery, il calendario jQuery e tutti i file CSS e JS richiesti da ``response.files``.
+
+#### Layout di default delle pagine
+``superfish``:inxx ``ez.css``:inxx
+
+Ecco un esempio minimale di "views/layout.html" che è distribuito con l'applicazione **welcome** di web2py. Ogni nuova applicazione creata con web2py avrà un layout di default simile:
+
+``
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="{{=T.accepted_language or 'en'}}">
+  <head>
+    <title>{{=response.title or request.application}}</title>
+    <link rel="shortcut icon"
+	  href="{{=URL(request.application,'static','favicon.ico')}}"
+	  type="image/vnd.microsoft.icon">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+    {{######  require CSS and JS files for this page (read info in base.css) }}
+    {{response.files.append(URL(request.application,'static','base.css'))}}
+    {{response.files.append(URL(request.application,'static','superfish.js'))}}
+
+    {{###### include web2py specific js code (jquery, calendar, form stuff) }}
+    {{include 'web2py_ajax.html'}}
+  </head>
+  <body>
+    <div class="flash">{{=response.flash or ''}}</div>
+    <div class="ez-mr wrapper" id="layout">
+
+      {{###### Layout 3 from http://www.ez-css.org/layouts }}
+      <div class="ez-wr">
+	<div class="ez-box" id="header">
+
+	  {{try:}}{{=auth.navbar(action=URL(request.application,'default','user'))}}{{except:pass}}
+          <h1>
+            <a href="">{{=response.title or 'response.title'}}</a>
+          </h1>
+          <h2>
+	    {{=response.subtitle or 'response.subtitle'}}
+	  </h2>
+	</div>
+	<div class="ez-box" id="statusbar">
+
+	  {{###### superfish menu }}
+	  {{=MENU(response.menu,_class='sf-menu')}}
+
+          <script>
+	    jQuery(document).ready(function(){
+              jQuery('ul.sf-menu').superfish({delay:400});});
+	  </script>
+	</div>
+	<div class="ez-wr">
+	  <div class="ez-fl ez-negmx">
+            <div class="ez-box" id="left_sidebar">{{###### unused space}}</div>
+	  </div>
+	  <div class="ez-fl ez-negmr">
+            <div class="ez-box" id="content">{{include}}</div>
+	  </div>
+	  <div class="ez-last ez-oh">
+            <div class="ez-box" id="right_sidebar">{{###### unused space}}</div>
+	  </div>
+	</div>
+	<div class="ez-box" id="footer">
+          {{=T('Copyright')}} &#169; 2010 -
+          {{=T('Powered by')}} <a href="http://www.web2py.com">web2py</a>
+	</div>
+      </div>
+    </div>
+  </body>
+</html>
+``:code
+
+Alcune caratteristiche di questo layout di default lo rendono molto semplice da usare e da personalizzare:
+
+- ``{{# ... }}`` sono commenti speciali che non appariranno nel corpo della pagina HTML.
+- Sono visualizzati sia ``response.title`` che ``response.subtitle`` che possono essere definiti nel modello. Se non sono stati impostati il titolo è il nome dell'applicazione.
+- Il file ``web2py_ajax.html`` è incluso nell'header.
+- Due file sono esplicitamente richiesti: "base.css" and "superfish.js". Il primo contiene il CSS completo per la pagina, è personalizzabile e molto ben documentato. Il secondo contiene il codice Javascript per il menu di default.
+- ``{{=auth.navbar( ... )}}`` visualizza il messaggio di saluto per l'utente corrente insieme con i link alle funzioni di login, logout, registrazione, cambio della password, ecc. a seconda del contesto. E' posizionato all'interno di una ``{{try:}} ... {{except:pass}}`` per il caso in cui ``auth`` non sia definito.
+- ``{{=MENU(response.menu)`` visualizza la struttura di menu come una lista di tipo ``<ul> ... </ul>``.
+- E' presente uno script per attivare il menu a cascata ''Superfish'' che può essere rimosso se non necessario.
+- ``{{include}}`` è sostituito con il contenuto della vista indicata quando la pagina è visualizzata.
+- Di default è usato un layout di pagina a tre colonne, con i seguenti identificativi di ``DIV``: "header", "left_sidebar", "content", "right_sidebar" e "footer" sebbene il CSS "base.css" imposti l'altezza delle sidebars a zero.
+- E' utilizzata la convenzione "ez.css" per i nomi del layout CSS definita in ref ``ezcss``:cite. In particolare è utilizzato il Layout numero 3. Un "ez.css" minimale è incluso in "base.css".
+
+#### Personalizzare il layout di default
+
+La personalizzazione del layout di default è molto semplice e ben documentata nel file "static/base.css" che è organizzato nelle seguenti sezioni:
+
+- [[ez.css http://www.ez-css.org/layouts]]
+- reimposta i flag comuni
+- sceglie i font di default
+- sceglie lo stile dei link
+- aggiunge la linea dei pulsanti alle righe delle tabelle
+- imposta alcune etichette in grassetto e alcune centrate nella pagina
+- imposta tutti i campi di input alla stessa dimensione
+- aggiunge la corretta separazione tra i tag h1-h6 e il testo
+- indenta sempre la prima riga e aggiunge spazio sotto i paragrafi
+- indenta le liste numerate e non numerate
+- allinea i form e le tabelle
+- blocchi di codice
+- aggiunge spazio a sinistra e a destra del testo quotato
+- allineamento della pagina, larghezza e padding (da cambiare per gli spazi)
+- larghezza delle colonne (da cambiare per usare ``left_sidebar`` e ``right_sidebar``)
+- immagini e colori di sfondo (da cambiare per i colori)
+- stile dei menu (per superfish.js)
+- attività specifiche di web2py (.flash, .error)
+
+Per cambiare la larghezza di left_sidebar, content, right_sidebar basta modificare la relativa sezione in "base.css":
+
+``
+/*********** column widths ***********/
+#left_sidebar { width: 0px; }
+#content { width: 840px; }
+#right_sidebar { width: 0px; }
+``:code
+
+Per cambiare i colori e le immagini di background basta modificare la seguente sezione:
+
+``
+/*********** backrgound images and colors ***********/
+body { background: url('images/background.png') repeat-x #3A3A3A; }
+
+a { color: #349C01; }
+.auth_navbar {
+   top: 0px;
+   float: right;
+   padding: 3px 10px 3px 10px;
+   font-size: 0.9em;
+}
+code { color: green; background: black; }
+input:focus, textarea:focus { background: #ccffcc; }
+#layout { background: white; }
+#header, #footer { color: white; background: url('images/header.png') repeat #111111;}
+#header h1 { color: #349C01; }
+#header h2 { color: white; font-style: italic; font-size: 14px;}
+#statusbar { background: #333333; border-bottom: 5px #349C01 solid; }
+#statusbar a { color: white; }
+#footer { border-top: 5px #349C01 solid; }
+``:code
+
+Il menu è costruito senza tener conto dei colori, ma può essere cambiato.
+
+Ovviamente i file "layout.html" e "base.css" possono essere completamente sostituiti.
+
+### Funzioni nelle viste
+
+Con questo "layout.html":
+
+``
+<html>
+  <body>
+    {{include}} <!-- must come before the two blocks below -->
+    <div class="sidebar">
+      {{if 'mysidebar' in globals():}}{{mysidebar()}}{{else:}}
+        my default sidebar
+      {{pass}}
+  </body>
+</html>
+``:code
+
+e con questa vista che lo estende:
+
+``
+{{def mysidebar():}}
+my new sidebar!!!
+{{return}}
+{{extend 'layout.html'}}
+Hello World!!!
+``:code
+
+la funzione mysidebar() è definita prima di ``{{extend ... }}`` ed è inclusa nella vista estesa senza il prefisso ``=``.
+
+Il codice generato è il seguente:
+``
+<html>
+  <body>
+    Hello World!!!
+    <div class="sidebar">
+      {{block mysidebar}}
+        my new sidebar!!!
+      {{end}}
+  </body>
+</html>
+``:code
+
+Notare che le funzioni sono definite in HTML (sebbene possano contenere anche codice Python) e che ``response.write`` è usato per scrivere il loro contenuto (le funzioni non ritornano nessun contenuto). Questo è il motivo per cui la funzione deve essere chiamata utilizzando ``{{mysidebar()}}`` piuttosto che ``{{=mysidebar()}}``. Le funzioni definite in questo modo possono anche avere argomenti.
+
+### Blocchi nelle viste
+``block``:inxx
+
+Un altro modo di rendere una vista più modulare è quello di utilizzare ``{{block ... }}``. Questo meccanismo è un'alternativa a quello descritto nella sezione precedente.
+
+Con il file "layout.html":
+
+``
+<html>
+  <body>
+    {{include}} <!-- must come before the two blocks below -->
+    <div class="sidebar">
+      {{block mysidebar}}
+        my default sidebar
+      {{end}}
+  </body>
+</html>
+``:code
+
+e questa vista che lo estende:
+
+``
+{{extend 'layout.html'}}
+Hello World!!!
+{{block mysidebar}}
+my new sidebar!!!
+{{end}}
+``:code
+
+il codice generato è il seguente:
+
+``
+<html>
+  <body>
+    Hello World!!!
+    <div class="sidebar">
+      {{block mysidebar}}
+        my new sidebar!!!
+      {{end}}
+  </body>
+</html>
+``:code
+
+Si possono definire molti blocchi e se un blocco è presente nella vista estesa ma non in quella che lo estende è utilizzato il contenuto della vista estesa.
+
+### Utilizzare i template per inviare email
+``emails``:inxx
+
+E' possibile utilizzare il sistema dei template pe generare delle email. Per esempio, con la seguente tabella:
+
+``
+db.define_table('person', Field('name'))
+``:code
+
+se si vuole inviare ad ogni persona del database il seguente messaggio, memorizzato nella vista "message.html":
+
+``
+Dear {{=person.name}},
+You have won the second prize, a set of steak knives.
+``:code
+
+basta eseguire il seguente codice:
+
+``
+>>> from gluon.tool import Mail
+>>> mail = Mail(globals())
+>>> mail.settings.server = 'smtp.gmail.com:587'
+>>> mail.settings.sender = '...@somewhere.com'
+>>> mail.settings.login = None or 'username:password'
+>>> for person in db(db.person.id>0).select():
+>>>     context = dict(person=person)
+>>>     message = response.render('message.html', context)
+>>>     mail.send(to=['who@example.com'],
+>>>               subject='None',
+>>>               message=message)
+``:code
+
+dove la maggior parte del lavoro è fatto nella linea:
+
+``
+response.render('message.html', context)
+``:code
+
+che visualizza la vista "file.html" con le variabili definite nel dizionario "context", e ritorna una stringa con il testo della email. "context" è un dizionario che contiene le variabili che saranno visibili al file di template.
+
+Se il messaggio inizia con ``<html>`` e termina con ``</html>`` l'email sarà inviata in formato HTML.
+
+Lo stesso meccanismo usato per generare il testo dell'email può essere anche utilizzato per generare SMS o altri tipi di messaggi basati su template.

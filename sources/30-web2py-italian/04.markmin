@@ -1,0 +1,1587 @@
+
+## Il nucleo di web2py
+
+### Opzioni della linea di comando
+Per non visualizzare la finestra grafica d'avvio di web2py è possibile digitare dalla linea di comando:``password``:inxx
+
+``
+python web2py.py -a 'your password' -i 127.0.0.1 -p 8000
+``:code
+
+Quando web2py si avvia crea un file chiamato "parameters_8000.py" dove memorizza la password codificata. Se si utilizza "<ask>" come password web2py la richiederà all'avvio.
+
+Per maggior sicurezza è possibile avviare web2py con:
+
+``
+python web2py.py -a '<recycle>' -i 127.0.0.1 -p 8000
+``:code
+
+In questo caso web2py riutilizza la password precedentemente memorizzata. Se non è stata fornita nessuna password o se il file "parameters_8000.py" è stato cancellato l'interfaccia amministrativa sarà disabilitata.
+
+``PAM``:inxx
+SU alcuni sistemi Unix/Linux se la password è:
+``
+<pam_user:some_user>
+``:code
+web2py utilizzerà la password PAM dell'account ``some_user`` del sistema operativo come password dell'amministratore, a meno che questo sia bloccato dalla configurazione di PAM.
+
+-------
+web2py utilizza normalmente CPython (l'implementazione in C dell'inteprete Python creato da Guido van Rossum)  ma può essere eseguito anche con Jython (l'implementazione Java del medesimo interprete). Questa seconda opzione consente l'utilizzo di web2py nel contesto di un'infrastruttura J2EE. Per utilizzare Jython sostituire "python web2py.py ..." con "jython web2py.py ...". Ulteriori dettagli sull'installazione di Jython e sui moduli zxJDBC necessari per accedere ai database saranno forniti nel capitolo 12.
+-------
+
+Lo script "web2py.py" può avere molte opzioni sulla linea di comando per specificare, per esempio, il numero massimo di thread, l'utilizzo di SSL, ecc. Per una lista completa digitare:
+
+``command line``:inxx
+``
+>>> python web2py.py -h
+Usage: python web2py.py
+
+web2py Web Framework startup script. ATTENTION: unless a password
+is specified (-a 'passwd'), web2py will attempt to run a GUI.
+In this case command line options are ignored.
+
+Options:
+  --version             show program's version number and exit
+  -h, --help            show this help message and exit
+  -i IP, --ip=IP        ip address of the server (127.0.0.1)
+  -p PORT, --port=PORT  port of server (8000)
+  -a PASSWORD, --password=PASSWORD
+                        password to be used for administration
+                        use -a "<recycle>" to reuse the last
+                        password
+  -u UPGRADE, --upgrade=UPGRADE
+                        -u yes: upgrade applications and exit
+  -c SSL_CERTIFICATE, --ssl_certificate=SSL_CERTIFICATE
+                        file that contains ssl certificate
+  -k SSL_PRIVATE_KEY, --ssl_private_key=SSL_PRIVATE_KEY
+                        file that contains ssl private key
+  -d PID_FILENAME, --pid_filename=PID_FILENAME
+                        file to store the pid of the server
+  -l LOG_FILENAME, --log_filename=LOG_FILENAME
+                        file to log connections
+  -n NUMTHREADS, --numthreads=NUMTHREADS
+                        number of threads
+  -s SERVER_NAME, --server_name=SERVER_NAME
+                        server name for the web server
+  -q REQUEST_QUEUE_SIZE, --request_queue_size=REQUEST_QUEUE_SIZE
+                        max number of queued requests when server unavailable
+  -o TIMEOUT, --timeout=TIMEOUT
+                        timeout for individual request (10 seconds)
+  -z SHUTDOWN_TIMEOUT, --shutdown_timeout=SHUTDOWN_TIMEOUT
+                        timeout on shutdown of server (5 seconds)
+  -f FOLDER, --folder=FOLDER
+                        folder from which to run web2py
+  -v, --verbose         increase --test verbosity
+  -Q, --quiet           disable all output
+  -D DEBUGLEVEL, --debug=DEBUGLEVEL
+                        set debug output level (0-100, 0 means all,
+                        100 means none; default is 30)
+  -S APPNAME, --shell=APPNAME
+                        run web2py in interactive shell or IPython
+                        (if installed) with specified appname
+  -P, --plain           only use plain python shell; should be used
+                        with --shell option
+  -M, --import_models   auto import model files; default is False;
+                        should be used with --shell option
+  -R PYTHON_FILE, --run=PYTHON_FILE
+                        run PYTHON_FILE in web2py environment;
+                        should be used with --shell option
+  -T TEST_PATH, --test=TEST_PATH
+                        run doctests in web2py environment;
+                        TEST_PATH like a/c/f (c,f optional)
+  -W WINSERVICE, --winservice=WINSERVICE
+                        -W install|start|stop as Windows service
+  -C, --cron            trigger a cron run manually; usually invoked
+                        from a system crontab
+  -N, --no-cron         do not start cron automatically
+  -L CONFIG, --config=CONFIG
+                        config file
+  -F PROFILER_FILENAME, --profiler=PROFILER_FILENAME
+                        profiler filename
+  -t, --taskbar         use web2py gui and run in taskbar
+                        (system tray)
+  --nogui               text-only, no GUI
+  -A ARGS, --args=ARGS  should be followed by a list of arguments to be passed
+                        to script, to be used with -S, -A must be the last
+                        option
+  --interfaces=INTERFACES
+                        allows multiple interfaces to be served
+``:code
+
+Le opzioni in caratteri minuscoli sono utilizzate per configurare il server web. L'opzione ``-L`` indica a web2py di leggere le opzioni di configurazione da un file, ``-W`` installa web2py come un servizio Windows, mentre ``-S``, ``-P`` e ``-M`` avviano una shell Python interattiva. L'opzione ``-T`` esegue i doctest dei controller nell'ambiente di esecuzione di web2py. Per esempio, il seguente comando esegue i doctest di tutti i controller nell'applicazione "welcome":
+``
+python web2py.py -vT welcome
+``:code
+
+Se si esegue web2py come un servizio Windows (``-W``), non è conveniente passare gli argomenti di configurazione sulla linea di comando. Per questo motivo nella cartella di web2py c'è un file di configurazione "option_std.py" per il server web interno:
+
+``
+import socket, os
+ip = '127.0.0.1'
+port = 8000
+password = '<recycle>' ### <recycle> means use the previous password
+pid_filename = 'httpserver.pid'
+log_filename = 'httpserver.log'
+ssl_certificate = " ### path to certificate file
+ssl_private_key = " ### path to private key file
+numthreads = 10
+server_name = socket.gethostname()
+request_queue_size = 5
+timeout = 10
+shutdown_timeout = 5
+folder = os.getcwd()
+``:code
+
+Questo file contiene le opzioni di default di web2py. Se si modifica questo file è necessario importarlo esplicitamente con l'opzione ``-L`` e funziona solamente se si esegue web2py come un servizio Windows.
+
+### Indirizzamento delle URL (dispatching)
+``url mapping``:inxx ``dispatching``:inxx
+
+web2py collega una URL nella seguente forma:
+
+``
+http://127.0.0.1:8000/a/c/f.html
+``:code
+
+alla funzione ``f()`` nel controller "c.py" dell'applicazione "a". Se ``f`` non è presente, web2py utilizza come default la funzione ``index`` del controller. Se ``c`` non è presente, web2py utilizza come default il controller "default.py" e se ``a`` non è presente web2py utilizza come default l'applicazione ``init``. Se questa non esiste web2py tenta di eseguire l'applicazione ``welcome``. Questo è schematicamente indicato nella seguente immagine.
+
+[[image @///image/en5600.png center 300px]]
+
+Di default ogni nuova richiesta crea una nuova sessione. In aggiunta un cookie di sessione è inviato al browser dell'utente per mantenere traccia della sessione.
+
+L'estensione ``.html`` è opzionale; se non è indicata nessuna estensione ``.html`` è assunto come default. L'estensione utilizzata determina l'estensione della vista che produce l'output della funzione ``f()`` del controller. Questo rende possibile restituire lo stesso contenuto in diversi formati (html, xml, json, rss, etc.).
+
+-------
+Le funzioni con argomenti o che iniziano con un doppio underscore (__) non sono esposte pubblicamente e possono essere chiamate solamente da altre funzioni.
+-------
+
+``static files``:inxx 
+
+Un'eccezione a questa regola di definizione delle URL è la forma:
+
+``
+http://127.0.0.1:8000/a/static/filename
+``:code
+
+Sebbene non ci sia nessun controller chiamato "static" web2py interpreta questa URL come la richiesta di un file chiamato "filename" nella sottocartella "static" dell'applicazione "a".
+
+``PARTIAL CONTENT``:inxx ``IF_MODIFIED_SINCE``:inxx
+Quando i file statici sono scaricati web2py non crea una sessione nè invia un cookie o esegue il modello. web2py invia i file statici in blocchi di 1MB ed invia "PARTIAL CONTENT" quando il browser dell'utente manda una richiesta "RANGE" per una parte del file.
+
+web2py supporta inoltre il protocollo "IF_MODIFIED_SINCE" e non invia il file se questo è già memorizzato nella cache del browser ed il file non è cambiato rispetto a quella versione.
+
+``request.application``:inxx ``request.controller``:inxx ``request.function``:inxx ``GET``:inxx ``POST``:inxx ``request.args``:inxx
+web2py collega le richieste GET/POST nella forma:
+``
+http://127.0.0.1:8000/a/c/f.html/x/y/z?p=1&q=2
+``:code
+
+alla funzione ``f`` nel controller "c.py" dell'applicazione ``a`` e memorizza i parametri della URL nella variabile ``request``:
+``
+request.args = ['x', 'y', 'z']
+``:code
+
+e:
+``
+request.vars = {'p':1, 'q':2}
+``:code
+
+inoltre:
+``
+request.application = 'a'
+request.controller = 'c'
+request.function = 'f'
+``:code
+
+Nell'esempio precedente sia ``request.args[i]`` che ``request.args(i)`` possono essere utilizzati per recuperare l'elemento ``i`` di ``request.args`` ma mentre la prima forma genera un'eccezione se la lista non contiene l'elemento la seconda ritorna ``None``.
+
+``request.url``:inxx
+``
+request.url
+``:code
+
+memorizza l'intera URL della richiesta corrente (escluse le variabili GET).
+
+``request.ajax``:inxx
+``
+request.ajax
+``:code
+
+di default ritorna ``False`` ma se web2py determina che l'azione è stata eseguita da una richiesta Ajax ritorna ``True``.
+
+``request.get_vars``:inxx ``request.post_vars``:inxx ``request.vars``:inxx
+Se la richiesta HTTP è di tipo GET ``request.env.request_method`` ritorna "GET"; mentre se la richiesta è di tipo POST, ``request.env.request_method`` ritorna "POST". Le variabili della query dell'URL sono memorizzate nel dizionario (di tipo ``Storage``) ``request.vars``. Sono memorizzate anche in ``request.get_vars`` (per la richiesta di tipo GET) o in ``request.post_vars`` (per la richiesta di tipo POST).
+
+web2py memorizza le variabili d'ambiente WSGI e di web2py stesso in ``request.env``, come per esempio:
+``
+request.env.path_info = 'a/c/f'
+``:code
+
+come anche gli header HTTP:
+``
+request.env.http_host = '127.0.0.1:8000'
+``:code
+
+-------
+web2py valida tutte le URL per prevenire attacchi di tipo ''directory traversal''.
+-------
+ 
+Le URL possono contenere esclusivamente caratteri alfanumerici, underscore (_) e slash (/); gli argomenti ``args`` possono conteneri più punti (.) non consecutivi. Gli spazi sono sostituiti dall'underscore prima della validazione. Se la sintassi della URL non è valida web2py ritorna un messaggio d'errore HTTP 400``http:w,http:o``:cite.
+
+Se la URL corrisponde ad una richiesta per un file statico web2py lo legge e lo invia in streaming al browser dell'utente.
+
+Se la URL non richiede un file statico web2py processa la richiesta nel seguente ordine:
+
+- Legge i cookie.
+- Crea un ambiente nel quale eseguire la funzione.
+- Inizializza ``request``, ``response`` e ``cache``.
+- Apre la sessione esistente (``session``) o ne crea una nuova.
+- Esegue i modelli dell'applicazione richiesta.
+- Esegue la funzione relativa all'azione richiesta del controller.
+- Se la funzione ritorna un dizionario esegue la vista associata.
+- Se tutto è stato eseguito con successo completa (''commit'') le transazioni aperte.
+- Salva la sessione.
+- Ritorna la risposta HTTP.
+
+Il controller e la vista sono eseguiti in copie diverse dello stesso ambiente; pertanto la vista non vede il controller ma vede il modello e le variabili ritornate dalla funzione del controller relativa all'azione richiesta.
+
+Se è generata una eccezione (diversa da ``HTTP``) web2py si comporta nel seguente modo:
+- Memorizza il ''traceback'' in un file d'errore e gli assegna un numero di ticket.
+- Annulla (''rollback'') tutte le transazioni aperte.
+- Ritorna una pagina d'errore che riporta il numero del ticket.
+
+Se l'eccezione è di tipo ``HTTP`` questa è considerata come un comportamento voluto (per esempio una redirect HTTP) e tutte le transazioni aperte sono completate. Il comportamento successivo è specificato dalla stessa eccezione. La classe dell'eccezione ``HTTP`` non è un'eccezione standard di Python ma è definita da web2py.
+
+### Librerie
+Le librerie di web2py sono esposte alle applicazioni come oggetti globali. Per esempio alcune variabili (``request``, ``response``, ``session`` e ``cache``), alcune classi (''helpers'', validatori, DAL) e alcune funzioni (``T`` and ``redirect``).
+
+Questi oggetti sono definiti nei seguenti file di web2py:
+``
+web2py.py
+gluon/__init__.py    gluon/highlight.py   gluon/restricted.py  gluon/streamer.py
+gluon/admin.py       gluon/html.py        gluon/rewrite.py     gluon/template.py
+gluon/cache.py       gluon/http.py        gluon/rocket.py      gluon/storage.py
+gluon/cfs.py         gluon/import_all.py  gluon/sanitizer.py   gluon/tools.py
+gluon/compileapp.py  gluon/languages.py   gluon/serializers.py gluon/utils.py
+gluon/contenttype.py gluon/main.py        gluon/settings.py    gluon/validators.py
+gluon/dal.py         gluon/myregex.py     gluon/shell.py       gluon/widget.py
+gluon/decoder.py     gluon/newcron.py     gluon/sql.py         gluon/winservice.py
+gluon/fileutils.py   gluon/portalocker.py gluon/sqlhtml.py     gluon/xmlrpc.py
+gluon/globals.py     gluon/reserved_sql_keywords.py
+``:code
+
+L'applicazione compressa che è contenuta in web2py e che è utilizzata come base per le nuove applicazioni è:
+``
+welcome.w2p
+``:code
+
+E' creata durante l'installazione ed è sovrascritta durante gli aggiornamenti.
+
+-------
+La prima volta che si avvia web2py vengono create due nuove cartelle: ``deposit`` e ``applications``. L'applicazione "welcome" è compressa nel file "welcome.w2p". La cartella ``deposit`` è utilizzata come una cartella temporanea per installare e disinstallare le applicazioni.
+-------
+
+le ''unit-test'' di web2py sono in:
+``
+gluon/tests/
+``:code
+
+Ci sono moduli ausiliari per connettere diversi server web:
+``
+cgihandler.py
+gaehandler.py
+fcgihandler.py
+wsgihandler.py
+modpythonhandler.py
+gluon/contrib/gateways/__init__.py
+gluon/contrib/gateways/fcgi.py
+``:code
+
+(fcgi.py è stato sviluppato da Allan Saddi)
+
+Ci sono due file d'esempio:
+``
+options_std.py
+routes.example.py
+``:code
+
+Il primo è un file opzionale di configurazione che può essere passato a web2py con l'opzione ``-L``. Il secondo è un file di esempio di ''mapping'' delle URL. Viene automaticamente caricato quando è rinominato in "routes.py".
+
+I file:
+``
+app.yaml
+index.yaml
+``:code
+
+sono file di configurazione necessari per il ''deployment'' sul ''Google Application Engine''. Solitamente non è necessario modificarli; ulteriori informazioni sono disponibili nelle pagine di documentazione di Google sul GAE.
+
+Sono presenti anche librerie aggiuntive, la maggior parte sviluppate da terze parti:
+
+**feedparser**``feedparser``:cite  di Mark Pilgrim per leggere i feed RSS ed Atom:
+``
+gluon/contrib/__init__.py
+gluon/contrib/feedparser.py
+``:code
+
+**markdown2**``markdown2``:cite  di Trent Mick per il markup nei Wiki:
+``
+gluon/contrib/markdown/__init__.py
+gluon/contrib/markdown/markdown2.py
+``:code
+
+**markmin** markup:
+``
+gluon/contrib/markmin.py
+``:code
+
+**pysimplesoap** è un'implementazione leggera di un server SOAP creata da Mariano Reingart:
+
+``
+gluon/contrib/pysimplesoap/
+``:code
+
+**memcache**``memcache``:cite di Evan Martin è una API di Python per la gestione delle cache:
+``
+gluon/contrib/memcache/__init__.py
+gluon/contrib/memcache/memcache.py
+``:code
+
+**gql**, è un ''porting'' del DAL per il ''Google App Engine'':
+``
+gluon/contrib/gql.py
+``:code
+
+**memdb**, è un ''porting'' del DAL per memcache:
+``
+gluon/contrib/memdb.py
+``:code
+
+**gae_memcache** è un'API per utilizzare memcache con il ''Google App Engine'':
+``
+gluon/contrib/gae_memcache.py
+``:code
+
+**pyrtf**``pyrtf``:cite  per generare documenti in formato RTF (''Rich Text Format'') sviluppato da Simon Cusack e revisionato da Grant Edwards:
+``
+gluon/contrib/pyrtf
+gluon/contrib/pyrtf/__init__.py
+gluon/contrib/pyrtf/Constants.py
+gluon/contrib/pyrtf/Elements.py
+gluon/contrib/pyrtf/PropertySets.py
+gluon/contrib/pyrtf/README
+gluon/contrib/pyrtf/Renderer.py
+gluon/contrib/pyrtf/Styles.py
+``:code
+
+**PyRSS2Gen**``pyrss2gen``:cite  sviluppato da Dalke Scientific Software, per generare feed RSS:
+``
+gluon/contrib/rss2.py
+``:code
+
+**simplejson**``simplejson``:cite  di Bob Ippolito, la libreria standard per la gestione degli oggetti JSON (Javascript Object Notation):
+``
+gluon/contrib/simplejson/__init__.py
+gluon/contrib/simplejson/decoder.py
+gluon/contrib/simplejson/encoder.py
+gluon/contrib/simplejson/jsonfilter.py
+gluon/contrib/simplejson/scanner.py
+``:code
+
+**AuthorizeNet**``authorizenet``:cite  fornisce un'API per accettare pagamenti con carta di credito tramite il network Authorize.net:
+``
+gluon/contrib/AuthorizeNet.py
+``:code
+
+**PAM**``PAM``:cite  è un'API di autenticazione creata da Chris AtLee:
+``
+gluon/contrib/pam.py
+``:code
+
+Un classificatore Bayesiano per popolare il database con dati fittizi per il test:
+``
+gluon/contrib/populate.py
+``:code
+
+Un file che consente l'interazione con la taskbar di Windows quando web2py è utilizzato come servizio:
+``
+gluon/contrib/taskbar_widget.py
+``:code
+
+Diversi **metodi di login** opzionali e form di login da utilizzare per l'autenticazione:
+``
+gluon/contrib/login_methods/__init__.py
+gluon/contrib/login_methods/basic_auth.py
+gluon/contrib/login_methods/cas_auth.py
+gluon/contrib/login_methods/email_auth.py
+gluon/contrib/login_methods/extended_login_form.py
+gluon/contrib/login_methods/gae_google_account.py
+gluon/contrib/login_methods/ldap_auth.py
+gluon/contrib/login_methods/linkedin_account.py
+gluon/contrib/login_methods/oauth20_account.py
+gluon/contrib/login_methods/openid_auth.py
+gluon/contrib/login_methods/pam_auth.py
+gluon/contrib/login_methods/rpx_account.py
+``:code
+
+
+web2py contiene inoltre una cartella con script di utilità:
+``
+scripts/setup-web2py-fedora.sh
+scripts/setup-web2py-ubuntu.sh
+scripts/cleancss.py
+scripts/cleanhtml.py
+scripts/contentparser.py
+scripts/repair.py
+scripts/sessions2trash.py
+scripts/sync_languages.py
+scripts/tickets2db.py
+...
+``:code
+
+I primi due file sono particolarmente utili perchè tentano una installazione ed un setup completo di un ambiente di produzione di web2py. Sono discussi nel capitolo 12 ma sono abbastanza auto-documentati.
+
+Infine web2py include i seguenti file necessari per costruire le distribuzioni binarie:
+``
+Makefile
+setup_exe.py
+setup_app.py
+``:code
+Questi sono script di setup rispettivamente per **py2exe** e **py2app** e sono richiesti solamente per costruire le distribuzioni binarie di web2py. NON DEVONO MAI ESSERE ESEGUITI!
+
+Riepilogando, le librerie di web2py forniscono le seguenti funzionalità:
+- Collegano le URL alle chiamate alle funzioni.
+- Gestiscono il passaggio dei parametri via HTTP.
+- Eseguono la validazione di questi parametri.
+- Proteggono le applicazioni da molti problemi di sicurezza.
+- Gestiscono la persistenza dei dati (database, sessioni, cache, cookie).
+- Eseguono la traduzione delle stringhe nei diversi linguaggi supportati.
+- Generano codice HTML (per esempio dalle tabelle di un database).
+- Generano codice SQL tramite il DAL (Database Abstraction Layer).
+- Generano l'output in formato RTF (Rich Text Format). 
+- Generano output in formato CSV (Comma Separated Value) dalle tabelle di un database.
+- Generano feed RSS (Really Simple Syndication).
+- Generano la serializzazione delle stringhe in JSON (Javascript Object Notation) per Ajax.
+- Traducono il markup dei Wiki (Markdown) in HTML.
+- Espongono servizi web XML-RPC.
+- Caricano e scaricano file di grande dimensione tramite streaming.
+
+Le applicazioni web2py contengono ulteriori file, in particolare librerie Javascript di terze parti, come jQuery, calendar, EditArea e nicEdit. Gli autori di queste librerie sono indicati all'interno delle librerie stesse.
+
+### Applicazioni
+
+Le applicazioni sviluppate in web2py sono composte delle seguenti parti:
+
+- I **modelli** descrivono una rappresentazione dei dati (come le tabelle dei database e le relazioni tra di esse).
+- I **controller** descrivono la logica dell'applicazione ed il suo flusso di lavoro.
+- Le **viste** descrivono come i dati dovrebbero essere presentati all'utente utilizzando HTML e Javascript.
+- I **linguaggi** descrivono come tradurre le stringhe dell'applicazione in diverse lingue.
+- I **file statici** non richiedeono nessuna elaborazione (per esempio immagini, CSS, ecc.).
+- **ABOUT** e **README** contengono informazioni sull'applicazione.
+- Gli **errori** memorizzano informazioni sugli errori generati dall'applicazione.
+- Le **sessioni** memorizzano informazioni legate ad ogni specifico utente.
+- I **database** memorizzano i database di SQLite ed informazioni aggiuntive sulle tabelle
+- la **cache** memorizza oggetti utilizzati dall'applicazione
+- I **moduli** sono altri moduli di Python aggiuntivi.
+- I file **privati** sono acceduti dai controller ma non direttamente dallo sviluppatore.
+- I file di **upload** sono acceduti dai modelli ma non direttamente dallo sviluppatore (per esempio i file caricati dagli utenti di un'applicazione).
+- I file di **test** sono memorizzati in una cartella per memorizzare gli script di test e le ''fixture''.
+
+I modelli, le viste, i controller, i linguaggi e i file statici sono accessibili dall'interfaccia web di amministrazione. I file di ABOUT, README e gli errori sono anch'essi accessibili dall'interfaccia web di amministrazione tramite la corrispondente sezione. Le sessioni, la cache, i moduli ed i file privati sono accessibili all'applicazione ma non all'iterfaccia web di amministrazione.
+
+Tutti questi file sono organizzati in una precisa struttura di cartelle, replicata per ogni applicazione web2py, anche se l'utente non ha mai bisogno di accedere direttamente al filesystem:
+
+``about``:inxx ``license``:inxx ``cache``:inxx ``controllers``:inxx ``databases``:inxx ``errors``:inxx ``languages``:inxx ``models``:inxx ``modules``:inxx ``private``:inxx ``session``:inxx ``static``:inxx ``tests``:inxx ``uploads``:inxx ``views``:inxx ``__init__.py``:inxx
+``
+__init__.py  ABOUT        LICENSE    models    views
+controllers  modules      private    tests     cron
+cache        errors       upload     sessions  static
+``:code
+
+"__init__.py" è un file vuoto che è necessario per consentire a Python (e a web2py) di importare i moduli presenti nella cartella ``modules``.
+
+L'applicazione **admin** fornisce solamente una interfaccia web alle applicazioni web2py presenti sul filesystem del server. Le applicazioni web2py possono anche essere create e sviluppate dalla linea di comando, non è indispensabile utilizzare l'interfaccia web dell'applicazione **admin**. Una nuova applicazione può essere creata manualmente replicando la struttura di cartelle in una nuova cartella all'interno della cartella ``applications`` (o più semplicemente scompattando il file ``welcome.w2p`` nella nuova cartella). I file che compongono l'applicazione possono essere creati e modificati dalla linea di comando senza dover usare l'interfaccia web dell'applicazione **admin**.
+
+
+### API
+
+I modelli, i controller e le viste sono eseguiti in un ambiente dove i seguenti oggetti sono automaticamente importati:
+
+**Oggetti globali:** ``request``:inxx ``response``:inxx ``session``:inxx ``cache``:inxx
+
+``
+request, response, session, cache
+``:code
+
+**Navigazione:** ``redirect``:inxx ``HTTP``:inxx
+
+``
+redirect, HTTP
+``:code
+
+**Internationalizzazione:** ``T``:inxx ``internationalization``:inxx
+
+``
+T
+``:code
+
+**Helpers:** ``helpers``:inxx
+
+``
+XML, URL, BEAUTIFY
+
+A, B, BEAUTIFY, BODY, BR, CENTER, CODE, DIV, EM, EMBED,
+FIELDSET, FORM, H1, H2, H3, H4, H5, H6, HEAD, HR, HTML,
+I, IFRAME, IMG, INPUT, LABEL, LEGEND, LI, LINK, OL, UL,
+MARKMIN, MENU, META, OBJECT, ON, OPTION, P, PRE, SCRIPT,
+OPTGROUP, SELECT, SPAN, STYLE, TABLE, TAG, TD, TEXTAREA,
+TH, THEAD, TBODY, TFOOT, TITLE, TR, TT, URL, XHTML, 
+xmlescape, embed64
+``:code
+
+**Validatori** ``validators``:inxx
+
+``
+CLEANUP, CRYPT, IS_ALPHANUMERIC, IS_DATE_IN_RANGE, IS_DATE,
+IS_DATETIME_IN_RANGE, IS_DATETIME, IS_DECIMAL_IN_RANGE,
+IS_EMAIL, IS_EMPTY_OR, IS_EXPR, IS_FLOAT_IN_RANGE, IS_IMAGE,
+IS_IN_DB, IS_IN_SET, IS_INT_IN_RANGE, IS_IPV4, IS_LENGTH,
+IS_LIST_OF, IS_LOWER, IS_MATCH, IS_EQUAL_TO, IS_NOT_EMPTY,
+IS_NOT_IN_DB, IS_NULL_OR, IS_SLUG, IS_STRONG, IS_TIME,
+IS_UPLOAD_FILENAME, IS_UPPER, IS_URL
+``:code
+
+**Database:** ``DAL``:inxx
+
+``
+DAL, Field
+``:code
+Per compatibilità con le versioni precedenti di web2py sono presenti anche ``SQLDB=DAL`` e ``SQLField=Field``. E' bene però utilizzare la nuova sintassi ``DAL`` e ``Field`` invece della vecchia.
+
+Altri moduli ed oggetti sono definiti nelle librerie ma non sono automaticamente importati perchè non usati molto spesso.
+
+Le entità fondamentali nell'ambiente d'esecuzione di web2py sono ``request``, ``response``, ``session``, ``cache``, ``URL``, ``HTTP``, ``redirect`` e ``T`` e sono illustrate di seguito.
+
+Alcuni oggetti e funzioni (come **Auth**, **Crud** e **Service**) sono definiti in "gluon/tools.py" e devono essere importati se richiesti:
+``
+from gluon.tools import Auth, Crud, Service
+``:code
+
+### request
+``request``:inxx ``Storage``:inxx ``request.cookies``:inxx
+
+L'oggetto ``request`` è un'istanza della onnipresente classe di web2py chiamata ``gluon.storage.Storage``, che estende la classe ``dict`` standard di Python. E' fondamentalmente un dizionario ma i suoi valori possono essere acceduti anche come attributi:
+``
+request.vars
+``:code
+
+è lo stesso di:
+``
+request['vars']
+``:code
+
+A differenza di un dizionario se un attributo (o una chiave) non esiste non viene generata un'eccezione ma viene ritornato ``None``.
+
+``request`` ha le seguenti chiavi (attributi), alcune delle quali sono esse stesse un istanza della classe ``Storage``:
+- **request.cookies**: un oggetto di tipo ``Cookie.SimpleCookie()`` che contiene i cookie passati nella richiesta HTTP. Agisce come un dizionario di cookie dove ogni cookie è un oggetto Morsel di Python.
+- **request.env**: un oggetto di tipo ``Storage`` che contiene le variabli d'ambiente passate al controller cioè le variabili presenti nell'header HTTP dalla richiesta HTTP ed i parametri standard WSGI. Le variabili d'ambiente sono tutte convertite in minuscolo e i punti sono convertiti in underscore per una memorizzazione più facile.
+- **request.application**: il nome dell'applicazione richiesta (estratta da ``request.env.path_info``).
+- **request.controller**: il nome del controller richiesto (estratto da ``request.env.path_info``).
+- **request.function**: il nome della funzione richiesta (estratto da ``request.env.path_info``).
+- **request.extension**: l'estensione dell'azione richiesta. Ha come default "html". Se la funzione del controller ritorna un dizionario e non specifica una vista l'estensione è usata per determinare quale file di vista deve essere usato per visualizzare il dizionario (estratto da ``request.env.path_info``).
+- **request.folder**: la cartella dell'applicazione. Per esempio per l'applicazione "welcome" ``request.folder`` è impostato al percorso assoluto "/path/to/welcome". Nei programmi deve sempre essere usata questa variabile e la funzione ``os.path.join`` per costruire il path ai file. Sebbene web2py utilizzi sempre path assoluti è buona regola non cambiare mai la cartella di lavoro corrente poichè questa non è una pratica sicura per i thread.
+- **request.now**: un oggetto di tipo ``datetime.datetime`` che contiene l'orario della richiesta corrente.
+- **request.args**: una lista delle componenti delle URL che seguono il nome della funzione; equivalente a ``request.env.path_info.split('/')[3:]``
+- **request.vars**: un oggetto di tipo ``gluon.storage.Storage`` che contiene le variabili della query HTTP GET o HTTP POST.
+- **request.get_vars**: un oggetto di tipo ``gluon.storage.Storage`` contenente solo le variabili della query HTTP GET.
+- **request.post_vars**: un oggetto di tipo ``gluon.storage.Storage`` contenente solo le variabili della query HTTP POST.
+- **request.client**: L'indirizzo IP del client come determinato da ``request.env.remote_addr`` o da ``request.env.http_x_forwarded_for`` se presente. Sebbene questo può essere utile non dovrebbe essere considerato come un dato affidabile perchè ``http_x_forwarded_for`` può essere falsificato.
+- **request.body**: uno stream file in sola lettura che contiene il corpo della richiesta HTTP. Questo stream è analizzato per recuperare ``request.post_vars`` ed è poi reinizializzato. Può essere letto con ``request.body.read()``.
+- **request.wsgi** un ''hook'' che consente di chiamare applicazioni WSGI di terze parti dall'interno delle azioni.
+
+Per esempio, la seguenta chiamata su un tipico sistema web2py:
+``
+http://127.0.0.1:8000/examples/default/status/x/y/z?p=1&q=2
+``:code
+
+risulta nel seguente dizionario:
+``request``:inxx ``env``:inxx
+
+----------
+variable | value
+request.application | examples
+request.controller | default
+request.function | index
+request.extension | html
+request.view | status
+request.folder | applications/examples/
+request.args | ['x', 'y', 'z']
+request.vars | <Storage {'p': 1, 'q': 2}>
+request.get_vars | <Storage {'p': 1, 'q': 2}>
+request.post_vars | <Storage {}>
+request.wsgi | hook
+request.env.content_length | 0
+request.env.content_type |
+request.env.http_accept | text/xml,text/html;
+request.env.http_accept_encoding | gzip, deflate
+request.env.http_accept_language | en
+request.env.http_cookie | session_id_examples=127.0.0.1.119725
+request.env.http_host | 127.0.0.1:8000
+request.env.http_max_forwards | 10
+request.env.http_referer | http://web2py.com/
+request.env.http_user_agent | Mozilla/5.0
+request.env.http_via | 1.1 web2py.com
+request.env.http_x_forwarded_for | 76.224.34.5
+request.env.http_x_forwarded_host | web2py.com
+request.env.http_x_forwarded_server | 127.0.0.1
+request.env.path_info | /examples/simple_examples/status
+request.env.query_string | remote_addr:127.0.0.1
+request.env.request_method | GET
+request.env.script_name |
+request.env.server_name | 127.0.0.1
+request.env.server_port | 8000
+request.env.server_protocol | HTTP/1.1
+request.env.web2py_path | /Users/mdipierro/web2py
+request.env.we2bpy_version | Version 1.81.5
+request.env.web2py_runtime_gae | (opzionale, definita solo se è utilizzato Google App Engine)
+request.env.wsgi_errors | <open file, mode 'w' at >
+request.env.wsgi_input |
+request.env.wsgi_multiprocess | False
+request.env.wsgi_multithread | True
+request.env.wsgi_run_once | False
+request.env.wsgi_url_scheme | http
+request.env.wsgi_version | 10
+--------
+ 
+Quali variabili d'ambiente siano effettivamente definite dipende dal server web. Qui è utilizzato il server WSGI Rocket, presente all'interno di web2py. Il set di variabili non è molto diverso quando si usa il server web Apache.
+
+Le variabili ``request.env.http_*`` sono estratte dall'header della richiesta HTTP.
+
+Le variabili ``request.env.web2py_*`` non sono estratte dall'ambiente del server web ma sono create da web2py. Sono utili se l'applicazione dovesse aver bisogno di informazioni relative alla posizione o alla versione di web2py o conoscere se l'applicazione sta girando su Google App Engine (perchè potrebbe essere necessaria una specifica ottimizzazione).
+Anche le variabili ``request.env.wsgi_*`` sono specifiche dell'adattatore WSGI.
+
+### response
+``response``:inxx
+``response.body``:inxx
+``response.cookies``:inxx
+``response.download``:inxx
+``response.files``:inxx
+``response.flash``:inxx
+``response.headers``:inxx
+``response.meta``:inxx
+``response.menu``:inxx
+``response.postprocessing``:inxx
+``response.render``:inxx
+``response.status``:inxx
+``response.stream``:inxx
+``response.subtitle``:inxx
+``response.title``:inxx
+``response.view``:inxx
+``response.write``:inxx
+``response`` è un'altra istanza della classe ``Storage``. Contiene le seguenti variabili:
+- **response.body**: un oggetto di tipo ``StringIO`` nel quale web2py scrive l'output del corpo della pagina. NON CAMBIARE MAI QUESTA VARIABILE.
+- **response.cookies**: simile a  **request.cookies** ma mentre quest'ultima contiene i cookie inviati dal client al server **response.cookies** contiene i cookie inviati dal server al client. Il cookie di sessione è gestito automaticamente.
+- **response.download(request, db)**: un metodo utilizzato per implementare la funzione del controller che consente lo scarico dei file caricati dagli utenti.
+- **response.files**: una lista dei file .css e .js necessari per la pagina di risposta. I loro link saranno automaticamente inclusi nell'header di "layout.html" standard. Per includere un nuovo file .css o .js è sufficiente aggiungerlo a questa lista. I duplicati sono gestiti dalla lista stessa e l'ordine d'inserimento è significativo.
+- **response.flash**: un parametro opzionale che può essere incluso nelle viste. Normalmente utilizzato per notificare informazioni all'utente.
+- **response.headers**: un ``dict`` per gli header HTTP della risposta.
+- **response.menu**: un parametro opzionale che può essere incluso nelle viste, solitamente usato per passare un menu di navigazione alla vista. Può essere visualizzato tramite l'helper MENU.
+- **response.meta**: un oggetto di tipo ``Storage`` che contiene informazioni ''meta'' opzionali come ``response.meta.author``, ``response.meta.description`` e ``response.meta.keywords``. Il contenuto della variabile ``response.meta`` è automaticamente inserito nel tag ``META`` dal codice in "web2py_ajax.html" che è incluso nella vista di default "views/layout.html".
+- **response.postprocessing**: è una lista di funzioni, vuota di default. Queste funzioni sono utilizzate per filtrare l'oggetto response dopo l'output dell'azione e prima che venga visualizzato dalla vista. Può essere usato per implementare il supporto per altri linguaggi di template.
+- **response.render(view, vars)**: un metodo utilizzato per chiamare la vista esplicitamente dall'interno del controller. ``view`` è un parametro opzionale con il nome del file della vista e ``vars`` è un dizionario di chiavi/valori passato alla vista.
+- **response.session_file**: è uno stream del file che contiene la sessione.
+- **response.session_file_name**: è il nome del file dove sarà memorizzata la ssssione.
+- **response.session_id**: l'id della sessione corrente, generato automaticamente. NON CAMBIARE MAI QUESTA VARIABILE.
+- **response.session_id_name**: il nome del cookie di sessione per l'applicazione. NON CAMBIARE MAI QUESTA VARIABILE.
+- **response.status**: Il valore del codice di stato HTTP che deve essere passato alla response. Il default è 200 (OK).
+- **response.stream(file, chunk_size)**: quando un controller ritorna questo valore web2py invia il contenuto al client in blocchi delle dimensioni di ``chunk_size``.
+- **response.subtitle**: parametro opzionale che può essere aggiunto alla vista. Dovrebbe contenere il sottotitolo della pagina.
+- **response.title**: parametro opzionale che può essere aggiunto alla vista. Dovrebbe contenere il titolo della pagina e dovrebbe essere visualizzato dal tag TITLE nell'header della pagina.
+- **response._vars**: questa variabile è accessibile solo in una vista, non in un'azione. Contiene i valori ritornati dall'azione alla vista.
+- **response.view**: il nome della vista che deve visualizzare la pagina. E' impostato per default a:
+``
+"%s/%s.%s" % (request.controller, request.function, request.extension)
+``:code
+o, se il file precedente non esiste, è impostato a:
+``
+"generic.%s" % (request.extension)
+``:code
+
+Cambiare il valore di questa variabile per modificare il file della vista associato con una azione particolare.
+- **response.xmlrpc(request, methods)**: quando un controller ritorna questo valore, questa funzione espone i metodi via XML-RPC``xmlrpc``:cite. Questa funzione è deprecata in quanto esiste un meccanismo migliore illustrato nel capitolo 9.
+- **response.write(text)**: un metodo per scrivere all'interno del corpo della pagina.
+
+Poichè *response** è un oggetto di tipo ``gluon.storage.Storage`` può essere utilizzato per memorizzare altri attributi che si vuol passare alla vista. Sebbene non ci siano limitazioni tecniche è bene memorizzare solamente variabili che devono essere visualizzate in tutte le pagine del layout globale "layout.html".
+
+In ogni modo le seguenti variabili dovrebbero essere utilizzate:
+``
+response.title
+response.subtitle
+response.flash
+response.menu
+response.meta.author
+response.meta.description
+response.meta.keywords
+response.meta.*
+``:code
+
+perchè questo rende più facile sostituire il template standard "layout.html" incluso in web2py con un altro file di layout che utilizzi le stesse variabili.
+
+Le vecchie versioni di web2py usano ``response.author`` invece di ``response.meta.author``, lo stesso vale per gli altri attributi ''meta''.
+
+### session
+``session``:inxx ``session.connect``:inxx ``session.forget``:inxx ``session.secure``:inxx
+``session`` è un'altra istanza della classe ``Storage``. Tutto quello che è memorizzato in ``session`` per esempio:
+``
+session.myvariable = "hello"
+``:code
+
+può essere successivamente recuperato:``
+a = session.myvariable
+``:code
+
+purchè il codice sia eseguito nella stessa sessione dello stesso utente (e che l'utente non abbia cancellato i cookie di sessione e che la sessione stessa non sia scaduta). Poichè ``session`` è un oggetto ``Storage`` se si tenta di accedere ad un attributo/chiave che non esiste non si genera nessuna eccezione ma si ottiene ``None``.
+
+L'oggetto ``session`` ha due metodi importanti, il primo è **forget**:
+
+``
+session.forget()
+``:code
+
+ed indica a web2py di non memorizzare la sessione. Questo dovrebbe essere utilizzato in quei controller le cui azioni sono chiamate spesso e non necessitano di tracciare l'attività dell'utente.
+
+L'altro metodo è **connect**:
+``
+session.connect(request, response, db, masterapp=None)
+``:code
+
+dove ``db`` è il nome di una connessione di database aperta (come ritornata dal DAL). Indica a web2py che si vuole memorizzare le sessioni nel database e non nel filesystem. web2py crea una tabella:
+``
+db.define_table('web2py_session',
+                 Field('locked', 'boolean', default=False),
+                 Field('client_ip'),
+                 Field('created_datetime', 'datetime', default=now),
+                 Field('modified_datetime', 'datetime'),
+                 Field('unique_key'),
+                 Field('session_data', 'text'))
+``:code
+
+è memorizza con ''cPickle'' le sessioni nel campo ``session_data``.
+
+L'opzione ``masterapp=None`` indica a web2py di recuperare una sessione esistente per l'applicazione con il nome indicato (come memorizzato in ``request.application``) all'interno della applicazione corrente.
+
+Se si vuole che due o più applicazioni condividano le sessioni basta impostare ``masterapp`` al nome dell'applicazione principale.
+
+E' possibile controllare lo stato dell'applicazione in ogni momento visualizzando le variabili di sistema ``request``, ``session`` e ``response``. Un modo di fare questo è definire un'azione dedicata:
+``
+def status():
+    return dict(request=request, session=session, response=response)
+``:code
+
+### cache
+``cache``:inxx ``cache.ram``:inxx ``cache.disk``:inxx
+``cache`` è un oggetto globale definito nell'ambiente d'esecuzione di web2py. Ha due attributi:
+- **cache.ram**: la cache dell'applicazione è memorizzata nella memoria principale.
+- **cache.disk**: la cache dell'applicazione è memorizzata nel filesystem.
+``cache`` è un oggetto richiamabile (''callable''), questo consente di utilizzarlo come decoratore per le azioni e le viste.
+
+Il seguente esempio utilizza la ram per la cache della funzione ``time.ctime()``:
+``
+def cache_in_ram():
+    import time
+    t = cache.ram('time', lambda: time.ctime(), time_expire=5)
+    return dict(time=t, link=A('click me', _href=request.url))
+``:code
+
+L'output della funzione ``lambda: time.ctime()`` è memorizzato nella ram per 5 secondi. La stringa ``'time'`` è utilizzata come chiave:
+
+Il seguente esempio utilizza il filesystem per la stessa operazione:
+``
+def cache_on_disk():
+    import time
+    t = cache.disk('time', lambda: time.ctime(), time_expire=5)
+    return dict(time=t, link=A('click me', _href=request.url))
+``:code
+
+L'output di ``lambda: time.ctime()`` è memorizzato sul disco (utilizzando il modulo ''shelve'') per 5 secondi.
+
+Il seguente esempio utilizza sia la ram che il filesystem:
+``
+def cache_in_ram_and_disk():
+    import time
+    t = cache.ram('time', lambda: cache.disk('time',
+                       lambda: time.ctime(), time_expire=5),
+                       time_expire=5)
+    return dict(time=t, link=A('click me', _href=request.url))
+``:code
+
+L'output di ``lambda: time.ctime()`` è memorizzato su disco (utilizzando il modulo shelve) e poi in ram per 5 secondi. web2py cerca prima nella ram e se non trova nulla cerca su disco. Se non trova nulla neanche sul disco web2py esegue la funzione ``lambda: time.ctime()`` e la cache viene aggiornata. Questa tecnica è utile in un ambiente multi-processo. I due orari non devono essere per forza gli stessi.
+
+Il seguente esempio memorizza in ram l'output della funzione del controller (ma non della vista):
+``cache controller``:inxx
+``
+
+@cache(request.env.path_info, time_expire=5, cache_model=cache.ram)
+def cache_controller_in_ram():
+    import time
+    t = time.ctime()
+    return dict(time=t, link=A('click me', _href=request.url))
+``:code
+
+Il dizionario restituito da ``cache_controller_in_ram`` è memorizzato in ram per 5 secondi. Il risultato di una SELECT su un database non può essere memorizzato nella cache se non viene prima serializzato. Un modo migliore di effettuare la cache di un database è di eseguire il metodo ``select`` con l'attributo ``cache``
+
+Il seguente esempio memorizza l'output di una funzione di un controller (ma non della vista) su disco:
+``
+@cache(request.env.path_info, time_expire=5, cache_model=cache.disk)
+def cache_controller_on_disk():
+    import time
+    t = time.ctime()
+    return dict(time=t, link=A('click to reload',
+                              _href=request.url))
+``:code
+
+Il dizionario restituito da ``cache_controller_on_disk`` è memorizzato su disco per 5 secondi. web2py non può memorizzare nella cache oggetti che non sono serializzabili tramite ''cPickle''.
+
+E' anche possibile memorizzare una vista nella cache. Il trucco è nel preparare l'output della vista in una funzione del controller in modo che sia ritornata come una stringa. Per fare questo è necessario ritornare la funzione ``response.render(d)`` dove ``d`` è il 
+dizionario che si vuole passare alla vista:
+
+Il seguente esempio memorizza nella ram l'output della funzione (incluso l'output della vista):
+
+``cache view``:inxx
+``
+@cache(request.env.path_info, time_expire=5, cache_model=cache.ram)
+def cache_controller_and_view():
+    import time
+    t = time.ctime()
+    d = dict(time=t, link=A('click to reload', _href=request.url))
+    return response.render(d)
+``:code
+``response.render(d)`` restituisce l'output della vista come una stringa che è memorizzata in ram per 5 secondi. Questo è il modo migliore e più veloce di utilizzare la cache.
+
+E' anche possibile definire altri meccanismi di cache come, per esempio, ``memcache``. ``memcache`` è disponibile nel modulo ``gluon.contrib.memcache`` ed è discusso con maggior dettaglio nel capitolo 11.
+
+### URL
+``URL``:inxx
+La funzione ``URL`` è una delle più importanti in web2py. Genera i percorsi delle URL interni all'applicazione per le azioni e i file statici.
+
+Ecco un esempio:
+
+``
+URL('F')
+``:code
+
+è trasformato in:
+
+``
+/[application]/[controller]/F
+``:code
+
+L'output della funzione ``URL`` dipende dall'applicazione corrente, dal controller in uso e da altri parametri. web2py supporta sia il collegamento diretto delle URL (''mapping'') che il collegamento inverso (''reverse mapping''). Il mapping delle URL consente di ridefinire il formato delle URL esterne. Se si utilizza la funzione ``URL`` per generare tutte le URL dell'applicazione l'aggiunta o la modifica delle URL eviterà la presenza di link errati all'interno dell'applicazione.
+
+E' possibile passare parametri aggiuntivi alla funzione URL, per esempio parti aggiuntive nel path (argomenti, ``args``) e variabili di query (``vars``):
+
+``
+URL('F', args=['x', 'y'], vars=dict(z='t'))
+``:code
+
+è trasformata in:
+``
+/[application]/[controller]/F/x/y?z=t
+``:code
+
+Gli attributi presenti in ``args`` sono automaticamente analizzati, decodificati e memorizzati in ``request.args`` da web2py. Allo stesso modo le variabili nel dizionario ``vars`` sono analizzate, decodificate e memorizzate in ``request.vars``.
+``args`` e ``vars`` sono il meccanismo di base con il quale web2py scambia informazioni con il browser dell'utente. Se ``args`` contiene un solo elemento non è necessario passarlo all'interno di una lista.
+
+E' anche possibile utilizzare la funzione ``URL`` per generare URL verso azioni presenti in altri controller ed in altre applicazioni:
+
+``
+URL('a', 'c', 'f', args=['x', 'y'], vars=dict(z='t'))
+``:code
+
+è trasformato in:
+
+``
+/a/c/f/x/y?z=t
+``
+
+E' anche possibile specificare l'applicazione il controller e la funzione utilizzanto argomenti con nome:
+
+``
+URL(a='a', c='c', f='f')
+``:code
+
+Se l'applicazione non è indicata è utilizzato quella corrente.
+
+``
+URL('c', 'f')
+``:code
+
+Se il controller non è indicato è utilizzato quello corrente.
+``
+URL('f')
+``:code
+
+Invece di passare il nome di una funzione di un controller è possibile passare direttamente la funzione:
+``
+URL(f)
+``:code
+
+Per le ragioni sopra indicate si dovrebbe sempre utilizzare la funzione ``URL`` per generare le URL dei file statici dell'applicazione. I file statici sono memorizzati nella cartella ``static`` dell'applicazione (ed è la cartella dove vengono caricati dall'interfaccia amministrativa). web2py mette a disposizione un controller virtuale chiamato "static" il cui compito è recuperare i file dalla cartella ``static``, determinare tipo del loro contenuto (''content-type'') ed inviare i file all'utente. Il seguente esempio genera l'URL per il file statico "image.png":
+
+``
+URL('static', 'image.png')
+``:code
+
+che viene trasformato in:
+
+``
+/[application]/static/image.png
+``:code
+
+Non è necessario codificare o validare (''escape'') gli argomenti di ``args`` e ``vars`` in quanto questa operazione è eseguita direttamente ed automaticamente da web2py.
+
+### HTTP e la redirezione
+``HTTP``:inxx ``redirect``:inxx
+
+web2py definisce solo una nuova eccezione, chiamata ``HTTP``. Questa eccezione può essere generata in un qualsiasi punto di un modello, un controller o una vista con il comando:
+
+``
+raise HTTP(400, "my message")
+``:code
+
+e fa si che il flusso dell'elaborazione si interrompa e torni immediatamente a web2py che ritorna una risposta HTTP del tipo:
+
+``
+HTTP/1.1 400 BAD REQUEST
+Date: Sat, 05 Jul 2008 19:36:22 GMT
+Server: Rocket WSGI Server
+Content-Type: text/html
+Via: 1.1 127.0.0.1:8000
+Connection: close
+Transfer-Encoding: chunked
+
+my message
+``:code
+
+Il primo argomento di ``HTTP`` è il codice di stato HTTP. Il secondo argomento è la stringa che verrà ritornata come corpo della risposta. Argomenti con nome (aggiuntivi ed opzionali) sono utilizzati per costruire l'header della risposta HTTP. Per esempio:
+
+``
+raise HTTP(400, 'my message', test='hello')
+``:code
+
+genera:
+``
+HTTP/1.1 400 BAD REQUEST
+Date: Sat, 05 Jul 2008 19:36:22 GMT
+Server: Rocket WSGI Server
+Content-Type: text/html
+Via: 1.1 127.0.0.1:8000
+Connection: close
+Transfer-Encoding: chunked
+test: hello
+
+my message
+``:code
+
+Se non si vuole che le transazioni del database siano finalizzate (''commit'') è necessario annullare le transazioni (''rollback'') prima di generare l'eccezione.
+
+Qualsiasi altra eccezione diversa da ``HTTP`` fa sì che web2py annulli tutte le transazioni di database aperte, registri il traceback dell'errore, emetta un ticket per l'utente e ritorni una pagina standard d'errore. Questo significa che solamente ``HTTP`` può essere utilizzata per cambiare il flusso di controllo tra le diverse pagine. Altre eccezioni devono essere gestite dall'applicazione, altrimenti genereranno un ticket di web2py.
+
+Il comando:
+``
+redirect('http://www.web2py.com')
+``:code
+
+E' semplicemente una scorciatoia per:
+``
+raise HTTP(303,
+           'You are being redirected <a href="%s">here</a>' % location,
+           Location='http://www.web2py.com')
+``:code
+
+Gli argomenti con nome del metodo ``HTTP`` sono tradotti in direttive dell'header HTTP, in questo caso la destinazione della redirezione. ``redirect`` ha un secondo parametro opzionale che è il codice di stato HTTP della redirezione (303 di default). Si può cambiare questo codice a 307 per una redirezione temporanea o a 301 per una redirezione permanente.
+
+Il modo più comune di usare le redirezioni è quello di reindirezzare ad altre pagine della stessa applicazione e (opzionalmente) passare dei parametri:
+
+``
+redirect(URL('index',args=(1,2,3),vars=dict(a='b')))
+``:code
+
+### T e l'internazionalizzazione
+``T``:inxx ``internationalization``:inxx
+
+L'oggetto ``T`` è il traduttore di linguaggio. Costituisce una singola istanza globale della classe ``gluon.language.translator`` di web2py. Tutte le stringe costanti (e solamente quelle costanti) dovrebbero essere utilizzate con ``T``, per esempio:
+``
+a = T("hello world")
+``:code
+
+web2py identifica tutte le stringhe utilizzate con ``T`` come stringhe che necessitano della traduzione in un altro linguaggio e quindi verranno tradotte quando il codice (nel modello, nel controller o nella vista) sarà eseguito. Se la stringa da tradurre non è una costante ma è una variabile sarà aggiunta al file di traduzione durante l'esecuzione (tranne che su GAE) per essere tradotta successivamente.
+
+L'oggetto ``T`` può anche contenere variabili interpolate, per esempio:
+
+``
+a = T("hello %(name)s", dict(name="Massimo"))
+``:code
+
+La prima parte della stringa è tradotta secondo il file di linguaggio richiesto mentre il valore della variabile ``name`` è utilizzato indipendentemente dal linguaggio.
+
+Il concatenamento di più stringhe da tradurre con ``T`` non è una buona idea, per questo è impedito da web2py:
+
+``
+T("blah ") + name + T(" blah")   # non valido!
+``:code
+
+mentre è consentito:
+``
+T("blah %(name)s blah", dict(name='Tim'))
+``:code
+
+o anche la sintassi alternativa:
+``
+T("blah %(name)s blah") % dict(name='Tim')
+``:code
+
+In ambedue i casi la traduzione viene effettuata prima che la variabile ``name`` sia sostituita nella posizione "%(name)s" La sintassi seguente invece NON DEVE ESSERE USATA:
+``
+T("blah %(name)s blah" % dict(name='Tim'))
+``:code
+
+perchè la traduzione avverrebbe dopo la sostituzione.
+
+Il linguaggio richiesto è determinato dal campo "Accept-Language" dell'header HTTP ma può essere forzato da programma richiedendo uno specifico file di traduzione, per esempio:
+
+``
+T.force('it-it')
+``:code
+
+che obbliga web2py a leggere il file di linguaggio "languages/it-it.py".
+I file di linguaggio possono essere creati e modificati dall'interfaccia amministrativa.
+
+Normalmente la traduzione delle stringhe è eseguita alla fine, quando l'output della vista viene generato; per questo il metodo ``force`` del traduttore non dovrebbe essere chiamato all'interno di una vista.
+
+E' possibile disabilitare questo comportamento "pigro" (''lazy'') della valutazione delle stringhe da tradurre con:
+``
+T.lazy = False
+``:code
+
+In questo modo le stringhe sono tradotte immediatamente dall'operatore ``T`` in base al linguaggio attualmente accettato o forzato.
+
+Un problema tipico è il seguente: l'applicazione originale contiene le stringhe in Inglese, esiste un file di linguaggio in italiano (languages/it-it.py) e il client HTTP dichiara di accettare Inglese (en) ed Italiano (it-it) in quest'ordine. In questo caso si ha il seguente comportamento (non voluto): web2py non sa che l'applicazione contiene le stringhe in Inglese, perciò preferisce le stringhe in Italiano (it-it) perchè il file di traduzione in Inglese (en) non esiste. Se non esistesse nemmeno il file languages/it-it.py web2py avrebbe utilizzato le stringhe in Inglese presenti nell'applicazione.
+
+Ci sono due soluzioni per questo problema: creare un file di traduzione in Inglese, che sarebbe ridondante e non necessario, oppure (ed è la soluzione consigliata) indicare a web2py in quale linguaggio sono le stringhe contenute nel codice dell'applicazione. Questo può essere fatto con:
+``
+T.set_current_language('en', 'en-en')
+``:code
+
+Questo comando memorizza in ``T.current_languages`` una lista dei linguaggi che non necessitano di traduzione e forza una rilettura dei file di linguaggio.
+
+E' da notare che "it" e "it-it" sono due linguaggi diversi dal punto di vista di web2py. Per supportare tutti e due è necessario avere due file di traduzione (uno per "it" e uno per "it-it"), sempre in minuscolo. Lo stesso è valido per tutti gli altri linguaggi.
+
+Il linguaggio attualmente accettato è memorizzato in:
+``
+T.accepted_language
+``:code
+
+E' da ricordare che T(...) non serve a tradurre solamente le stringhe ma anche le variabili:
+``
+>>> a="test"
+>>> print T(a)
+``:code
+
+In questo caso la parola "test" è tradotta ma, se non viene trovata nel file di linguaggio e il filesystem è scrivibile verrà aggiunta alla lista delle parole da tradurre nel file di linguaggio.
+
+### Cookie
+``cookies``:inxx
+
+web2py utilizza i moduli standard di Python per la gestione dei cookie.
+
+I cookie ricevuti dal browser sono presenti in ``request.cookies`` e i cookie inviati dal server sono in ``response.cookies``.
+
+Un cookie può essere impostato nel seguente modo:``
+response.cookies['mycookie'] = 'somevalue'
+response.cookies['mycookie']['expires'] = 24 * 3600
+response.cookies['mycookie']['path'] = '/'
+``:code
+La seconda linea indica al browser di mantenere il cookie per 24 ore. La terza linea indica al browser di reinviare il cookie ad ogni applicazione del dominio corrente.
+
+I cookie possono essere resi sicuri con:
+``
+response.cookies['mycookie']['secure'] = True
+``:code
+
+Un cookie sicuro è rinviato solamente su una connessione HTTPS e non su una connessione HTTP.
+
+Il cookie può essere recuperato con:
+``
+if request.cookies.has_key('mycookie'):
+    value = request.cookies['mycookie'].value
+``:code
+
+A meno che le sessioni siano disabilitate web2py, automaticamente, imposta il seguente cookie e lo utilizza per gestire le sessioni:
+
+``
+response.cookies[response.session_id_name] = response.session_id
+response.cookies[response.session_id_name]['path'] = "/"
+``:code
+
+### L'applicazione **init**
+``init``:inxx
+
+Quando si installa web2py, si potrebbe volere un'applicazione di default, cioè l'applicazione che viene eseguita quando il path della URL è vuoto, come in:
+
+``
+http://127.0.0.1:8000
+``:code
+
+Per default, quando riceve un path vuoto web2py cerca un'applicazione chiamata **init**. Se l'applicazione init non è presente cerca un applicazione chiamata **welcome**.
+
+Ecco tre modi per impostare l'applicazione di default:
+- Chiamare l'applicazione che si vuole avere come default "init".
+- Creare un link simbolico da "applications/init" alla cartella dell'applicazione richiesta.
+- Usare la riscrittura delle URL come indicato nella prossima sezione.
+
+### Riscrittura delle URL 
+``url rewrite``:inxx
+``routes_in``:inxx
+``routes_out``:inxx
+
+web2py ha la capacità di riscrivere il path delle URL delle richieste entranti prima di chiamare l'azione di un controller (''mapping'') e allo stesso modo web2py può riscrivere il path delle URL generate dalla funzione ``URL`` (''reverse mapping''). Un motivo per voler fare questo è per la gestione di URL pre-esistenti o per semplificare i path e renderli più brevi.
+
+Per usare questa funzionalità si deve creare un nuovo file nella cartella "web2py" chiamato "routes.py" e definire due liste (o tuple) ``routes_in`` e ``routes_out`` contenenti delle tuple. Ogni tupla contiene due elementi, il pattern che deve essere sostituito e la stringa che lo sostituisce. Per esempio:
+``
+routes_in = (
+  ('/testme', '/examples/default/index'),
+)
+routes_out = (
+  ('/examples/default/index', '/testme'),
+)
+``:code
+
+Con questi instradamenti la URL:
+``
+http://127.0.0.1:8000/testme
+``:code
+
+è trasformata nella URL:
+``
+http://127.0.0.1:8000/examples/default/index
+``:code
+
+Per l'utente tutti i link alla pagina index sono ``/testme``.
+
+I pattern possono avere la stessa sintassi delle espressioni regolari di Python. Per esempio:
+``
+  ('.*\.php', '/init/default/index'),
+``:code
+
+indirizza tutte le URL che finiscono con ".php" alla pagina ``/init/default/index``.
+
+Nel caso che esista solo una applicazione potrebbe essere utile eliminare il nome dell'applicazione dalla URL. Questo può essere fatto con:
+
+``
+routes_in = (
+  ('/(?P<any>.*)', '/init/\g<any>'),
+)
+routes_out = (
+  ('/init/(?P<any>.*)', '/\g<any>'),
+)
+``:code
+
+Per gli instradamenti esiste una sintassi alternativa che può essere utilizzata insieme alle espressioni regolari: consiste nell'utilizzare ``name`` invece di ``(?P<name>[\w_]+)`` o ``\g<name>``. Per esempio:
+``
+routes_in = (
+  ('/$c/$f', '/init/$c/$f'),
+)
+
+routes_out = (
+  ('/init/$c/$f', '/$c/$f'),
+)
+``:code
+
+elimina il nome dell'applicazione in tutte le URL.
+
+Usando la notazione con il carattere ``$`` si può eseguire la mappatura automatica da ``routes_in`` a ``routes_out`` purchè non si utilizzino espressioni regolari. Per esempio:
+``
+routes_in = (
+  ('/$c/$f', '/init/$c/$f'),
+)
+
+routes_out = [(x, y) for (y, x) in routes_in]
+``:code
+
+In caso di instradamenti multipli viene eseguito il primo per il quale la URL soddisfa l'espressione regolare. Se nessun instradamento viene trovato il path rimane inalterato.
+
+E' possibile utilizzare ``$anything`` per indicare qualsiasi carattere fino alla fine della linea.
+
+Ecco un file "routes.py" minimale per gestire correttamente le richieste per ``favicon.ico`` e per ``robot.txt``:
+``favicon``:inxx ``robots``:inxx
+``
+routes_in = (
+  ('/favicon.ico', '/examples/static/favicon.ico'),
+  ('/robots.txt', '/examples/static/robots.txt'),
+)
+routes_out = ()
+``:code
+
+Questo è un esempio più complesso che espone una singola applicazione ("myapp") senza prefisso ma rende disponibili anche **admin**, **appadmin** e i file statici:
+
+``
+routes_in = (
+  ('/admin/$anything', '/admin/$anything'),
+  ('/static/$anything', '/myapp/static/$anything'),
+  ('/appadmin/$anything', '/myapp/appadmin/$anything'),
+  ('/favicon.ico', '/myapp/static/favicon.ico'),
+  ('/robots.txt', '/myapp/static/robots.txt'),
+)
+routes_out = [(x, y) for (y, x) in routes_in[:-2]]
+``:code
+
+La sintassi per gli instradamenti è più complessa di quella indicata nei semplici esempi visti finora. Ecco una esempio più generale e complesso:
+``
+routes_in = (
+ ('140\.191\.\d+\.\d+:https://www.web2py.com:POST /(?P<any>.*)\.php',
+  '/test/default/index?vars=\g<any>'),
+)
+``:code
+
+Questo esempio instrada le richieste ``https`` ``POST`` all'host ``www.web2py.com`` da un IP remoto che corrisponde alla seguente espressione regolare
+``
+140\.191\.\d+\.\d+
+``:code
+
+e che richiede una pagina che corrisponde alla seguente espressione
+
+``
+/(?P<any>.*)\.php!
+``:code
+
+in:
+``
+/test/default/index?vars=\g<any>
+``:code
+
+dove ``\g<any>`` è sostituito dal valore trovato dall'espressione regolare corrispondente.
+
+La sintassi generale è:
+
+``
+[remote address]:[protocol]://[host]:[method] [path]
+``:code
+
+Tutta la stringa è considerata un'espressione regolare, perciò il "." deve sempre essere codificato ed ogni sub-espressione trovata può essere catturata con "(?P<...>...)", secondo la sintassi di Python per le espressioni regolari.
+
+In questo modo è possibile reinstradare le richieste basandosi sull'indirizzo IP del client, sul dominio, sul tipo della richiesta, sul metodo e sul path. Inoltre è possibile mappare virtual host differenti su applicazioni differenti. Ogni sub-espressione trovata può essere usata per costruire la URL ed, eventualmente, passata come una variabile di tipo GET.
+
+Tutti i principali server web, come per esempio Apache e lighttpd, hanno la capacità di riscrivere le URL. In un ambiente di produzione è consigliato utilizzare direttamente tali funzionalità.
+
+### Instradamenti  degli errori
+``routes_on_error``:inxx
+
+E' possibile utilizzare "routes.py" per reinstradare gli utenti verso azioni speciali in caso di errore sul server. Questa regola può essere indicata globalmente, per ciascuna applicazione, per ogni codice di errore e per la combinazione di applicazione e codice d'errore. Ecco un esempio:
+``
+routes_onerror = [
+  ('init/400', '/init/default/login'),
+  ('init/*', '/init/static/fail.html'),
+  ('*/404', '/init/static/cantfind.html'),
+  ('*/*', '/init/error/index')
+]
+``:code
+
+Per ogni tupla la prima stringa è ricercata in "[appname]/[error code]". Se la stringa viene trovata l'utente è reindirizzato alla URL nella seconda stringa della tupla. Se web2py ha emesso un ticket per l'errore questo viene passato alla nuova URL come una variabile di tipo GET chiamata "ticket".
+
+Gli errori che non corrispondono a nessun instradamento vengono visualizzati in una pagina d'errore di default. Questa pagina può essere personalizzata:
+
+``
+error_message = '<html><body><h1>Invalid request</h1></body></html>'
+error_message_ticket = '''<html><body><h1>Internal error</h1>
+     Ticket issued: <a href="/admin/default/ticket/%(ticket)s"
+     target="_blank">%(ticket)s</a></body></html>'''
+``:code
+
+La prima variabile contiene il messaggio d'errore relativo alla richiesta di una applicazione non valida. La seconda variabile contiene il messaggio d'errore relativo all'emissione di un ticket.
+
+### Cron
+``cron``:inxx
+
+La funzionalità ''cron'' di web2py fornisce alle applicazioni la capacità di eseguire delle operazioni ad orari prefissati, in modo indipendente dalla piattaforma (Linux, Unix, Mac OS X, Windows) su cui web2py è in esecuzione.
+Per ogni applicazione questa funzionalità è definita dal file di crontab "app/cron/crontab" che segue la sintassi definita in ``cron``:cite (con alcune estensioni specifiche per web2py).
+
+Questo significa che ciascuna applicazione può avere una configurazione separata e che questa può essere cambiata dall'interno di web2py senza conseguenze sul Sistema Operativo.
+
+Ecco un esempio:
+``
+0-59/1  *  *  *  *  root python /path/to/python/script.py
+30      3  *  *  *  root *applications/admin/cron/db_vacuum.py
+*/30    *  *  *  *  root **applications/admin/cron/something.py
+@reboot root    *mycontroller/myfunction
+@hourly root    *applications/admin/cron/expire_sessions.py
+``:code
+
+Le ultime due linee dell'esempio precedente utilizzano delle estensioni alla sintassi standard di cron per fornire funzionalità aggiuntive di web2py. Il cron di web2py ha una sintsassi extra per supportare eventi specifici di web2py.
+
+Se il task (o lo script) è preceduto da un asterisco (*) e termina con ".py" sarà eseguito nell'ambiente runtime di web2py. Questo significa che saranno disponibili tutti i controller e i modelli. Se si utilizzano due asterischi (**) i modelli non saranno eseguiti. E' preferibile utilizzare questa seconda modalità in quanto ha meno sovraccarico nell'esecuzione e consente di evitare eventuali problemi di deadlock. Le funzioni eseguite all'interno dell'ambiente di runtime di web2py richiedono una esplicita chiamata alla funzione ``db.commit()`` per completare la transazione che altrimenti sarà annullata.
+
+web2py non genera ticket o traceback utili quando è usato in modalità ''shell'' (modalità nella quale sono eseguiti i task di cron). E' bene assicurarsi che il codice sia eseguito senza errori prima di utilizzarlo come un task automatizzato con cron, perchè è improbabile che possa essere controllato mentre è in esecuzione.
+Inoltre è bene fare attenzione nell'utilizzo dei modelli: poichè l'esecuzione avviene in un processo separato, devono essere considerati eventuali lock al database per evitare che le pagine web dell'applicazione attendano che il task sia completato. Per questo, se non è necessario utilizzare il modello nel task di cron è bene utilizzare la sintassi ** per eseguire il task.
+
+E' anche possibile eseguire una funzione di un controller. Non è necessario specificarne il path. Il controller e la funzione saranno quelli dell'applicazione in cui il cron è definito. Anche in questo caso è bene fare attenzione ai problemi sopra indicati. Per esempio:
+
+``
+*/30  *  *  *  *  root *mycontroller/myfunction
+``:code
+
+Se nel primo campo di una linea del file di crontab si specifica @reboot il task relativo sarà eseguito solo una volta all'avvio di web2py. Questa caratteristica può essere utilizzata per precaricare, controllare od inizializzare dati all'avvio dell'applicazione. Poichè i task di cron sono eseguiti contemporaneamente all'applicazione in caso che l'applicazione debba aspettare il completamento del task per funzionare correttamente dovranno essere implementati gli opportuni controlli. Per esempio:
+``
+@reboot  *  *  *  *  root *mycontroller/myfunction
+``:code
+
+A seconda di come viene eseguito web2py sono disponibili quattro modalità di operazione per il cron:
+- ''Soft cron'': disponibile in tutte le modalità d'esecuzione di web2py
+- ''Hard cron'': disponibile se si usa il server web interno di web2py (sia direttamente che tramite il modulo mod_proxy di Apache)
+- ''External cron'': disponibile se si ha accesso al servizio cron del Sistema Operativo
+- Nessun cron
+
+Il default è ''hard cron'' se si sta utilizzando il server web interno, in tutti gli alri casi il default è ''soft cron''.
+
+''soft cron'' è il default anche se si sta usando CGI, FASTCGI o WSGI. I task indicati nel file di cron saranno eseguiti alla prima chiamata (caricamento di una pagina) a web2py dopo che sarà scaduto il tempo specificato nel crontab (ma successivamente al caricamento della pagina stessa, in modo che non vi siano ritardi per l'utente). Ovviamente in questo modo l'effettiva esecuzione del task dipende dal traffico che il sito riceve. Inoltre il task può essere interrotto se il server web ha impostato un timeout per il caricamento delle pagine. Se queste limitazioni non sono accettabili si può utilizzare ''external cron''. ''Soft cron'' è un compromesso ragionevole ma se il server web mette a disposizioni altri metodi di cron questi dovrebbero essere preferiti.
+
+''Hard cron'' è il default se si utilizza il server web interno (anche tramite mod_proxy). ''Hard cron'' è eseguito in un thread parallelo e pertanto non ha limitazioni riguardo la precisione dei tempi di esecuzione.
+
+
+''External cron'' non è automaticamente usato in nessun caso perchè richiede l'accesso al cron di sistema. Viene eseguito in un processo parallelo quindi le limitazioni del ''soft cron'' non sono presenti. Questo è il modo raccomandato per utilizzare il cron con WSGI o FASTCGI.
+Ecco un esempio della linea da aggiungere alla crontab di sistema (solitamente /etc/crontab):
+``
+0-59/1 * * * * web2py cd /var/www/web2py/ && python web2py.py -C -D 1 >> /tmp/cron.output 2>&1
+``:code
+
+Se si utilizza ''external cron'' assicurarsi che web2py sia avviato con il parametro -N in modo da non avere collisioni con altri tipi di cron.
+
+Se non è necessaria nessuna funzionalità legata a cron questo può essere disabilitato con il parametro -N durante l'avvio di web2py. La disabilitazione di cron potrebbe disattivare anche alcuni task di manutenzione (come la pulizia automatica delle cartelle delle sessioni). L'utilizzo più comune di questo parametro si ha nel caso che si utilizzi ''external cron'' oppure si voglia eseguire il debug dell'applicazione senza nessuna interferenza da parte di cron.
+
+### Processi in backgroup e code dei task
+
+Sebbene cron sia utile per eseguire task ad intervalli regolari non è sempre la soluzione migliore per eseguire un processo in backgroud. Per questo specifico compito web2py mette a disposizione la possibilità di eseguire qualsiasi script di Python come se fosse eseguito dall'interno di un controller:
+``
+python web2py.py -S app -M -N -R applications/app/private/myscript.py -A a b c
+``:code
+
+dove ``-S app`` indica a web2py di eseguire "myscript.py nell'applicazion "app", ``-M`` indica a web2py di eseguire i modelli, ``-N`` indica a web2py di nono eseguire cron e ``-A a b c`` passa per parametri opzionali della linea di comando a "myscript.py" (come ``sys.args=['a','b','c']``).
+
+Un tipico caso d'utilizzo consiste nel processare una coda:
+
+con il modello
+``
+db.define_table('queue',
+    Field('status'),
+    Field('email'),
+    Field('subject'),
+    Field('message'))
+``:code
+
+ed una applicazione che accoda i messaggi da inviare con 
+``
+db.queue.insert(status='pending',
+                email='you@example.com',
+                subject='test',
+                message='test')
+``:code
+Il processo in background che invia le email potrebbe essere il seguente script:
+
+``
+## in file myscript.py
+import time
+while True:
+    rows = db(db.queue.status=='pending').select()
+    for row in rows:
+        if mail.send(to=row.email,
+            subject=row.subject,
+            message=row.message):
+            row.update_record(status='sent')
+        else:
+            row.update_record(status='failed')
+        db.commit()
+    time.sleep(60) # check every minute
+``:code
+
+L'oggetto ``mail`` è definito nel file ``db.py`` dell'applicazione di base ed è accessibile perchè web2py è stato avviato con l'opzione ``-M``. Il file ``db.py`` dovrebbe essere configurato per funzionare correttamente. Inoltre è importane completare le transazioni prima possibile per non bloccare il database che potrebbe essere acceduto da altri processi concorrenti.
+
+Un processo di questo tipo, funzionante in background, non deve essere eseguito via cron (tranne nel caso di @reboot) perchè non dovrebbe esserci più di una sua istanza in esecuzione. Se si esegue con cron è possibile che il processo sia ancora attivo quando cron, alla successiva iterazione, lo rilancia causando così problemi nella gestione della coda.
+
+### Moduli di terze parti
+``import``:inxx ``local_import``:inxx
+
+web2py è scritto in Python e quindi può importare ed utlizzare qualsiasi modulo Python, inclusi moduli di terze parti. web2py deve solamente essere in grado di importarli.
+
+I moduli possono essere installati nella cartella ufficiale di Python "site-packages" o in un qualsiasi altra posizione in cui l'applicazione possa trovarli.
+
+I moduli nella cartella "site-packages" sono disponibili globalmente. Le applicazioni che richiedono moduli installati in site-packages non sono portabili a meno di installare i tali moduli separatamente. Il vantaggio di installare i moduli in "site-packages" è che più applicazioni possono utilizzarli. Per esempio il package di disegno chiamato "matplotlib" può essere installato dalla shell utilizzando il comand PEAK ``easy_install``:
+``
+easy_install py-matplotlib
+``:code
+
+e può essere importato in ogni modello, vista o controller con:
+``
+import matplotlib
+``:code
+la distribuzione binaria di web2py per Windows ha la cartella "site-packages" al primo livello. La distribuzione binaria per Mac ha la cartella "site-packages" in:
+
+``web2py.app/Contents/Resources/site-packages``:code
+
+I moduli possono essere installati localmente utilizzando la cartella "modules" di ogni applicazione. Il vantaggio di tale modalità è che i moduli saranno automaticamente copiati e distribuiti con l'applicazione sebbene non disponibili globalmente a tutte le applicazioni Python. 
+
+web2py dispone anche di una funzione "local_import". Ecco come si deve usare:
+
+``
+mymodule = local_import(mymodule)
+``:code
+
+Questa funzione ricerca "mymodule" nella cartella "modules" dell'applicazione e importa il modulo con il nome indicato a sinistra del carattere di assegnazione.
+
+Questa funzione richiede tre argomenti: ``name``, ``reload`` ed ``app``. Quando si specifica ``reload=True`` il modulo sarà reimportato ad ogni richiesta, altrimenti il processo Python lo importerà una volta sola. Il default è ``reload=False``. ``app`` è il nome dell'applicazione da cui importare il modulo e ha come default l'applicazione corrente (indicata in ``request.application``).
+
+Il motivo dell'esistenza di questa funzione è che poichè un server potrebbe eseguire diverse istanze di web2py non è agevole aggiungere a ``sys.path`` i diversi path dei moduli la cui ricerca diventerebbe dipendente dal loro ordine in ``sys.path``.
+
+### L'ambiente d'esecuzione
+``exec_environment``:inxx
+
+-----
+Sebbene tutto quello che è stato appena discusso funzioni correttamente è bene costruire le applicazioni utilizzando i componenti, come descritto nel capitolo 13.
+-----
+
+I file di modello e i controller di web2py non sono moduli Python standard poichè non possono essere importati con il comando ``import`` di Python. Questo perchè i modelli e i controller sono progettati per essere eseguiti in un ambiente appositamente preparato da web2py che è stato pre-popolato con alcuni oggetti globali (request, response, session, cache e T) ed alcune funzioni ausiliarie. Questo è necessario perchè Python è un linguaggio con uno ''scope'' (ambito di validità) statico, mentre l'ambiente di web2py è creato dinamicamente.
+
+web2py mette a disposizione la funzione ``exec_environment`` per consentire l'accesso diretto ai modelli e ai controller. ``exec_environment`` crea un ambiente d'esecuzione di web2py, carica il file all'interno di quell'ambiente e ritorna un oggetto di tipo ``Storage`` che contiene l'ambiente appena creato e che serve anche come ''namespace''.
+Qualsiasi file Python progettato per essere eseguito nell'ambiente di esecuzione di web2py può essere caricato usando ``exec_environment``. I possibili utilizzi di ``exec_environment`` includono:
+- Accedere ai dati (modelli) da altre applicazioni.
+- Accedere ad oggetti globali da altri modelli o controller.
+- Eseguire le funzioni di un controller dall'interno di un altro controller.
+- Caricare librerie ausiliarie globali.
+
+Questo esempio legge le righe dalla tabella ``user`` nell'applicazione ``cas``:
+``
+from gluon.shell import exec_environment
+cas = exec_environment('applications/cas/models/db.py')
+rows = cas.db().select(cas.db.user.ALL)
+``:code
+
+Un altro esempio:
+
+se il controller "other.py" contiene la funzione:
+``
+def some_action():
+    return dict(remote_addr=request.env.remote_addr)
+``:code
+Questa azione può essere chiamata da un altro controller (o dalla shell di web2py) con:
+
+``
+from gluon.shell import exec_environment
+other = exec_environment('applications/app/controllers/other.py', request=request)
+result = other.some_action()
+``:code
+
+Nella linea 2 ``request=request`` è opzionale. Ha l'effetto di passare la richiesta corrente all'ambiente di esecuzione di "other". Senza questo argomento l'ambiente conterrebbe un nuovo oggetto request vuoto (tranne che per ``request.folder``). E' anche possibile passare un oggetto ``response`` e un oggetto ``session`` ad ``exec_environment``. Fare attenzione quando si passano gli oggetti ``request``, ``response`` e ``session`` perchè eventuali modifiche eseguite dall'azione chiamata o da altre dipendenze nell'azione chiamata potrebbero avere effetti collaterali inaspettati.
+
+La chiamata alla funzione nella linea 3 non esegue la vista ma ritorna solamente il dizionario a meno che ``response.render`` è chiamato esplicitamente in "some_action".
+
+Un'avvertenza finale: non usare ``exec_environment`` in modo non appropriato. Se si vuole utilizzare il risultato di un'azione in un'altra applicazione probabilmente si dovrebbe implementare una API XML-RPC (implementare una API XML-RPC in Python è quasi banale). Non si deve usare ``exec_environment`` come meccanismo di redirezione, per questo è disponibile la funzione ausiliaria ``redirect``.
+
+### Cooperazione
+``cooperation``:inxx
+
+Ci sono diversi modi in cui le applicazioni possono cooperare:
+- Le applicazioni possono connettersi allo stesso database e condividerne le tabelle. Non è necessario che tutte le tabelle del database siano definite in tutte le applicazioni, è sufficiente che siano definite dalle applicazioni che le utilizzano. Tutte le applicazioni, tranne una, che usano la stessa tabella devono definire le tabelle con ``migrate=False``.
+- Le applicazioni possono includere componenti da altre azioni utilizzando la funzione ausiliaria ``LOAD`` (descritta nel capitolo 13).
+- Le applicazioni possono condividere le sessioni.
+- Un'applicazione può chiamare l'azione di un altra applicazione remotamente con XML-RPC.
+- Un'applicazione può accedere ai file di un'altra applicazione tramite il filesystem (se risiedono sullo stesso filesystem).
+- Un'applicazione può chiamare le azioni di un'altra applicazione localmente utilizzando ``exec_environment`` come discusso più sopra.
+- Un'applicazione può importare i moduli di un'altra applicazione utilizzando la sintassi:
+- Le applicazioni possono importare qualsiasi modulo raggiungibile dal path di ricerca in ``PYTHONPATH``, ``sys.path``.
+- Un'applicazione può caricare la sessione di un'altra applicazione con il comando:
+
+``
+session.connect(request, response, masterapp='appname', db=db)
+``:code
+
+Qui "appname" è il nome dell'applicazione ''master'', quella che imposta il valore iniziale di ``session_id`` nel cookie. ``db`` è la connessione al database che contiene la tabella delle sessioni (``web2py_session``). Tutte le applicazioni che condividono le sessioni devono utilizzare lo stesso database per memorizzarle.
+
+Un'applicazione può caricare un modulo da un'altra applicazione con:
+
+``
+othermodule = local_import('othermodule',app='otherapp')
+``:code
+
+-------
+Se la funzione di un modulo ha bisogno di accedere ad uno degli oggetti globali (``request``, ``response``, ``session``, ``cache`` e ``T``), l'oggetto deve essere esplicitamente passato alla funzione. Non deve essere consentito al modulo di creare un'altra istanza dell'oggetto globale altrimenti la funzione si comporterà in modo inaspettato.
+-------
+
+### WSGI
+``WSGI``:inxx
+
+web2py e WSGI hanno una relazione di amore-odio. La prospettiva degli sviluppatori di web2py nell'utilizzo di WSGI è che questo sia stato sviluppato per essere un protocollo portabile di connessione tra il server web e le applicazioni Python e quindi è utilizzato con questo obiettivo. La parte più interna di web2py è un'applicazione WSGI: ``gluon.main.wsgibase``. Alcuni sviluppatori hanno spinto questa idea al limite e utlizzano WSGI come un protocollo per comunicazioni ''middleware'', sviluppando le applicazioni web come una "cipolla" con molti strati (in cui ogni strato è un middleware WSGI sviluppato indipendentemente dall'intero framework). web2py non adotta questa struttura internamente. Questo perchè le funzionalità centrali di un framework (gestione dei cookie, delle sessioni, degli errori, delle transazioni, dispatching) possono essere meglio ottimizzate per la velocità e la sicurezza se sono gestite da un unico strato che le raccoglie tutte.
+
+web2py consente comunque di utilizzare applicazioni WSGI di terze parti in tre modi diversi (incluse le loro combinazioni):
+- E' possibile modificare il file "wsgihandler.py" ed includere qualsiasi middleware WSGI di terze parti.
+- E' possibile connettere middleware WSGI di terze parti a qualsiasi azione di un'applicazione.
+- E' possibile chiamare un'applicazione WSGI da qualsiasi azione di un'applicazione.
+
+L'unica limitazione è che non è possibile utilizzare middleware di terze parti per sostituire le funzioni centrali di web2py.
+
+#### Middleware esterno
+
+Con il seguente file "wsgibase.py":
+``
+#...
+LOGGING = False
+#...
+if LOGGING:
+    application = gluon.main.appfactory(wsgiapp=gluon.main.wsgibase,
+                                        logfilename='httpserver.log',
+                                        profilerfilename=None)
+else:
+    application = gluon.main.wsgibase
+``:code
+
+quando LOGGING è impostato a ``True``, ``gluon.main.wsgibase`` è incluso nella funzione middleware e fornisce il logging nel file "httpserver.log". Allo stesso modo si può aggiungere qualsiasi middleware di terze parti. Riferirsi alla documentazione ufficiale di WSGI per ulteriori dettagli.
+
+#### Middleware interno
+
+Per qualsiasi azione (per esempio ``index``) in un controller e con un'applicazione middleware di terze parti (per esempio ``MyMiddelware`` che converte l'output in maiuscolo) si può usare un decoratore di web2py per applicare il middleware all'azione. Ecco l'esempio:
+
+``
+class MyMiddleware:
+    """converts output to upper case"""
+    def __init__(self,app):
+        self.app = app
+    def __call__(self,environ, start_response):
+        items = self.app(environ, start_response)
+        return [item.upper() for item in items]
+
+@request.wsgi.middleware(MyMiddleware)
+def index():
+    return 'hello world'
+``:code
+
+Non è possibile garantire che tutte le applicazioni middleware di terze parti funzionino con questo meccanismo.
+
+#### Chiamare le applicazioni WSGI
+
+E' facile chiamare un'applicazione WSGI da un'azione di un controller di web2py. Ecco un esempio:
+``
+def test_wsgi_app(environ, start_response):
+    """this is a test WSGI app"""
+    status = '200 OK'
+    response_headers = [('Content-type','text/plain'),
+                        ('Content-Length','13')]
+    start_response(status, response_headers)
+    return ['hello world!\n']
+
+def index():
+    """a test action that call the previous app and escapes output"""
+    items = test_wsgi_app(request.wsgi.environ,
+                          request.wsgi.start_response)
+    for item in items:
+        response.write(item,escape=False)
+    return response.body.getvalue()
+``:code
+
+In questo caso l'azione ``index`` richiama ``test_wsgi_app`` e codifica i valori ritornati prima di ritornarli a sua volta. Poichè ``index`` non è un'applicazione WSGI deve utilizzare le normali API di web2py (come per esempio ``response.write`` per scrivere nel socket).

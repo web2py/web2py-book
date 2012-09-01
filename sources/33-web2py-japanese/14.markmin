@@ -1,0 +1,512 @@
+## その他のレシピ
+
+### アップグレード
+``upgrades``:inxx
+
+管理者インターフェースの"site"ページには、"update now"があります。実行できないか、動作しない場合 (例えば、ファイルロック問題のため)、web2pyの手動アップデートはとても簡単です。
+
+-------
+単に、新しいweb2pyを古いインストレーションへ解凍するだけです。
+-------
+
+**admin**, **examples**, **welcome**アプリケーションだけでなくライブラリも全てアプグレードします。それは、新しい空の"NEWINSTALL"ファイルを生成します。再起動時に、web2pyは、空のファイルを消去し、welcomeアプリケーションは、新しい雛形アプリケーションとして使われる"welcome.w2p" の中に格納されます。
+
+web2pyは、他のファイルや既存のアプリケーションをアップグレードしません。
+
+### バイナリでアプリケーションを配布する方法
+
+web2pyのバイナリ形式の配布と一緒に独自のアプリケーションを同梱し配布できます。web2pyをバンドルしている事をアプリケーションのライセンスに明確に記載している事、そして``web2py.com``へのリンクを追記していれば、web2pyのライセンスはこれを許可します。
+
+ここにWindows用の配布方法を説明します:
+
+- いつも通りあなたのアプリを製作
+- **admin**を使い、アプリケーションをバイトコードにコンパイル (1クリック)
+- **admin**を使い、コンパイル済みアプリケーションをパック (もう1クリック)
+- "myapp"フォルダを生成
+- Windows用のweb2pyバイナリ配布をダウンロード
+- それを"myapp"フォルダに解凍し、起動 (2クリック)
+- **admin**を使いパックされたコンパイル済みアプリケーション名"init"をアップロード (1クリック)
+- "cd web2py; web2py.exe"と書かれた"myapp/start.bat"ファイルを作成
+- あなたのアプリケーション用のライセンスと、"distributed with an unmodified copy of web2py from web2py.com"である明言に念を押させることを含んだ"myapp/license"ファイルを作成
+- myappフォルダを"myapp.zip"ファイルに圧縮
+- "myapp.zip"を配布及び/または販売
+
+ユーザーが"myapp.zip"を解凍し"run"をクリックしたときに、"welcome"アプリケーションの代わりにあなたのアプリケーションが起動します。ユーザーは事前にPythonをインストールする必要さえありません。
+
+Mac用のバイナリを生成する過程も同じですが、"bat"ファイルは要りません。
+
+### web2pyの最小構成
+
+web2pyをとても小さなメモリ量でデプロイする場合があります。その場合は余分なものをそぎ落とし最小構成にしたいです。
+
+次に簡単な方法を示します:
+- プロダクトマシン上にweb2pyをソースからインストール
+- メインweb2pyフォルダ内で次のコマンドを実行
+``
+python scripts/make_min_web2py.py /path/to/minweb2py
+``
+- 次にデプロイしたいアプリケーションを"/path/to/minweb2py/applications"内にコピー
+- "/path/to/minweb2py"を小さなメモリ量のサーバとしてデプロイ
+
+この"make_min_web2py.py"スクリプトは、次の物を含まない最小構成のweb2pyディストリビューションを構築します: 
+- admin
+- examples
+- welcome
+- scripts
+- 稼働に不必要なcontribモジュール
+
+デプロイテスト用の1つのファイルから成る"welcome"アプリを含んでいます。このスクリプトを見てください。一番上に、何を含み何が含まれていないかの詳細なリストが書かれています。
+
+### 外部URLをフェッチ
+``fetch``:inxx
+
+Pythonには、URLフェッチするためのライブラリ``urllib``が同梱されています:
+``
+import urllib
+page = urllib.urlopen('http://www.web2py.com').read()
+``:code
+
+``API``:inxx
+
+通常は問題ないですが、``urllib``モジュールは、Google App Engine上では動作しません。Googleは、GAE用に、URLをダウンロードするための異なるAPIを提供します。あなたのコードを移植しやすくするために、web2pyは、他のPython環境だけでなくGAEでも動く``fetch``関数を同梱しています:
+
+``
+from google.tools import fetch
+page = fetch('http://www.web2py.com')
+``:code
+
+### 便利な日時表現(Pretty dates)
+``prettydate``:inxx
+
+日付を"2009-07-25 14:34:56"と表記するのではなく、"one years ago"と表記したほうが良い場合があります。このために、web2pyは便利な関数を提供します:
+
+``
+import datetime
+d = datetime.datetime(2009,7,25,14,34,56)
+from gluon.tools import prettydate
+pretty_d = prettydate(d,T)
+``:code
+
+出力結果の国際化対応のために第2引数 (T) が渡される必要があります。
+
+### ジオコーディング
+``geocode``:inxx
+
+住所(例: "243 S Wabash Ave, Chicago, IL, USA")を地理座標(緯度と経度)に変換する必要がある場合、web2pyはそのように動作する関数を提供します。
+
+``
+from gluon.tools import geocode
+address = '243 S Wabash Ave, Chicago, IL, USA'
+(latitude, longitude) = geocode(address)
+``:code
+
+``geocode``関数はネットワーク接続が必要で、ジオコーディング用の Google geocodingサービスに接続します。関数は失敗した場合に``(0,0)``を返します。Google geocodingサービスはリクエスト回数に上限を定めることに注意し、それらのサービス同意書を確認すべきです。``geocode``関数は``fetch``関数上で実装されているためGAEでも動作します。
+
+### ページネーション
+``pagination``:inxx
+
+このレシピは、ページネーション時にデータベースアクセスを最小化することに役立つ技術です。例えば、データベースから行のリストを表示する必要があるが複数のページにまたがる場合です。
+
+まず、データベースに1000個の素数を1番目から格納する**primes**アプリケーションを製作することから始めましょう。
+
+``db.py``モデル:
+Here is the model ``db.py``:
+``
+db = DAL('sqlite://primes.db')
+db.define_table('prime',Field('value','integer'))
+def isprime(p):
+    for i in range(2,p):
+        if p%i==0: return False
+    return True
+if len(db().select(db.prime.id))==0:
+   p=2
+   for i in range(1000):
+       while not isprime(p): p+=1
+       db.prime.insert(value=p)
+       p+=1
+``:code
+
+そしてこのように、"default.py"コントローラにデータベースを読む``list_item``アクションを作ります:
+
+``
+def list_items():
+    if len(request.args): page=int(request.args[0])
+    else: page=0
+    items_per_page=20
+    limitby=(page*items_per_page,(page+1)*items_per_page+1)
+    rows=db().select(db.prime.ALL,limitby=limitby)
+    return dict(rows=rows,page=page,items_per_page=items_per_page)
+``:code
+
+このコードは必要な個数より1つ多いアイテムを選択することに注意してください(20+1)。範囲外の要素は次のページがあるかどうかを示します。
+
+"default/list_items.html"　ビュー:
+``
+{{extend 'layout.html'}}
+
+{{for i,row in enumerate(rows):}}
+{{if i==items_per_page: break}}
+{{=row.value}}<br />
+{{pass}}
+
+{{if page:}}
+<a href="{{=URL(args=[page-1])}}">previous</a>
+{{pass}}
+
+{{if len(rows)>items_per_page:}}
+<a href="{{=URL(args=[page+1])}}">next</a>
+{{pass}}
+``:code
+
+この方法で処理ごとに1つの選択でページネーションができ、1つの選択だけで必要な行だけを選んでくれます。
+
+### httpserver.logとログファイルフォーマット
+``httpserver.log``:inxx
+
+web2pyのwebサーバーはファイルへのリクエストをweb2pyのルートディレクトに置かれている:
+
+``
+httpserver.log
+``:code
+
+へ全て記録します。ファイル名やロケーションをweb2pyのコマンドラインオプションを使い指定できます。
+
+新しいエントリーは、リクエストが処理されるたびにファイル末尾へ追加されます。それぞれの行はこのようになります:
+``
+127.0.0.1, 2008-01-12 10:41:20, GET, /admin/default/site, HTTP/1.1, 200, 0.270000
+``:code
+
+フォーマットは:
+``
+ip, timestamp, method, path, protocol, status, time_taken
+``:code
+
+各要素について
+- ipはリクエストしてきたクライアントのIPアドレス
+- timestampはリクエストの日付と時間、ISO8601フォーマット(YYYY-MM-DDT HH:MM:SS)で記述
+- methodはPOSTかGETのどちらか
+- pathはクライアントがリクエストしたパス
+- protocolはクライアントへの送信に使用されたHTTPプロトコル、たいていはHTTP/1.1
+- ``status``:citeはHTTPのステータスコード91
+- time_takenはサーバーがリクエストプロセスに掛けた時間の統計、単位は秒、アップロード/ダウンロードにかかる時間は含まれません
+
+アプリケーションのリポジトリ``appliances``:citeから、ログ解析のアプリケーションを利用できます。
+
+このログは、mod_wsgi使用時はApacheログと同じになるため、デフォルトでは有効になりません。
+
+### ダミーデータをデータベースに登録
+
+テスト用にダミーデータをデータベーステーブルに登録できれば便利です。この目的に合う読解可能なダミーテキスを学習させたベイズ分類器を、web2pyはすでに含んでいます。
+
+簡単な使い方:
+``
+from gluon.contrib.populate import populate
+populate(db.mytable,100)
+``:code
+
+100個のダミーレコードをdb.mytableに挿入します。stringフィールド用の短文、textフィールド用の長文、integer、double、date、datetime、time、boolean、その他のフィールドを知的に生成します。バリデータで指定された必要条件を尊重しようとします。フィールドに単語"name"が含まれているとダミーの名前を生成しようとします。リファレンスフィールドにより妥当なリファレンスを生成します。
+
+もしBがAを参照する2つのテーブル(AとB)があるとき、Aから先に登録し、次にBを登録します。
+
+登録作業はトランザクションで実行されるので、とりわけリファレンスが含まれる場合は一度にたくさんのレコードを登録しようとしないでください。その代わりに、100個ずつの登録を、コミット、ループすることを推奨します。
+``
+for i in range(10):
+    populate(db.mytable,100)
+    db.commit()
+``:code
+
+ベイズ分類器にいくつかの文章を学習させ、学習データと似ているが無意味なダミーテキストを生成できます。
+``
+from gluon.contrib.populate import Learner, IUP
+ell=Learner()
+ell.learn('some very long input text ...')
+print ell.generate(1000,prefix=None)
+``:code
+
+### クレジットカード払いの承認
+
+``Google Wallet``:inxx ``Paypal``:inxx ``Stripe.com``:inxx
+``Authorize.net``:inxx ``DowCommerce``:inxx
+
+オンラインでのクレジットカードを認証する多様な方法があります。web2pyは、いくつかの有名で実践的なAPIを提供します:
+
+- Google Wallet ``googlewallet``:cite
+- PayPal ``paypal``cite
+- Stripe.com ``stripe``:cite
+- Authorize.net ``authorizenet``:cite
+- DowCommerece ``dowcommerce``:cite
+
+
+最初2つの仕組みは外部のサービスへの受け取り人を証明するプロセスを上層に委任します。これがセキュリティにとって最良の方法であると同時に(あなたのアプリケーションは全てにおいてクレジットカード情報を取り扱わない)、それは面倒なプロセス(ユーザーは2回ログインする必要がある;例えば、1度目はあなたのアプリケーション、もう1回はGoogleに)を生成しあなたのアプリケーションが自動化された方法で繰り返し支払処理するのを許可しません。
+
+さらなるコントロールが必要な時や自作のクレジットカード情報の入力フォームを生成したい時、すなわち、プログラムがクレジットカードからあなたのアカウントへ送金するための処理を依頼する時があります。
+
+このためweb2pyはStrip、Authorize.Net(モジュールはJohn Condeによって開発され若干修正されています)、DownCommerceとの統合を既定で提供しています。Stripeは最も簡単に使え、低額の売買なら安くすみます(使用料は固定額ではなく取引価格の約3%)。Authorize.netは高額の取引向けです(1年間の定額の使用料が掛かり、加えて1回の取引に安い使用料が掛かります)。
+
+StripeとAuthorize.netの場合、あなたのプログラムがクレジットカード情報を承認することを覚えておいてください。クレジットカード情報を記録する必要はありませんし、我々は法的必要条件が関係するため(VisaやMastercardで取引する場合)あなたにそうすべきでないとアドバイスしますが、何回も会計をしたりAmazon one-clickボタンを再現するためにクレジットカード情報を記録したい場合もあります。
+
+#### Google Wallet
+
+Google Wallet(Level 1)を簡単に使用する一番の方法は、あなたのページにボタンを埋め込み、そのボタンをクリック時に訪問者をGoogleから提供されている支払いページへリダイレクトする方法です。
+
+まず始めに、あなたはこのURLでGoogle Merchant Accountに登録する必要があります:
+
+``
+https://checkout.google.com/sell
+``
+
+Googleにあなたの銀行口座情報を提供する必要があります。Googleはあなたに``merchant_id``と``merchant_key``を割り当てます(これらを紛失せず、極秘で保管しておいてください)。
+
+そして、ビューに次のコードを記述します:
+
+``
+{{from gluon.contrib.google_wallet import button}}
+{{=button(merchant_id="123456789012345",
+           products=[dict(name="shoes",
+                          quantity=1,
+                          price=23.5,
+                          currency='USD',
+                          description="running shoes black")])}}
+``
+
+ボタンをクリック時に訪問者は、商品の支払いが可能なGoogleのページへリダイレクトされます。ここでのproductsは製品のリストであり、各製品はあなたが精算したいアイテムを記述したディクショナリ型のパラメータです(name, quantity, price, currency, descriptionや他のオプションの説明はGoogle Walletドキュメントを見てください)。
+
+この仕組みを使用する場合、在庫状況や訪問者のショッピングカートに基づき、buttonへ渡す値をプログラムで生成することもできます。
+
+全ての税金と配送情報はGoogle側で取り扱われます。支払情報も同様です。デフォルトだとあなたのアプリケーションに取引完了されたことは通知されないため、Google Merchantサイトににアクセスし、どの製品が購入され、支払いがされ、どの製品を購入者に届けるべきかを確認する必要があります。Googleはこれらの情報を電子メールでもあなたに知らせてくれます。
+
+しっかりと統合されたものが欲しい時には、Level 2 notification APIを使用するべきです。これを使用した場合、Googleへさらに多くの情報を渡すことができ、Googleは製品購入を通知するためにあなたのAPIを呼びます。このことは、あなたに支払情報をアプリケーション内に保持することを許可しますが、Google Walletと通信可能なWebサービスを公開することをあなたに要求します。
+
+これは難しい処理ですが、そのようなAPIはすでに実装されており、次のURLにプラグインとして公開されています。
+
+``
+http://web2py.com/plugins/static/web2py.plugin.google_checkout.w2p
+``
+
+ドキュメントはプラグイン自身に書かれています。
+
+#### Paypal
+
+Paypalの統合について、ここでは説明しませんが、このリソースにたくさんの情報があります:
+
+``
+http://www.web2pyslices.com/main/slices/take_slice/9
+``
+
+#### Stripe.com
+
+これはおそらく最も簡単な方法の1つであり、クレジットカード払いを許可する柔軟な方法です。
+
+Stripe.comに登録する必要がありますが、とても簡単です。実際、Stripはテスト用のAPIキーを認証情報を作成する以前に割り当ててくれます。
+
+一度APIキーを取得しさえすれば、次のコードでクレジットカードを受け付けることができます:
+
+``
+from gluon.contrib.stripe import Stripe
+stripe = Stripe(api_key)
+d = stripe.charge(amount=100,
+	      currency='usd',
+              card_number='4242424242424242',
+              card_exp_month='5',
+              card_exp_year='2012',
+              card_cvc_check='123',
+              description='the usual black shoes')
+if d.get('paid',False):
+    # payment accepted
+elif:
+    # error is in d.get('error','unknown')
+``
+
+レスポンス``d``はディクショナリ型ですので詳細は自分で確認してみてください。例で使われているカード番号はサンドボックスであり、いつも成功します。それぞれの取引は``d['id']``に格納されたトランザクションIDに関連付けられます。
+
+Stripeは後から取引を照合することもできます:
+
+``
+d = Stripe(key).check(d['id'])
+``
+
+そして取引を返金できます:
+
+``
+r = Stripe(key).refund(d['id'])
+if r.get('refunded',False):
+    # refund was successful
+elif:
+    # error is in d.get('error','unkown')
+``
+
+Stripeでアプリケーション内に支払情報を簡単に保持できます。
+
+アプリとStripe間の全ての通信はRESTfulWebサービス上で行われます。Stripeは実際多くのサービスを公開しており、巨大なPython APIセットを提供しています。Stripeのサイトには、よりたくさんの情報があります。
+
+#### Authorize.Net
+
+もう1つの簡単にクレジットカード承認の方法としてAuthorize.netがあります。いつもどおりあなたは登録する必要があり、``login``とトランザクションキー(``transaction``)を取得します。一度、それらを取得すると、Stripeの様に動作します:
+Another simple way to accept credit cards is to use Authorize.Net. As usual you need to register and you will obtain a ``login`` and a transaction key (``transkey``. Once you have them it works very much like Stripe does:
+
+``
+from gluon.contrib.AuthorizeNet import process
+if process(creditcard='4427802641004797',
+           expiration="122012,
+           total=100.0,cvv='123',tax=None,invoice=None,
+           login='cnpdev4289', transkey='SR2P8g4jdEn7vFLQ',testmode=True):
+   # payment was processed
+else:
+   # payment was rejected
+``:code
+
+もし有効なAuthorize.Netのアカウントを持っているなら、サンドボックス用の``login``と``transkey``をあなたのアカウントに置き換え、サンドボックスの代わりに本番のプラットフォーム上で動作させるため``testmode=False``に設定すべきです。そうすることで訪問者のクレジットカード情報を扱えます。
+
+もし、``process``が``True``を返却したら、訪問者のクレジットカードからあなたのAuthorize.Netアカウントへ送金されたことになります。あなたのプリケーション内でデータと情報を一致させるために、``invoice``は、あなたが設定できる文字列であり、このトランザクションでAuthorize.Netにより保持されます。
+
+次のコードは、今までより複雑な、より多くの変数を扱うワークフローの例です:
+``
+from gluon.contrib.AuthorizeNet import AIM
+payment = AIM(login='cnpdev4289',
+              transkey='SR2P8g4jdEn7vFLQ',
+              testmod=True)
+payment.setTransaction(creditcard, expiration, total, cvv, tax, invoice)
+payment.setParameter('x_duplicate_window', 180) # three minutes duplicate windows
+payment.setParameter('x_cust_id', '1324')       # customer ID
+payment.setParameter('x_first_name', 'Agent')
+payment.setParameter('x_last_name', 'Smith')
+payment.setParameter('x_company', 'Test Company')
+payment.setParameter('x_address', '1234 Main Street')
+payment.setParameter('x_city', 'Townsville')
+payment.setParameter('x_state', 'NJ')
+payment.setParameter('x_zip', '12345')
+payment.setParameter('x_country', 'US')
+payment.setParameter('x_phone', '800-555-1234')
+payment.setParameter('x_description', 'Test Transaction')
+payment.setParameter('x_customer_ip', socket.gethostbyname(socket.gethostname()))
+payment.setParameter('x_email', 'you@example.com')
+payment.setParameter('x_email_customer', False)
+
+payment.process()
+if payment.isApproved():
+    print 'Response Code: ', payment.response.ResponseCode
+    print 'Response Text: ', payment.response.ResponseText
+    print 'Response: ', payment.getResultResponseFull()
+    print 'Transaction ID: ', payment.response.TransactionID
+    print 'CVV Result: ', payment.response.CVVResponse
+    print 'Approval Code: ', payment.response.AuthCode
+    print 'AVS Result: ', payment.response.AVSResponse
+elif payment.isDeclined():
+    print 'Your credit card was declined by your bank'
+elif payment.isError():
+    print 'It did not work'
+print 'approved',payment.isApproved()
+print 'declined',payment.isDeclined()
+print 'error',payment.isError()
+``:code
+
+上記のコードはダミーのテストアカウントを使用していることに注意してください。Authorize.Netに登録(無料ではありません)する必要があり、AIMコンストラクタにlogin、transkeyを渡し、testmode=TrueまたはFalseを設定します。
+
+### Dropbox API
+
+``Dropbox.com``:inxx
+
+Dropboxは、とても有名なストレージサービスです。ファイルをストレージするだけでなく、クラウド上に保存し全てのマシーンと同期してくれます。グループを作ったり、ユーザ個別やグループへ様々なフォルダに対し読み書きの権限を与えることが許可されています。全ファイルのバージョン履歴も保持してくれます。"Public"というフォルダを含んでおり、このフォルダ内のファイルには公開URLが付けられます。共同作業にDropboxは打って付けです。
+
+Dropboxに簡単にアクセスできるようにするには
+
+``
+https://www.dropbox.com/developers
+``
+
+で登録を済まし、``APP_KEY``と``APP_SECRET``を取得します。一度それらを取得すると、ユーザのDropboxの認証を使用できます。
+
+"yourapp/private/dropbox.key"ファイルを作り、この様に書きます。
+``
+<APP_KEY>:<APP_SECERT>:app_folder
+``
+``<APP_KEY>``と``APP_SECRET``は、それぞれkeyとsecretです。
+
+その次に、"models/db.py"へ次のコードを書きます:
+
+``
+from gluon.contrib.login_methods.dropbox_account import use_dropbox
+use_janrain(auth,filename='private/dropbox.key')
+mydropbox = auth.settings.login_form
+``
+このコードは、ユーザにDropbox認証を扱うアプリへのログインを許可し、あなたのプログラムはユーザのDropboxアカウントにファイルをアップロードすることができます:
+
+``
+stream = open('localfile.txt','rb')
+mydropbox.put('destfile.txt',stream)
+``
+
+ファイルのダウンロード:
+
+``
+stream = mydropbox.get('destfile.txt')
+open('localfile.txt','wb').write(read)
+``
+
+ディレクトリのリストを取得:
+
+``
+contents = mydropbox.dir(path = '/')['contents']
+``
+
+### Twitter API
+
+ツイートを送信/取得する方法の手軽な例を示します。TwitterはシンプルなRESTful APIを利用するため、サードパーティのライブラリを必要としません。
+
+ツイートを送信する方法の例を示します:
+``
+def post_tweet(username,password,message):
+    import urllib, urllib2, base64
+    import gluon.contrib.simplejson as sj
+    args= urllib.urlencode([('status',message)])
+    headers={}
+    headers['Authorization'] = 'Basic '+base64.b64encode(
+        username+':'+password)
+    req = urllib2.Request(
+        'http://twitter.com/statuses/update.json',
+        args, headers)
+    return  sj.loads(urllib2.urlopen(req).read())
+``:code
+
+ツイートを受信する方法の例です:
+``
+def get_tweets():
+    user='web2py'
+    import urllib
+    import gluon.contrib.simplejson as sj
+    page = urllib.urlopen('http://twitter.com/%s?format=json' % user).read()
+    tweets=XML(sj.loads(page)['#timeline'])
+    return dict(tweets=tweets)
+``:code
+
+より多くの複雑な操作には、Twitter APIドキュメントを参照してください。
+
+### 仮想ファイルのストリーミング
+``streaming``:inxx
+
+悪意ある攻撃者にとってwebサイトが脆弱かどうかをスキャンするのはよくあることです。彼らはNessusといったセキュリティスキャナを使いスクリプトに脆弱性があるかを知ることで標的となるウェブサイトを探索します。スキャンされたマシンからのwebサーバログや既知の脆弱性の多く示すNessusデータベースでの直接の解析はPHPスクリプトやASPスクリプトにおけるものです。我々はweb2pyを稼動させて以降も、それらの脆弱性が無いにもかかわらず、彼らから未だにスキャンされます。迷惑なので、これらの脆弱性に対応し、攻撃者に彼らの時間を空費することを理解させるのが望ましいです。
+
+1つの方法は攻撃に対抗して.php、.asp、疑わしいダミーアクションへの全リクエストをリダイレクトすることで、攻撃者を長時間忙しくさせ続けることです。そのうち攻撃者はあきらめ、私たちをを二度とスキャンしないでしょう。
+
+このレシピは2つの部品を必要とします。
+
+次のように"default.py"コントローラに**jammer**という専用のアプリケーションを作成します:
+``
+class Jammer():
+   def read(self,n): return 'x'*n
+def jam(): return response.stream(Jammer(),40000)
+``:code
+
+このアクションが呼ばれたときに、一度に40000文字の"x"で満たされた無限のデータストリームを返します。
+
+2つ目の要素は.php、.aps(大文字、小文字)などで終わるどのようなリクエストもこのコントローラにリダイレクトする"route.py"ファイルです。
+``
+route_in=(
+ ('.*\.(php|PHP|asp|ASP|jsp|JSP)','jammer/default/jam'),
+)
+``:code
+
+一度目に攻撃を受けた際には小さなオーバヘッドしかないかもしれませんが、私たちの経験からして同じ攻撃者は2度と攻撃してきません。
+
+##### 第3版 - 翻訳: Yota Ichino　レビュー: Omi Chiba
+##### 第4版 - 翻訳: Yota Ichino　レビュー: Omi Chiba

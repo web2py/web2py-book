@@ -1,0 +1,1140 @@
+## コンポーネントとプラグイン
+``component``:inxx
+``plugin``:inxx
+
+コンポーネントとプラグインは比較的新しいweb2pyの機能です。それが何なのか、どうあるべきかに関して開発者の間では意見の相違があります。混乱のほとんどは、他のソフトウェアプロジェクトにおける、これらの用語のさまざまな用途に由来することと、開発者がまだ仕様を完成させるために働いているという事実に由来しています。
+
+しかしながら、プラグインのサポートは重要な機能であり、我々はいくつかの定義を提供する必要があります。これらの定義は最終的なものではなく、単に、本章で説明するプログラミング・パターンに従ったものです。
+
+ここでは次の2つの問題を扱いたいと思います。
+
+- サーバー負荷を最小化しコード再利用を最大化するような、モジュール化されたアプリケーションをどのように構築できるのか？
+- プラグイン・アンド・プレイ形式のようなコード断片を、どのように配布することができるか？
+
+''コンポーネント''では第１の問題を、''プラグイン''では第２の問題を扱います。
+
+### コンポーネント
+``load``:inxx
+``LOAD``:inxx
+``Ajax``:inxx
+
+------
+**コンポーネント**は、ウェブページの自律的な機能部品です。
+------
+
+コンポーネントは、モジュール、コントローラ、ビューから構成されています。しかしウェブページに埋め込まれた時、HTMLのタグ(例、DIV、SPAN、IFRAME)中に局所化しなければいけないこと、ページの残り部分とは独立してタスクを実行しなければならないこと以外には厳密な要求はありません。ここでは特にページ内でロードされ、Ajaxを介してコンポーネントのコントローラ関数と交信を行う、コンポーネントに注目します。
+
+コンポーネントの1つの例は、DIVに含まれている"コメント・コンポーネント"です。これはユーザーコメントと新規投稿コメントフォームを表示します。フォームをサブミットする時、フォームをAjaxを介してサーバーに送ります。さらにリストを更新し、コメントをサーバーサイドのデータベースに保存します。そして、ページの残り部分をリロードすることなく、DIVの中身を更新します。
+
+web2pyのLOAD関数は、明示的なJavaScript/Ajaxの知識やプログラミンなしに、容易にそれを行うことを可能にします。
+
+
+私たちの目標は、ページレイアウトにコンポーネントを組み込むことで、Webアプリケーションを開発できるようにすることです。
+
+デフォルトのひな形アプリを拡張子した、"test"という簡単なweb2pyのアプリを考えます。これは、"models/db_comments.py"ファイルにおいて、次のようなカスタムモデルを持ちます。
+
+``
+db.define_table('comment',
+   Field('body','text',label='Your comment'),
+   Field('posted_on','datetime',default=request.now),
+   Field('posted_by',db.auth_user,default=auth.user_id))
+db.comment.posted_on.writable=db.comment.posted_on.readable=False
+db.comment.posted_by.writable=db.comment.posted_by.readable=False
+``:code
+
+"controllers/comments.py"コントーローラのコードです。
+
+``
+@auth.requires_login()
+def post():
+    return dict(form=crud.create(db.comment),
+                comments=db(db.comment).select())
+``:code
+
+対応する、"views/comments/post.html" ビューです。
+
+``
+{{extend 'layout.html'}}
+{{for comment in comments:}}
+<div class="comment">
+  on {{=comment.posted_on}} {{=comment.posted_by.first_name}}
+  says <span class="comment_body">{{=comment.body}}</span>
+</div>
+{{pass}}
+{{=form}}
+``:code
+
+通常と同じようにアクセス可能です。
+
+``
+http://127.0.0.1:8000/test/comments/post
+``:code
+
+[[image @///image/en7900.png center 480px]]
+
+ここまでの機能では、特別なことは行っていません。しかしレイアウトを拡張しない、".load"拡張子が付いた新しいビューを定義することにより、コンポーネントに切り替えることが可能です。
+
+このため、"views/comments/post.load" を作成します。
+
+``
+{{#extend 'layout.html' <- notice this is commented out!}}
+{{for comment in comments:}}
+<div class="comment">
+  on {{=comment.posted_on}} {{=comment.posted_by.first_name}}
+  says <span class="comment_body">{{=comment.body}}</span>
+</div>
+{{pass}}
+{{=form}}
+``:code
+
+次のURLで、アクセス可能です。
+
+``
+http://127.0.0.1:8000/test/comments/post.load
+``:code
+
+これは次のように表示されます。
+
+[[image @///image/en8000.png center 480px]]
+
+このコンポーネントは、次のように任意のページに埋め込むことができます。
+
+``
+{{=LOAD('comments','post.load',ajax=True)}}
+``:code
+
+例えば、"controllers/default.py" を次のように編集します。
+
+``
+def index():
+    return dict()
+``:code
+
+さらにビューについても、コンポーネントを加えます。
+
+``
+{{extend 'layout.html'}}
+<p>{{='bla '*100}}</p>
+{{=LOAD('comments','post.load',ajax=True)}}
+``:code
+
+ページにアクセスします。
+
+``
+http://127.0.0.1:8000/test/default/index
+``:code
+
+通常のコンテンツとコメントのコンポーネントが表示されます。
+
+[[image @///image/en8100.png center 480px]]
+
+``{{=LOAD(...)}}`` コンポーネントは次のようにレンダリングされます。
+
+``
+<script type="text/javascript"><!--
+web2py_component("/test/comment/post.load","c282718984176")
+//--></script><div id="c282718984176">loading...</div>
+``:code
+
+(実際に生成されるコードは、LOAD関数に渡すオプションに依存します)
+
+``web2py_component(url,id)``関数は、"web2py_ajax.html"に定義されています。これが、すべての魔法を叶えます。つまり、Ajaxを介して``url``を呼び出し、そのレスポンスと対応する``id``をDIVに埋め込みます。これはDIVに対する全てのフォーム送信を捕捉し、Ajax経由でこれらのフォームを送信します。Ajaxのターゲットは、常にDIVそのものになります。
+
+LOAD関数のすべての引数は以下の通りです。
+
+``
+LOAD(c=None, f='index', args=[], vars={},
+     extension=None, target=None,
+     ajax=False, ajax_trap=False,
+     url=None,user_signature=False,
+     content='loading...',**attr):
+``:code
+
+解説
+- 最初の2つの引数 ``c`` と ``f`` は、呼び出すそれぞれのコントローラ及び関数です。
+- ``args`` と ``vars`` は関数に渡したい引数と変数です。前者はリスト型、後者は辞書型です。
+- ``extension`` は省略可能な拡張子です。なお、拡張子は、``f='index.load'`` のように、関数の一部としても渡すことができます。
+- ``target``はターゲットとなるDIVの ``id`` です。指定していない場合、ランダムなターゲット ``id`` を生成します。
+- ``ajax`` は、DIVがAjax経由で書き込まれる場合に ``True`` にします。現在のページが返される前に、書き込む必要がある場合は ``False`` にします(Ajax呼び出しを回避します)。
+- ``ajax_trap=True`` とした場合、DIV内のどのフォームの送信も捕捉され、Ajax経由で送信します。そして、レスポンスはDIV内でレンダリングされていることが必要です。 ``ajax_trap=False`` ではフォームは通常通り送信するため、ページ全体がリロードされます。``ajax=True``の場合は、``ajax_trap`` の値が何であっても無視されて ``True`` として扱われます。
+- ``url`` の指定がある場合、``c``、``f``、``args``、``vars``、``extension``の値を上書きし、``url`` のコンポーネントをロードします。これは他のアプリケーション(自身もしくはweb2pyで作成されていないかもしれません)によって供給されるコンポーネントページとして、ロードするために使用されます。
+- ``user_signature`` はデフォルトは False です。しかしログインしている場合、True に設定すべきです。これは ajaxのコールバックが、デジタル署名されていることを確認します。この件は４章で触れています。
+- ``content`` は ajax 呼び出し実行中に表示されるコンテンツです。これは ``content=IMG(..)`` のようにヘルパーになります。
+- オプション引数の ``**attr`` は、``DIV`` へ属性値を渡すことが可能です。
+
+``.load`` ビューが指定されていない場合、処理から返される辞書型データをレイアウトなしにレンダリングする ``generic.load`` が使用されます。これは、単一のアイテムを保持する辞書型データの場合、最も上手く動作します。
+
+``.load``拡張子と、他の機能（例えばログインフォーム）へリダイレクトするコントローラを持つコンポーネントをLOADで使用する場合、``.load`` 拡張子は伝搬し、新しいURL（リダイレクト先の一つ）にも ``.load`` 拡張子がロードされます。
+
+*以下、注意してください*
+Ajaxのpostは、マルチパートフォーム(multipart forms)、すなわちファイルアップロードをサポートしていません。このためアップロードフィールドは、LOADコンポーネントでは機能しません。個別コンポーネントの.loadビューからPOSTした場合、アップロードフィールドは通常通り機能するので、これが機能するかのように錯覚するかもしれません。代わりに、ajax互換サードパーティ製ウィジットと、web2pyの手動アップロードを行うstoreコマンドによって、アップロードを行います。
+
+#### クライアント・サーバー コンポーネント通信
+
+コンポーネントの機能がAjaxを経由して呼ばれるとき、web2pyはリクエストに2つのHTTPヘッダを渡します。
+
+``
+web2py-component-location
+web2py-component-element
+``:code
+
+これは次の変数を介して、アクセスできます。
+
+``
+request.env.http_web2py_component_location
+request.env.http_web2py_component_element
+``:code
+
+後者はまた次のようにアクセスできます。 ``request.cid``:inxx
+
+``
+request.cid
+``:code
+
+前者は、コンポーネント機能を呼び出したページのURLが含まれています。
+後者は、レスポンスを含んだDIVの ``id`` が含まれています。
+
+コンポーネント機能はまた、2つの特別なHTTPレスポンスのヘッダにデータを格納します。これらは、レスポンス時にページ全体で解釈されます。次の通りです。
+
+``
+web2py-component-flash
+web2py-component-command
+``:code
+
+これらは、次のものを介して設定可能です。
+
+``
+response.headers['web2py-component-flash']='....'
+response.headers['web2py-component-command']='...'
+``:code
+
+または(機能がコンポーネントから呼び出されたなら)、自動的に次のようにすることもできます。
+
+``
+response.flash='...'
+response.js='...'
+``:code
+
+前者は、レスポンス時にフラッシュさせたいテキストを含みます。
+後者は、レスポンス時に実行させたいJavaScriptを含みます。改行文字を含むことはできません。
+
+例として、ユーザーが質問できるようなコンタクトフォームのコンポーネントを"controllers/contact/ask.py"に定義します。コンポーネントは、システム管理者に質問をメールし、"thank you"メッセージをフラッシュし、ページからそのコンポーネントを取り除きます。
+
+``
+def ask():
+    form=SQLFORM.factory(
+        Field('your_email',requires=IS_EMAIL()),
+        Field('question',requires=IS_NOT_EMPTY()))
+    if form.process().accepted:
+        if mail.send(to='admin@example.com',
+                  subject='from %s' % form.vars.your_email,
+                  message = form.vars.question):
+            response.flash = 'Thank you'
+            response.js = "jQuery('#%s').hide()" % request.cid
+        else:
+            form.errors.your_email = "Unable to send the email"
+    return dict(form=form)
+``:code
+
+最初の4行はフォームを定義し、それを処理します。送信用のメールオブジェクトは、デフォルトのひな形アプリケーションで定義されています。最後の4行は、HTTPリクエストヘッダからデータを取得し、HTTPレスポンスヘッダにそれを設定する、コンポーネント固有のロジックを実装しています。
+
+これで次のように、このコンタクトフォームを任意のページに埋め込むことができます。
+
+``
+{{=LOAD('contact','ask.load',ajax=True)}}
+``:code
+
+``ask`` コンポーネントに対して、``.load`` ビューを定義しなかったことに、注目してください。これは単一のオブジェクト(form)を返すため、"generic.load" で十分なためです。汎用ビューは開発ツールであることに注意してください。開発においては、 "views/generic.load" を "views/contact/ask.load" にコピーする必要があります。
+
+
+``user_signature``:inxx ``requires_signature``:inxx
+``user_signature``引数を使用し、URLをデジタル署名することにより、Ajaxを介して呼び出される関数へのアクセスをブロックすることができます。
+
+``
+{{=LOAD('contact','ask.load',ajax=True,user_signature=True)}}
+``:code
+
+URLに対するデジタル署名を有効にしています。
+デジタル署名ではコールバック関数に、デコレータを使った認可を必要とします。
+
+``
+@auth.requires_signature()
+def ask(): ...
+``:code
+
+#### Ajax トラップリンク
+``A``:inxx
+``Ajax links``:inxx
+
+通常、リンクはトラップしません。このため、コンポーネント内のリンクをクリックすると、リンクページ全体がロードされます。しかし、リンクしたページがコンポーネント内にロードするようにしたい場合があります。これは次のように``A``ヘルパを用いて、実現することができます。
+
+``
+{{=A('linked page',_href='http://example.com',cid=request.cid)}}
+``:code
+
+``cid``が指定された場合、リンクページはAjaxを経由してロードされます。``cid``は、設置するロードページ・コンテンツのhtml要素の``id``です。この例では``request.cid``、すなわちリンクを生成したコンポーネントの``id``を設定しています。リンクページは通常、URLコマンドを用いて生成した内部URLにします。
+
+### プラグイン
+
+-------
+**プラグイン** は、アプリケーションファイルのサブセットです。
+-------
+
+そして次のような、''いくつか''の現実的な特徴があります。
+
+- プラグインはモジュールでなく、モデルでもなく、コントローラやビューでもありません。むしろモジュール・モデル・コントローラを含んでおり、ビューは含まれたり、含まれなかったりします。
+- プラグインは機能上、自律性がある必要はありません。他のプラグインや特定ユーザのコードに依存していても構いません。
+- ''プラグイン'' は ''プラグインシステム'' ではありません。ある程度の独立性を実現するためのルールは決めようとしていますが、登録や独立といった概念は持っていません。
+- プラグインは、アプリケーションのためであり、web2py（フレームワーク）のためのプラグインではありません。
+
+それでは、なぜ''プラグイン''と呼ぶのでしょうか？。それはアプリケーションのサブセットをパッキングし、他のアプリケーション上でアンパッキング（つまり''プラグイン''）するメカニズムを提供するからです。この定義に基づき、アプリケーション中のいくつかのファイルはプラグインとして扱われます。
+
+アプリケーションが配布される時、プラグインはパックされ、アプリケーションと一緒に配布されます。
+
+実際に **admin** はアプリケーションから独立して、パッキングやアンパッキングするためのインターフェイスを提供します。接頭語 ``plugin_`` ''name'' の名前をもつアプリケーションのファイル及びフォルダは、次のファイルにまとめることができます。
+
+``web2py.plugin.``''name''``.w2p``
+
+そして一緒に配布されます。
+
+[[image @///image/en8200.png center 480px]]
+
+**admin** が一緒に配布されることを名前から判断し、さらに別ページに表示することを除き、web2pyはプラグインの構成するファイルを別に扱うことはしません。
+
+[[image @///image/en8300.png center 480px]]
+
+まだ実際のところ、上記の定義に従い **admin** よって承認されたようなプラグインよりも、次のようなプラグインが一般的です。
+
+現実的には、私たちは2つのタイプのプラグインだけ考えることにします。
+
+- ''コンポーネントプラグイン''。これは前セクションで定義したようなコンポーネントを含んだプラグインです。コンポーネントプラグインは、1つ以上のコンポーネントを含めることがで可能です。上記の''comments''コンポーネントを含んだ、''plugin_comments''を例として考えることができます。他の例は、''tagging''コンポーネントと、プラグインによって定義したいくつかのデータベーステーブルを共有する''tag-cloud''コンポーネントを含む、``plugin_tagging`` です。
+- ''レイアウトプラグイン''、これはレイアウトビューと必要な静的ファイルを含んだプラグインです。プラグインを適用するとアプリケーションに新しい、ルック＆フィールを提供します。
+
+上記の定義に従って、前セクションで製作したコンポーネントがあります。例えば、"controllers/contact.py"は既にプラグインです。あるアプリケーションで定義したコンポーネントを、他のアプリケーションに持って行き使用することが可能です。しかしまだ、プラグインとしてのラベルが無いため、**admin** から承認されていません。これには、解決すべき２つの問題があります。
+
+- プラグインファイルを規定に従って命名することで、**admin** は同じプラグインの属するものとして承認できます。
+- モデルファイルがプラグインにある場合、規定を設定することで名前空間を汚さず、互いの衝突も避けることをできます。
+
+''name''という名前のプラグインを仮定とします。以下のような従うべきルールがあります。
+
+**ルール 1**:
+プラグインのモデルとコントローラはそれぞれ、次のように呼ばれる必要があります。
+
+- ``models/plugin_``''name''``.py``
+- ``controllers/plugin_``''name''``.py``
+
+フオルダ内にあるプラグインのビュー、モデル、静的ファイル、プライベートファイルは次のように呼ばれる必要があります。
+
+- ``views/plugin_``''name''``/``
+- ``modules/plugin_``''name''``/``
+- ``static/plugin_``''name''``/``
+- ``private/plugin_``''name''``/``
+
+**ルール 2**:
+プラグインのモデルは、次の名前で始まるオブジェクトを定義するだけです。
+- ``plugin_``''name''
+- ``Plugin``''Name''
+- ``_``
+
+**ルール 3**:
+プラグインモデルは、次の名前で始まるsession変数を定義するだけです。
+- ``session.plugin_``''name''
+- ``session.Plugin``''Name''
+
+**ルール 4**:
+プラグインはライセンスとドキュメントを含める必要があります。設置は次の場所です。
+- ``static/plugin_``''name''``/license.html``
+- ``static/plugin_``''name''``/about.html``
+
+**ルール 5**:
+プラグインはひな形の"db.py"で定義された、次のグローバルオブジェクトだけに依存できます。
+
+- ``db``というデータベースのコネクション
+- ``auth``という``Auth``インスタンス 
+- ``crud``という``Crud``インスタンス
+- ``service``という``Service``インスタンス
+
+いくつかのプラグインはより高度です。複数のdbインスタンスが存在する場合、これらのプラグインはパラメータ設定を持っています。
+
+**ルール 6**:
+プラグインにパラメータが必要な場合、以下で説明するPluginManagerを使用して設定してください。
+``PluginManager``:inxx
+
+上記のルールに従うことによって、次のことが確実になります。
+- **admin** は全ての ``plugin_``''name''ファイルとフォルダーを、単一エンティティの一部として承認します。
+- プラグインは互いに干渉しません。
+
+上記のルールはプラグインのバージョンと依存関係の問題は解決しません。それは機能の範囲を超えています。
+
+#### コンポーネントプラグイン
+``component plugin``:inxx
+
+コンポーネントプラグインはコンポーネントを定義するプラグインです。コンポーネントは通常、データベースにアクセスし独自モデルを定義します。
+
+以前記述したコードと同じですが、前述のルールに従い、``comments`` コンポーネントを ``comments_plugin`` に変更します。
+
+ステップ１、"models/plugin_comments.py" モデルを作成します。
+
+``
+db.define_table('plugin_comments_comment',
+   Field('body','text', label='Your comment'),
+   Field('posted_on', 'datetime', default=request.now),
+   Field('posted_by', db.auth_user, default=auth.user_id))
+db.plugin_comments_comment.posted_on.writable=False
+db.plugin_comments_comment.posted_on.readable=False
+db.plugin_comments_comment.posted_by.writable=False
+db.plugin_comments_comment.posted_by.readable=False
+
+def plugin_comments():
+    return LOAD('plugin_comments','post',ajax=True)
+``:code
+(プラグイン組み込みを単純化する関数定義がある、最後の2行を注意のこと)
+
+ステップ2、"controllers/plugin_comments.py"を定義します。
+
+``
+@auth.requires_login()
+def post():
+    comment = db.plugin_comments_comment
+    return dict(form=crud.create(comment),
+                comments=db(comment).select())
+``:code
+
+ステップ3、"views/plugin_comments/post.load"ビューを作成します。
+
+``
+{{for comment in comments:}}
+<div class="comment">
+  on {{=comment.posted_on}} {{=comment.posted_by.first_name}}
+  says <span class="comment_body">{{=comment.body}}</span>
+</div>
+{{pass}}
+{{=form}}
+``:code
+
+**admin** を使って配布用プラグインをパックできます。Adminはこのプラグインを次のように保存します。
+
+``
+web2py.plugin.comments.w2p
+``:code
+
+**admin** の **edit** ページでプラグインをインストールし、ビューに追加するだけで、どのビューでもプラグインを使用することが可能になります。
+
+``
+{{=plugin_comments()}}
+``:code
+
+もちろん、パラメータを取得しオプションを設定したコンポーネントを用いることで、より高度なプラグインの作成が可能です。コンポーネントがより複雑になれば、名前の衝突を避けるのが難しくなります。以下で説明するプラグインマネージャーは、この問題を回避するように設計されています。
+
+#### プラグインマネージャー
+
+``PluginManager``は、``gluon.tools``で定義されているクラスです。内部でどの様に動作するかを説明する前に、使用方法を説明します。
+
+ここでは前述の ``comments_plugin`` を改良します。また、プラグインのコード変更なしで、カスタマイズを行なってみます。
+
+``
+db.plugin_comments_comment.body.label
+``:code
+
+次のように改良します。
+
+最初に、次のように"models/plugin_comments.py"を書き換えます。
+
+``
+db.define_table('plugin_comments_comment',
+   Field('body','text',label=plugin_comments.comments.body_label),
+   Field('posted_on', 'datetime', default=request.now),
+   Field('posted_by', db.auth_user, default=auth.user_id))
+
+def plugin_comments()
+    from gluon.tools import PluginManager
+    plugins = PluginManager('comments', body_label='Your comment')
+
+    comment = db.plugin_comments_comment
+    comment.label=plugins.comments.body_label
+    comment.posted_on.writable=False
+    comment.posted_on.readable=False
+    comment.posted_by.writable=False
+    comment.posted_by.readable=False
+    return LOAD('plugin_comments','post.load',ajax=True)
+``:code
+
+テーブル定義を除くすべてのコードが、単一関数内にカプセル化されていることに、注意してください。また関数が、 ``PluginManager`` のインスタンスを作成することについても、注意してください。
+
+アプリケーションの他のモデルファイルに、例えば"models/db.py"で、次のようにプラグインの設定をしてください。
+
+``
+from gluon.tools import PluginManager
+plugins = PluginManager()
+plugins.comments.body_label = T('Post a comment')
+``:code
+
+-----
+``plugins`` オブジェクトのインスタンス化は、ひな形アプリケーションの"models/db.py"で既に設定されています。
+-----
+
+PluginManagerオブジェクトは、スレッドレベルのシングルトン（singleton）Storageオブジェクトです。これは、同じアプリケーション内で好きなだけインスタンスを作成できますが、しかし(同じ名前を持っていようがいまいが)これらは1つのPluginManager インスタンスであるかのように振る舞います。
+
+特に各プラグインファイルは、独自にPluginManagerオブジェクトを作成登録し、デフォルトパラメータを設定できます。
+
+``
+plugins = PluginManager('name', param1='value', param2='value')
+``:code
+
+他の場所（例えば "models/db.py"）で、これらのパラメータの上書きが可能です。
+
+``
+plugins = PluginManager()
+plugins.name.param1 = 'other value'
+``:code
+
+一箇所で複数のプラグインの設定も可能です。
+
+``
+plugins = PluginManager()
+plugins.name.param1 = '...'
+plugins.name.param2 = '...'
+plugins.name1.param3 = '...'
+plugins.name2.param4 = '...'
+plugins.name3.param5 = '...'
+``:code
+
+-----
+プラグインが定義される時、PluginManagerは引数を取る必要があります。プラグイン名と、デフォルトパラメータであるオプションの名前付き引数があります。しかし、プラグインが設定されている場合、PluginManagerコンストラクタは引数を取りません。設定はプラグイン定義の前に行う必要があります(つまり、名前がアルファベット順で先頭のモデルファイルで行う必要があります)。
+-----
+
+#### レイアウトプラグイン
+``layout plugin``:inxx
+
+レイアウトプラグインは通常コードは含まず、ビューと静的ファイルだけで構成されるため、コンポーネントプラグインより単純です。とはいえ、次のような良いプラクティスに従うべきです。
+
+最初に、"static/plugin_layout_''name''/"(nameはレイアウトの名前です) フォルダを作成し、そこに必要な静的ファイルを配置します。
+
+2番目に、レイアウトと画像リンクを含んだ"views/plugin_layout_''name''/layout.html"レイアウトファイルを作成し、CSSとJavaScriptファイルを"static/plugin_layout_''name''/"に配置します。
+
+3番目に、"views/layout.html"を単純に読み込みするように修正します。
+
+``
+{{extend 'plugin_layout_name/layout.html'}}
+{{include}}
+``:code
+
+この設計の利点は、このプラグインのユーザが複数レイアウトをインストールできることと、"views/layout.html"を編集するだけで、どのデザインを適用するか選択できることです。その上、"views/layout.html"はプラグインと一緒に **admin** によりパックされませんので、インストール済みレイアウトのユーザコードをプラグインが上書きする心配がありません。
+
+### ``plugin_wiki``
+``plugin_wiki``:inxx ``wiki``:inxx
+
+-----
+免責条項: plugin_wikiは、まだ頻繁に開発を行っており、従って、web2pyのコア関数と同じレベルの後方互換性を約束しません。
+-----
+
+**plugin_wiki**は強化されたプラグインです。この意味することは、複数の有用なコンポーネントを定義することであり、これはアプリケーションの開発方法を変えるかもしれないということです。
+
+次のURLからダウンロード可能です。
+
+``
+http://web2py.com/examples/static/web2py.plugin.wiki.w2p
+``:code
+
+**plugin_wiki** のアイデアの背景には、ほとんどのアプリケーションが半分静的なページを含んでいるということです。これらは複雑な、カスタムロジックを含んでいないページです。それらは構造化テキスト(ヘルプページを彷彿とさせるもの)、画像、音楽、ビデオ、crudフォーム、標準コンポーネントのセット(コメント、タグ、チャート、地図)など、を含んでいます。これらのページは公開されているかもしれませし、ログインや他の認証制限を要求するかもしれません。これらのページはメニューでリンクされるかもしれませんし、ウィザードフォームを通じて辿りつけるだけかもしれません。**plugin_wiki** は標準的なweb2pyアプリケーションに、この様なページを追加する簡単な方法を提供します。
+
+特に **plugin_wiki** が提供するのは以下の項目です。
+``widget in plugin_wiki``:inxx
+
+- アプリケーションにページを追加したり、スラグ（固定URL）での参照を許可するwikiライクなインターフェイス。これらのページ(wikiページとして参照される)はバージョンを持っておりデータベースに保存されます。
+- 公開と非公開ページ(ログインを要求)。ページがログインを要求する場合、ユーザが指定グループのメンバーシップを持つことも要求するかもしれません。
+- 1，2，3の3つのレベル。レベル１はテキスト、画像、音楽と動画のみを含むページです。レベル2はウィジット(前セクションで説明した、wikiページに埋め込み可能な定義されたコンポーネント)を含むページです。レベル3は、web2pyのテンプレートコードも含めることができるページです。
+- markmin構文か、WYSIWYGエディタを使用してのHTMLか、ページの編集方法を選択できます。
+- ウィジットコレクション。コンポーネントとして実装されています。セルフドキュメント化されおり、普通のweb2pyビューに通常コンポーネントとして埋め込んだり、wikiページに簡略化した構文を使用して埋め込むことが可能です。
+- 特別なページ(``meta-code``、``meta-menu``、など)のセット。これはプラグイン(例えば、プラグインが実行するコードの定義、カスタマイズメニュー、など)をカスタマイズするために使用可能です。
+
+------
+**welcome** に **plugin_wiki** を加えたアプリケーションは、ブログのような単純なWebアプリケーションを構築するための、適切な開発環境と考えることができます。
+------
+
+ここからは、 **plugin_wiki** をひな形アプリケーションである **welcome** のコピーに適用させたとして話を進めます。
+
+最初に、プラグインをインストールすると、''pages''と呼ばれる新しいメニューアイテムが追加されることに注意してください。
+
+メニューアイテム''pages''をクリックすると、プラグインの機能にリダイレクトされます。
+
+``
+http://127.0.0.1:8000/myapp/plugin_wiki/index
+``:code
+
+[[image @///image/en8400.png center 480px]]
+
+プラグインのインデックスページは、プラグイン自身を使い作成したページの一覧を表示します。また ``slug`` を選択することで、新規ページを作成することができます。ここでは、 ``home`` ページを作成してみます。次のURLにリダイレクトします。
+
+``
+http://127.0.0.1:8000/myapp/plugin_wiki/page/home
+``:code
+
+''create page''をクリックし、内容を編集します。
+
+[[image @///image/en8500.png center 480px]]
+
+-----
+デフォルトではプラグインは、レベル3になっています。これはページに、コードと同じようにウィジットの挿入も可能なことを示します。またデフォルトでは、ページ内容を記述するのに、markmin構文を使用します。
+-----
+
+#### ``MARKMIN`` 構文
+``MARKMIN syntax``:inxx
+
+ここでは、markmin構文の初歩を説明します。
+
+------
+**markmin** | **html**
+``# title`` | ``<h1>title</h1>``
+``## subtitle`` | ``<h2>subtitle</h2>``
+``### subsubtitle`` | ``<h3>subsubtitle</h3>``
+``**bold**`` | ``<strong>bold</strong>``
+``''italic''`` | ``<i>italic</i>``
+``http://...`` | ``<a href="http://...com">http:...</a>``
+``http://...png`` | ``<img src="http://...png" />``
+``http://...mp3`` | ``<audio src="http://...mp3"></audio>``
+``http://...mp4`` | ``<video src="http://...mp4"></video>``
+``qr:http://...`` | ``<a href="http://..."><img src="qr code"/></a>``
+``embed:http://...`` | ``<iframe src="http://..."></iframe>``
+------
+
+リンク、画像、オーディオ、ビデオのファイルが自動的に埋め込まれていることに注意してください。 MARKMIN構文の詳細については、第5章を参照してください。
+
+ページが存在しない場合、ページを作成するか尋ねられます。
+
+編集ページは、ページに添付ファイルを追加可能です（つまり、静的ファイル）。
+
+[[image @///image/en8600.png center 480px]]
+
+これらへのリンクは、次のように記述することができます。
+
+``
+[[mylink name attachment:3.png]]
+``:code
+
+もしくは埋め込みの場合は、次のように記述します。
+
+``
+[[myimage attachment:3.png center 200px]]
+``:code
+
+画像サイズ(``200px``)はオプションです。 ``center`` はオプションではありませんが、 ``left`` や ``right`` で置き換えてもよいです。
+
+blockquoted（引用ブロック）の埋め込みです。
+
+``
+-----
+this is blockquoted
+-----
+``:code
+
+同じようにテーブルです。
+
+``
+-----
+0 | 0 | X
+0 | X | 0
+X | 0 | 0
+-----
+``:code
+
+逐語的なテキスト
+
+``
+!`!!`!
+verbatim text
+!`!!`!
+``:code
+
+``-----`` もしくは ``!`!!`!`` の最後に、 ``:class`` をオプションで追加することも可能です。blockquotedテキストとテーブルは、タグのクラスに変換されます。例えば次のようになります。
+
+``
+-----
+test
+-----:abc
+``:code
+
+次のようにレンダリングされます。
+
+``
+<blockquote class="abc">test</blockquote>
+``:code
+
+逐語的なテキストのためクラスは、異なるタイプの埋め込みコンテンツに使用することができます。
+
+例えば、``code_``''language''でプログラム言語を指定することで、シンタックスハイライトしたコードを埋め込むことができます。
+
+``
+!`!!`!
+def index(): return 'hello world'
+!`!!`!:code_python
+``:code
+
+ウィジットの埋め込みも可能です。
+
+``
+!`!!`!
+name: widget_name
+attribute1: value1
+attribute2: value2
+!`!!`!:widget
+``:code
+
+編集ページから"widget builder"をクリックし、リストからウィジットフォームをインタラクティブで追加できます。
+
+[[image @///image/en8700.png center 480px]]
+
+(ウィジットのリストは、次のサブセクションを参照のこと)
+
+web2pyテンプレート言語のコードを埋め込むもできます。
+
+``
+!`!!`!
+{{for i in range(10):}}<h1>{{=i}}</h1>{{pass}}
+!`!!`!:template
+``:code
+
+#### ページの権限
+
+ページの編集時には、次のフィールドを使用します。
+- **active** (デフォルトは``True``)。ページが有効でない場合、訪問者はアクセスが許されません(例えパブリックでも)。
+- **public** (デフォルトは``True``)。ページがパブリックの場合、訪問者はログイン無しでアクセスが許されます。
+- **Role** (デフォルトはNone)。ページにロールが設定されており、該当するロールのグループメンバーである訪問者がログインしている場合に、ページへのアクセスがが許されます。
+
+#### スペシャルページ
+``menu in plugin_wiki``:inxx
+
+**meta-menu** はメニューを含みます。ページが存在しない場合、web2pyは"models/menu.py"の ``response.menu`` 定義を使用します。meta-menuページの内容は、メニューを上書きします。構文は次のようになります。
+
+``
+Item 1 Name http://link1.com
+   Submenu Item 11 Name http://link11.com
+   Submenu Item 12 Name http://link12.com
+   Submenu Item 13 Name http://link13.com
+Item 2 Name http://link1.com
+   Submenu Item 21 Name http://link21.com
+      Submenu Item 211 Name http://link211.com
+      Submenu Item 212 Name http://link212.com
+   Submenu Item 22 Name http://link22.com
+   Submenu Item 23 Name http://link23.com
+``:code
+
+インデントはサブメニューの構造を決定します。各項目は、メニューテキストとそれに続くリンクで構成されます。リンクは、``page:``''slug'' にすることが可能です。``None`` リンクは、どのページにもリンクしません。余計な空白は無視されます。
+
+他の例です。
+
+``
+Home             page:home
+Search Engines   None
+   Yahoo         http://yahoo.com
+   Google        http://google.com
+   Bing          http://bing.com
+Help             page:help
+``:code
+
+このレンダリングは次のようになります。
+
+[[image @///image/en8800.png center 480px]]
+
+``meta-menu``:inxx ``meta-code``:inxx ``meta-header``:inxx ``meta-sidebar``:inxx ``meta-footer``:inxx
+**meta-code**はもう一つのスペシャルページであり、web2pyのコードを含む必要があります。これはモデルを拡張したもので、実際ここにモデルコードを書くことが可能です。"models/plugin_wiki.py"コードが実行される時に、実行が行われます。
+
+``meta-code`` では、テーブル定義が可能です。
+
+例えば ``meta-code``に次のコードを置くことで、単純な"friends"テーブルを作成できます。
+
+``
+db.define_table('friend',Field('name',requires=IS_NOT_EMPTY()))
+``:code
+
+そして、選択した下のコードをページに埋め込むことによって、フレンド管理インターフェイスを作成できます。
+``jqGrid``:inxx ``CRUD``:inxx
+
+``
+## List of friends
+!`!!`!
+name: jqgrid
+table: friend
+!`!!`!:widget
+
+## New friend
+!`!!`!
+name: create
+table: friend
+!`!!`!:widget
+
+``:code
+
+ページには、（先頭が#で始まる）"List of friends" と "New friend" の２つのヘッダーがあります。さらにページは、フレンドの一覧を表示する jqgrid と、新しいフレンドを追加する crud の、２つのウィジットが（対応するヘッダー下で）含まれています。
+
+[[image @///image/en8900.png center 480px]]
+
+``meta-header``, ``meta-footer``, ``meta-sidebar`` は、デフォルトレイアウトの"welcome/views/layout.html"では使用されていません。これらを使用する場合、**admin** を使用して"layout.html"を編集し、適切な場所に次のタグを置きます。
+
+``
+{{=plugin_wiki.embed_page('meta-header') or ''}}
+{{=plugin_wiki.embed_page('meta-sidebar') or ''}}
+{{=plugin_wiki.embed_page('meta-footer') or ''}}
+``:code
+
+これによって、ページコンテンツのレイアウトに、ヘッダー、サイドバー、フッターが表示されます。
+
+#### plugin_wikiの設定
+
+"models/db.py"の他のプラグインと同様に、下記のように記述できます。
+
+``
+from gluon.tools import PluginManager
+plugins = PluginManager()
+plugins.wiki.editor = auth.user.email == mail.settings.sender
+plugins.wiki.level = 3
+plugins.wiki.mode = 'markmin' or 'html'
+plugins.wiki.theme = 'ui-darkness'
+``:code
+
+それぞれ
+- 現在のログインユーザが plugin_wiki ページの編集を許可される場合、**editor** は true です。
+- **level** は権限です。1の場合、通常のページの編集です。2はウィジットの埋め込みです。3はコードの埋め込みです。
+- **mode** は"markmin"のエディタか、WYSIWYGの"html"エディタのどちらを使用するかを決定します。 ``WYSIWYG``:inxx
+- **theme** はjQuery UIテーマの名前を指定します。デフォルトではニュートラル色の、"ui-darkness" だけがインストールされています。
+
+次の場所にテーマを追加することが可能です。
+
+``
+static/plugin_wiki/ui/%(theme)s/jquery-ui-1.8.1.custom.css
+``:code
+
+#### 現在のwidgets
+
+各ウィジットは、plugin_wikiページや通常のweb2pyテンプレートに埋め込むことができます。
+
+例えば、plugin_wikiのページにYouTubeビデオを埋め込む場合、次のようにします。
+
+``
+!`!!`!
+name: youtube
+code: l7AWnfFRc7g
+!`!!`!:widget
+``
+
+同じウィジットを、web2pyビューに埋め込む場合は、次のようにします。
+
+``
+{{=plugin_wiki.widget('youtube',code='l7AWnfFRc7g')}}
+``:code
+
+どちらの場合でも、次のアウトプットになります。
+
+[[image @///image/en9000.png center 480px]]
+
+デフォルト値を持たないウィジット引数が必要です。
+
+現在のすべてのウィジットのリストは、次の通りです。
+
+**読み込み read**
+``
+read(table,record_id=None)
+``:code
+
+レコードを読み込み、表示します。
+- ``table`` テーブル名
+- ``record_id`` レコード番号
+
+**作成 create**
+``
+create(table,message='',next='',readonly_fields='',
+       hidden_fields='',default_fields='')
+``:code
+
+レコード作成フォームの表示です。
+- ``table`` テーブル名
+- ``message`` レコード作成後に表示するメッセージ
+- ``next`` リダイレクト先、例 "page/index/[id]"
+- ``readonly_fields`` 読み取り専用フィールド、コンマで区切ったフィールドのリスト
+- ``hidden_fields`` 非表示フィールド、コンマで区切ったフィールドのリスト
+- ``default_fields`` フィールドのデフォルト値、コンマで区切った ``fieldname=value`` のリスト
+
+**更新 update**
+``
+update(table,record_id='',message='',next='',
+       readonly_fields='',hidden_fields='',default_fields='')
+``:code
+
+レコード更新フォームの表示です。
+- ``table`` テーブル名
+- ``record_id`` 更新するレコード、もしくは ``{{=request.args(-1)}}``
+- ``message`` レコード作成後に表示するメッセージ
+- ``next`` リダイレクト先、例 "page/index/[id]"
+- ``readonly_fields`` 読み取り専用フィールド、コンマで区切ったフィールドのリスト
+- ``hidden_fields`` 非表示フィールド、コンマで区切ったフィールドのリスト
+- ``default_fields`` フィールドのデフォルト値、コンマで区切った ``fieldname=value`` のリスト
+
+**選択 select**
+``
+select(table,query_field='',query_value='',fields='')
+``:code
+
+テーブルの全レコードリスト
+- ``table`` レコード名
+- ``query_field`` 及び ``query_value`` レコードフィルターがある場合のクエリ ``query_field == query_value`` で使用
+- ``fields`` コンマで区切った表示するフィールドのリスト
+
+**検索 search**
+``
+search(table,fields='')
+``:code
+
+レコード検索フォームの表示です。
+- ``table`` レコード名
+- ``fields`` 表示用フィールド、コンマで区切ったフィールドのリスト
+
+**jqgrid**
+``jqGrid``:inxx
+``
+jqgrid(table,fieldname=None,fieldvalue=None,col_widths='',
+       colnames=None,_id=None,fields='',col_width=80,width=700,height=300)
+``:code
+
+jqGrid プラグインの埋め込み
+- ``table`` テーブル名
+- ``fieldname``, ``fieldvalue`` フィルターオプションで使用 ``fieldname==fieldvalue``
+- ``col_widths`` 各項目の幅
+- ``colnames`` 表示する項目名のリスト
+- ``_id`` jqGrid が含まれているTABLEタグの"id"
+- ``fields`` 表示する項目のリスト
+- ``col_width`` デフォルトの項目幅
+- ``height`` jqGrid の高さ
+- ``width`` jqGridの幅
+
+一度plugin_wikiをインストールすると、簡単に他のビューにもjqGridを使用できます。次は使用例です(表示は、yourtable を fk_id==47 でフィルタしたものです)。
+``
+{{=plugin_wiki.widget('jqgrid','yourtable','fk_id',47,'70,150',
+    'Id,Comments',None,'id,notes',80,300,200)}}
+``:code
+
+**latex**
+``latex``:inxx
+``
+latex(expression)
+``:code
+
+**latex**
+``latex``:inxx
+``
+latex(expression)
+``:code
+
+LaTeXを埋め込むために、Google charting APIを使用します
+
+**円グラフ**
+``pie chart``:inxx
+``
+pie_chart(data='1,2,3',names='a,b,c',width=300,height=150,align='center')
+``:code
+
+円グラフを埋め込みます。
+- ``data`` コンマで区切った値のリスト
+- ``names`` コンマで区切ったラベルのリスト(データアイテム毎に一つ)
+- ``width`` 画像の幅
+- ``height`` 画像の高さ
+- ``align`` 画像の位置を決定
+
+**棒グラフ**
+``bar chart``:inxx
+``
+bar_chart(data='1,2,3',names='a,b,c',width=300,height=150,align='center')
+``:code
+
+棒グラフを埋め込みます。
+- ``data`` コンマで区切った値のリスト
+- ``names`` コンマで区切ったラベルのリスト(データアイテム毎に一つ)
+- ``width`` 画像の幅
+- ``height`` 画像の高さ
+- ``align`` 画像の位置を決定
+
+**スライドショー**
+``slideshow``:inxx
+``
+slideshow(table, field='image', transition='fade', width=200, height=200)
+``:code
+
+スライドショーを埋め込みます。テーブルから画像を取得します。
+- ``table`` テーブル名
+- ``field`` 画像が入ったテーブルのアップロードフィールド
+- ``transition`` 画像切替時のエフェクトタイプ、例 フェードなど
+- ``width`` 画像の幅
+- ``height`` 画像の高さ
+
+**youtube**
+``YouTube``:inxx
+``
+youtube(code, width=400, height=250)
+``:code
+
+YouTubeビデオを埋め込みます（コードを使用）。
+- ``code`` ビデオのコード
+- ``width`` 画像の幅
+- ``height`` 画像の高さ
+
+**vimeo**
+``Vimeo``:inxx
+``
+vimeo(code, width=400, height=250)
+``:code
+
+Vimeoビデオを埋め込みます（コードを使用）。
+- ``code`` ビデオのコード
+- ``width`` 画像の幅
+- ``height`` 画像の高さ
+
+**メディアプレイヤー**
+``flash mediaplayer``:inxx
+``
+mediaplayer(src, width=400, height=250)
+``:code
+
+メディアファイルを埋め込みます（FlashファイルやMP3ファイルコードなど）。
+- ``src`` ビデオのソース
+- ``width`` 画像の幅
+- ``height`` 画像の高さ
+
+**コメント**
+``comments``:inxx
+``
+comments(table='None', record_id=None)
+``:code
+
+ページにコメントを埋め込みます。
+
+コメントは、テーブルまたはレコードもしくは両方共に、リンクを張ることが可能です。
+
+- ``table`` テーブル名
+- ``record_id`` レコードのid
+
+**タグ**
+``tags``:inxx
+``
+tags(table='None', record_id=None)
+``:code
+
+ページにタグを埋め込みます。
+
+タグは、テーブルまたはレコードもしくは両方共に、リンクを張ることが可能です。
+
+- ``table`` テーブル名
+- ``record_id`` レコードのid
+
+**タグクラウド**
+``tag cloud``:inxx
+``
+tag_cloud()
+``:code
+
+タグクラウドを埋め込みます。
+
+**地図**
+``Google map``:inxx
+``
+map(key='....', table='auth_user', width=400, height=200)
+``:code
+Googleマップを埋め込みます。
+
+テーブルからマップ上の位置を取得します。
+
+- ``key`` GoogleマップAPI のキー (デフォルト動作は 127.0.0.1)
+- ``table`` テーブル名
+- ``width`` マップの幅
+- ``height`` マップの高さ
+
+テーブルには、``latitude``、``longitude``、``map_popup`` カラムがある必要があります。
+目印をクリックした時に、``map_popup`` のメッセージが表示されます。
+
+**インラインフレーム**
+``iframe``:inxx
+``
+iframe(src, width=400, height=300)
+``:code
+
+``<iframe></iframe>`` にページを埋め込みます。
+
+**load_url**
+``load_url``:inxx
+``
+load_url(src)
+``:code
+
+LOAD関数を使用して、URLのコンテンツを読み込みます。
+
+**load_url**
+``load_url``:inxx
+
+**load_action**
+``load_action``:inxx
+``
+load_action(action, controller='', ajax=True)
+``:code
+
+LOAD関数を使用して、URL（アプリケーション・コントローラ・機能を指定）のコンテンツを読み込みます。
+
+#### ウィジットの拡張
+
+#### Extending widgets
+
+plugin_wiki はウィジットを追加できます。これは "models/plugin_wiki_"''name'' のように、''name''に任意の名前を付けた、新しいモデルファイルを作成することで行います。またこのファイルは次のようなコードを含んでいます。
+
+``
+class PluginWikiWidgets(PluginWikiWidgets):
+    @staticmethod
+    def my_new_widget(arg1, arg2='value', arg3='value'):
+        """
+        document the widget
+	"""
+        return "body of the widget"
+``:code
+
+1行目は、ウィジットのリストを拡張することを宣言しています。クラスの中に、必要なだけの関数を定義できます。アンダースコアで始まる関数は除き、それぞれの静的関数は新しいウィジットになります。関数はデフォルト値の有無に関係なく、任意の数の引数を取ることが可能です。関数のドキュメンテーション文字列（docstring）には、markmin構文自体を使用し関数のドキュメントを記述する必要があります。
+
+plugin_wikiページにウィジットを埋め込んでいる場合、引数は文字列でウィジットに渡されます。これはウィジット関数の全ての引数は文字列を受け取り、最終的には必要な形式に変換することが必要なことを示しています。必要な文字列表現は決めることができますが、docstringにドキュメント化するようにしてください。
+
+ウィジットは、web2pyヘルパー文字列を返すことができます。後述するケースでは、``.xml()`` でシリアライズされています。
+
+新しいウィジットは、グローバル名前空間で宣言された任意の変数にアクセスできることに注意してください。
+
+この章の最初に作成した"contact/ask"フォームを表示する、新しいウィジットを例として作成します。これは以下のコードを含む、"models/plugin_wiki_contact"ファイルを作成することで可能になります。
+
+``
+class PluginWikiWidgets(PluginWikiWidgets):
+    @staticmethod
+    def ask(email_label='Your email', question_label='question'):
+        """
+	This plugin will display a contact us form that allows
+	the visitor to ask a question.
+	The question will be emailed to you and the widget will
+	disappear from the page.
+	The arguments are
+
+	- email_label: the label of the visitor email field
+	- question_label: the label of the question field
+
+	"""
+        form=SQLFORM.factory(
+           Field('your_email', requires=IS_EMAIL(), label=email_label),
+           Field('question', requires=IS_NOT_EMPTY()), label=question_label)
+        if form.process().accepted:
+           if mail.send(to='admin@example.com',
+                        subject='from %s' % form.vars.your_email,
+                        message = form.vars.question):
+	       command="jQuery('#%s').hide()" % div_id
+               response.flash = 'Thank you'
+               response.js = "jQuery('#%s').hide()" % request.cid
+        else:
+            form.errors.your_email="Unable to send the email"
+        return form.xml()
+``:code
+
+-------
+``response.render(...)`` 関数がウィジットにより明示的に呼び出されない限り、plugin_wikiウィジットはレンダリングしません。
+-------
+
+##### 第3版 - 翻訳: 細田謙二　レビュー: Omi Chiba
+##### 第4版 - 翻訳: Hitoshi Kato　レビュー: Omi Chiba
