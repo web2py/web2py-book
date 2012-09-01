@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os, glob
+session.forget()
 
 response.title = 'web2py'
 response.subtitle = 'Full Stack Web Framework, 4th Ed.\nwritten by Massimo Di Pierro in English'
@@ -17,8 +18,12 @@ def get_folders():
 FOLDER, FOLDERS = get_folders()
 
 def get_subfolder(book_id):
-    subfolders = [f for f in FOLDERS if f.startswith(book_id)]
-    return subfolders[0] if subfolders else redirect(URL('index'))
+    if not book_id:
+        redirect(URL('index'))
+    for f in FOLDERS:
+        if f.startswith(book_id):
+            return f
+    redirect(URL('index'))
 
 def get_info(subfolder):
     infofile = os.path.join(FOLDER,subfolder,'info.txt')
@@ -63,7 +68,8 @@ def convert2html(book_id,text):
     extra['inxx'] = lambda code: '<div class="inxx">'+code+'</div>'
     extra['ref'] = lambda code: '[ref:'+code+']'
     # extra['code'] = lambda code: CODE(code,language='web2py').xml()
-    return MARKMIN(text.replace('\r',''),extra=extra,url=url2)
+    rtn = MARKMIN(text.replace('\r',''),extra=extra,url=url2)
+    return rtn
 
 def index():
     books = {}
@@ -74,19 +80,28 @@ def index():
 def chapter():
     book_id, chapter_id = request.args(0), request.args(1,cast=int,default='0')
     subfolder = get_subfolder(book_id)
-    info = get_info(subfolder)
-    chapters = get_chapters(subfolder)
+    info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=60*60*24)
+    chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=60*60*24)
     filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
-    content = open(filename).read()
-    content = convert2html(book_id,content)
-    return locals()
+    dest = os.path.join(request.folder, 'static_chaps', subfolder, '%.2i.html' % chapter_id)
+    if not os.path.isfile(dest):
+        content = open(filename).read()
+        content = convert2html(book_id,content).xml()
+        if not os.path.exists(os.path.dirname(dest)):
+            os.makedirs(os.path.dirname(dest))
+        open(dest, 'w').write(content)
+        content = XML(content)
+        return locals()
+    else:
+        content = XML(open(dest).read())
+        return locals()
 
 def search():
     book_id = request.args(0) or redirect(URL('index'))
     search = request.vars.search or redirect(URL('chapter',args=book_id))
     subfolder = get_subfolder(book_id)
-    info = get_info(subfolder)
-    chapters = get_chapters(subfolder)
+    info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=60*60*24)
+    chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=60*60*24)
     results = []
     for chapter in chapters:
         chapter_id = int(chapter[0])
@@ -100,8 +115,8 @@ def search():
                             chapter[2],BR(),
                             A('more',_href=URL('chapter',args=(book_id,chapter[0])),_class="btn"))
                         for chapter in results])
-        if not results:
-            response.flash = "no results"
+    if not results:
+        response.flash = "no results"
     response.view = 'default/chapter.html'
     return locals()
 
@@ -110,7 +125,7 @@ def image():
     key = request.args(1)
     subfolder = get_subfolder(book_id)
     filename = os.path.join(FOLDER,subfolder,'images',key)
-    if not os.path.exists(filename):
+    if not os.path.isfile(filename):
         raise HTTP(404)
     return response.stream(open(filename,'r'))
 
@@ -120,7 +135,7 @@ def reference():
     key = request.args(1)
     subfolder = get_subfolder(book_id)
     filename = os.path.join(FOLDER,subfolder,'references',key)
-    if not os.path.exists(filename):
+    if not os.path.isfile(filename):
         raise HTTP(404)
     info = dict(splitter(line)
                 for line in open(filename).readlines()
