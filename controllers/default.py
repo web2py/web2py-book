@@ -45,6 +45,7 @@ def build_menu():
         book_id = subfolder.split('-')[0]
         submenu.append((info['title']+' '+info['language'],None,URL('chapter',args=book_id)))
     menu.append(('Books',None,None,submenu))
+    menu.append(('Contribute',None,'https://github.com/mdipierro/web2py-book'))
     return menu
 
 response.menu = build_menu()
