@@ -323,6 +323,20 @@ Notice that since both "page_one" and "page_two" use the same ``form``, we have 
 
 Since "page_one" does not call ``process`` (nor ``accepts``), the form has no name and no key, so you must pass  ``session=None`` and set ``formname=None`` in ``process``, or the form will not validate when "page_two" receives it.
 
+#### Adding buttons to FORMs
+
+Usually a form provides a single submit button. It is common to want to add a "back" button that instead of submitting the form, directs the visitor to a different page.
+
+``add_button``:inxx
+
+This can be done with the ``add_button`` method:
+
+``
+form.add_button('Back', URL('other_page'))
+``:code
+
+You can add more than one button to form. The arguments of ``add_button`` are the value of the button (its text) and the url where to redirect to.
+
 ### ``SQLFORM``
 
 We now move to the next level by providing the application with a model file:
@@ -823,7 +837,9 @@ The name assigned by web2py to the uploaded file can be found in:
 form.vars.fieldname
 ``:code
 
-### ``SQLFORM.factory``
+### Other types of Forms
+
+#### ``SQLFORM.factory``
 
 There are cases when you want to generate forms ''as if'' you had a database table but you do not want the database table. You simply want to take advantage of the ``SQLFORM`` capability to generate a nice looking CSS-friendly form and perhaps perform file upload and renaming.
 
@@ -892,6 +908,53 @@ data in the other.
 -------
 This only works when the tables don't have field names in common.
 -------
+
+
+#### Confirmation Forms
+
+``confirm``:inxx
+
+Often you needs a form with to confirma choice. The form should be accepted if the choice is accepted and none otherwise. The form may have additional options that link other web pages. web2py provides a simple way to do this:
+
+``
+form = FORM.confirm('Are you sure?')
+if form.accepted: do_what_needs_to_be_done()
+``:code
+
+Notice that teh confirm form does not need and must not call ``.accepts`` or ``.process`` because this is done internally. You can add buttons with links to the confirmation form in the form of a dictionary of ``{'value':'link'}``:
+
+``
+form = FORM.confirm('Are you sure?',{'Back':URL('other_page')})
+if form.accepted: do_what_needs_to_be_done()
+``:code
+
+#### Form to edit a dictionary
+
+Imagine a system that stores configurations options in a dictionary,
+
+``
+config = dict(color='black', langauge='english')
+``:code
+
+and you need a form to allow the visitor to modify this dictionary.
+This can be done with:
+
+``
+form = SQLFORM.dictform(config)
+if form.process().accepted: config.update(form.vars)
+``:code
+
+The form will display one INPUT field for each item in the dictionary. It will use dictionary keys as INPUT names and lables and current values to infer types (string, int, double, date, datetime, boolean).
+
+This works great but leave to you the logic of making the config dictionary persistent. For example you may want to store the ``config`` in a session.
+
+``
+session.config or dict(color='black', langauge='english')
+form = SQLFORM.dictform(session.config)
+if form.process().accepted:
+    session.config.update(form.vars)
+``:code
+
 
 ### CRUD
 ``CRUD``:inxx ``crud.create``:inxx ``crud.update``:inxx ``crud.select``:inxx ``crud.search``:inxx ``crud.tables``:inxx ``crud.delete``:inxx
@@ -2176,7 +2239,11 @@ In this case the value of ``id_field`` tells the widget that even if the value t
 
 This widget works via Ajax. Where is the Ajax callback? Some magic is going on in this widget. The callback is a method of the widget object itself. How is it exposed? In web2py any piece of code can generate a response by raising an HTTP exception. This widget exploits this possibility in the following way: the widget sends the Ajax call to the same URL that generated the widget in the first place and puts a special token in the request.vars. Should the widget get instantiated again, it finds the token and raises an HTTP exception that responds to the request. All of this is done under the hood and hidden to the developer.
 
-### ``SQLFORM.grid`` and ``SQLFORM.smartgrid`` (experimental)
+### ``SQLFORM.grid`` and ``SQLFORM.smartgrid``
+
+-------
+Attention: grid and smartgrid were experimental prior web2py version 2.0 and vulnerable to information leakage. The grid and smartgrid are no longer experimental but we are still not promising backward comcpatiblity of the presentation layer of the grid, only of its APIs.
+-------
 
 These are two high level gadgets that create complex CRUD controls. They provide pagination, the ability to browser, search, sort, create, update and delete records from a single gadgets.
 
@@ -2231,6 +2298,7 @@ SQLFORM.grid(query,
              left=None,
              headers={},
              orderby=None,
+	     groupby=None,
              searchable=True,
              sortable=True,
              deletable=True,

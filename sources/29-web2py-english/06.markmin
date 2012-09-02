@@ -1405,6 +1405,7 @@ Max
 The ``find`` method as an optional limitby argument with the same syntax and functionality as the Set select ``method``.
 
 
+
 ### Other methods
 
 #### ``update_or_insert``
@@ -2072,9 +2073,20 @@ In those cases where a nested select is required and the loop-up field is a refe
 db.define_table('person',Field('name'))
 db.define_table('thing',Field('owner'),Field('owner','reference thing'))
 db(db.thing.owner.belongs(db.person.name=='Johnathan')).select()
-``:cite
+``:code
 
 In this case it is obvious that the next select only needs the field referenced by the ``db.thing.owner`` field so we do not need the more verbose ``_select`` notation.
+
+``nested_select``:inxx
+
+A nested select can also be used as insert/update value but in this case the symtax is different:
+
+``
+lazy = db(db.person.name=='Jonathan').nested_select(db.person.id)
+db(db.thing.id==1).update(owner = lazy)
+``:code
+
+In this case ``lazy`` is a nested expression that computes the ``id`` of person "Jonathan". The two lines result in one single SQL query.
 
 #### ``sum``, ``avg``, ``min``, ``max`` and ``len``
 
@@ -2559,6 +2571,65 @@ db.define_table('payment', Field('amount', 'double'), auth.signature)
 ``
 
 When using table inheritance, if you want the inheriting table to inherit validators, be sure to define the validators of the parent table before defining the inheriting table.
+
+#### before and after callbacks
+
+``_before_insert``:inxx
+``_after_insert``:inxx
+``_before_update``:inxx
+``_after_update``:inxx
+``_before_delete``:inxx
+``_after_delete``:inxx
+
+Web2py provides a mechanism to register callbacks to be called before and/or after insert, update and delete of records.
+
+Each table stores six lists of callbacks:
+
+``
+db.mytable._before_insert
+db.mytable._after_insert
+db.mytable._before_update
+db.mytable._after_update
+db.mytable._before_delete
+db.mytable._after_delete
+``:code
+
+You can register callback function by appending it the corresponding function to one of those lists. The caveat is that depending on the functionality, the callback has different signature.
+
+This is best explained via some examples.
+
+``
+>>> db.define_table('person',Field('name'))
+>>> def pprint(*args): print args
+>>> db.person._before_insert.append(lambda f: pprint(f))
+>>> db.person._after_insert.append(lambda f,id: pprint(f,id))
+>>> db.person._before_update.append(lambda s,f: pprint(s,f))
+>>> db.person._after_update.append(lambda s,f: pprint(s,f))
+>>> db.person._before_delete.append(lambda s: pprint(s))
+>>> db.person._after_delete.append(lambda s: pprint(s))
+``:code
+
+Here ``f`` is a dict of fields passed to insert or update, ``id`` is the id of the newly inserted record, ``s`` is the Set object used for update or delete.
+
+``
+>>> db.person.insert(name='John')
+({'name': 'John'},)
+({'name': 'John'}, 1)
+>>> db(db.person.id==1).update(name='Tim')
+(<Set (person.id = 1)>, {'name': 'Tim'})
+(<Set (person.id = 1)>, {'name': 'Tim'})
+>>> db(db.person.id==1).delete()
+(<Set (person.id = 1)>,)
+(<Set (person.id = 1)>,)
+``:code
+
+The return values of these callback should be ``None`` or ``False``. If any of the ``_before_*`` callback returns a ``True`` value it will abort the actual insert/update/delete operation.
+
+``update_naive``:inxx.
+
+Some times a callback may need to perform an update in the same of a different table ane one wants to avoid callbacks calling themselves recursively.
+
+For this purpose there the Set objects have an ``update_naive`` method that works like ``update`` but ignores before and after callbacks.
 
 #### Common fields and multi-tenancy
 ``common fields``:inxx
