@@ -2582,6 +2582,27 @@ db.define_table('payment', Field('amount', 'double'), auth.signature)
 
 When using table inheritance, if you want the inheriting table to inherit validators, be sure to define the validators of the parent table before defining the inheriting table.
 
+#### ``filter_in`` and `filter_out``
+``filter_in``:inxx ``filter_out``:inxx
+
+It is possible to define a filter for each field to be called before a value is inserted into the database for that field and after a value is retrieved from the database. 
+
+Imagine for example that you want to store a serializable Python data structure in a field in the json format. Here is how it could be accomplished:
+
+``
+>>> from simplejson import loads, dumps
+>>> db.define_table('anyobj',Field('name'),Field('data','text'))
+>>> db.anyobj.data.filter_in = lambda obj, dumps=dumps: dumps(obj)
+>>> db.anyobj.data.filter_out = lambda txt, loads=loads: loads(txt)
+>>> myobj = ['hello', 'world', 1, {2: 3}]
+>>> id = db.anyobj.insert(name='myobjname', data=myobj)
+>>> row = db.anyobj(id)
+>>> row.data
+['hello', 'world', 1, {2: 3}] 
+``:code
+
+Another way to accomplish the same is by using a Field of type ``SQLCustomType``, as discussed later.
+
 #### before and after callbacks
 
 ``_before_insert``:inxx
@@ -2640,6 +2661,48 @@ The return values of these callback should be ``None`` or ``False``. If any of t
 Some times a callback may need to perform an update in the same of a different table ane one wants to avoid callbacks calling themselves recursively.
 
 For this purpose there the Set objects have an ``update_naive`` method that works like ``update`` but ignores before and after callbacks.
+
+#### Record versioning 
+
+``_enable_record_versioning``:inxx
+
+It is possible to ask web2py to save every copy of a record when the record is modified. There are many ways to do it and it can be done for all tables at once using the ``auth.enable_record_versioning`` method, discussed in the chapter about authentication, or it can be done for each individual table as discussed here.
+
+Consider the following table:
+
+``
+db.define_table('stored_item',
+    Field('name'),
+    Field('quantity','integer'),
+    Field('is_active','boolean',
+          writable=False,readable=False,default=True))
+``:code
+
+Notice we the hidden boolean field called ``is_active`` and defaulting to 
+True.
+
+We can tell web2py to create a new table (in the same or a different database) and store all previous versions of each record in the table, when modified.
+
+This is done in the following way:
+``
+db.stored_item._enable_record_versioning()
+``:code
+
+or in a more verbose syntax:
+
+``
+db.stored_item._enable_record_versioning(
+    archive_db = db,
+    archive_name = 'strored_item_archive',
+    current_record = 'current_record',
+    is_active = 'is_active')
+``
+
+The ``arhcive_db=db`` tells web2py to store the archive table in the same database as the ``stored_item`` table. The ``archive_name`` sets the name for the arvchive table. The archive table has the same fields as the original table ``stored_item`` except that unique fields are no longer unique (because it needs to store multiple versions) and has an extra field which name is specified by ``current_record`` and which is a reference to the current record in the ``stored_item`` table.
+
+When records are deleted, they are not really deleted. A deleted record is copied in the ``strored_item_archive`` table (like when it is modified) and the ``is_active`` field is set to False. By enabling record versining web2py sets a ``custom_filter`` on this table that hides all fields in table ``strored_item`` where the ``is_active`` field is set to False. The ``is_active`` parameter in the ``_enable_record_versioning`` method allows to specify the name of the field used by the ``custom_filter`` to determine if the field was deleted or not.
+
+``custom_filter``s are ignored by the appadmin interface.
 
 #### Common fields and multi-tenancy
 ``common fields``:inxx
