@@ -111,9 +111,14 @@ def search():
         if k>=0:
             snippet = data[data.rfind('\n\n',0,k)+1:data.find('\n\n',k)].strip()
             results.append((chapter[0],chapter[1],convert2html(book_id,snippet)))
-        content = CAT(*[DIV(H2(A(chapter[1],_href=URL('chapter',args=(book_id,chapter[0])))),
+            content = CAT(*[DIV(H2(A(chapter[1],
+                                     _href=URL('chapter',
+                                               vars=dict(search=search),
+                                               args=(book_id,chapter[0])))),
                             chapter[2],BR(),
-                            A('more',_href=URL('chapter',args=(book_id,chapter[0])),_class="btn"))
+                            A('more',_href=URL('chapter',
+                                               vars=dict(search=search),
+                                               args=(book_id,chapter[0])),_class="btn"))
                         for chapter in results])
     if not results:
         response.flash = "no results"
