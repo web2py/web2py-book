@@ -53,6 +53,9 @@ Options:
                         file that contains ssl certificate
   -k SSL_PRIVATE_KEY, --ssl_private_key=SSL_PRIVATE_KEY
                         file that contains ssl private key
+  --ca-cert=SSL_CA_CERTIFICATE
+                        Use this file containing the CA certificate to
+                        validate X509 certificates from clients
   -d PID_FILENAME, --pid_filename=PID_FILENAME
                         file to store the pid of the server
   -l LOG_FILENAME, --log_filename=LOG_FILENAME
@@ -71,6 +74,8 @@ Options:
                         timeout for individual request (10 seconds)
   -z SHUTDOWN_TIMEOUT, --shutdown_timeout=SHUTDOWN_TIMEOUT
                         timeout on shutdown of server (5 seconds)
+  --socket-timeout=SOCKET_TIMEOUT
+                        timeout for socket (5 second)
   -f FOLDER, --folder=FOLDER
                         folder from which to run web2py
   -v, --verbose         increase --test verbosity
@@ -94,9 +99,13 @@ Options:
                         run PYTHON_FILE in web2py environment; should be used
                         with --shell option
   -K SCHEDULER, --scheduler=SCHEDULER
-                        run scheduled tasks for the specified apps
-                        -K app1, app2, app3 requires a scheduler defined in the
-                        models of the respective apps
+                        run scheduled tasks for the specified apps: expects a
+                        list of app names as -K app1,app2,app3 or a list of
+                        app:groups as -K app1:group1:group2,app2:group1 to
+                        override specific group_names. (only strings, no
+                        spaces allowed. Requires a scheduler defined in the
+                        models
+  -X, --with-scheduler  run schedulers alongside webserver
   -T TEST_PATH, --test=TEST_PATH
                         run doctests in web2py environment; TEST_PATH like
                         a/c/f (c,f optional)
@@ -118,9 +127,11 @@ Options:
                         option
   --no-banner           Do not print header banner
   --interfaces=INTERFACES
-                        listen on multiple addresses:
-                        "ip:port:cert:key;ip2:port2:cert2:key2;..." (:cert:key
+                        listen on multiple addresses: "ip:port:cert:key:ca_cer
+                        t;ip2:port2:cert2:key2:ca_cert2;..." (:cert:key
                         optional; no spaces)
+  --run_system_tests    runs web2py tests
+
 ``:code
 
 Lower-case options are used to configure the web server. The ``-L`` option tells web2py to read configuration options from a file, ``-W`` installs web2py as a windows service, while ``-S``, ``-P`` and ``-M`` options start an interactive Python shell. The ``-T`` option finds and runs controller doctests in a web2py execution environment. For example, the following example runs doctests from all controllers in the "welcome" application:
@@ -459,7 +470,7 @@ gluon/contrib/fpdf
 ``
 This is not documented in this book but it is hosted and documented here:
 ``
-http://code.google.com/p/pyfpdf/
+http://code.google.com/p/fpdf/
 ``
 
 **pysimplesoap** is a lightweight SOAP server implementation created by Mariano Reingart:
@@ -2076,6 +2087,7 @@ This type of background process should not be executed via cron (except perhaps 
 
 In chapter 8, we will provide an example of how to use the above method to send emails.
 
+
 #### Scheduler (experimental)
 
 The web2py scheduler works very much like the task queue described in the previous sub-section with some differences:
@@ -2095,28 +2107,80 @@ def task_add(a,b):
 
 Tasks will always be called in the same environment seen by controllers and therefore they see all the global variables defined in models, including database connections (``db``). Tasks differ from a controller action because they are not associated with an HTTP request and therefore there is no ``request.env``.
 
-Once the tasks are defined, you need to enable the scheduler by adding the following code to your model:
+To enable the scheduler you should put into a model it's instantiation.
+The recommended way to enable the scheduler to your app is to create a model file named ``scheduler.py`` and define your function there. After the functions, you can put the following code into the model:
 
 ``
-myscheduler = Scheduler(db, dict(task_add=task_add))
+from gluon.scheduler import Scheduler
+myscheduler = Scheduler(db)
 ``
+NB: If your tasks are defined in a module (as opposed to a model) you may have to restart the workers.
 
-The first argument of the ``Scheduler`` class must be the database to be used by the scheduler to communicate with the workers. This can be the ``db`` of the app or another dedicated ``db``, perhaps one shared by multiple apps. The Scheduler creates the tables it needs. The second argument is a Python dictionary of ``key:value`` pairs where ``key`` is the name you want to use to expose a task, and ``value`` is the actual name of the function that defines the task.
 
-Once the tasks are defined and the ``Scheduler`` is instantiated, all that is needed to do is to start the workers:
+##### Parameters
+The first argument of the ``Scheduler`` class must be the database to be used by the scheduler to communicate with the workers. This can be the ``db`` of the app or another dedicated ``db``, perhaps one shared by multiple apps. If you use SQLite it's recommended to use a separate db from the one used by your app in order to keep the app responsive.
+Once the tasks are defined and the ``Scheduler`` is instantiated, all that is needed to do is to start the workers. You can do that in several ways:
 
 ``
 python web2py.py -K myapp
 ``
+starts a worker for the app ``myapp``. If you want start multiple workers for the same app, you can do so just passing ``myapp,myapp``. You can pass also the ``group_names`` (overriding the one set in your model) with
 
-The ``-K`` option starts a worker. The argument of the ``-K`` option is a list of app names, separated by commas. These are the apps that will be served by this worker. One can start many workers.
+``
+python web2py.py -K myapp:group1:group2,myotherapp:group1
+``
 
-Now we have the infrastructure in place: defined the tasks, told the scheduler about them, started the worker(s). What remains is to actually schedule the tasks:
+If you have a model called ``scheduler.py`` you can start/stop the workers from web2py's default window (the one you use to set the ip address and the port).
 
+One last nice addition: if you use the embedded webserver, you can start the webserver and the scheduler with just one line of code (this assumes you don't want the web2py window popping up, or you can use the "Schedulers" menu instead)
+
+``
+python web2py.py -a yourpass -K myapp -X
+``
+You can pass the usual parameters (-i, -p, here -a prevents the window from showing up), pass whatever app in the -K parameter and append a -X. The scheduler will run alongside the webserver!
+
+Scheduler's complete signature is:
+
+``
+Scheduler(
+    db,
+    tasks=None,
+    migrate=True,
+    worker_name=None,
+    group_names=None,
+    heartbeat=HEARTBEAT,
+    max_empty_runs=0,
+    discard_results=False,
+    utc_time=False
+)
+``:code
+
+Let's see them in order:
+
+- ``db`` is the database DAL instance were you want the scheduler tables be placed.
+- ``tasks`` can be a dict. Must be defined if you want to call a function not by his name, i.e. ``tasks=dict(mynameddemo1=demo1)`` will let you execute function demo1 with ``st.insert(task_name='mytask', function_name='mynameddemo1')`` or ``st.insert(task_name='mytask', function_name='demo1')``. If you don't pass this parameter, function will be searched in the app environment.
+- ``worker_name`` is None by default. As soon as the worker is started, a worker name is generated as hostname-uuid. If you want to specify that, be sure that it's unique.
+- ``group_names`` is by default set to **[main]**. All tasks have a ``group_name`` parameter, set to **main** by default. Workers can only pick up tasks of their assigned group.
+NB: This is useful if you have different workers instances (e.g. on different machines) and you want to assign tasks to a specific worker.
+NB2: It's possible to assign a worker more groups, and they can be also all the same, as
+``['mygroup','mygroup']``. Tasks will be distributed taking into consideration that
+a worker with group_names ``['mygroup','mygroup']`` is able to process the double of the tasks
+a worker with group_names ``['mygroup']`` is.
+- ``heartbeat`` is by default set to 3 seconds. This parameter is the one controlling how often a scheduler will check its status on the ``scheduler_worker`` table and see if there are any **ASSIGNED** tasks to itself to process.
+- ``max_empty_runs`` is 0 by default, that means that the worker will continue to process tasks as soon as they are **ASSIGNED**. If you set this to a value of, let's say, 10, a worker will die automatically if it's **ACTIVE** and no tasks are **ASSIGNED** to it for 10 loops. A loop is when a worker searches for tasks, every 3 seconds (or the set ``heartbeat``)
+- ``discard_results`` is False by default. If set to True, no scheduler_run records will be created.
+NB: scheduler_run records will be created as before for **FAILED**, **TIMEOUT** and
+**STOPPED** tasks's statuses.
+- ``utc_time`` is False by default. If you need to coordinate with workers living in different timezones, or don't have problems with solar/DST times, supplying datetimes from different countries, etc, you can set this to True. The scheduler will honour the UTC time and work leaving the local time aside. Caveat: you need to schedule tasks with UTC times (for start_time, stop_time, and so on.)
+
+Now we have the infrastructure in place: defined the tasks, told the scheduler about them, started the worker(s). What remains is to actually schedule the tasks
+
+
+##### Tasks
 Tasks can be scheduled programmatically or via appadmin. In fact, a task is scheduled simply by adding an entry in the table "scheduler_task", which you can access via appadmin:
 
 ``
-http://127.0.0.1:8000/scheduler/appadmin/insert/db/scheduler_task
+http://127.0.0.1:8000/myapp/appadmin/insert/db/scheduler_task
 ``
 
 The meaning of the fields in this table is obvious. The "args" and "vars"" fields are the values to be passed to the task in JSON format. In the case of the "task_add" above, an example of "args" and "vars" could be:
@@ -2133,15 +2197,63 @@ args = []
 vars = {'a':3, 'b':4}
 ``
 
-A task can be in one of the following states:
+The ``scheduler_task`` table is the one where tasks are organized.
+
+All tasks follow a lifecycle
+
+[[scheduler tasks http://yuml.me/ce8edcc3.jpg center]]
+
+Let's go with order. By default, when you send a task to the scheduler, you'll want that to be executed. It's in **QUEUED** status.
+If you need it to be executed later, use the ``start_time`` parameter (default = now).
+If for some reason you need to be sure that the task don't get executed after a certain point in time (maybe a request to a webservice
+that shuts down at 1AM, a mail that needs to be sent not after the working hours, etc...) you can set a ``stop_time`` (default = None) for it.
+If your task is NOT picked up by a worker before stop_time, it will be set as **EXPIRED**.
+Tasks with no stop_time set or picked up **BEFORE** stop_time are **ASSIGNED** to a worker. When a workers picks up them, they become **RUNNING**.
+**RUNNING** tasks may end up:
+- **TIMEOUT** when more than n seconds passed with ``timeout`` parameter (default = 60 seconds)
+- **FAILED** when an exception is detected
+- **COMPLETED** when all went ok
+
+Additionally, you can control how many times a task should be repeated (i.e. you need to aggregate some data at specified intervals). To do so, set the ``repeats``
+parameter (default = 1 time only, 0 = unlimited). You can influence how many seconds should pass between executions with the ``period`` parameter (default = 60 seconds).
+NB: the time is not calculated between the END of the first round and the START of the next, but from the START time of the first round to the START time of the next cycle)
+
+Another nice addition, you can set how many times the function can raise an exception (i.e. requesting data from a sloooow webservice) and be queued again instead of stopping in **FAILED**  status with the parameter ``retry_failed`` (default = 0, -1 = unlimited).
+
+[[task repeats http://yuml.me/7d8b85e4.jpg center]]
+
+Summary: you have
+- ``period`` and ``repeats`` to get an automatically rescheduled function
+- ``timeout`` to be sure that a function doesn't exceed a certain amount of time
+- ``retry_failed`` to control how many times the task can "fail"
+- ``start_time`` and ``stop_time`` to schedule a function in a restricted timeframe
+
+
+##### Reporting percentages
+
+A special "word" encountered in the print statements of your functions clear all
+the previous output. That word is ``!clear!``.
+This, coupled with the ``sync_output`` parameter, allows to report percentages
+a breeze. Let's see how that works:
 
 ``
-QUEUED, RUNNING, COMPLETED, FAILED, TIMEOUT
+def repoting_percentages():
+    time.sleep(5)
+    print '50%'
+    time.sleep(5)
+    print '!clear!100%'
+    return 1
 ``
 
-Once a task exists (there is a record in the "scheduler_task" table), is ``QUEUED``, and is ready (meets all the conditions specified in the record), it can be picked up by a worker. As soon as a worker is available, it picks the first ready task scheduled to run. The worker creates an entry in a another table, "scheduler_run" (also created by the scheduler).
+The function ``demo6`` sleeps for 5 seconds, outputs ``50%``.
+Then, it sleeps other 5 seconds and outputs ``100%``. Note that the output in the scheduler_run table is synced every 2 seconds and that the second print statement that contains ``!clear!100%`` gets the ``50%`` output cleared and replaced by ``100%`` only.
 
-The table "scheduler_run" stores the status of all running tasks. Each record references a task that has been picked up by a worker.  One task can have multiple runs. For example, a task scheduled to repeat 10 times an hour will probably have 10 runs (unless one fails or they take longer than 1 hour).
+``
+st.validate_and_insert(task_name='percentages', function_name='demo6', sync_output=2)
+``
+
+##### Results and output
+The table "scheduler_run" stores the status of all running tasks. Each record references a task that has been picked up by a worker.  One task can have multiple runs. For example, a task scheduled to repeat 10 times an hour will probably have 10 runs (unless one fails or they take longer than 1 hour). Beware that if the task has no return values, it is removed from the scheduler_run table as soon as it is finished.
 
 Possible run statuses are:
 
@@ -2149,7 +2261,6 @@ Possible run statuses are:
 RUNNING, COMPLETED, FAILED, TIMEOUT
 ``
 
-When a ``QUEUED`` task is picked up, it becomes a ``RUNNING`` task and its run status is also ``RUNNING``.
 If the run is completed, no exceptions are thrown, and there is no task timeout, the run is marked as ``COMPLETED`` and the task is marked as ``QUEUED`` or ``COMPLETED`` depending on whether it is supposed to run again at a later time. The output of the task is serialized in JSON and stored in the run record.
 
 When a ``RUNNING`` task throws an exception, the run is mark as ``FAILED`` and the task is marked as ``FAILED``. The traceback is stored in the run record.
@@ -2162,30 +2273,39 @@ Using appadmin, one can check all ``RUNNING`` tasks, the output of ``COMPLETED``
 
 The scheduler also creates one more table called "scheduler_worker", which stores the workers' heartbeat and their status. Possible worker statuses are:
 
-``
-ACTIVE, INACTIVE, DISABLED
-``
+##### Managing processes
+Worker fine management is hard. This module tries not to leave behind any platform (Mac, Win, Linux) .
 
-You can disable a worker by changing its status using appadmin.
+When you start a worker, you may want later to:
+- kill it "no matter what its doing"
+- kill it only if its not processing tasks
+- put it to sleep
+Maybe you have yet some tasks queued, and you want to save some resources.
+You know you want them processed every hour, so, you'll want to:
+- process all queued tasks and die automatically
+All of these things are possible managing ``Scheduler`` parameters or the ``scheduler_worker`` table.
+To be more precise, for started workers you will change the ``status`` value of any worker to influence
+its behaviour.
+As tasks, workers can be in some fixed statuses : ACTIVE, DISABLED, TERMINATE or KILLED.
+
+**ACTIVE** and **DISABLED** are "persistent", while **TERMINATE** or **KILL**, as statuses
+name suggest, are more "commands" than real statuses.
+Hitting ctrl+c is equal to set a worker to **KILL**
+
+[[workers statuses http://yuml.me/bd891eed.jpg center]]
 
 Everything that one can do via appadmin one can do programmatically by inserting and updating records in these tables.
 
-Anyway, one should not update records relative to ``RUNNING`` tasks as this may create an un-expected behavior. The best practice is to queue tasks using "insert". For example:
+Anyway, one should not update records relative to ``RUNNING`` tasks as this may create an un-expected behavior. The best practice is to queue tasks using "validate_and_insert". For example:
 
 ``
-db.scheduler_task.insert(
-    status='QUEUED',
-    application_name='myapp',
-    task_name='my first task',
+db.scheduler_task._validate_and_insert(
     function_name='task_add',
     args='[]',
     vars="{'a':3,'b':4}",
-    enabled=True,
-    start_time = request.now,
-    stop_time = request.now+datetime.timedelta(days=1),
     repeats = 10, # run 10 times
     period = 3600, # every 1h
-    timeout = 60, # should take less than 60 seconds
+    timeout = 120, # should take less than 120 seconds
     )
 ``:code
 
@@ -2201,9 +2321,6 @@ completed_runs = db(db.scheduler_run.status='COMPLETED').select()
 The scheduler is experimental because it needs more extensive testing and because the table structure may change as more features are added.
 ------
 
-- We recommend having a separate model file for definindg the tasks and instantiate ``Scheduler`` (after te tasks are defined).
-- We recommend that use at least one worker per application so that you have more control, although that is not strictly necessary.
-- If your tasks are defined in a module (as opposed to a model) you may have to restart the workers.
 
 ### Third party modules
 ``import``:inxx
