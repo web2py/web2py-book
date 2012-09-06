@@ -103,6 +103,7 @@ def search():
     info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=60*60*24)
     chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=60*60*24)
     results = []
+    content = H2('No results for "%s"' % search)
     for chapter in chapters:
         chapter_id = int(chapter[0])
         filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
@@ -120,8 +121,6 @@ def search():
                                                vars=dict(search=search),
                                                args=(book_id,chapter[0])),_class="btn"))
                         for chapter in results])
-    if not results:
-        response.flash = "no results"
     response.view = 'default/chapter.html'
     return locals()
 
