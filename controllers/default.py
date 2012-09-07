@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, glob
+import os, datetime
 session.forget()
 
 response.title = 'web2py'
@@ -74,8 +74,13 @@ def convert2html(book_id,text):
 def index():
     books = {}
     for subfolder in FOLDERS:        
-        books[subfolder] = get_info(subfolder)
+        books[subfolder] = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=60*60*24)
     return locals()
+
+def calc_date(now=request.utcnow.date()):
+    TOMORROW = now + datetime.timedelta(days=1)
+    format = '%a, %d %b %Y %H:%M:%S GMT'
+    return TOMORROW.strftime(format)
 
 def chapter():
     book_id, chapter_id = request.args(0), request.args(1,cast=int,default='0')
@@ -84,6 +89,9 @@ def chapter():
     chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=60*60*24)
     filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
     dest = os.path.join(request.folder, 'static_chaps', subfolder, '%.2i.html' % chapter_id)
+    response.headers['Cache-Control'] = 'public, must-revalidate'
+    response.headers['Expires'] = calc_date()
+    response.headers['Pragma'] = None
     if not os.path.isfile(dest):
         content = open(filename).read()
         content = convert2html(book_id,content).xml()
@@ -131,7 +139,10 @@ def image():
     filename = os.path.join(FOLDER,subfolder,'images',key)
     if not os.path.isfile(filename):
         raise HTTP(404)
-    return response.stream(open(filename,'r'))
+    response.headers['Cache-Control'] = 'public, must-revalidate'
+    response.headers['Expires'] = calc_date()
+    response.headers['Pragma'] = None
+    return response.stream(filename)
 
 
 def reference():
