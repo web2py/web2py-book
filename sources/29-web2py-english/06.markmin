@@ -992,7 +992,9 @@ Apparently similar to ``db.mytable[id]`` the above syntax is more flexible and s
 
 Consider the previous table person and a new table "thing" referencing a "person":
 ``
->>> db.define_table('thing', Field('name'), Field('owner','reference person'))
+>>> db.define_table('thing', 
+        Field('name'), 
+        Field('owner','reference person'))
 ``:code
 
 and a simple select from this table:
@@ -1675,7 +1677,16 @@ To illustrate how to implement one to many relations with the web2py DAL, define
                     format='%(name)s')
 ``:code
 
-Table "thing" has two fields, the name of the thing and the owner of the thing. When a field type is another table, it is intended that the field reference the other table by its id. In fact, you can print the actual type value and get:
+Table "thing" has two fields, the name of the thing and the owner of the thing. The "owner" field id a reference field. A reference type can be specified in two equivalent ways:
+
+``
+Field('owner', 'reference person')
+Field('owner', db.person)
+``:code
+
+The latter is always converted to the former. They are equivalent except in the case of lazy tables, self references or other types of cyclic references where the former notation is the only allowed notation.
+
+When a field type is another table, it is intended that the field reference the other table by its id. In fact, you can print the actual type value and get:
 ``
 >>> print db.thing.owner.type
 reference person
@@ -2460,9 +2471,9 @@ def cache_db_select():
 
 ``cacheable``:inxx
 
-The ``select`` method has an optional ``cacheable`` argument, normally set to ``False``. When a select is cached, ``cacheable`` is set to ``True``. This makes a simple ``Rows`` result which is serializable but The ``Row``s lack ``update_record`` and ``delete_record`` methods.
+The ``select`` method has an optional ``cacheable`` argument, normally set to ``False``. When ``cacheable=True`` the resulting ``Rows`` is serializable but The ``Row``s lack ``update_record`` and ``delete_record`` methods.
 
-If you do not need these methods you can speed up selects even if you do not plan to cache then by setting the cacheable attribute:
+If you do not need these methods you can speed up selects a lot by setting the cacheable attribute:
 
 ``
 rows = db(query).select(cacheable=True)
@@ -2472,19 +2483,17 @@ rows = db(query).select(cacheable=True)
 The results of a ``select`` are normally complex, un-pickleable objects; they cannot be stored in a session and cannot be cached in any other way than the one explained here unless the ``cache`` attribute is set or ``cacheable=True``.
 -------
 
+When the ``cache`` argument is set but ``cacheable=False`` (default) only the database results are cached, not the actual Rows object. When the ``cache`` argument is used in conjuction with ``cacheable=True`` the entire Rows object is cached and this results in much baster caching:
+
+``
+rows = db(query).select(cache=(cache.ram,3600),cacheable=True)
+``:code
+
 ### Self-Reference and aliases
 
 ``self reference``:inxx
 ``alias``:inxx
-It is possible to define tables with fields that refer to themselves although the usual notation may fail. The following code would be wrong because it uses a variable ``db.person`` before it is defined:
-``
-db.define_table('person',
-    Field('name'),
-    Field('father_id', 'reference person'),
-    Field('mother_id', 'reference person'))
-``:code
-
-The solution consists of using an alternate notation
+It is possible to define tables with fields that refer to themselves, here is an example:
 ``reference table``:inxx
 ``
 db.define_table('person',
@@ -2493,7 +2502,15 @@ db.define_table('person',
     Field('mother_id', 'reference person'))
 ``:code
 
-In fact ``db.tablename`` and ``"reference tablename"`` are equivalent field types.
+Notice that the alterantive notation of using a table object as field type will fail in this case, because it uses a variable ``db.person`` before it is defined:
+``
+db.define_table('person',
+    Field('name'),
+    Field('father_id', db.person), # wrong!
+    Field('mother_id', db.person)) # wrong!
+``:code
+
+In general ``db.tablename`` and ``"reference tablename"`` are equivalent field types, but the latter is the only one allowed for self.references.
 
 ``with_alias``:inxx
 If the table refers to itself, then it is not possible to perform a JOIN to select a person and its parents without use of the SQL "AS" keyword. This is achieved in web2py using the ``with_alias``. Here is an example:
