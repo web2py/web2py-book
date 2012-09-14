@@ -11,7 +11,7 @@ def splitter(x):
     return a.strip(),b.strip()
 
 @cache('folders',None)
-def get_folders():
+def get_folders(dummy=None):
     folder = os.path.join(request.folder,'sources')
     return folder, [f for f in os.listdir(folder) 
                     if os.path.isdir(os.path.join(folder,f))]
@@ -42,7 +42,7 @@ def get_chapters(subfolder):
     return chapters
 
 @cache('menu',None)
-def build_menu():
+def build_menu(dummy=None):
     menu = []
     submenu = []
     for subfolder in FOLDERS:
@@ -78,9 +78,12 @@ def index():
     return locals()
 
 def calc_date(now=request.utcnow.date()):
-    TOMORROW = now + datetime.timedelta(days=1)
-    format = '%a, %d %b %Y %H:%M:%S GMT'
-    return TOMORROW.strftime(format)
+    # if you are changing sources often remove the 
+    # comment from the next 2 lines
+    # import datetime
+    # now = now + datetime.timedelta(days=1)
+    format = '%a, %d %b %Y 23:59:59 GMT'
+    return now.strftime(format)
 
 def chapter():
     book_id, chapter_id = request.args(0), request.args(1,cast=int,default='0')
