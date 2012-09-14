@@ -746,7 +746,7 @@ labels = {'dog.owner':"This person's dogs"}
 
 If you click on the link you get directed to:
 ``
-/test/default/list_records/dog?query=dog.owner%3D5
+/test/default/list_records/dog?query=db.dog.owner%3D%3D5
 ``:code
 
 "list_records" is the specified action, with ``request.args(0)`` set to the name of the referencing table and ``request.vars.query`` set to the SQL query string.
@@ -757,9 +757,12 @@ contains the value "dog.owner=5" appropriately url-encoded
 You can easily implement a very general "list_records" action as follows:
 ``
 def list_records():
-    table = request.args(0)
-    query = request.vars.query
-    records = db(query).select(db[table].ALL)
+    REGEX = re.compile('^(\w+)\.(\w+)\.(\w+)\=\=(\d+)$')
+    match = REGEX.match(request.vars.query)
+    if not match:
+        redirect(URL('error'))
+    table, field, id = match.group(2), match.group(3), match.group(4)
+    records = db(db[table][field]==id).select()
     return dict(records=records)
 ``:code
 
