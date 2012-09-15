@@ -266,3 +266,173 @@ As noted in Chapter 4, this type of background process should not be executed vi
 
 Note, one drawback to sending email via a background process is that it makes it difficult to provide feedback to the user in case the email fails. If email is sent directly from the controller action, you can catch any errors and immediately return an error message to the user. With a background process, however, the email is sent asynchronously, after the controller action has already returned its response, so it becomes more complex to notify the user of a failure.
 
+
+### Reading email boxes (Experimental)
+
+The ``IMAP`` adapter is intended as an interface with email IMAP servers to perform simple queries in the web2py ``DAL`` query syntax, so email read, search and other related IMAP mail services (as those implemented by brands like Google(r), and Yahoo(r) can be managed from web2py applications.
+
+It creates its table and field names "statically", meaning that the developer should leave the table and field definitions to the DAL instance by calling the adapter ``.define_tables()`` method. The tables are defined with the IMAP server mailbox list information.
+
+
+#### Connection
+
+For a single mail account, this is the code recommended to start imap support at the app's model
+
+``
+# Replace user, password, server and port in the connection string
+# Set port as 993 for ssl support
+imapdb = DAL("imap://user:password@server:port", pool_size=1)
+imapdb.define_tables()
+``:code
+
+Note that ``<imapdb>.define_tables()`` returns a dictionary of strings mapping dal tablenames to the server mailbox names with the structure ``{<tablename>: <server mailbox name>, ...}``, so you can get the actual mailbox name in the IMAP server.
+
+
+To handle the different native mailbox names for the user interface,  the following attributes give access to the adapter auto mailbox mapped names (which native mailbox has what table name and vice versa):
+
+-------------------------------------------------------
+**Attribute** | **Type** | **Format**
+=======================================================================
+imapdb.mailboxes | dict | {<tablename>: <server native name>, ...}
+imapdb.mailbox_names | dict | {<server native name>: <tablename>, ...}
+=======================================================================
+-------------------------------------------------------
+
+
+The second can be useful to retrieve imap query sets by the native email service mailbox
+``
+# mailbox is a string containing the actual mailbox name
+tablename = imapdb.mailbox_names[mailbox]
+myset = imapdb(imapdb[tablename])
+``:code
+
+#### Fetching mail and updating flags
+
+Here's a list of imap commands you could use in the controller. For the examples, it's assumed that your imap service has a mailbox named ``INBOX``, which is the case for Gmail(r) accounts.
+
+
+To count today's unseen messages smaller than 6000 octets from the inbox mailbox do
+``
+q = imapdb.INBOX.seen == False
+q &= imapdb.INBOX.created == datetime.date.today()
+q &= imapdb.INBOX.size < 6000
+unread = imapdb(q).count()
+``:code
+
+
+You can fetch the previous query messages with
+``
+rows = imapdb(q).select()
+``:code
+
+
+Usual query operators are implemented, including belongs
+
+``
+messages = imapdb(imapdb.INBOX.uid.belongs(<uid sequence>)).select()
+``:code
+
+**Note**: It's strongly adviced that you keep the query results below a given data size threshold to avoid jamming the server with large select commands. As of now, the messages are retrieved entirely by the adapter before any filter by field can be applied.
+
+It is possible to filter query select results with limitby and sequences of mailbox fields
+``
+# Replace the arguments with actual values
+myset.select(<fields sequence>, limitby=(<int>, <int>))
+``:code
+
+Say you want to have an app action show a mailbox message. First we retrieve the message (If your IMAP service supports it, fetch messages by ``uid`` field to avoid using old sequence references).
+
+``
+mymessage = imapdb(imapdb.INBOX.uid == <uid>).select().first()
+``:code
+
+Otherwise, you can use the message's ``id``.
+
+``
+mymessage = imapdb.INBOX[<id>]
+``:code
+
+Note that using the id in a reference field is not supported, because there's no way of writing to the tables the same way as in other standard database adapters. If you still want to record references to messages in another database, the solution is to use the uid field as reference whenever supported, and retrieve each message with the recorded value.
+
+
+Finally, add something like the following to show the message content in a view
+
+``
+{{=P(T("Message from"), " ", mymessage.sender)}}
+{{=P(T("Received on"), " ", mymessage.created)}}
+{{=H5(mymessage.subject)}}
+{{for text in mymessage.content:}}
+  {{=DIV(text)}}
+  {{=TR()}}
+{{pass}}
+``:code
+
+As expected, we can take advantage of the ``SQLTABLE`` helper to build message lists in views
+
+``
+{{=SQLTABLE(myset.select(), linkto=URL(...))}}
+``:code
+
+And of course, it's possible to feed a form helper with the appropiate sequence id value
+
+``
+{{=SQLFORM(imapdb.INBOX, <message id>, fields=[...])}}
+``:code
+
+The current adapter supported fields available are the as follows:
+
+---------------------------------------
+**Field** | **Type** | **Description**
+=======================================
+uid | string |
+answered | boolean | Flag
+created | date |
+content | list:string | A list of text or html parts
+to | string |
+cc | string |
+bcc | string |
+size | integer | the amount of octets of the message*
+deleted | boolean | Flag
+draft | boolean | Flag
+flagged | boolean | Flag
+sender | string |
+recent | boolean | Flag
+seen | boolean  | Flag
+subject | string|
+mime | string | The mime header declaration
+email | string | The complete RFC822 message**
+attachments | list:string | Each non text decoded part as string
+================================================================
+----------------------------------------------------------------
+
+*At the application side it is measured as the length of the RFC822
+message string
+
+**WARNING**: As row id's are mapped to email sequence numbers, make sure your imap client web2py app does not delete messages
+during select or update actions, to prevent updating or deleting different messages.
+
+Sequence numbers change whenever the mailbox is updated. To avoid this sequence numbers issues, it is recommended the use
+of uid fields in query references (although the update and delete in separate actions rule still applies).
+
+
+To mark last query messages as seen
+``
+seen = imapdb(q).update(seen=True)
+``:code
+
+
+Here we delete messages in the imap database that have mails from mr. Gumby
+``
+deleted = 0
+for tablename in imapdb.tables
+    deleted += imapdb(imapdb[tablename].sender.contains("gumby")).delete()
+``:code
+
+
+It is possible also to mark messages for deletion instead of ereasing them
+directly with
+``
+myset.update(deleted=True)
+``:code
+
+``IMAP``:inxx
