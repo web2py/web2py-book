@@ -1,0 +1,1358 @@
+## Services
+``Web Services``:inxx ``API``:inxx
+
+The W3C defines a web service as "a software system designed to support interoperable machine-to-machine interaction over a network". This is a broad definition, and it encompasses a large number of protocols designed not for machine-to-human communication, but for machine-to-machine communication such as XML, JSON, RSS, etc.
+
+In this chapter we discuss how to expose web services using web2py. If you are interested in examples of consuming third party services (Twitter, Dropbox, etc.) you should look into Chapter 9 and Chapter 14.
+
+web2py provides, out of the box, support for many protocols, including XML, JSON, RSS, CSV, XMLRPC, JSONRPC, AMFRPC, and SOAP. web2py can also be extended to support additional protocols.
+
+Each of those protocols are supported in multiple ways, and we make a distinction between:
+- Rendering the output of a function in a given format (for example XML, JSON, RSS, CSV)
+- Remote Procedure Calls (for example XMLRPC, JSONRPC, AMFRPC)
+
+### Rendering a dictionary
+
+#### HTML, XML, and JSON
+``HTML``:inxx ``XML``:inxx ``JSON``:inxx
+
+Consider the following action:
+``
+def count():
+    session.counter = (session.counter or 0) + 1
+    return dict(counter=session.counter, now=request.now)
+``:code
+
+This action returns a counter that is increased by one when a visitor reloads the page, and the timestamp of the current page request.
+
+Normally this page would be requested via:
+
+``
+http://127.0.0.1:8000/app/default/count
+``:code
+
+and rendered in HTML. Without writing one line of code, we can ask web2py to render this page using different protocols by adding an extension to the URL:
+
+``
+http://127.0.0.1:8000/app/default/count.html
+http://127.0.0.1:8000/app/default/count.xml
+http://127.0.0.1:8000/app/default/count.json
+``:code
+
+The dictionary returned by the action will be rendered in HTML, XML and JSON, respectively.
+
+Here is the XML output:
+``
+<document>
+   <counter>3</counter>
+   <now>2009-08-01 13:00:00</now>
+</document>
+``:code
+
+Here is the JSON output:
+``
+{ 'counter':3, 'now':'2009-08-01 13:00:00' }
+``:code
+
+Notice that date, time and datetime objects are rendered as strings in ISO format. This is not part of the JSON standard, but rather a web2py convention.
+
+#### Generic views
+
+When, for example, the ".xml" extension is called, web2py looks for a template file called "default/count.xml", and if it does not find it, looks for a template called "generic.xml".  The files "generic.html", "generic.xml", "generic.json" are provided with the current scaffolding application. Other extensions can be easily defined by the user.
+
+------
+For security reasons the generic views are only allowed to be accessed on localhost. In order to enable the access from remote clients you may need to set the response.generic_patterns.
+------
+Assuming you are using a copy of scaffold app, edit the following line in models/db.py
+
+- restrict access only to localhost
+``
+response.generic_patterns = ['*'] if request.is_local else []
+``:code
+
+- to allow all generic views
+``
+response.generic_patterns = ['*']
+``:code
+
+- to allow only .json
+
+``
+response.generic_patterns = ['*.json']
+``:code
+
+The generic_patterns is a glob pattern, it means you can use any patterns that matches with your app actions or pass a list of patterns.
+
+``
+response.generic_patterns = ['*.json','*.xml']
+``:code
+
+
+To use it in an older web2py app, you may need to copy the "generic.*" files from a later scaffolding app (after version 1.60).
+
+Here is the code for "generic.html"
+``
+{{extend 'layout.html'}}
+
+{{=BEAUTIFY(response._vars)}}
+
+<button onclick="document.location='{{=URL("admin","default","design",
+args=request.application)}}'">admin</button>
+<button onclick="jQuery('#request').slideToggle()">request</button>
+<div class="hidden" id="request"><h2>request</h2>{{=BEAUTIFY(request)}}</div>
+<button onclick="jQuery('#session').slideToggle()">session</button>
+<div class="hidden" id="session"><h2>session</h2>{{=BEAUTIFY(session)}}</div>
+<button onclick="jQuery('#response').slideToggle()">response</button>
+<div class="hidden" id="response"><h2>response</h2>{{=BEAUTIFY(response)}}</div>
+<script>jQuery('.hidden').hide();</script>
+``:code
+
+Here is the code for "generic.xml"
+``
+{{
+try:
+   from gluon.serializers import xml
+   response.write(xml(response._vars),escape=False)
+   response.headers['Content-Type']='text/xml'
+except:
+   raise HTTP(405,'no xml')
+}}
+``:code
+
+And here is the code for "generic.json"
+``
+{{
+try:
+   from gluon.serializers import json
+   response.write(json(response._vars),escape=False)
+   response.headers['Content-Type']='text/json'
+except:
+   raise HTTP(405,'no json')
+}}
+``:code
+
+Any dictionary can be rendered in HTML, XML and JSON as long as it only contains python primitive types (int, float, string, list, tuple, dictionary). ``response._vars`` contains the dictionary returned by the action.
+
+If the dictionary contains other user-defined or web2py-specific objects, they must be rendered by a custom view.
+
+#### Rendering ``Rows``
+``as_list``:inxx
+
+If you need to render a set of Rows as returned by a select in XML or JSON or another format,
+first transform the Rows object into a list of dictionaries using the ``as_list()`` method.
+
+Consider for example the following mode:
+``
+db.define_table('person', Field('name'))
+``:code
+
+The following action can be rendered in HTML, but not in XML or JSON:
+``
+def everybody():
+    people = db().select(db.person.ALL)
+    return dict(people=people)
+``:code
+
+while the following action can rendered in XML and JSON:
+
+``
+def everybody():
+    people = db().select(db.person.ALL).as_list()
+    return dict(people=people)
+``:code
+
+#### Custom formats
+
+If, for example, you want to render an action as a Python pickle:
+
+``
+http://127.0.0.1:8000/app/default/count.pickle
+``:code
+
+you just need to create a new view file "default/count.pickle" that contains:
+``
+{{
+import cPickle
+response.headers['Content-Type'] = 'application/python.pickle'
+response.write(cPickle.dumps(response._vars),escape=False)
+}}
+``:code
+
+If you want to be able to render any action as a pickled file, you need only to save the above file with the name "generic.pickle".
+
+Not all objects are pickleable, and not all pickled objects can be un-pickled. It is safe to stick to primitive Python objects and combinations of them. Objects that do not contain references to file streams or database connections are usually pickleable, but they can only be un-pickled in an environment where the classes of all pickled objects are already defined.
+
+#### RSS
+``RSS``:inxx
+
+web2py includes a "generic.rss" view that can render the dictionary returned by the action as an RSS feed.
+
+Because the RSS feeds have a fixed structure (title, link, description, items, etc.) then for this to work, the dictionary returned by the action must have the proper structure:
+``
+{'title'      : '',
+ 'link'       : '',
+ 'description': '',
+ 'created_on' : '',
+ 'entries'    : []}
+``:code
+
+and each entry in entries must have the same similar structure:
+
+``
+{'title'      : '',
+ 'link'       : '',
+ 'description': '',
+ 'created_on' : ''}
+``:code
+
+For example the following action can be rendered as an RSS feed:
+``
+def feed():
+    return dict(title="my feed",
+                link="http://feed.example.com",
+                description="my first feed",
+                entries=[
+                  dict(title="my feed",
+                  link="http://feed.example.com",
+                  description="my first feed")
+                ])
+``:code
+
+by simply visiting the URL:
+
+``
+http://127.0.0.1:8000/app/default/feed.rss
+``:code
+
+Alternatively, assuming the following model:
+``
+db.define_table('rss_entry',
+    Field('title'),
+    Field('link'),
+    Field('created_on','datetime'),
+    Field('description'))
+``:code
+
+the following action can also be rendered as an RSS feed:
+
+``
+def feed():
+    return dict(title="my feed",
+                link="http://feed.example.com",
+                description="my first feed",
+                entries=db().select(db.rss_entry.ALL).as_list())
+``:code
+
+The ``as_list()`` method of a Rows object converts the rows into a list of dictionaries.
+
+If additional dictionary items are found with key names not explicitly listed here, they are ignored.
+
+Here is the "generic.rss" view provided by web2py:
+``
+{{
+try:
+   from gluon.serializers import rss
+   response.write(rss(response._vars),escape=False)
+   response.headers['Content-Type']='application/rss+xml'
+except:
+   raise HTTP(405,'no rss')
+}}
+``:code
+
+As one more example of an RSS application, we consider an RSS aggregator that collects data from the "slashdot" feed and returns a new web2py rss feed.
+``
+def aggregator():
+    import gluon.contrib.feedparser as feedparser
+    d = feedparser.parse(
+        "http://rss.slashdot.org/Slashdot/slashdot/to")
+    return dict(title=d.channel.title,
+                link = d.channel.link,
+                description = d.channel.description,
+                created_on = request.now,
+                entries = [
+                  dict(title = entry.title,
+                  link = entry.link,
+                  description = entry.description,
+                  created_on = request.now) for entry in d.entries])
+``:code
+
+It can be accessed at:
+
+``
+http://127.0.0.1:8000/app/default/aggregator.rss
+``:code
+
+#### CSV
+``CSV``:inxx
+
+The Comma Separated Values (CSV) format is a protocol to represent tabular data.
+
+Consider the following model:
+``
+db.define_table('animal',
+    Field('species'),
+    Field('genus'),
+    Field('family'))
+``:code
+
+and the following action:
+``
+def animals():
+    animals = db().select(db.animal.ALL)
+    return dict(animals=animals)
+``:code
+
+web2py does not provide a "generic.csv"; you must define a custom view "default/animals.csv"
+that serializes the animals into CSV. Here is a possible implementation:
+``
+{{
+import cStringIO
+stream=cStringIO.StringIO()
+animals.export_to_csv_file(stream)
+response.headers['Content-Type']='application/vnd.ms-excel'
+response.write(stream.getvalue(), escape=False)
+}}
+``:code
+
+Notice that one could also define a "generic.csv" file, but one would have to specify the name of the object to be serialized ("animals" in the example). This is why we do not provide a "generic.csv" file.
+
+### Remote procedure calls
+``RPC``:inxx
+
+web2py provides a mechanism to turn any function into a web service.
+The mechanism described here differs from the mechanism described before because:
+- The function may take arguments
+- The function may be defined in a model or a module instead of controller
+- You may want to specify in detail which RPC method should be supported
+- It enforces a more strict URL naming convention
+- It is smarter than the previous methods because it works for a fixed set of protocols. For the same reason it is not as easily extensible.
+
+To use this feature:
+
+First, you must import and initiate a service object.
+``
+from gluon.tools import Service
+service = Service()
+``:code
+
+-------
+This is already done in the "db.py" model file in the scaffolding application.
+-------
+
+Second, you must expose the service handler in the controller:
+``
+def call():
+    session.forget()
+    return service()
+``:code
+
+-------
+This is already done in the "default.py" controller of the scaffolding application. Remove ``session.forget()`` if you plan to use session cookies with the services.
+-------
+
+Third, you must decorate those functions you want to expose as a service. Here is a list of currently supported decorators:
+``
+@service.run
+@service.xml
+@service.json
+@service.rss
+@service.csv
+@service.xmlrpc
+@service.jsonrpc
+@service.amfrpc3('domain')
+@service.soap('FunctionName',returns={'result':type},args={'param1':type,})
+``:code
+
+As an example, consider the following decorated function:
+``
+@service.run
+def concat(a,b):
+    return a+b
+``:code
+
+This function can be defined in a model or in the controller where the ``call`` action is defined. This function can now be called remotely in two ways:
+
+``
+http://127.0.0.1:8000/app/default/call/run/concat?a=hello&b=world
+http://127.0.0.1:8000/app/default/call/run/concat/hello/world
+``:code
+
+In both cases the http request returns:
+``
+helloworld
+``:code
+
+If the ``@service.xml`` decorator is used, the function can be called via:
+
+``
+http://127.0.0.1:8000/app/default/call/xml/concat?a=hello&b=world
+http://127.0.0.1:8000/app/default/call/xml/concat/hello/world
+``:code
+
+and the output is returned as XML:
+``
+<document>
+   <result>helloworld</result>
+</document>
+``:code
+
+It can serialize the output of the function even if this is a DAL Rows object. In this case, in fact, it will call ``as_list()`` automatically.
+
+If the ``@service.json`` decorator is used, the function can be called via:
+
+``
+http://127.0.0.1:8000/app/default/call/json/concat?a=hello&b=world
+http://127.0.0.1:8000/app/default/call/json/concat/hello/world
+``:code
+
+and the output returned as JSON.
+
+If the ``@service.csv`` decorator is used, the service handler requires, as the return value, an iterable object of iterable objects, such as a list of lists. Here is an example:
+``
+@service.csv
+def table1(a,b):
+    return [[a,b],[1,2]]
+``:code
+
+This service can be called by visiting one of the following URLs:
+
+``
+http://127.0.0.1:8000/app/default/call/csv/table1?a=hello&b=world
+http://127.0.0.1:8000/app/default/call/csv/table1/hello/world
+``:code
+
+and it returns:
+``
+hello,world
+1,2
+``:code
+
+The ``@service.rss`` decorator expects a return value in the same format as the "generic.rss" view discussed in the previous section.
+
+Multiple decorators are allowed for each function.
+
+So far, everything discussed in this section is simply an alternative to the method described in the previous section. The real power of the service object comes with XMLRPC, JSONRPC and AMFRPC, as discussed below.
+
+#### XMLRPC
+``XMLRPC``:inxx
+
+Consider the following code, for example, in the "default.py" controller:
+``
+@service.xmlrpc
+def add(a,b):
+    return a+b
+
+@service.xmlrpc
+def div(a,b):
+    return a/b
+``:code
+
+Now in a python shell you can do
+``
+>>> from xmlrpclib import ServerProxy
+>>> server = ServerProxy(
+       'http://127.0.0.1:8000/app/default/call/xmlrpc')
+>>> print server.add(3,4)
+7
+>>> print server.add('hello','world')
+'helloworld'
+>>> print server.div(12,4)
+3
+>>> print server.div(1,0)
+ZeroDivisionError: integer division or modulo by zero
+``:code
+
+The Python xmlrpclib module provides a client for the XMLRPC protocol. web2py acts as the server.
+
+The client connects to the server via ServerProxy and can remotely call decorated functions in the server. The data (a,b) is passed to the function(s), not via GET/POST variables, but properly encoded in the request body using the XMLPRC protocol, and thus it carries with itself type information (int or string or other). The same is true for the return value(s). Moreover, any exception raised on the server propagates back to the client.
+
+There are XMLRPC libraries for many programming languages (including C, C++, Java, C#, Ruby, and Perl), and they can interoperate with each other. This is one the best methods to create applications that talk to each other independent of the programming language.
+
+The XMLRPC client can also be implemented inside a web2py action, so that one action can talk to another web2py application (even within the same installation) using XMLRPC. Beware of session deadlocks in this case. If an action calls via XMLRPC a function in the same app, the caller must release the session lock before the call:
+``
+session.forget(response)
+``:code
+
+#### JSONRPC
+
+``JSONRPC``:inxx
+
+In this section we are going to use the same code example as for XMLRPC but we will expose the service using JSONRPC instead:
+
+``
+@service.jsonrpc
+def add(a,b):
+    return a+b
+
+def call():
+    return service()
+``:code
+
+JSONRPC is very similar to XMLRPC but uses JSON instead of XML as data serialization protocol.
+
+Of course we can call the service from any program in any language but here we will do it in Python. web2py ships with a module "gluon/contrib/simplejsonrpc.py" created by Mariano Reingart. Here is an example of how to use to call the above service:
+
+``
+>>> from gluon.contrib.simplejsonrpc import
+>>> URL = "http://127.0.0.1:8000/app/default/call/jsonrpc"
+>>> service = ServerProxy(URL, verbose=True)
+>>> print service.add(1, 2)
+``:code
+
+#### JSONRPC and Pyjamas
+``JSONRPC``:inxx ``Pyjamas``:inxx
+
+JSONRPC is very similar to XMLRPC, but uses the JSON-based protocol instead of XML to encode the data. As an example of application here, we discuss its usage with Pyjamas. Pyjamas is a Python port of the Google Web Toolkit (originally written in Java). Pyjamas allows writing a client application in Python. Pyjamas translates this code into JavaScript. web2py serves the JavaScript and communicates with it via AJAX requests originating from the client and triggered by user actions.
+
+Here we describe how to make Pyjamas work with web2py. It does not require any additional libraries other than web2py and Pyjamas.
+
+We are going to build a simple "todo" application with a Pyjamas client (all JavaScript) that talks to the server exclusively via JSONRPC.
+
+First, create a new application called "todo".
+
+Second, in "models/db.py", enter the following code:
+``
+db=DAL('sqlite://storage.sqlite')
+db.define_table('todo', Field('task'))
+service = Service()
+``:code
+
+''(Note: Service class is from gluon.tools).''
+
+Third, in "controllers/default.py", enter the following code:
+``
+    def index():
+    redirect(URL('todoApp'))
+
+    @service.jsonrpc
+    def getTasks():
+        todos = db(db.todo).select()
+        return [(todo.task,todo.id) for todo in todos]
+
+    @service.jsonrpc
+    def addTask(taskFromJson):
+        db.todo.insert(task= taskFromJson)
+        return getTasks()
+
+    @service.jsonrpc
+    def deleteTask (idFromJson):
+        del db.todo[idFromJson]
+        return getTasks()
+
+    def call():
+        session.forget()
+        return service()
+
+    def todoApp():
+        return dict()
+``:code
+
+The purpose of each function should be obvious.
+
+Fourth, in "views/default/todoApp.html", enter the following code:
+``
+<html>
+  <head>
+    <meta name="pygwt:module"
+     content="{{=URL('static','output/TodoApp')}}" />
+    <title>
+      simple todo application
+    </title>
+  </head>
+  <body bgcolor="white">
+    <h1>
+      simple todo application
+    </h1>
+    <i>
+      type a new task to insert in db,
+      click on existing task to delete it
+    </i>
+    <script language="javascript"
+     src="{{=URL('static','output/pygwt.js')}}">
+    </script>
+  </body>
+</html>
+``:code
+
+This view just executes the Pyjamas code in "static/output/todoapp" - code that we have not yet created.
+
+Fifth, in "static/TodoApp.py" (notice it is TodoApp, not todoApp!),
+enter the following client code:
+``
+from pyjamas.ui.RootPanel import RootPanel
+from pyjamas.ui.Label import Label
+from pyjamas.ui.VerticalPanel import VerticalPanel
+from pyjamas.ui.TextBox import TextBox
+import pyjamas.ui.KeyboardListener
+from pyjamas.ui.ListBox import ListBox
+from pyjamas.ui.HTML import HTML
+from pyjamas.JSONService import JSONProxy
+
+class TodoApp:
+    def onModuleLoad(self):
+        self.remote = DataService()
+        panel = VerticalPanel()
+
+        self.todoTextBox = TextBox()
+        self.todoTextBox.addKeyboardListener(self)
+
+        self.todoList = ListBox()
+        self.todoList.setVisibleItemCount(7)
+        self.todoList.setWidth("200px")
+        self.todoList.addClickListener(self)
+        self.Status = Label("")
+
+        panel.add(Label("Add New Todo:"))
+        panel.add(self.todoTextBox)
+        panel.add(Label("Click to Remove:"))
+        panel.add(self.todoList)
+        panel.add(self.Status)
+        self.remote.getTasks(self)
+
+        RootPanel().add(panel)
+
+    def onKeyUp(self, sender, keyCode, modifiers):
+        pass
+
+    def onKeyDown(self, sender, keyCode, modifiers):
+        pass
+
+    def onKeyPress(self, sender, keyCode, modifiers):
+        """
+        This function handles the onKeyPress event, and will add the
+        item in the text box to the list when the user presses the
+        enter key. In the future, this method will also handle the
+        auto complete feature.
+        """
+        if keyCode == KeyboardListener.KEY_ENTER and \
+           sender == self.todoTextBox:
+            id = self.remote.addTask(sender.getText(),self)
+            sender.setText("")
+            if id<0:
+                RootPanel().add(HTML("Server Error or Invalid Response"))
+
+    def onClick(self, sender):
+        id = self.remote.deleteTask(
+                sender.getValue(sender.getSelectedIndex()),self)
+        if id<0:
+            RootPanel().add(
+                HTML("Server Error or Invalid Response"))
+
+    def onRemoteResponse(self, response, request_info):
+        self.todoList.clear()
+        for task in response:
+            self.todoList.addItem(task[0])
+            self.todoList.setValue(self.todoList.getItemCount()-1,
+                                   task[1])
+
+    def onRemoteError(self, code, message, request_info):
+        self.Status.setText("Server Error or Invalid Response: " \
+                            + "ERROR " + code + " - " + message)
+
+class DataService(JSONProxy):
+    def __init__(self):
+        JSONProxy.__init__(self, "../../default/call/jsonrpc",
+                           ["getTasks", "addTask","deleteTask"])
+
+if __name__ == '__main__':
+    app = TodoApp()
+    app.onModuleLoad()
+``:code
+
+Sixth, run Pyjamas before serving the application:
+``
+cd /path/to/todo/static/
+python /python/pyjamas-0.5p1/bin/pyjsbuild TodoApp.py
+``:code
+
+This will translate the Python code into JavaScript so that it can be executed in the browser.
+
+To access this application, visit the URL:
+
+``
+http://127.0.0.1:8000/todo/default/todoApp
+``:code
+
+This subsection was created by Chris Prinos with help from Luke Kenneth Casson Leighton (creators of Pyjamas), updated by Alexei Vinidiktov. It has been tested with Pyjamas 0.5p1. The example was inspired by this Django page in ref.``blogspot1``:cite.
+
+#### Amfrpc
+``PyAMF``:inxx ``Adobe Flash``:inxx
+
+AMFRPC is the Remote Procedure Call protocol used by Flash clients to communicate with a server. web2py supports AMFRPC, but it requires that you run web2py from source and that you preinstall the PyAMF library. This can be installed from the Linux or Windows shell by typing:
+``
+easy_install pyamf
+``:code
+
+(please consult the PyAMF documentation for more details).
+
+In this subsection we assume that you are already familiar with
+ActionScript programming.
+
+We will create a simple service that takes two numerical values, adds them together, and returns the sum. We will call our web2py application "pyamf_test", and we will call the service ``addNumbers``.
+
+First, using Adobe Flash (any version starting from MX 2004), create the Flash client application by starting with a new Flash FLA file. In the first frame of the file, add these lines:
+``
+import mx.remoting.Service;
+import mx.rpc.RelayResponder;
+import mx.rpc.FaultEvent;
+import mx.rpc.ResultEvent;
+import mx.remoting.PendingCall;
+
+var val1 = 23;
+var val2 = 86;
+
+service = new Service(
+    "http://127.0.0.1:8000/pyamf_test/default/call/amfrpc3",
+    null, "mydomain", null, null);
+
+var pc:PendingCall = service.addNumbers(val1, val2);
+pc.responder = new RelayResponder(this, "onResult", "onFault");
+
+function onResult(re:ResultEvent):Void {
+    trace("Result : " + re.result);
+    txt_result.text = re.result;
+}
+
+function onFault(fault:FaultEvent):Void {
+    trace("Fault: " + fault.fault.faultstring);
+}
+
+stop();
+``:code
+
+This code allows the Flash client to connect to a service that corresponds to a function called "addNumbers" in the file "/pyamf_test/default/gateway". You must also import ActionScript version 2 MX remoting classes to enable Remoting in Flash. Add the path to these classes to the classpath settings in the Adobe Flash IDE, or just place the "mx" folder next to the newly created file.
+
+Notice the arguments of the Service constructor. The first argument is the URL corresponding to the service that we want will create. The third argument is the domain of the service. We choose to call this domain "mydomain".
+
+Second, create a dynamic text field called
+"txt_result" and place it on the stage.
+
+Third, you need to set up a web2py gateway that can communicate with the Flash client defined above.
+
+Proceed by creating a new web2py app called ``pyamf_test`` that will host the new service and the AMF gateway for the flash client.
+Edit the "default.py" controller and make sure it contains
+``
+@service.amfrpc3('mydomain')
+def addNumbers(val1, val2):
+    return val1 + val2
+
+def call(): return service()
+``:code
+
+Fourth, compile and export/publish the SWF flash client as ``pyamf_test.swf``, place the "pyamf_test.amf", "pyamf_test.html", "AC_RunActiveContent.js", and "crossdomain.xml" files in the "static" folder of the newly created appliance that is hosting the gateway, "pyamf_test".
+
+You can now test the client by visiting:
+
+``
+http://127.0.0.1:8000/pyamf_test/static/pyamf_test.html
+``:code
+
+The gateway is called in the background when the client connects to addNumbers.
+
+If you are using AMF0 instead of AMF3 you can also use the decorator:
+``
+@service.amfrpc
+``:code
+
+instead of:
+``
+@service.amfrpc3('mydomain')
+``:code
+
+In this case you also need to change the service URL to:
+
+``
+http://127.0.0.1:8000/pyamf_test/default/call/amfrpc
+``:code
+
+#### SOAP
+``SOAP``:inxx
+
+web2py includes a SOAP client and server created by Mariano Reingart. It can be used very much like XML-RPC:
+
+Consider the following code, for example, in the "default.py" controller:
+``
+@service.soap('MyAdd',returns={'result':int},args={'a':int,'b':int,})
+def add(a,b):
+    return a+b
+``:code
+
+Now in a python shell you can do:
+``
+>>> from gluon.contrib.pysimplesoap.client import SoapClient
+>>> client = SoapClient(wsdl="http://localhost:8000/app/default/call/soap?WSDL")
+>>> print client.MyAdd(a=1,b=2)
+{'result': 3}
+``:code
+
+To get proper encoding when returning a text values, specify string as u'proper utf8 text'.
+
+You can obtain the WSDL for the service at
+
+``
+http://127.0.0.1:8000/app/default/call/soap?WSDL
+``:code
+
+And you can obtain documentation for any of the exposed methods:
+
+``
+http://127.0.0.1:8000/app/default/call/soap
+``:code
+
+### Low level API and other recipes
+
+#### simplejson
+``JSON``:inxx ``simplejson``:inxx
+
+web2py includes gluon.contrib.simplejson, developed by Bob Ippolito. This module provides the most standard Python-JSON encoder-decoder.
+
+SimpleJSON consists of two functions:
+- ``gluon.contrib.simplesjson.dumps(a)`` encodes a Python object ``a`` into JSON.
+- ``gluon.contrib.simplejson.loads(b)`` decodes a JavaScript object ``b`` into a Python object.
+
+Object types that can be serialized include primitive types, lists, and dictionaries. Compound objects can be serialized with the exception of user defined classes.
+
+Here is a sample action (for example in controller "default.py") that serializes the Python list containing weekdays using this low level API:
+``
+def weekdays():
+    names=['Sunday','Monday','Tuesday','Wednesday',
+           'Thursday','Friday','Saturday']
+    import gluon.contrib.simplejson
+    return gluon.contrib.simplejson.dumps(names)
+``:code
+
+Below is a sample HTML page that sends an Ajax request to the above action, receives the JSON message and stores the list in a corresponding JavaScript variable:
+``
+{{extend 'layout.html'}}
+<script>
+$.getJSON('/application/default/weekdays',
+          function(data){ alert(data); });
+</script>
+``:code
+
+The code uses the jQuery function ``$.getJSON``, which performs the Ajax call and, on response, stores the weekdays names in a local JavaScript variable ``data`` and passes the variable to the callback function. In the example the callback function simply alerts the visitor that the data has been received.
+
+#### PyRTF
+``PyRTF``:inxx ``RTF``:inxx
+
+Another common need of web sites is that of generating Word-readable text documents. The simplest way to do so is using the Rich Text Format (RTF) document format. This format was invented by Microsoft and it has since become a standard.
+
+web2py includes gluon.contrib.pyrtf, developed by Simon Cusack and revised by Grant Edwards. This module allows you to generate RTF documents programmatically, including colored formatted text and pictures.
+
+In the following example we initiate two basic RTF classes, Document and Section, append the latter to the former and insert some dummy text in the latter:
+``
+def makertf():
+    import gluon.contrib.pyrtf as q
+    doc=q.Document()
+    section=q.Section()
+    doc.Sections.append(section)
+    section.append('Section Title')
+    section.append('web2py is great. '*100)
+    response.headers['Content-Type']='text/rtf'
+    return q.dumps(doc)
+``:code
+
+In the end the Document is serialized by ``q.dumps(doc)``. Notice that before returning an RTF document it is necessary to specify the content-type in the header else the browser does not know how to handle the file.
+
+Depending on the configuration, the browser may ask you whether to save this file or open it using a text editor.
+
+#### ReportLab and PDF
+``ReportLab``:inxx ``PDF``:inxx
+
+web2py can also generate PDF documents, with an additional library called "ReportLab"``ReportLab``:cite .
+
+If you are running web2py from source, it is sufficient to have ReportLab installed. If you are running the Windows binary distribution, you need to unzip ReportLab in the "web2py/" folder. If you are running the Mac binary distribution, you need to unzip ReportLab  in the folder:
+``
+web2py.app/Contents/Resources/
+``:code
+
+From now on we assume ReportLab is installed and that web2py can find it.
+We will create a simple action called "get_me_a_pdf" that generates a PDF document.
+``
+from reportlab.platypus import *
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.rl_config import defaultPageSize
+from reportlab.lib.units import inch, mm
+from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER, TA_JUSTIFY
+from reportlab.lib import colors
+from uuid import uuid4
+from cgi import escape
+import os
+
+def get_me_a_pdf():
+    title = "This The Doc Title"
+    heading = "First Paragraph"
+    text = 'bla '* 10000
+
+    styles = getSampleStyleSheet()
+    tmpfilename=os.path.join(request.folder,'private',str(uuid4()))
+    doc = SimpleDocTemplate(tmpfilename)
+    story = []
+    story.append(Paragraph(escape(title),styles["Title"]))
+    story.append(Paragraph(escape(heading),styles["Heading2"]))
+    story.append(Paragraph(escape(text),styles["Normal"]))
+    story.append(Spacer(1,2*inch))
+    doc.build(story)
+    data = open(tmpfilename,"rb").read()
+    os.unlink(tmpfilename)
+    response.headers['Content-Type']='application/pdf'
+    return data
+``:code
+
+Notice how we generate the PDF into a unique temporary file, ``tmpfilename``, we read the generated PDF from the file, then we deleted the file.
+
+For more information about the ReportLab API, refer to the ReportLab documentation. We strongly recommend using the Platypus API of ReportLab, such as ``Paragraph``, ``Spacer``, etc.
+
+
+### Restful Web Services
+
+``REST``:inxx
+
+REST stands for "REpresentational State Transfer" and it is a type of web service architecture and not, like SOAP, a protocol. In fact there is no standard for REST.
+
+Loosely speaking REST says that a service can be thought of as a collection of resources. Each resource should be identified by a URL. There are four methods actions on a resource and they are POST (create), GET (read), PUT (update) and DELETE, from which the acronym CRUD (create-read-update-delete) stands for. A client communicates with the resource by making an HTTP request to the URL that identifies the resource and using the HTTP method POST/PUT/GET/DELETE to pass instructions to the resource. The URL may have an extension, for example ``json`` that specify how the protocol for encoding the data.
+
+So for example a POST request to
+
+``
+http://127.0.0.1/myapp/default/api/person
+``
+
+means that you want to create a new ``person``. In this case a ``person`` may correspond to a record in table ``person`` but may also be some other type of resource (for example a file).
+
+Similarly a GET request to
+
+``
+http://127.0.0.1/myapp/default/api/persons.json
+``
+
+indicates a request for a list of persons (records from the data ``person``) in json format.
+
+A GET request to
+
+``
+http://127.0.0.1/myapp/default/api/person/1.json
+``
+
+indicates a request for the information associated to ``person/1`` (the record with ``id==1``) and in json format.
+
+In the case of web2py each request can be split into three parts:
+
+- A first part that identify the location of the service, i.e. the action that exposes the service:
+``
+http://127.0.0.1/myapp/default/api/
+``
+- The name of the resource (``person``, ``persons``, ``person/1``, etc.)
+- The communication protocol specified y the extension.
+
+Notice that we can always use the router to eliminate any unwanted prefix in the URL and for example simplify this:
+
+``
+http://127.0.0.1/myapp/default/api/person/1.json
+``
+
+into this:
+
+``
+http://127.0.0.1/api/person/1.json
+``
+
+yet this is a matter of test and we have already discussed it at length in chapter 4.
+
+In our example we used an action called ``api`` but this is not a requirement. We can in fact name the action that exposes the RESTful service any way we like and we can in fact even create more than one. For the sake of argument we will continue to assume that our RESTful action is called ``api``.
+
+We will also assume we have defined the following two tables:
+
+``
+db.define_table('person',Field('name'),Field('info'))
+db.define_table('pet',Field('owner',db.person),Field('name'),Field('info'))
+``
+
+and they are the resources we want to expose.
+
+The first thing we do is create the RESTful action:
+
+``
+def api():
+    return locals()
+``
+
+Now we modify it so that the extension is filtered out of the request args (so that ``request.args`` can be used to identify the resource) and so that it can handle the different methods separately:
+
+``
+@request.restful()
+def api():
+    def GET(*args,**vars):
+        return dict()
+    def POST(*args,**vars):
+        return dict()
+    def PUT(*args,**vars):
+        return dict()
+    def DELETE(*args,**vars):
+        return dict()
+    return locals()
+``
+
+Now when we make a GET http request to
+
+``
+http://127.0.0.1:8000/myapp/default/api/person/1.json
+``
+
+it calls and returns ``GET('person','1')`` where GET is the function defined inside the action. Notice that:
+- we do not need to define all four methods, only those that we wish to expose.
+- the method function can take named arguments
+- the extension is stored in ``request.extension`` and the content type is set automatically.
+
+--------
+The ``@request.restful()`` decorator makes sure that the extension in the path info is stored into ``request.extension``, maps the request method into the corresponding function within the action (POST, GET, PUT, DELETE), and passes ``request.args`` and ``request.vars`` to the selected function.
+--------
+
+Now we build a service to POST and GET individual records:
+
+``
+@request.restful()
+def api():
+    response.view = 'generic.json'
+    def GET(tablename,id):
+        if not tablename=='person': raise HTTP(400)
+	return dict(person = db.person(id))
+    def POST(tablename,**fields):
+        if not tablename=='person': raise HTTP(400)
+        return db.person.validate_and_insert(**fields)
+    return locals()
+``
+
+Notice that:
+- the GET and POST are dealt with by different functions
+- the function expect the correct arguments (un-named arguments parsed by ``request.args`` and named arguments are from ``request.vars``)
+- they check the input is correct and eventually raise an exception
+- GET perform a select and returns the record, ``db.person(id)``. The output is automatically converted to JSON because the generic view is called.
+- POST performs a ``validate_and_insert(..)`` and returns the ``id`` of the new record or, alternatively, validation errors. The POST variables, ``**fields``, are the post variables.
+
+#### ``parse_as_rest`` (experimental)
+
+The logic explained so far is sufficient to create any type of RESTful web service yet web2py helps us even more.
+
+In fact, web2py provides a syntax to describe which database tables we want to expose and how to map resource into URLs and vice versa.
+
+``parse_as_rest``:inxx
+
+This is done using URL patterns.
+A pattern is a string that maps the request args from a URL into a database query.
+There 4 types of atomic patterns:
+
+- String constants for example "friend"
+- String constant corresponding to a table. For example "friend[person]" will match "friends" in the URL to the "person" table.
+- Variables to be used to filter. For example "{person.id}" will apply a ``db.person.name=={person.id}`` filter.
+- Names of fields, represented by ":field"
+
+Atomic patters can be combined into complex URL patters using "/" such as in
+
+``
+"/friend[person]/{person.id}/:field"
+``
+
+which gives a url of the form
+
+``
+http://..../friend/1/name
+``
+
+Into a query for a person.id that returns the name of the person. Here "friend[person]" matches "friend" and filters the table "person". "{person.id}" matches "1" and filters "person.id==1". ":field" matches "name" and returns:
+
+``
+db(db.person.id==1).select().first().name
+``
+
+Multiple URL patters can be combined into a list so that one single RESTful action can serve different types of requests.
+
+The DAL has a method ``parse_as_rest(pattern,args,vars)`` that given a list of patterns, the ``request.args`` and the ``request.vars`` matches the pattern and returns a response (GET only).
+
+So here is a more complex example:
+
+``
+
+@request.restful()
+def api():
+    response.view = 'generic.'+request.extension
+    def GET(*args,**vars):
+        patterns = [
+            "/friends[person]",
+            "/friend/{person.name.startswith}",
+            "/friend/{person.name}/:field",
+            "/friend/{person.name}/pets[pet.owner]",
+            "/friend/{person.name}/pet[pet.owner]/{pet.name}",
+            "/friend/{person.name}/pet[pet.owner]/{pet.name}/:field"
+            ]
+        parser = db.parse_as_rest(patterns,args,vars)
+        if parser.status == 200:
+            return dict(content=parser.response)
+        else:
+            raise HTTP(parser.status,parser.error)
+    def POST(table_name,**vars):
+        if table_name == 'person':
+            return db.person.validate_and_insert(**vars)
+        elif table_name == 'pet':
+            return db.pet.validate_and_insert(**vars)
+        else:
+            raise HTTP(400)
+    return locals()
+``:code
+
+Which understands the following URLs that correspond to the listed patters:
+
+- GET all persons
+``
+http://.../api/friends
+``
+- GET one person with name starting with "t"
+``
+http://.../api/friend/t
+``
+- GET the "info" field value of the first person with name equal to "Tim"
+``
+http://.../api/friend/Tim/info
+``
+- GET a list of pets of the person (friend) above
+``
+http://.../api/friend/Tim/pets
+``
+- GET the pet with name "Snoopy of person with name "Tim"
+``
+http://.../api/friend/Tim/pet/Snoopy
+``
+- GET the "info" field value for the pet
+``
+http://.../api/friend/Tim/pet/Snoopy/info
+``
+
+The action also exposes two POST urls:
+
+- POST a new friend
+- POST a new pet
+
+If you have the "curl" utility installed you can try:
+
+``
+$ curl -d "name=Tim" http://127.0.0.1:8000/myapp/default/api/friend.json
+{"errors": {}, "id": 1}
+$ curl http://127.0.0.1:8000/myapp/default/api/friends.json
+{"content": [{"info": null, "name": "Tim", "id": 1}]}
+$ curl -d "name=Snoopy&owner=1" http://127.0.0.1:8000/myapp/default/api/pet.json
+{"errors": {}, "id": 1}
+$ curl http://127.0.0.1:8000/myapp/default/api/friend/Tim/pet/Snoopy.json
+{"content": [{"info": null, "owner": 1, "name": "Snoopy", "id": 1}]}
+``
+
+It is possible to declare more complex queries such where a value in the URL is used to build a query not involving equality. For example
+
+``patterns = ['friends/{person.name.contains}'``
+
+maps
+
+``
+http://..../friends/i
+``
+
+into
+
+``
+db.person.name.contains('i')
+``
+
+And similarly:
+
+``patterns = ['friends/{person.name.ge}/{person.name.gt.not}'``
+
+maps
+
+``
+http://..../friends/aa/uu
+``
+
+into
+
+``
+(db.person.name>='aa')&(~(db.person.name>'uu'))
+``
+
+valid attributes for a field in a pattern are: ``contains``, ``startswith``, ``le``, ``ge``, ``lt``, ``gt``, ``eq`` (equal, default), ``ne`` (not equal). Other attributes specifically for date and datetime fields are ``day``, ``month``, ``year``, ``hour``, ``minute``, ``second``.
+
+Notice that this pattern syntax is not designed to be general. Not every possible query can be described via a pattern but a lot of them are. The syntax may be extended in the future.
+
+Often you want to expose some RESTful URLs but you want to restrict the possible queries. This can be done by passing an extra argument ``queries`` to the ``parse_as_rest`` method. ``queries`` is a dictionary of ``(tablename,query)`` where query is a DAL query to restrict access to table ``tablename``.
+
+We can also order results using the order GET variables
+
+``
+http://..../api/friends?order=name|~info
+``
+which order alphabetically (``name``) and then by reversed info ``order``.
+
+We can also limit the number of records by specifying a ``limit`` and ``offset`` GET variables
+
+``
+http://..../api/friends?offset=10&limit=1000
+``
+which will return up to 1000 friends (persons) and skip the first 10. ``limit`` defaults to 1000 and ``offset`` default to 0.
+
+Let's now consider an extreme case. We want to build all possible patterns for all tables (except ``auth_`` tables). We want to be able to search by any text field, any integer field, any double field (by range) and any date (also by range). We also want to be able to POST into any table:
+
+In the general case this requires a lot of patterns. Web2py makes it simple:
+
+``
+@request.restful()
+def api():
+    response.view = 'generic.'+request.extension
+    def GET(*args,**vars):
+        patterns = 'auto'
+        parser = db.parse_as_rest(patterns,args,vars)
+        if parser.status == 200:
+            return dict(content=parser.response)
+        else:
+            raise HTTP(parser.status,parser.error)
+    def POST(table_name,**vars):
+        return db[table_name].validate_and_insert(**vars)
+    return locals()
+``
+
+Settings ``patterns='auto'`` results in web2py generating all possible patterns for all non-auth tables.
+There is even a pattern for querying about patterns:
+
+``
+http://..../api/patterns.json
+``
+
+which for out ``person`` and ``pet`` tables results in:
+
+``
+{"content": [
+   "/person[person]",
+   "/person/id/{person.id}",
+   "/person/id/{person.id}/:field",
+   "/person/id/{person.id}/pet[pet.owner]",
+   "/person/id/{person.id}/pet[pet.owner]/id/{pet.id}",
+   "/person/id/{person.id}/pet[pet.owner]/id/{pet.id}/:field",
+   "/person/id/{person.id}/pet[pet.owner]/owner/{pet.owner}",
+   "/person/id/{person.id}/pet[pet.owner]/owner/{pet.owner}/:field",
+   "/person/name/pet[pet.owner]",
+   "/person/name/pet[pet.owner]/id/{pet.id}",
+   "/person/name/pet[pet.owner]/id/{pet.id}/:field",
+   "/person/name/pet[pet.owner]/owner/{pet.owner}",
+   "/person/name/pet[pet.owner]/owner/{pet.owner}/:field",
+   "/person/info/pet[pet.owner]",
+   "/person/info/pet[pet.owner]/id/{pet.id}",
+   "/person/info/pet[pet.owner]/id/{pet.id}/:field",
+   "/person/info/pet[pet.owner]/owner/{pet.owner}",
+   "/person/info/pet[pet.owner]/owner/{pet.owner}/:field",
+   "/pet[pet]",
+   "/pet/id/{pet.id}",
+   "/pet/id/{pet.id}/:field",
+   "/pet/owner/{pet.owner}",
+   "/pet/owner/{pet.owner}/:field"
+]}
+``
+
+You can specify auto patterns for some tables only:
+
+``
+patterns = [':auto[person]',':auto[pet]']
+``
+
+#### ``smart_query`` (experimental)
+
+``smart_query``:inxx
+
+There are times when you need more flexibility and you want to be able to pass to a RESTful service an arbitrary query like
+
+``
+http://.../api.json?search=person.name starts with 'T' and person.name contains 'm'
+``
+
+You can do this using
+
+``
+@request.restful()
+def api():
+    response.view = 'generic.'+request.extension
+    def GET(search):
+        try:
+            rows = db.smart_query([db.person,db.pet],search).select()
+	    return dict(result=rows)
+        except RuntimeError:
+            raise HTTP(400,"Invalid search string")
+    def POST(table_name,**vars):
+        return db[table_name].validate_and_insert(**vars)
+    return locals()
+``
+
+The method ``db.smart_query`` takes two arguments:
+- a list of field or table that should be allowed in the query
+- a string containing the query expressed in natural language
+and it returns a ``db.set`` object with the records that have been found.
+
+Notice that the search string is parsed, not evaluated or executed and therefore it provides no security risk.
+
+
+#### Access Control
+
+Access to the API can be restricted as usual by using decorators. So, for example
+
+``
+auth.settings.allow_basic_login = True
+
+@auth.requires_login()
+@request.restful()
+def api():
+   def GET(s):
+       return 'access granted, you said %s' % s
+   return locals()
+``
+
+can now be accessed with
+
+``
+$ curl --user name:password http://127.0.0.1:8000/myapp/default/api/hello
+access granted, you said hello
+``
+
+### Services and Authentication
+``Authentication``:inxx
+
+In the previous chapter we have discussed the use of the following decorators:
+``
+@auth.requires_login()
+@auth.requires_membership(...)
+@auth.requires_permission(...)
+``:code
+
+For normal actions (not decorated as services), these decorators can be used even if the output is rendered in a format other than HTML.
+
+For functions defined as services and decorated using the ``@service...`` decorators, the ``@auth...`` decorators should not be used. The two types of decorators cannot be mixed. If authentication is to be performed, it is the ``call`` actions that needs to be decorated:
+``
+@auth.requires_login()
+def call(): return service()
+``:code
+
+Notice that it also possible to instantiate multiple service objects, register the same different functions with them, and expose some of them with authentication and some not:
+``
+public_services=Service()
+private_services=Service()
+
+@public_service.jsonrpc
+@private_service.jsonrpc
+def f(): return 'public'
+
+@private_service.jsonrpc
+def g(): return 'private'
+
+def public_call(): return public_service()
+
+@auth.requires_login()
+def private_call(): return private_service()
+``:code
+
+This assumes that the caller is passing credentials in the HTTP header (a valid session cookie or using basic authentication, as discussed in the previous section). The client must support it; not all clients do.
+
+

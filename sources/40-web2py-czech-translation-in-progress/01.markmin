@@ -1,0 +1,464 @@
+## Úvodem
+Web2py``web2py``:cite  je open-source webový framework pro rychlý vývoj bezpečných databázových webových aplikací. Je vytvořen v jazyce Python``python``:cite , s jehož pomocí se také píší cílové webové aplikace. 
+Web2py je full-stack framework, což znamená, že obsahuje všechny komponenty, které potřebujete pro vytvoření kompletní, plně funkční webové aplikace.
+
+Web2py je navrženo tak, aby vývojář následoval zdravé postupy konstrukce aplikace (good software engineering practices), např. použití Model-View-Controller (MVC) návrhového vzoru. Web2py odděluje data (model) od prezentace (view) a od aplikační a řídící logiky (controller). Web2py nabízí knihovny, které vývojáři pomáhají navrhovat, implementovat a testovat každou z těchto částí jak samostatně, tak ve vzájemné součinnosti.
+
+Web2py je zaměřeno na bezpečnost. To znamená, že automaticky ošetřuje mnoho aspektů, které by mohly vést k bezpečnostním dírám a rizikům. Např. validuje veškerý vstup (aby se zabránilo ohrožení formou injections), escapuje veškerý výstup (aby se zabránilo cross-site scriptingu), přejmenovává uploadované soubory (aby se zabránilo directory traversal útokům).
+
+Web2py obsahuje Databázovou Abstrakční Vrstvu (Database Abstraction Layer, DAL) která sestavuje SQL``sql:w``:cite  dynamicky, takže to nemusí dělat vývojář. DAL umí generovat SQL pro SQLite``sqlite``:cite, MySQL``mysql``:cite, PostgreSQL``postgres``:cite, MSSQL``mssql``:cite, FireBird``firebird``:cite, Oracle``oracle``:cite, IBM DB2``db2``:cite, Informix``informix``:cite a Ingres``ingresdb``:cite.
+DAL také umí generovat volání funkcí Google Datastore, když provozujete aplikaci nad Google App Engin-ou (GAE)``gae``:cite.
+Experimentálně podporujeme ještě další databáze. Na Web2py webové stránce a v dalších zdrojích naleznete aktuální seznam ovladačů.
+Jakmile definujete jednu nebo více tabulek databáze, Web2py poskytne plně funkční webové administrační rozhraní pro přístup k databázi, tabulkám a jejich obsahu.
+
+Web2py se odlišuje od ostatních webových frameworků plnou podporou Web 2.0
+paradigmatu, kde webový obsah je chápán a měněn stejně jako dříve obsah na jednotlivém počítači. Web2py dokonce nepotřebuje instalaci ani konfiguraci; běží na každé architektuře, kde lze spouštět Python (Windows, Windows CE, Mac OS X, iOS, a Unix/Linux), a vývoj, nasazení (deployment), a údržba aplikace může být kompletně prováděna pomocí lokálního nebo vzdáleného webového rozhraní. Web2py běží nad CPythonem (C implementací Pythonu) i Jythonem (Java implementací), nad Python verzemi 2.4, 2.5, 2.6, a 2.7, ačkoli "oficiálně" podporujeme verzi 2.5 (aby byla zajištěna široká zpětná kompatibilita aplikací.
+
+Web2py poskytuje ticketing system: Když dojde k chybě, je vystaven ticket pro uživatele a podrobnosti o chybě jsou logovány pro administrátora.
+
+Web2py je open source projekt a je publikováno pod LGPL licencí verze 3.
+
+Dalším rysem Web2py je, že my, vývojáři frameworku, maximálně usilujeme o zpětnou kompatibilitu budoucích verzí.
+Snažili jsme se o to od prvního vydání v říjnu 2007.
+Bylo přidáno mnoho nových vlastností a odstraněny chyby, ale pokud program pracoval pod Web2py 1.0, bude pracovat i dnes.
+
+Zde je několik příkladů příkazů Web2py, abychom demonstovali jeho sílu a jednoduchost. Následující kód:
+``
+db.define_table('person', Field('name'), Field('image', 'upload'))
+``:code
+
+vytvoří databázovou tabulku "person" se dvěma poli: "name" (string) a "image" (soubor, který lze uploadovat). Jestliže tabulka již existuje, ale její struktura neodpovídá této definici, je na strukturu podle takto uvedené definice automaticky aktualizována (samozřejmě se zachováním obsahu).
+
+Za použití výše definované tabulky následující kód:
+``
+form = crud.create(db.person)
+``:code
+
+vytvoří formulář pro vkládání záznamů, takže uživatel může přes získané webové rozhraní uploadovat obrázky. Uvedený kód zajistí i validaci záznamu, s ohledem na bezpečnost přejmenuje uploadovaný obrázek, uloží jej do souboru, založí odpovídající záznam v dattabázi, ošetří nebezpečí dvojího Submitu, a případně modifikuje formulář přidáním chybových hlášení, kdyby data přidávaného záznamu nevyhověla validaci.
+
+Následující kód:
+``
+@auth.requires_permission('read','person')
+def f(): ....
+``:code
+
+zabrání uživateli webu volat funkci ``f``, když uživatel není členem některé skupiny, která má oprávnění "read" pro záznamy tabulky "person". Není-li uživatel dosud přihlášen, je směrován na login stránku (kterou v defaultní podobě zajistí Web2py bez dalšího programování).
+
+Následující kód zavede do stránky komponentu:
+``
+{{=LOAD('other_controller','function.load',ajax=True, ajax_trap=True)}}
+``:code
+
+Web2py vloží do stránky obsah, generovaný jinou funkcí controlleru (řídící logiky) nebo obecně jakoukoli funkcí. Obsah je získán pomocí Ajaxu, vložen do aktuální stránky (za použití aktuálního vzhledu, nikoli vzhledu, který odpovídá funkci other_controller), a všechny případné formuláře ve vloženém obsahu jsou ošetřeny, aby byly submitovány rovněž pomocí Ajaxu bez reloadu stránky. Může být i vkládán obsah z jiných aplikací než Web2py.
+
+LOAD funkce umožňuje velmi moudulární konstrukci aplikací; detaily jejího použití jsou diskutovány v poslední kapitole této knihy.
+
+### Principy
+
+Programování v Pythonu obvykle respektuje tyto základní principy:
+- Neopakuj se (Don't repeat yourself - DRY).
+- Měla by být právě jedna správná cesta, jak věci dělat.
+- Explicitní je lepší než implicitní.
+
+Web2py plně respektuje úvodní dva principy, takže směřuje vývojáře ke psaní kódu, který se neopakuje. Web2py vede vývojáře téměř při všech úkolech, typických pro vývoj webových aplikací (vytváření formulářů a zpracování zadání z nich, obsluha session, cookies, aplikačních chyb, apod.).
+
+``request``:inxx
+Web2py se nicméně liší od ostatních frameworků ve vztahu ke třetímu uvedenému principu, který někdy koliduje s předchozími dvěma. Konkrétně se Web2py odlišuje tím, že neimportuje kód vývojáře (což je obvyklá technika použití kódu v Pythonu), ale vykoná jej v předdefinovaném kontextu (prostředí). Tento kontext dává kódu k dispozici fráze (keywords) Pythonu i Web2py.
+
+Někomu to může připadat jako kouzlení, ale není třeba se tak na to dívat.
+Jednoduše některé moduly jsou vždy importovány automaticky - ty, které při tvorbě webové aplikace stále znova potřebujete.
+Web2py tak nemá běžný rys ostatních frameworků, kdy vývojář je nucen importovat stejné moduly úvodem kódu každého modulu i controlleru.
+
+Web2py, tím, že automaticky importuje své moduly, šetří čas a brání omylům vývojáře, takže následuje myšlenku "zbytečně se neopakuj" a "je jedna správná cesta, jak věci dělat".
+
+Když však vývojář chce použít jiné moduly Pythonu nebo third-party moduly, musí je explicitně importovat - stejně jako v jakémkoli jiném Python programu.
+
+### Web frameworky
+``PHP``:inxx ``ASP``:inxx ``JSP``:inxx
+
+Ve své základní funkci webová aplikace sestává z programů, které jsou vykonány, když uživatel naviguje na některou URL (adresu). Výstup, sestavený těmito programy, je vrácen návštěvníkovi a interpretován prohlížečem.
+
+Účelem webových frameworků je umožnit vývojáři vytvořit nové aplikace rychle, snadno a bez chyb.
+Dosahuje se toho tak, že je dáno k dispozici API (rozhraní pro programování) a nástroje, které redukují a zjednodušují zbývající potřebné kódování.
+
+Dva obvyklé klasické styly vývoje webových aplikací jsou tyto:
+- Sestavení HTML``html:w,html:o``:cite  programově.
+- Začlenění kódu do HTML stránky (šablony).
+
+První styl používaly např. původní CGI scripty.
+Druhý styl se používá např. v PHP``php``:cite
+(kde kód je v PHP, jazyce obdobném C), ASP (kde kód je ve Visual Basicu) nebo JSP (kde kód je v Javě).
+
+Tady je příklad PHP programu, který, když je vykonán, získá data z databáze a vrátí HTML stránku, zobrazující získané záznamy:
+``
+<html><body><h1>Records</h1><?
+  mysql_connect(localhost,username,password);
+  @mysql_select_db(database) or die( "Unable to select database");
+  $query="SELECT * FROM contacts";
+  $result=mysql_query($query);
+  mysql_close();
+  $i=0;
+  while ($i < mysql_numrows($result)) {
+    $name=mysql_result($result,$i,"name");
+    $phone=mysql_result($result,$i,"phone");
+    echo "<b>$name</b><br>Phone:$phone<br /><br /><hr /><br />";
+    $i++;
+  }
+?></body></html>
+``:code
+
+Problém tohoto přístupu je, že není nijak separován kód, použitý k různým účelům: je vložen do HTML, generuje další přídavné HTML, generuje SQL příkazy. Tak je smíšeno více funkčních vrstev aplikace a to dělá kód obtížněji čitelným a udržovatelným. Situace je ještě horší u Ajaxových aplikací, a složitost roste s počtem stránek, které aplikaci tvoří.
+
+Ve Web2py získáme tutéž funkcionalitu dvěma řádky kódu v Pythonu:
+``
+def index():
+    return HTML(BODY(H1('Records'), db().select(db.contacts.ALL)))
+``:code
+
+V tomto jednoduchém příkladu je struktura HTML stránky reprezentována programově pomocí ``HTML``, ``BODY``, a ``H1`` objektů; databáze ``db`` je dotázána pomocí ``select`` příkazu; a nakonec je vše serializováno do HTML.
+Poznamenejme, že ``db`` není slovo jazyka (keyword), ale uživatelem definovaná proměnná. Mohla by se tedy jmenovat jinak, ale aby nedošlo k nedorozumění, budeme používat toto jméno (db), když se budeme odkazovat na připojení do databáze (database connection).
+
+Webové frameworky se typicky dělí do dvou kategorií:
+- Souborný ("glued") framework je vytvořen propojením několika third-party komponent.
+- Full-stack framework je tvořen komponentami, vyvinutými speciálně pro něj, a konstruovanými pro těsnou integraci a spolupráci.
+
+Web2py je full-stack framework. Téměř všechny jeho komponenty byly navrženy od začátku a tak, aby pracovaly společně. Jsou ale dobře použitelné i mimo kompletní Web2py framework. Např. Databázová Abstrakční Vrstva (DAL) nebo jazyk šablon (template language) mohou být používány nezávisle tak, že do svého kódu importujeme ``gluon.dal`` nebo ``gluon.template``. ``gluon`` je jméno Web2py modulu, který obsahuje systémové knihovny. Některé Web2py knihovny, např. pro sestavení a obsluhu formulářů, pracujících s daty v databázi, ale už mají závislosti na dalších částech Web2py. Web2py může také pracovat s jinými third-party Python knihovnami, např. s jiným šablonovým (template) jazykem nebo jiným DAL, které ale nebudou tak úzce integrovány jako vlastní Web2py komponenty.
+
+### Model-View-Controller
+``Model-View-Controller``:inxx
+Web2py podporuje vývojáře, aby oddělil reprezentaci dat (model), prezentační vrstvu (view) a aplikační logiku (controller). Vraťme se znovu k předchozímu příkladu a podívejme se, jak vytvořit odpovídající Web2py aplikaci. Zde vidíte, jak vypadá Web2py rozhraní pro vývoj MVC aplikace:
+
+[[image @///image/en0.png center 480px]]
+
+Typický průběh zpracování požadavku (request) ve Web2py popisuje následující diagram:
+
+[[image @///image/en100.png center 480px]]
+
+kde:
+- Server může být vestavěný Web2py server nebo third-party server, jako třeba Apache. Server řídí používání více vláken (multi-threading).
+- "Main", hlavní aplikace, je jádro WSGI aplikace (WSGI ``wsgi:w,wsgi:o``:cite (Web Server Gateway Interface) je vynikající Python standard pro komunikaci mezi webovým serverem a Python aplikací). Zajišťuje obecné činnosti a je obálkou pro uživatelskou aplikaci. Ošetřuje cookies, sessiony, transakce, překlad URL adres (URL routing a reverse routing), a dispatching. Může také streamovat statické soubory, jestliže to nezajišťuje již samotný server.
+- Model, Controller a View představují uživatelskou aplikaci (kterých může být hostováno i více v jediné instanci Web2py).
+- Čárkované šipky ukazují komunikaci s databázovým strojem. Databázové dotazy mohou být psány v hrubém SQL (což se nedoporučuje) nebo za použití Web2py DAL - Databázové Abstrakční Vrstvy, kdy Web2py aplikační kód nezávisí na konkrétním databázovém stroji (doporučeno).
+- Hlavní aplikace mapuje požadovaná URL na volání funkcí controlleru. Výstupem těchto funkcí může být buď obyčejný řetězec nebo slovník symbolů (rozuměj: slovník jako Python datová struktura - dictionary). Je-li vrácen jen řetězec, není dále zpracováván, kdežto je-li vrácen slovník, je renderován (sestaven výstup) pomocí view. Když návštěvník požadoval HTML stránku (tedy v obvyklém případě), slovník je renderován na HTML stránku. Jestliže návštěvník požadoval obdobné, jenže s příponou XML, Web2py zkusí najít odpovídající view pro renderování slovníku (návratové hodnoty controlleru) do XML. Vývojář může vytvořit view pro renderování do kteréhokoli podporovaného protokolu (HTML, XML, JSON, RSS, CSV, RTF) nebo případně do dalších uživatelsky definovaných protokolů.
+- Všechny updaty databáze během požadavku (v modelu, controlleru a view) jsou zabaleny do společné transakace, která je odrolována zpět, když v uživatelském kódu dojde k jakékoli neošetřené výjimce. Jen když celý kód proběhne správně, je transakce potvrzena (commit).
+- Web2py také automaticky pracuje se sessionami a s cookies, a spolu s potvrzením transakce také uloží session, pokud toto chování vývojář nezmění.
+- Je možné definovat cron úlohy, tedy úlohy, které se spustí v plánovaných časech nebo intervalech nebo po dokončení některých akcí. Takto je vhodné spouštět výpočtově a časově náročný kód na pozadí, aby nebyla blokována navigace na stránky.
+
+Tady je příklad minimální a úplné MVC aplikace, kterou tvoří 3 soubory:
+
+-----
+"db.py" je model:
+-----
+
+``
+db = DAL('sqlite://storage.sqlite')
+db.define_table('contact',
+   Field('name'),
+   Field('phone'))
+``:code
+
+Vytvoří připojení do databáze (v tomto případě do SQLite databáze, tvořené souborem ``storage.sqlite``) a definuje tabulku ``contact``. Pokud tabulka ještě neexistuje, Web2py ji vytvoří pomocí automaticky sestaveného SQL kódu. Použijeme-li místo SQLite jiný databázový stroj (MySQL, PostgreSQL, MSSQL, FireBird, Oracle, DB2, Informix, Interbase, Ingres, nebo Google App Engine (obě verze, SQL i NoSQL) Web2py automaticky upraví dialekt SQL jazyka.
+V souvislosti s předchozí definicí a vytvořením tabulky Web2py také poskytne webový administrační interface (nazvaný **appadmin**) pro přístup k databázi a právě definovaným tabulkám.
+
+-----
+"default.py" je controller:
+-----
+
+``
+def contacts():
+    grid=SQLFORM.grid(db.contact, user_signature=False)
+    return locals()
+``:code
+
+Ve Web2py jsou URL mapována na volání funkcí. V našem případě controller obsahuje jedinou funkci (nebo "akci"), pojmenovannou ``contacts``. Funkce může vrátit řetězec (tj. už sestavenou webovou stránku), obvyklejší je ale vracet slovník (dictionary, tedy sadu dvojic ``key:value``). V našem případě vracíme slovník, který obsahuje celou sadu lokálních proměnných.
+Když funkce vrátí slovník, je tato návratová hodnota (slovník) předána do view se jménem controller/function (v našem případě default/contacts.html), které renderuje výslednou stránku.
+V našem případě funkce controlleru ``contacts`` vytvoří grid pro tabulku ``db.contact`` s možností výběru, hledání, přidání záznamu, editace a rušení záznamu.
+
+-----
+"default/contacts.html" je view:
+-----
+
+``
+{{extend 'layout.html'}}
+<h1>Manage My Contacts</h1>
+{{=grid}}
+``:code
+
+Toto view je, jak už jsme řekli, automaticky zavoláno, když funkce ``contacts`` controlleru ``default`` vrátí slovník. Účelem view je renderovat (konvertovat do výstupního HTML) vrácený slovník (v našem případě s jedním klíčem a hodnotou: ``grid``).
+View je psáno v HTML jazyce, ale může obsahovat kód Pythonu, uvozený speciálními znaky ``{{`` a ``}}``. To je docela odlišné od uvedeného příkladu v PHP, protože jediný kód, začleněný do HTML, je kód "prezentační vrstvy".
+Soubor "layout.html", odkazovaný na prvním řádku tohoto view je součástí Web2py a vytváří obecný základní vzhled stránek, vystavených Web2py aplikací. Není problém jej podle potřeby buď modifikovat nebo nahradit (použitím jiného jména v příkazu ``extend``).
+
+### Proč Web2py?
+
+Web2py je jedním z mnoha aplikačních frameworků, ale má výhodné a unikátní vlastnosti.
+Web2py bylo původně vyvinuto jako didaktický nástroj pro výuku principů webových aplikací, a to s následující hlavní motivací:
+- Pro uživatele snadná výuka server-side webového vývoje bez omezení výsledné funkcionality. Z tohoto důvodu Web2py nepotřebuje ani instalaci, ani konfiguraci, nemá závislosti (s výjimkou source code distribuce, která vyžaduje Python 2.5 (nebo vyšší) a jeho standard library moduly), a většinu své funkcionality zpřístupňuje pomocí webového prohlížeče.
+- Web2py bylo od počátku a je stabilní. To proto, že bylo vytvořeno top-down postupem, neboli jeho API bylo nejprve kompletně navrženo a pak teprve implementováno. I když byla později přidávána nová funkcionalita, Web2py neporušilo závazek zpětné kompatibility, což se chystáme dodržet i v budoucnu.
+- Web2py aktivně ošetřuje většinu důležitých bezpečnostních rizik, která ohrožují moderní webové aplikce, jak je uvádí OWASP``owasp``:cite níže.
+- Web2py kód je stručný. Knihovny jeho jádra, včetně Databázové Abstrakční Vrstvy, šablonového (template) jazyka a všech helperů (zestručňující funkce pro kontrukci HTML) má kolem 1.4MB. Kompletní kód včetně vzorových aplikací má kolem 10 MB.
+- Web2py má účelný kód a proto je hodně rychlé. Používá-li defaultní Rocket``rocket``:cite WSGI webový server, vytvořený Timothy Farrellem, je s ním stejně rychlé jako Apache s mod_wsgi. Naše testy ukázaly, že na průměrném PC vystaví obvyklou dynamickou stránku (bez započtení přístupu do databáze) za přibližně 10ms. DAL (Databázová Abstrakční Vrstva) má zanedbatelný nárůst času zpracování, typicky menší než 3%.
+- Web2py používá standardní Python syntaxi pro modely, controllery a view, ale neimportuje model ani controller (jak to dělají všechny ostatní Python frameworky), místo toho je přímo vykoná. Velmi dobrým důsledkem je, že veškeré instalace, odinstalace a jakékoli změny v aplikaci se obejdou bez restartu webového serveru (dokonce v produkčním prostředí) a různé aplikace mohou spoluexistovat, aniž by se jejich moduly vzájemně ovlivňovaly.
+- Web2py používá Databázovou Abstrakční Vrstvu (Database Abstraction Layer, DAL) místo Object Relational Mapper-u (ORM). Koncepčně to znamená, že jednotlivé tabulky jsou mapovány jako různé instance jediné ``Table`` třídy a ne jako různé třídy. Podobně záznamy (records) jsou mapovány jako instance jediné ``Row`` třídy, nikoli jako instance odpovídající table třídy. Praktickým důsledkem je, že SQL syntaxe blízce sleduje DAL syntaxi - a není zde, jako v populárních ORM systémech, komplikované metaclass programování, které by zpomalilo překlad do SQL.
+
+
+Zde je screenshot hlavního Web2py **admin** rozhraní:
+
+[[image @///image/en200.png center 480px]]
+
+
+### Bezpečnost
+``security``:inxx
+The Open Web Application Security Project``owasp``:cite  (OWASP) je volná a otevřená světová komunita, zaměřená na zlepšení bezpečnosti aplikačního softwaru.
+
+OWASP vyjmenoval "top 10" bezpečnostních rizik, která ohrožují webové aplikace.
+Uvádíme tu tentto seznam spolu s komentářem, jak k těmto rizikům přistupuje Web2py [pozn.překl.: ''popisy rizik ponechávám zatím záměrně nepřeložené, aby překlad nebyl zkreslující'']:
+- ``cross site scripting``:inxx  "Cross Site Scripting (XSS): XSS flaws occur whenever an application takes user supplied data and sends it to a web browser without first validating or encoding that content. XSS allows attackers to execute scripts in the victim's browser which can hijack user sessions, deface web sites, possibly introduce worms, etc." ''Web2py automaticky escapuje všechny proměnné, které renderuje ve view, čímž zabraňuje XSS.''
+- ``injection flaws``:inxx "Injection Flaws: Injection flaws, particularly SQL injection, are common in web applications. Injection occurs when user-supplied data is sent to an interpreter as part of a command or query. The attacker's hostile data tricks the interpreter into executing unintended commands or changing data." ''Web2py obsahuje DAL vrstvu, která SQL injekci znemožňuje. SQL příkazy vývojář obvykle vůbec nepoužívá - místo toho jsou dynamicky generovány pomocí DAL, která zajišťuje, aby všechna uživatelem vložená data byla řádně escapována.''
+- ``malicious file execution``:inxx "Malicious File Execution: Code vulnerable to remote file inclusion (RFI) allows attackers to include hostile code and data, resulting in devastating attacks, such as total server compromise." ''Web2py dovoluje vykonání pouze zveřejněných (exposed) funkcí a tak zabraňuje útokům typu malicious file execution. Importované funkce nikdy nejsou veřejně přístupné; jsou přístupné pouze akce controlleru. Web2py používá webové administrační rozhraní, které pomáhá udržovat dobrý přehled o tom, co je veřejně přístupné.''
+- ``insecure object reference``:inxx "Insecure Direct Object Reference: A direct object reference occurs when a developer exposes a reference to an internal implementation object, such as a file, directory, database record, or key, as a URL or form parameter. Attackers can manipulate those references to access other objects without authorization." ''Web2py nezveřejňuje žádné vnitřní objekty; navíc, Web2py validuje všechny URL, a tak brání directory traversal útokům. Web2py také poskytuje jednoduchý mechanismus pro vytváření formulářů, které automaticky validují všechny vstupní hodnoty.''
+- ``CSRF``:inxx "Cross Site Request Forgery (CSRF): A CSRF attack forces a logged-on victim's browser to send a pre-authenticated request to a vulnerable web application, which then forces the victim's browser to perform a hostile action to the benefit of the attacker. CSRF can be as powerful as the web application that it attacks." ''Web2py zabraňuje CSRF útokům a stejně i náhodnému dvojímu potvrzení formuláře přidáním jednorázového náhodného identifikátoru do každého formuláře. Navíc Web2py používá UUID pro session cookies.''
+- ``information leakage``:inxx ``improper error handling``:inxx "Information Leakage and Improper Error Handling: Applications can unintentionally leak information about their configuration, internal workings, or violate privacy through a variety of application problems. Attackers use this weakness to steal sensitive data, or conduct more serious attacks." ''Web2py používá tiketový (ticketing) systém. Žádná chyba nemůže vést k tomu, aby uživatel viděl kód. Všechny chyby jsou logovány a uživateli je vystaven tiket pro identifikaci chyby. Ale chyby spolu se zdrojovým kódem jsou dostupné jen administrátorovi.''
+- "Broken Authentication and Session Management: Account credentials and session tokens are often not properly protected. Attackers compromise passwords, keys, or authentication tokens to assume other users' identities." ''Web2py poskytuje vestavěný mechanismus pro autentikaci administrátora, a ošetřuje sessiony nezávisle pro každou aplikaci. Administrační rozhraní také vynucuje používání bezpečných session cookies, není-li klient "localhost". Aplikace mají k dispozici účinné API pro Řízení Přístupu Pomocí Rolí (Role Based Access Control).''
+- ``cryptographic store``:inxx "Insecure Cryptographic Storage: Web applications rarely use cryptographic functions properly to protect data and credentials. Attackers use weakly protected data to conduct identity theft and other crimes, such as credit card fraud." ''Web2py používá MD5 nebo HMAC+SHA-512 hash algoritmy k ochraně uložených hesel. K dispozici jsou i jiné algoritmy.''
+- ``secure communications``:inxx "Insecure Communications: Applications frequently fail to encrypt network traffic when it is necessary to protect sensitive communications." ''Web2py obsahuje Rocket WSGI server s možností SSL``ssl``:cite, a zrovna tak může používat Apache nebo Lighttpd a mod_ssl, aby byla k dispozici SSL šifrovaná komunikace.''
+- ``access restriction``:inxx "Failure to Restrict URL Access: Frequently an application only protects sensitive functionality by preventing the display of links or URLs to unauthorized users. Attackers can use this weakness to access and perform unauthorized operations by accessing those URLs directly." ''Web2py mapuje URL požadavky na Python moduly a funkce. Web2py poskytuje mechanismus pro určení, které funkce jsou přístupné veřejně a které vyžadují autentikaci a autorizaci. API pro Role Based Access Control umožňuje vývojáři omezit přístup ke kterékoli funkci na základě login jména, členství ve skupině a skupinových oprávnění. Oprávnění jsou jemně členěna a např. ve spojení s CRUD (styl programování formulářů) mohou dávat přístup jen k některým tabulkám nebo záznamům. Web2py také dovoluje digitálně podepsané URL a poskytuje API pro digitální podepisování ajax callbacků.''
+
+Web2py bylo z hlediska bezpečnosti prověřeno a výsledek prověrky můžete najít v ref.``pythonsecurity``:cite.
+
+### Co je součástí frameworku
+
+Web2py můžete stáhnout z oficiální webové stránky:
+
+``
+http://www.web2py.com
+``:code
+
+Web2py je tvořeno následujícími komponentami:
+- **knihovny (libraries)**: poskytují funkcionalitu jádra Web2py a jsou přístupné programově.
+- **web server**: Rocket WSGI webový server.
+- **admin aplikace**: použitelná pro vytvoření, úpravy a správu jiných Web2py aplikací. **admin** poskytuje úplné webově orientované Integrované Vývojové Prostředí (Integrated Development Environment, IDE) pro vytváření Web2py aplikací. Nabízí ještě další funkcionalitu, jako webové rozhraní pro testování a webový shell (interpreter příkazů).
+- **examples aplikace**: obsahuje dokumentaci a interaktivní příklady. **examples** je klonem oficiální web2py.com webové stránky a obsahuje epydoc dokumentaci.
+- **welcome aplikaci**: základní vzorová aplikace pro začátek návrhu ostatních aplikací. Obsahuje CSS kaskádové menu a uživatelskou autentikaci (popsanou v kapitole 9).
+
+Web2py je distribuováno ve zdrojové formě a v binární formě pro Microsoft Windows a Mac OS X.
+
+Zdrojová forma může být provozována na kterékoli platformě, kde běží Python, a zahrnuje výše zmíněné komponenty.
+Ke spuštění zdrojového kódu potřebujete předinstalovaný Python 2.5 (nebo vyšší, např. 2.7) a některý z podporovaných databázových strojů.
+Pro testování a databázově nenáročné aplikace můžete použít SQLite databázi, která je k dispozici spolu s Pythonem 2.x.
+
+Binární verze Web2py (pro Windows a Mac OS X) obsahují Python 2.5 interpreter a SQLite databázi. Ty pochopitelně, technicky vzato, nejsou součástí Web2py. Jsou zahrnuty proto, aby bylo možné spouštět Web2py ihned bez dalších předběžných požadavků.
+
+Následující obrázek vysvětluje strukturu Web2py:
+
+[[image @///image/en300.png center 480px]]
+
+### Licence
+``license``:inxx
+
+Web2py je poskytováno pod LGPL verze 3 licencí. Úplný text licence je k dipozici v ref.``lgpl3``:cite.
+
+V souladu s LGPL smíte:
+
+- redistribuovat Web2py spolu s vašimi aplikacemi (včetně oficiálních Web2py binárních verzí)
+- publikovat vaše aplikace, používající Web2py knihovny, pod jakoukoli licencí chcete
+
+Musíte ale:
+
+- jasně uvést v dokumentaci, že vaše aplikace používá Web2py
+- publikovat jakoukoli případnou modifikaci Web2py knihoven pod LGPLv3 licencí
+
+Licence obsahuje obvyklou výhradu:
+
+THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.
+EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+FOR A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE
+PROGRAM IS WITH YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL
+NECESSARY SERVICING, REPAIR OR CORRECTION.
+
+IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY COPYRIGHT
+HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
+BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL
+DAMAGES ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED
+TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES
+OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER
+PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+**Starší verze**
+
+Starší verze Web2py, 1.0.*-1.90.*, byly publikovány pod GPL2 licencí s komerční výjimkou, což je pro praktické účely velice podobné aktuální LPGLv3 licenci.
+
+**Third party software distribuovaný spolu s Web2py**
+
+Web2py obsahuje third party software ve složce gluon/contrib/ a různé JavaScript a CSS soubory.
+Tyto soubory jsou distribuovány spolu s Web2py pod jejich originálními licencemí, jak je naleznete v popisných souborech.
+
+
+### Zásluhy
+
+Původním autorem Web2py je Massimo Di Pierro.
+První verze (1.0) byla uvolněna v říjnu 2007. Od té doby ji začalo používat mnoho uživatelů, z nichž někteří také přispěli hlášením chyb, testováním, laděním, pomocí patchů, zkušebním čtením knihy, apod.
+
+Někteří z hlavních přispěvatelů v abecedním pořadí podle křestního jména:
+
+Alexey Nezhdanov,
+Alvaro Justen,
+Andrew Willimott,
+Angelo Compagnucci,
+Anthony Bastardi,
+Antonio Ramos,
+Arun K. Rajeevan,
+Attila Csipa,
+Ben Reinhart,
+Bill Ferret,
+Boris Manojlovic,
+Branko Vukelic,
+Brian Meredyk,
+Bruno Rocha,
+Carlos Galindo,
+Carsten Haese,
+Chris Clark,
+Chris Steel,
+Christian Foster Howes,
+Christopher Smiga,
+CJ Lazell,
+Cliff Kachinske,
+Craig Younkins,
+Daniel Lin,
+David Harrison,
+David Wagner,
+Denes Lengyel,
+Douglas Soares de Andrade,
+Eric Vicenti,
+Falko Krause,
+Farsheed Ashouri,
+Fran Boon,
+Francisco Gama,
+Fred Yanowski,
+Gilson Filho,
+Graham Dumpleton,
+Gyuris Szabolcs,
+Hamdy Abdel-Badeea,
+Hans Donner,
+Hans Murx,
+Hans C. v. Stockhausen,
+Ian Reinhart Geiser,
+Ismael Serratos,
+Jan Beilicke,
+Jonathan Benn,
+Jonathan Lundell,
+Josh Goldfoot,
+Jose Jachuf,
+Josh Jaques,
+José Vicente de Sousa,
+Keith Yang,
+Kenji Hosoda,
+Kyle Smith,
+Limodou,
+Lucas D'Ávila,
+Marcel Leuthi,
+Marcel Hellkamp,
+Marcello Della Longa,
+Mariano Reingart,
+Mark Larsen,
+Mark Moore,
+Markus Gritsch,
+Martin Hufsky,
+Martin Mulone,
+Mateusz Banach,
+Miguel Lopez,
+Michael Willis,
+Michele Comitini,
+Nathan Freeze,
+Niall Sweeny,
+Niccolo Polo,
+Nicolas Bruxer,
+Olaf Ferger,
+Omi Chiba,
+Ondrej Such,
+Ovidio Marinho Falcao Neto,
+Pai,
+Paolo Caruccio,
+Patrick Breitenbach,
+Phyo Arkar Lwin,
+Pierre Thibault,
+Ramjee Ganti,
+Robin Bhattacharyya,
+Ross Peoples,
+Ruijun Luo,
+Ryan Seto,
+Scott Roberts,
+Sergey Podlesnyi,
+Sharriff Aina,
+Simone Bizzotto,
+Sriram Durbha,
+Sterling Hankins,
+Stuart Rackham,
+Telman Yusupov,
+Thadeus Burgess,
+Tim Michelsen,
+Timothy Farrell,
+Yair Eshel,
+Yarko Tymciurak,
+Younghyun Jo,
+Vidul Nikolaev Petrov,
+Vinicius Assef,
+Vladyslav Kozlovskyy,
+Zahariash.
+
+Někoho jsem určitě zapomněl, a to mi promiňte.
+
+Zvláště děkuji: Anthony, Jonathan, Mariano, Bruno, Vladyslav, Martin, Nathan, Simone, Thadeus, Tim, Iceberg, Denes, Hans, Christian, Fran and Patrick za jejich zásadní příspěvky ke kódu Web2py
+a: Anthony, Alvaro, Bruno, Denes, Felipe, Graham, Jonathan, Hans, Kyle, Mark, Michele, Richard, Robin, Roman, Scott, Shane, Sharriff, Sriram, Sterling, Stuart, Thadeus (a jiní) za zkušební čtení této knihy. Jejich příspěvek je nedocenitelný. Naleznete-li v knize chyby, jsou výhradně způsobeny mnou, nejspíš zaneseny při závěrečné editaci na poslední chvíli. Také děkuji: Ryan Steffen z Wiley Custom Learning Solutions za pomoc s publikováním první edice knihy.
+
+Web2py obsahuje kód těchto autorů, kterým chci také poděkovat:
+
+Guido van Rossum for Python``python``:cite, Peter Hunt, Richard Gordon, Timothy Farrell for the Rocket``rocket``:cite  web server, Christopher Dolivet for EditArea``editarea``:cite, Bob Ippolito for simplejson``simplejson``:cite, Simon Cusack and Grant Edwards for pyRTF``pyrtf``:cite, Dalke Scientific Software for pyRSS2Gen``pyrss2gen``:cite, Mark Pilgrim for feedparser``feedparser``:cite, Trent Mick for markdown2``markdown2``:cite, Allan Saddi for fcgi.py, Evan Martin for the Python memcache module``memcache``:cite, John Resig for jQuery``jquery``:cite.
+
+Obálku knihy navrhl: Peter Kirchner at Young Designers.
+
+Děkuji: Helmut Epp (provost of DePaul University), David Miller (Dean of the College of Computing and Digital Media of DePaul University), and Estia Eichten (Member of MetaCryption LLC), za dlouhodobou důvěru a podporu.
+
+Na závěr děkuji mé ženě Claudii a synovi Marcovi, že mě podpořili během těch mnoha hodin, které jsem věnoval vývoji Web2py, výměně mailů s užživateli a přispěvateli, a psaní této knihy. Tato kniha je věnována jim.
+
+### O této knize
+
+Kniha obsahuje následující kapitoly, následující po této úvodní:
+- Kapitola 2 je minimalistický úvod do Pythonu. Předpokládá znalost procedurální i objektově orientované koncepce programování, jako jsou smyčky, podmínky, volání funkcí a třídy, a zahrnuje základní syntaxi Pythonu. Obsahuje také příklady Python modulů, použitých jinde v této knize. Znáte-li už Python, kapitolu 2 přeskočte.
+- Kapitola 3 ukazuje, jak s Web2py začít. Diskutuje administrativní rozhraní a uvádí čtenáře do problematiky pomocí různých příkladů se stupňující se složitostí: alikace, která vrací řetězec; aplikace s čítačem; blog s fotografiemi; wiki aplikace, která umožňuje upload fotografií a jejich popis, spolu s autentikací, autorizací, webovými službami a RSS kanálem. Když budete číst tuto kapitolu, možná budete potřebovat se dívat do dalších kapitol s podrobnějším popisem použité funkcionality.
+- Kapitola 4 popisuje více systematicky základní strukturu a knihovny: URL mapování, request (požadavek), response (odpověď), sessiony (uložení stavu mezi jednotlivými přístupy), cachování, cron (automaticky spouštěné úlohy), internationalizace aplikací a obecný princip a postup činnosti.
+- Kapitola 5 je reference jazyka šablon (template language) pro vytváření view. Ukazuje, jak integrovat Python kód do HTML, a demonstruje použití helpers (pomocníků; objektů, které pomáhají generovat HTML).
+- Kapitola 6 popisuje Databázovou Abstrakční Vrstvu (Database Abstraction Layer, DAL). Syntaxe DAL je vysvětlena pomocí série příkladů.
+- Kapitola 7 zahrnuje formuláře, jejich validaci a zpracování. FORM je nízkoúrovňový helper pro vytváření formulářů. SQLFORM je builder formulářů na vyšší úrovni. V kapitole 7 také probíráme API pro Přidávání/Prohlížení/Editace/Rušení (Create/Read/Update/Delete, CRUD).
+- Kapitola 8 popisuje komunikaci, jako je posílání e-mailů a SMS.
+- Kapitola 9 probírá autentikaci, autorizaci a řízení přístupu pomocí rolí (Role-Based Access Control). V souvislosti s autentikací je probrána konfigurace mailu a CAPTCHA. Od třetí edice knihy je přidán rozsáhlý materiál o způsobech integrace s autentikačními mechanismy třetích stran, jako jsou OpenID, OAuth, Google, Facebook, LinkedIn, apod.
+- Kapitola 10 hovoří o vytváření webových služeb pomocí Web2py. Ukazujeme příklady integrace s Google Web Toolkit pomocí Pyjamas, a s Adobe Flash pomocí PyAMF.
+- Kapitola 11 probírá vztah Web2py a jQuery. Web2py je sice určeno pro programování na straně serveru, ale zahrnnuje i podporu jQuery, protože jsme došli k závěru, že je to nejlepší open-source JavaScriptová knihovna pro efekty a pro Ajax. V této kapitole probíráme, jak efektivně používat jQuery spolu s Web2py.
+- Kapitola 12 diskutuje Web2py komponenty a pluginy jako způsob výstavby modulárních aplikací. Zabýváme se také příkladem jednoho konkrétního pluginu, který implementuje běžnou funkcionalitu, jako jsou grafy, komentáře, označování a wiki.
+- Kapitola 13 je o nasazení Web2py aplikací v produkčním prostředí. Zabýváme se hlavně třemi obvyklými produkčními scénáři: na linuxovém webovém serveru nebo skupině serverů (toto považuedí jeme za nejtypičtější nasazení), spouštění jako služba v prostředí Microsoft Windows, a nasazení na Google Applications Engine. V této kapitole také probíráme bezpečnostní otázky a škálovatelnost.
+- Kapitola 14 doplňuje některé ostatní věci pro řešení speciální problematiky, jako jsou upgrady, geocoding, stránkování, Twitter API, a další.
+
+Tato kniha pokrývá jen základní Web2py funkcionalitu a API. Nezabývá se Web2py hotovými aplikacemi, které jsou rovněž k dispozici. Ty můžete stáhnout z příslušné webové stránky ``appliances``:cite.
+
+Další zdroje najdete pomocí webové stránky web2py.com.
+
+Kniha je napsána v markmin syntaxi ``MARKMIN``:inxx a automaticky převáděna do HTML, LaTeX a PDF.
+
+### Styl a konvence
+
+PEP8 specifikace ``style``:cite obsahuje doporučené postupy pro programování v Pythonu. Zjistíte, že Web2py ne vždy následuje tato pravidla. Není to způsobeno přehlédnutím nebo ignorováním. Doporučujeme, aby uživatel Web2py tato pravidla respektoval a řídil se jimi. Rozhodli jsme se ale některá tato pravidla narušit, když jsme definovali helper objekty, a to proto, abychom minimalizovali riziko konfliktu s objekty, definovanými uživatelem.
+
+Například třídu, která reprezentuje prvek ``<div>`` jsme nazvali ``DIV``, ačkoli podle Python stylu by měla být pojmenována ``Div``. Rozhodli jsme se tak proto, protože si myslíme, že pro tento specifický účel je to přirozenější řešení. A pro programátora ponechává možnost si definovat třídu "Div", pokud ji potřebuje.
+Naše syntaxe také lépe koresponduje s DOM notací většiny prohlížečů (včetně například Firefoxu).
+
+Podle doporučeného stylu programování v Pythonu jsou všechny názvy velkými písmeny (upper-case) rezervovány pro konstanty a ne pro proměnné. Vrátíme-li se k našemu příkladu, poznamenejme, že ``DIV`` je sice třída, ale v daném kontextu speciální třída, která by neměla nikdy být modifikována (protože by to ohrozilo ostatní Web2py aplikace). Tak vlastně můžeme pohlížet na ``DIV`` jako na konstantu (podobnou rezervovanému slovu jazyka), a to také nahrává námi zvolené notaci.
+
+Shrneme-li to, jsou použity tyto konvence:
+- HTML helpery a validátoryy jsou vesměs velkými písmeny (upper-case) z výše diskutovaných důvodů (např. ``DIV``, ``A``, ``FORM``, ``URL``).
+- Objekt pro zajištění překladu (lokalizace) ``T`` je rovněž upper-case, ačkoli se jedná o instanci třídy a ne třídu samotnou. Jeho činnost je vlastně podobná helperům - ovlivňuje renderování výstupu. Ale především potřebujeme, aby ``T`` mělo krátké jméno a současně bylo snadno nalezitelné v kódu.
+- třídy Databázové Abstrakční Vrstvy (DAL) se řídí doporučeným stylem (začínají velkým písmenem), např. ``Table``, ``Field``, ``Query``, ``Row``, ``Rows``, apod.
+
+Ve všech ostatních případech jsme se snažili, jak to jen bylo možné, respektovat doporučený styl programování (PEP8). Např. všechny instance (objekty) jsou malými písmeny (request, response, session, cache) a všechny názvy vnitřních tříd začínají velkým písmenem.
+
+Ve všech příkladech v této knize Web2py klíčová slova zvýrazňujeme tučně. Kdežto řetězce a komentáře jsou uváděny šikmým písmem (italic).
