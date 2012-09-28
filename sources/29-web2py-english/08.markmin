@@ -267,7 +267,7 @@ As noted in Chapter 4, this type of background process should not be executed vi
 Note, one drawback to sending email via a background process is that it makes it difficult to provide feedback to the user in case the email fails. If email is sent directly from the controller action, you can catch any errors and immediately return an error message to the user. With a background process, however, the email is sent asynchronously, after the controller action has already returned its response, so it becomes more complex to notify the user of a failure.
 
 
-### Reading email boxes (Experimental)
+### Reading and managing email boxes (Experimental)
 
 The ``IMAP`` adapter is intended as an interface with email IMAP servers to perform simple queries in the web2py ``DAL`` query syntax, so email read, search and other related IMAP mail services (as those implemented by brands like Google(r), and Yahoo(r) can be managed from web2py applications.
 
@@ -293,8 +293,8 @@ To handle the different native mailbox names for the user interface,  the follow
 -------------------------------------------------------
 **Attribute** | **Type** | **Format**
 =======================================================================
-imapdb.mailboxes | dict | {<tablename>: <server native name>, ...}
-imapdb.mailbox_names | dict | {<server native name>: <tablename>, ...}
+imapdb.mailboxes | list | ``[<tablename>, ...]``
+imapdb.mailbox_names | dict | ``{<tablename>: <server native name>, ...}``
 =======================================================================
 -------------------------------------------------------
 
@@ -352,8 +352,7 @@ Otherwise, you can use the message's ``id``.
 mymessage = imapdb.INBOX[<id>]
 ``:code
 
-Note that using the id in a reference field is not supported, because there's no way of writing to the tables the same way as in other standard database adapters. If you still want to record references to messages in another database, the solution is to use the uid field as reference whenever supported, and retrieve each message with the recorded value.
-
+Note that using the message's id as reference is not recommended, because sequence numbers can change with mailbox mantainance operations as message deletions. If you still want to record references to messages (i.e. in another database's record field), the solution is to use the uid field as reference whenever supported, and retrieve each message with the recorded value.
 
 Finally, add something like the following to show the message content in a view
 
@@ -379,7 +378,7 @@ And of course, it's possible to feed a form helper with the appropiate sequence 
 {{=SQLFORM(imapdb.INBOX, <message id>, fields=[...])}}
 ``:code
 
-The current adapter supported fields available are the as follows:
+The current adapter supported fields available are the following:
 
 ---------------------------------------
 **Field** | **Type** | **Description**
@@ -411,9 +410,8 @@ message string
 **WARNING**: As row id's are mapped to email sequence numbers, make sure your imap client web2py app does not delete messages
 during select or update actions, to prevent updating or deleting different messages.
 
-Sequence numbers change whenever the mailbox is updated. To avoid this sequence numbers issues, it is recommended the use
-of uid fields in query references (although the update and delete in separate actions rule still applies).
 
+Standard ``CRUD`` database operations are not supported. There's no way of defining custom fields or tables and make inserts with different data types because updating mailboxes with IMAP services is usually reduced to posting flag updates to the server. Still, it's possible to access those flag commands trough DAL IMAP inteface
 
 To mark last query messages as seen
 ``
