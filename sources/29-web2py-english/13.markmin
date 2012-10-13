@@ -54,7 +54,7 @@ In the rest of the chapter, we consider various recipes that may provide an impr
 
 While we recommend following the first three recipes, the fourth recipe may provide an advantage mainly in the case of small files, but may be counterproductive for large files.
 
-#### ``anyserver.py``
+### ``anyserver.py``
 
 ``anyserver``:inxx ``bjoern``:inxx ``cgi``:inxx ``cherrypy``:inxx ``diesel``:inxx ``eventlet``:inxx ``fapws``:inxx ``flup``:inxx ``gevent``:inxx ``gnuicorn``:inxx ``mongrel2``:inxx ``paste``:inxx `` ``tornado``:inxx ``twisted``:inxx ``wsgiref
 
@@ -1153,6 +1153,27 @@ We can also obtain Redis statistics by calling:
 cache.redis.stats()
 ``:code
 
+#### Sessions in Redis
+If you have Redis in your stack, why not use it for sessions ?
+``
+from gluon.contrib.redis_session import RedisSession
+sessiondb = RedisSession('localhost:6379',db=0, session_expiry=False)
+session.connect(request, response, db = sessiondb)
+``
+The code has been tested with ~1M sessions. As long as Redis can fit in memory, the time taken to handle
+1 or 1M sessions is the same. While against file-based sessions or db-based sessions
+the speedup is unnoticeable for ~40K sessions, over that barrier the improvement is remarkable.
+You'll end up with 1 key per session, plus 2 keys, one holding an integer (needed for assigning different session keys) and the other holding the set of all
+sessions generated (so for 1000 sessions, 1002 keys).
+
+If ``session_expiry`` is not set, sessions will be handled as usual, you'd need to [[cleanup sessions as usual @///chapter/13#Cleaning-up-sessions]] once a while.
+
+However, when ``session_expiry`` is set will delete automatically sessions after n seconds
+(e.g. if set to 3600, session will expire exactly on hour later having been updated the last time)
+You should however occasionally run sessions2trash.py just to clean the key holding the set of all
+the sessions previously issued (for ~1M sessions, cleaning up requires 3 seconds)
+
+
 #### Removing applications
 ``removing application``:inxx
 
@@ -1203,6 +1224,16 @@ else:
 ``:code
 
 where 1,2,3 are slaves and 3,4,5 are masters.
+
+#### Compress static files
+Browsers can decompress content on-the-fly, so compressing content for those browsers saves your bandwith and theirs, lowering response times.
+Nowadays pretty much all the webservers can compress your content on-the-fly and send it to the browsers requesting gzipped content.
+However, for static files, you are wasting CPU cycles to compress over and over the same content.
+
+You can use ''scripts/zip_static_files.py'' to create gzipped versions of your static files and serve those without loosing CPU.
+Run as ``python web2py.py -S myapp -R scripts/zip_static_files.py`` in cron. The script takes care to create (or update) the gzipped version and saves them along with your files, appending a .gz to their name.
+You just need to let your webserver know when to send those files ``apache_gzip``:cite ``nginx_gzip``:cite
+  
 
 ### Deploying on Google App Engine
 ``Google App Engine``:inxx
