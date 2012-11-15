@@ -13,7 +13,7 @@ def splitter(x):
 @cache('folders',None)
 def get_folders(dummy=None):
     folder = os.path.join(request.folder,'sources')
-    return folder, [f for f in os.listdir(folder) 
+    return folder, [f for f in os.listdir(folder)
                     if os.path.isdir(os.path.join(folder,f))]
 FOLDER, FOLDERS = get_folders()
 
@@ -73,12 +73,12 @@ def convert2html(book_id,text):
 
 def index():
     books = {}
-    for subfolder in FOLDERS:        
+    for subfolder in FOLDERS:
         books[subfolder] = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=60*60*24)
     return locals()
 
 def calc_date(now=request.utcnow.date()):
-    # if you are changing sources often remove the 
+    # if you are changing sources often remove the
     # comment from the next 2 lines
     # import datetime
     # now = now + datetime.timedelta(days=1)
@@ -157,7 +157,7 @@ def reference():
         raise HTTP(404)
     info = dict(splitter(line)
                 for line in open(filename).readlines()
-                if ':' in line)    
+                if ':' in line)
     if info['source_url']:
         redirect(info['source_url'])
     else:

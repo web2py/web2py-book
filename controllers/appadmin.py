@@ -437,6 +437,3 @@ def ccache():
 
     return dict(form=form, total=total,
                 ram=ram, disk=disk, object_stats=hp != False)
-
-
-
