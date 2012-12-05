@@ -1988,6 +1988,84 @@ The first variable contains the error message when an invalid application or fun
 ``routes_onerror`` work with both routing mechanisms
 -------
 
+#### Static asset management
+
+Since version 2.1.0, web2py has the ability to manage static assets.
+
+When an application is in development, static file can change often, therefore web2py sends static files with no cache headers. This has the side-effect of "forcing" the browser to request static files at every request. This resulst in low performance when loading the page.
+
+In a "production" site, you may want to serve static files with ``cache`` headers to prevent un-necessary downloads since static files do not change.
+
+``cache`` headers allow the browser to fetch each file only once, thus saving bandwidth and reducing loading time.
+
+Yet there is a problem: What should the cache headers declare? When should the files expire? When the files are first served, the server cannot forecast when they will be changed. 
+
+A manual approach consists of creating subfolders for different versions of static files. For example an early version of "layout.css" can be made available at the URL "/myapp/static/css/1.2.3/layout.css". When you cahnge the file, you create a new subfolder and you link it as "/myapp/static/css/1.2.4/layout.css".
+
+This procedure works but it is pedantic since everytime you update the css file, you must remember to move it to another folder, change the url of the file in your layout.html and deploy.
+
+Static asset management solves the problem by allowing the developer to declare a version for a group of static files and they will be requested again only when the version number changes. The version number of made part of the file url as in the previous example. The difference from the previous approach is that the version number only appears in the URL, not in the file system.
+
+
+If you want to serve "/myapp/static/layout.css" with the cache headers, you just need to include the file with a modified URL that includes a version number:
+``
+/myapp/static/_1.2.3/layout.css
+``
+(notice the URL defines a version number, it does not appear anywhere else).
+
+Notice tha URL starts with "/myapp/static/", followed by a version number composed by an underscore and 3 integers separated by a period (as descrived in [[SemVer http://semver.org/]]), then followed by the filename. Also notice that you do not have to create a "_1.2.3/" folder.
+
+Every time the static file is requested with a version in the url, it will be served with "far in the future" cache headers, specifically:
+``
+Cache-Control : max-age=315360000
+Expires: Thu, 31 Dec 2037 23:59:59 GMT
+``
+This means that the browser will fetch those file only once, and they will be saved "forever" in the browser's cache.
+
+Every time the "_1.2.3/filename" is requested, web2py will remove the version part from the path and serve your file with far in the future headers so they will be cached forever. If you changed the version number in the URL, this tricks the browser into thinking it is requesting a different file, and the file is fetched again.
+
+You can use "_1.2.3", "_0.0.0", "_999.888.888", as long as the version starts with underscore followed by three numbers separated by period.
+ 
+When in development, you can use ``response.files.append(...)`` to link the static URLs of static files. In this case you can include the "_1.2.3/" part manually, or you take advantage of a new parameter of the response object: ``response.static_version``.
+Just include the files the way you used to, for example
+``
+{{response.files.append(URL('static','layout.css'))}}
+``
+and in models set
+``:code
+response.static_version = '1.2.3'
+``:code
+This will rewrite automatically every "/myapp/static/layout.css" url as "/myapp/static/_1.2.3/layout.css", for every file included in ``response.files``.
+
+Often in production you let the webserver (apache, nginx, etc.) serve the static files. You need to adjust your configuration in such a way that it will "skip" the "_1.2.3/" part.
+
+For example, in Apache, change this:
+``
+AliasMatch ^/([^/]+)/static/(.*) \
+   /home/www-data/web2py/applications/$1/static/$2
+``
+into this:
+``
+AliasMatch ^/([^/]+)/static/(?:/_[\d]+\.[\d]+\.[\d]+)?(.*) \
+   /home/www-data/web2py/applications/$1/static/$2
+``
+
+Similarly, in Nginx change this:
+``
+location ~* /(\w+)/static/ {
+    root /home/www-data/web2py/applications/;
+    expires max;
+}
+``
+into this:
+``
+location ~* /(\w+)/static(?:/_[\d]+\.[\d]+\.[\d]+)?/(.*)$ {
+   alias /home/www-data/web2py/applications/$1/static/$2;
+   expires max;
+}
+``
+
+
 ### Running tasks in the background
 
 In web2py, every http request is served in its own thread. Threads are recycled for efficiency and managed by the web server. For security, the web server sets a time-out on each request. This means that actions should not run tasks that take too long, should not create new threads, and should not fork processes (it is possible but not recommended).
