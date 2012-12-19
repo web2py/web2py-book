@@ -1,0 +1,2492 @@
+## Формы и валидаторы
+
+В тексте отчасти использован перевод предложенный Anatoly Belyakov ажно в 04.03.2010
+
+Есть 4 различных способа построения форм в web2py:
+- ``FORM`` обеспечивает низкоуровневое построение форм, используя HTML теги. 
+- ``SQLFORM`` обеспечивает высокоуровневое API для создания форм. Позволяет: создавать, удалять, обновлять записи в таблице базы данных.
+- ``SQLFORM.factory`` это уровень абстракции находящийся выше ``SQLFORM``. Позволяет создавать формы, даже если нет базы данных. Этот способ генерирует формы очень похожие на ``SQLFORM`` формы, но без необходимости создавать таблицу базы данных.
+- ``CRUD`` метод. (СОздание, ЧТение, ОБНовление, Удаление). Функционально этот метод эквивалентен SQLFORM, но обеспечивает более компактное описание.
+
+Все эти формы имеют возможность проверки вводимых значений, и если вводимые значения не прошли проверку, то формы выводят сообщение об ошибке. Формы могут иметь переменные, отвечающие за сообщение об ошибке генерируемые на этапе проверки вводимых значений. 
+
+Произвольный HTML код может быть вставлен в создаваемые формы с помощью helpers. (что то мне не нравится слово помощники)
+
+``FORM`` и ``SQLFORM`` это помощники, и с ними можно точно таким же образом производить манипуляции, как и с тегом ``DIV``. Например, вы можете установить стиль формы: 
+
+``
+form = SQLFORM(..)
+form['_style']='border:1px solid black'
+sqlgrid['_style']='font-size:11px' 
+``:code
+
+### ``FORM``
+``form``:inxx ``accepts``:inxx ``formname``:inxx
+
+Рассмотрим как пример некое тестовое приложение с контроллером "default.py", содержащим следующий код:
+``
+def display_form():
+    return dict()
+``:code
+
+Ассоциируем этот код с файлом вида "default/didsplay_form":
+``
+{{extend 'layout.html'}}
+<h2>Input form</h2>
+<form enctype="multipart/form-data"
+      action="{{=URL()}}" method="post">
+Your name:
+<input name="name" />
+<input type="submit" />
+</form>
+<h2>Submitted variables</h2>
+{{=BEAUTIFY(request.vars)}}
+``:code
+
+Это обычная HTML форма содержащая запрос имени пользователя. Когда вы заполните форму и нажмете кнопку Submit(отправить), форма Обработается и вы увидите переменную ``request.vars.name`` и ее значение внизу формы. ( это произойдет благодаря записи {{=BEAUTIFY(request.vars)}} - выводящей значения всех переменных страницы)
+
+Вы можете сгенерировать такую же форму используя помощник.- helper
+
+Новый контроллер:
+``
+def display_form():
+   form=FORM('Your name:', INPUT(_name='name'), INPUT(_type='submit'))
+   return dict(form=form)
+``:code
+
+Файл вида "default/display_form.html":
+``
+{{extend 'layout.html'}}
+<h2>Input form</h2>
+{{=form}}
+<h2>Submitted variables</h2>
+{{=BEAUTIFY(request.vars)}}
+``:code
+
+По сути этот код эквивалентен предыдущему коду, отличие лишь в том, что форма сгенерирована с помощью указания ``{{=form}}`` , которая создана объектом ``FORM``.
+
+Сейчас мы добавим один уровень сложности - добавим проверку вводимых значений и обработку формы.
+
+Изменить контроллер как в коде ниже:
+``
+def display_form():
+    form=FORM('Your name:',
+              INPUT(_name='name', requires=IS_NOT_EMPTY()),
+              INPUT(_type='submit'))
+    if form.accepts(request,session):
+        response.flash = 'form accepted'
+    elif form.errors:
+        response.flash = 'form has errors'
+    else:
+        response.flash = 'please fill the form'
+    return dict(form=form)
+``:code
+
+Также измените файл вида "default/display_form.html":
+
+``
+{{extend 'layout.html'}}
+<h2>Input form</h2>
+{{=form}}
+<h2>Submitted variables</h2>
+{{=BEAUTIFY(request.vars)}}
+<h2>Accepted variables</h2>
+{{=BEAUTIFY(form.vars)}}
+<h2>Errors in form</h2>
+{{=BEAUTIFY(form.errors)}}
+``:code
+
+обратите внимание:
+- в коде мы добавили валидатор ``requires=IS_NOT_EMPTY()``(не пустое)  для поля "name".
+- в коде мы добавили действие при вызове ``form.accepts(..)``
+- в файле вида, мы выводим переменные формы ``form.vars`` и ошибки формы ``form.errors``.
+
+Если значение поля не отвечает требованиям, то валидатор возвращает ошибку, которая в свою очередь сохраняется в переменной ``form.errors``. Обе переменные ``form.vars`` и ``form.errors`` это объекты ``gluon.storage.Storage`` подобно ``request.vars``. Форма содержит значения, которые прошли проверку, например:
+``
+form.vars.name = "Max"
+``:code
+
+Последнее содержит ошибки, например:
+``
+form.errors.name = "Cannot be empty!"
+``:code
+
+Полная запись метода ``accepts`` имеет следующий вид:
+``onvalidation``:inxx
+``
+form.accepts(vars, session=None, formname='default',
+             keepvalues=False, onvalidation=None,
+             dbio=True, hideerror=False):
+``:code
+
+Значения опциональных параметров описано в следующей под-секции.
+Первым аргументом может быть ``request.vars`` или ``request.get_vars`` или ``request.post_vars`` или simply ``request``. Последнее эквивалентно отправке ввода ``request.post_vars``.
+
+Функция ``accepts`` возвращает ``True`` если форма принята и ``False`` если форма отвергнута. Форма может быть не принята если она имеет ошибки или когда форма не отправлена ( например когда она показывается в первый раз).
+
+Ниже, то как выглядит форма когда она показывается в первый раз:
+
+[[image @///image/en5800.png center 300px]]
+
+Так выглядит форма содержащая ошибки:
+
+[[image @///image/en5900.png center 300px]]
+
+Форма прошедшая проверку вводимых значений:
+
+[[image @///image/en6000.png center 300px]]
+
+#### Методы ``process`` и ``validate``
+
+Более легкий путь для описания
+``
+form.accepts(request.post_vars,session,...)
+``:code
+это
+``
+form.process(...).accepted
+``:code
+
+нет необходимости указывать аргументы ``request`` и ``session`` ( хотя в любом случае вы можете указать их опционально). Значения проверки возвращаются в переменной ``form.accepted``.
+
+Функция process берет некоторые дополнительные аргументы, которые не используются в функции ``accepts``:
+- ``message_onsuccess``
+- ``onsuccess``: это эквивалентно 'flash' ( по умолчанию в flash пишется сообщение которое появляется после того или иного события в правом верхнем углу экрана) когда форма отправлена появляется сообщение описанное в параметре message_onsuccess
+- ``message_onfailure``
+- ``onfailure``: событие эквивалентно 'flash' и проверки вводимых данных в форму. Сообщение 'message_onfailure'.
+- ``next`` действие после того как форма будет отправлена.
+функции ``onsuccess`` и ``onfailure``  могут функциями похожими на  функцию ``lambda form: do_something(form)``.
+
+``
+form.validate(...)
+``:code
+
+is a shortcut for
+
+``
+form.process(...,dbio=False).accepted
+``:code
+
+
+#### Скрытые поля формы(Hidden fields)
+
+Когда указанный выше объект формы сериализован с помощью {{=form}}, HTML-код теперь выглядит так:
+``
+<form enctype="multipart/form-data" action="" method="post">
+your name:
+<input name="name" />
+<input type="submit" />
+<input value="783531473471" type="hidden" name="_formkey" />
+<input value="default" type="hidden" name="_formname" />
+</form>
+``:code
+
+Итак здесь имеется два скрытых поля: : "_formkey" и "_formname". Поля играют 2 важные роли.
+
+- Скрытое поле "_formkey" это одномоментный токен используемый web2py для предотвращения двойной отправки формы. Значение этого ключа генерируется, когда форма создается и сохраняется в сессии. Когда форма отправлена это значение должно соответствовать сохраненному в сессии. 
+- Скрытое поле "_formname" это сгенерирован ное web2py имя для формы. Это поле необходимо для всех страниц, которые содержат множество форм. Web2py, таким образом, различает данные отправленные разными формами, используя их имена.
+- Опциональные скрытые поля могут быть указаны используя ``FORM(..,hidden=dict(...))``.
+
+Роль этих скрытых полей и их использование в разных формах и страницах с множеством форм будет рассмотрена позднее.
+Если форма будет отправлена с пустым полем "name" , то форма не пройдет проверку. Когда форма будет создана повторно - это будет выглядеть так:
+``
+<form enctype="multipart/form-data" action="" method="post">
+your name:
+<input value="" name="name" />
+<div class="error">cannot be empty!</div>
+<input type="submit" />
+<input value="783531473471" type="hidden" name="_formkey" />
+<input value="default" type="hidden" name="_formname" />
+</form>
+``:code
+
+Заметьте присутствие элемента DIV класса "error" в созданной форме. web2py вставляет сообщение об ошибке в форму для информирования посетителя о том, что форма не прошла проверку. Метод ``accepts`` определяет, что форма была отправлена, проверяет что поле "name" пустое (следовательно, не прошло проверку), и вставляет сообщение об ошибке.
+
+Базовый шаблон вида "layout.html" ожидает обращения к элементу DIV класса "error". Шаблон default использует jQuery эффект для отображения ошибок которые появляются под полем ввода. Ошибки ввода имеют красный фон, более подробно об этом см. Главу 11. 
+
+#### ``keepvalues`` Сохранение значений, введенных в форму
+
+``keepvalues``:inxx
+
+Полная сигнатура метода accepts следующая:
+form.accepts(vars, session=None, formname='default', keepvalues=False):
+
+Опциональный аргумент ``keepvalues`` говорит web2py, что необходимо сделать после того как форма была отправлена и не имеет редиректов, таким образом форма будет отображена повторно. По умолчанию форма пуста. Если ``keepvalues`` установлено значение ``True`` то форма будет отображена повторно уже с введенными значениями. Это может быть использовано для добавления множества записей отличающихся каким либо полем. Если аргумент ``dbio`` установлен в значение ``False``, web2py не будет ни каких изменений в базу данных после того как форма отправлена. Если ``hideerror`` имеет значение ``True`` и форма содержит ошибки, то ошибки не будут отображаться во время обработки формы. ( отображение ошибок в форме ``form.errors`` зависит от вас). Аргумент ``onvalidation`` будет описан далее.
+
+#### При проверке``onvalidation``
+
+Аргумент ``onvalidation`` может имет значение ``None`` или может указывать на функцию, которая обрабатывает форму и ни чего не возвращает. Такая функция вызывается и выполняется незамедлительно после проверки данных(если конечно пройдена проверка вводимых данных) и перед любыми другими функциями обработки. Цель этой функции многократное использование, функция может быть использована, например для проведения дополнительных проверок в форме и в конечном счете добавления сообщений о ошибках в форме. Так же эта функция может быть использована для предварительных вычислений в форме ( например сумма заказа). Так же эта функция может быть использована для инициирования каких либо действий ( например отправка email) до обновления/ удаления/ каких либо записей в базе данных.
+
+Пример:
+``
+db.define_table('numbers',
+    Field('a', 'integer'),
+    Field('b', 'integer'),
+    Field('c', 'integer', readable=False, writable=False))
+
+def my_form_processing(form):
+    c = form.vars.a * form.vars.b
+    if c < 0:
+       form.errors.b = 'a*b cannot be negative'
+    else:
+       form.vars.c = c
+
+def insert_numbers():
+   form = SQLFORM(db.numbers)
+   if form.process(onvalidation=my_form_processing).accepted:
+       session.flash = 'record inserted'
+       redirect(URL())
+   return dict(form=form)
+``:code
+
+#### Обнаружение изменения записи (Detect record change)
+
+Когда заполняется форма для редактирования записи имеется маленькая вероятность того что другой пользователь в это же время редактирует эту же запись. Для реализации проверки на возможные конфликты использования одной и тоже записи используем следующий код:
+``
+db.define_table('dog',Field('name'))
+
+def edit_dog():
+    dog = db.dog(request.args(0)) or redirect(URL('error'))
+    form=SQLFORM(db.dog,dog)
+    form.process(detect_record_change=True)
+    if form.record_changed:
+        # do something
+    elif form.accepted:
+        # do something else
+    else:
+        # do nothing
+    return dict(form=form)
+``:code
+
+#### Формы и перенаправление на другую страницу (Forms and redirection)
+
+Наиболее распространенный способ использования форм это использование механизма обратной передачи, когда переменные полей обрабатываются той же процедурой, генерирующей форму. Как только форма отправлена, форма опять отображается на странице, но согласитесь более распространено переадресация пользователя на другую "next" страницу.
+
+Новый пример контроллера:
+``
+def display_form():
+    form = FORM('Your name:',
+              INPUT(_name='name', requires=IS_NOT_EMPTY()),
+              INPUT(_type='submit'))
+    if form.process().accepted:
+        session.flash = 'form accepted'
+        redirect(URL('next'))
+    elif form.errors:
+        response.flash = 'form has errors'
+    else:
+        response.flash = 'please fill the form'
+    return dict(form=form)
+
+def next():
+    return dict()
+``:code
+
+Что бы установить flash сообщение на следующую страницу вместо текущей, вам необходимо использовать ``session.flash`` переменную вместо ``response.flash``. Заметьте, используя ``session.flash`` не используйте ``session.forget()``.
+
+#### Множество форм на странице
+
+Содержимое этого параграфа применимо к обоим объектам ``FORM`` и ``SQLFORM``.
+Для возможности использования множества форм на одной странице, вы должны разрешить web2py различать их. При использовании ``SQLFORM`` используйте различные таблицы, тогда web2py будет давать им различные имена; либо вам необходимо точно указывать имена форм. Ниже пример:
+
+``
+def two_forms():
+    form1 = FORM(INPUT(_name='name', requires=IS_NOT_EMPTY()),
+               INPUT(_type='submit'))
+    form2 = FORM(INPUT(_name='name', requires=IS_NOT_EMPTY()),
+               INPUT(_type='submit'))
+    if form1.process(formname='form_one').accepted:
+        response.flash = 'form one accepted'
+    if form2.process(formname='form_two').accepted:
+        response.flash = 'form two accepted'
+    return dict(form1=form1, form2=form2)
+``:code
+
+На выходим мы получим:
+
+[[image @///image/en6100.png center 300px]]
+
+Когда пользователь отправляет пустую form1, только у form1 появляется сообщение об ошибке; когда пользователь отправляет пустую form2 только form2 отображает сообщения об ошибке
+
+#### Совместное использование форм
+
+или как подсказывает коллега - "Форма, подчиненная разным контроллерам"
+
+Все так же в лучших традициях содержимое этого параграфа имеет место быть для объектов ``FORM`` и ``SQLFORM``. Тута мы поговорим о возможности (но не о рекомендации), которая всегда является хорошей практикой для форм с механизмом обратной передачи. 
+
+Можно создать форму, которая подчиняется разным контроллерам. 
+Это делается путем указания в URL функции, выполняющей обработку формы, 
+в атрибутах объектов FORM или SQLFORM. 
+
+``
+form = FORM(INPUT(_name='name', requires=IS_NOT_EMPTY()),
+        INPUT(_type='submit'), _action=URL('page_two'))
+
+def page_one():
+    return dict(form=form)
+
+def page_two():
+    if form.process(session=None, formname=None).accepted:
+         response.flash = 'form accepted'
+    else:
+         response.flash = 'there was an error in the form'
+    return dict()
+``:code
+
+Обратите внимание, что так как "page_one" and "page_two" используют одну и ту же форму, мы определяем её только один раз, вне всяких функций контроллера, с тем, чтобы не повторять описания. Общая часть кода в начале контроллера выполняется каждый раз, прежде чем управление передается конкретной функции. Поскольку "page_one" не вызывает функцию accepts(), форма не имеет ни имени, ни ключа, поэтому вы не должны использовать параметр session и установить параметр formname=None в функции accepts() или форма не будет проверяться, когда функция "page_two" получит её.
+
+Since "page_one" does not call ``process`` (nor ``accepts``), the form has no name and no key, so you must pass  ``session=None`` and set ``formname=None`` in ``process``, or the form will not validate when "page_two" receives it.
+
+#### Добавление кнопок в формы
+
+Часто форма имеет всего одну submit кнопку. Но чаще нам необходима кнопка "back" для возврата к введенным значениям или к другой странице.
+``add_button``:inxx
+Это можно реализовать используя метод ``add_button``:
+``
+form.add_button('Back', URL('other_page'))
+``:code
+
+Вы можете добавить больше кнопок в форму, используя аргументы метода ``add_button`` 
+### ``SQLFORM``
+
+Перейдем к следующему уровню создания форм ``SQLFORM``, который опирается на данные из файла моделей:
+``
+db = DAL('sqlite://storage.sqlite')
+db.define_table('person', Field('name', requires=IS_NOT_EMPTY()))
+``:code
+
+Модифицируйте файл контроллера следующим образом:
+``
+def display_form():
+   form = SQLFORM(db.person)
+   if form.process().accepted:
+       response.flash = 'form accepted'
+   elif form.errors:
+       response.flash = 'form has errors'
+   else:
+       response.flash = 'please fill out the form'
+   return dict(form=form)
+``:code
+
+Файл вида -шаблон нет необходимости менять.
+
+В новом контроллере, конструктор ``SQLFORM`` создает форму основываясь на таблице ``db.person``, структура которой описана в модели.  После сериализации в HTML, она выглядит так:
+``
+<form enctype="multipart/form-data" action="" method="post">
+  <table>
+    <tr id="person_name__row">
+       <td><label id="person_name__label"
+                  for="person_name">Your name: </label></td>
+       <td><input type="text" class="string"
+                  name="name" value="" id="person_name" /></td>
+       <td></td>
+    </tr>
+    <tr id="submit_record__row">
+       <td></td>
+       <td><input value="Submit" type="submit" /></td>
+       <td></td>
+    </tr>
+  </table>
+  <input value="9038845529" type="hidden" name="_formkey" />
+  <input value="person" type="hidden" name="_formname" />
+</form>
+``:code
+
+Созданная автоматически форма более сложна по сравнению с предыдущим низко уровневым методом создания форм. Прежде всего она содержит таблицу строк, и каждая строка имеет 3 столбца. Первый столбец содержит название поля (название берется из структуры ``db.person``), второй столбец содержит поле для ввода ( и возможных сообщений об ошибках), и третий столбец опционален - обычно пустой (чето тут автор решил пока забить на этот столбец, но позднее мы к нему доберемся)
+
+Все теги формы имеют имена, состоящие из имени таблицы и имени поля. Это позволяет легко настраивать формы с помощью CSS и JavaScript. Эта возможность обсуждается более подробно в главе 10.
+
+Более важным сейчас является метод ``accepts``, который проделывает больше работы для вас. Как и в предыдущем случае, он обрабатывает корректность ввода, и дополнительно если вводимые данные прошли проверку он так же осуществляет запись данных в таблицу базы данных, то есть из переменных переданные в ``form.vars.id`` формируется insert запрос к базе данных.
+
+Объект ``SQLFORM`` так же может автоматически сформировать поле "upload" для сохранения загружаемых файлов в папку ( ессно после безопасного переименования имени файла, для предотвращения возможных конфликтов и предотвращения возможных traversal атак) . Имена файлов сохраняются в предназначенное для этого поля в таблице.  
+
+``SQLFORM`` отображает логические переменные как чек-бокс - флажок, текст значения как textarea, значения которые имеют строго определенный выбора как выпадающий список, "upload" поля имеют ссылку позволяющую скачать загруженный файл. Поля "blob" скрыты, поскольку они могут быть обработаны различным способом, об этом мы поговорим позднее.
+
+Для примера посмотрите следующую модель:
+``
+db.define_table('person',
+    Field('name', requires=IS_NOT_EMPTY()),
+    Field('married', 'boolean'),
+    Field('gender', requires=IS_IN_SET(['Male', 'Female', 'Other'])),
+    Field('profile', 'text'),
+    Field('image', 'upload'))
+``:code
+
+В этом случае конструктор ``SQLFORM(db.person)`` создаст форму следующего вида:
+
+[[image @///image/en6200.png center 300px]]
+
+Конструктор SQLFORM допускает различные настройки, такие как:
+- отображение подмножества значений поля, 
+- изменение меток полей, 
+- добавление значений в третий столбец формы, 
+- создание форм для обновления UPDATE и удаления DELETE записи, отличающихся от форм для вставки INSERT новой записи
+
+``SQLFORM`` это большой обьект web2py позволяющий экономить время. :-) и деньги, но CRUD круче.
+Класс ``SQLFORM`` описан в файле "gluon/sqlhtml.py", его можно легко изменить заменив метод ``xml`` c помощью которого создаются обьекты формы.
+``fields``:inxx ``labels``:inxx
+Полная запись конструктора ``SQLFORM`` выглядит следующим образом:
+``
+SQLFORM(table, record = None,
+        deletable = False, linkto = None,
+        upload = None, fields = None, labels = None,
+        col3 = {}, submit_button = 'Submit',
+        delete_label = 'Check to delete:',
+        showid = True, readonly = False,
+        comments = True, keepopts = [],
+        ignore_rw = False, record_id = None,
+        formstyle = 'table3cols',
+	buttons = ['submit'], separator = ': ',
+        **attributes)
+
+``:code
+
+- Опциональный второй аргумент преобразует запись INSERT  в запись UPDATE для определенной записи ( рассмотрим далее).
+- Если ``deletable`` = True, то появляется чек бокс "Check to delete". Значением надписи можно изменять, используя аргумент delete_label.
+- ``submit_button`` устанавливает значение кнопки submit.
+- ``id_label`` установка названия поля id
+- запись "id" не отображется если ``showid``= ``False``.
+- ``fields`` это опциональный список, состоящий из имен полей которые будут отображены. например:
+``
+fields = ['name']
+``:code 
+- ``labels`` это словарь состоящий из имен полей. Ключи словаря это имена полей, значения полей это то что будет отображено за вместо ключа. Если параметр ``labels`` отсутствует, web2py использует в качестве имен столбцов имена полей из БД. (Преобразуя первую букву имени на большую, заменяя нижнее подчеркивание на символ пробела). Смотрите пример ниже:
+``
+labels = {'name':'Your Full Name:'}
+``:code
+- ``col3`` это словарь значений для 3-го столбца. 
+``
+col3 = {'name':A('what is this?', _href='http://www.google.com/search?q=define:name')}
+``:code
+- ``linkto`` и ``upload`` опциональные ссылки URL на определенные пользователем контроллеры, позволяющие форме вызвать соответствующие поля. В следующем параграфе поговорим об этом более подробно.
+- ``readonly`` если =True отображается форма только для чтения.
+- ``comments`` если = False то 3 й столбцен не будет отображен.
+- ``ignore_rw``. Обычно, для удаления/ обновления формы отображаются только те поля которые помечены как writable=True, А для форм только для чтения отображаются только поля отмеченные как readable=True. Аргумент ``ignore_rw=True`` позволяет игнорировать эти ограничения и отображает все поля. Чаще всего это используется в интерфейсе приложения appadmin для отображения всех полей всех таблиц, игнорируя описание в файлах моделей.
+- ``formstyle``:inxx ``formstyle`` определяет HTML стиль создаваемой формы. Стиль может быть "table3cols" (default), "table2cols" (один ряд для записей и комментариев, и один ряд для поля ввода), "ul" ( создает список полей ввода), "divs" (создается форма, состоящая из элементов DIV). Обратите внмание ``formstyle`` может быть функцией, входящие параметры которой (record_id, field_label, field_widget, field_comment) и возвращающей объекты TR().
+- ``buttons``:inxx это список ``INPUT`` или ``TAG.BUTTON`` (though technically could be any combination of helpers) that will be added to a DIV where the submit button would go.
+- ``separator``:inxx ``separator`` устанавливает строку, которая будет разделять названия полей ввода от самого поля ввода.
+- Опциональные ``attributes`` аттрибуты это аргументы, начинающиеся с символа нижнего подчеркивания, используйте их если хотите заменить методы используемые по умолчанию. Смотрите пример:
+``
+_action = '.'
+_method = 'POST'
+``:code
+
+Ниже код описывающий специальные ``hidden``-  скрытые аттрибуты. Когда словарь обрабатывает ``hidden`` это преобразовывается в скрытое поле ввода ( смотрите пример для метода ``FORM`` главы 5).
+``
+form = SQLFORM(....,hidden=...)
+``:code
+Означает скрытые поля для обработки.
+``form.accepts(...)`` is not intended to read the received hidden fields and move them into form.vars. The reason is security. hidden fields can be tampered with.
+So you have to do explicitly move hidden fields from the request to the form:
+
+``
+form.vars.a = request.vars.a
+form = SQLFORM(..., hidden=dict(a='b'))
+``:code
+
+#### ``SQLFORM`` для операций ``insert``/``update``/``delete``
+
+``SQLFORM`` creates a new db record when the form is accepted. Assuming ``form=SQLFORM(db.test)``:code, then the id of the last-created record will be accessible in ``myform.vars.id``.
+``delete record``:inxx
+
+Если вы передаете record в качестве необязательного второго аргумента SQLFORM-конструктора, форма становится UPDATE-формой для этой записи. Это означает, что, когда форма отправляется, то обновляется существующая запись, а новая запись не создаётся. 
+Если вы установите аргумент deletable=True, UPDATE-форма отображает флажок "Отметка для удаления". Если он установлен, запись будет удалена.
+------
+Если форма была отправлена и флажок подтверждающий удаление был установлен то значение ``form.deleted`` is set to ``True``
+------
+Вы можете, например, изменить контроллер из предыдущего примера, с тем чтобы, передать дополнительный аргумент в виде целого числа в URL-путь, например: 
+``
+/test/default/display_form/2
+``:code
+
+и если есть запись с заданным идентификатором, SQLFORM-конструктор сгенерирует формы UPDATE/DELETE для записи 2:
+``
+def display_form():
+   record = db.person(request.args(0)) or redirect(URL('index'))
+   form = SQLFORM(db.person, record)
+   if form.process().accepted:
+       response.flash = 'form accepted'
+   elif form.errors:
+       response.flash = 'form has errors'
+   return dict(form=form)
+``:code
+
+Строка 2 находит записи, строка 3 создает форму. Строка 4 занимается обработкой всей формы.
+------
+Форма редактирования очень похожа на форму создания, за исключением того что, имеет записи редактируемой записи и файлы картинки. По умолчанию ``deletable = True`` это означает, что форма редактирования имеет опцию "delete record".
+------
+Изменённая форма также содержат скрытые hidden поля с name="id", которые используются для идентификации записи. 
+Этот идентификатор также сохраняется на стороне сервера для обеспечения дополнительной безопасности и, если посетитель пытается изменить значение этого поля, UPDATE не выполняется и web2py возбуждает исключение SyntaxError
+"пользователь пытается подделать форму".
+
+Если при создании таблицы поле, отмечено как writable=False, то оно не отображается в форме для INSERT записи, а в форме для UPDATE записи показывается как поле "только для чтения". Если при создании таблицы поле помечено как writable=False and readable=False, то оно не отображается на формах всех типов, даже в форме UPDATE.
+
+Формы, созданные с помощью атрибута
+``
+form = SQLFORM(...,ignore_rw=True)
+``:code
+игнорируют состояние атрибутов readable и writable и показывают все поля формы. Формы в appadmin имеют ignore_rw=True "по умолчанию".
+
+Формы, созданные с помощью атрибута readonly=True
+``
+form = SQLFORM(table,record_id,readonly=True)
+``:code
+
+показывает все поля формы в режиме "только для чтения", и они не могут быть приняты функцией accepts().
+
+#### ``SQLFORM`` формы в HTML
+
+Иногда когда вы используете ``SQLFORM`` для создания форм вам необходим уровень, позволяющий кастомизировать HTML форму, в таком случае вам нет необходимости использовать параметры обьекта ``SQLFORM``, создайте свою собственную форму используя HTML
+
+Отредактируйте предыдущий контроллер и добавьте в него новое действие:
+``
+def display_manual_form():
+   form = SQLFORM(db.person)
+   if form.process(session=None, formname='test').accepted:
+       response.flash = 'form accepted'
+   elif form.errors:
+       response.flash = 'form has errors'
+   else:
+       response.flash = 'please fill the form'
+   # Note: no form instance is passed to the view
+   return dict()
+``:code
+
+Создайте файл вида ассоциируемый с этой функцией "default/display_manual_form.html":
+``
+{{extend 'layout.html'}}
+<form>
+<ul>
+  <li>Your name is <input name="name" /></li>
+</ul>
+  <input type="submit" />
+  <input type="hidden" name="_formname" value="test" />
+</form>
+``:code
+
+Заметьте, что функция не возвращает форму (return dict()). Файл вида уже содержит форму созданную с помощью HTML. Форма содержит скрытое поле "_formname", которое такое же как и указанное в контроллере в аргументе ``accepts`` . Web2py использует имя форм в случае использования множества форм на странице для определения принадлежности той или иной формы к породившему ее методу. Если же форма на странице одна вы можете выставить ``formname=None`` и опустить это скрытое поле в файле вида.
+``form.accepts`` will look inside ``response.vars`` for data that matches fields in the database table ``db.person``.  These fields are declared in the HTML in the format
+``<input name="field_name_goes_here" />
+``:code
+
+Note that in the example given, the form variables will be passed on the URL as arguments.  If this is not desired, the ``POST`` protocol will have to be specified.  Note furthermore, that if upload fields are specified, the form will have to be set up to allow this.  Here, both options are shown:
+``
+<form enctype="multipart/form-data" method="post">
+``:code
+
+#### ``SQLFORM`` и поля типа uploads
+
+Специальное поле "upload" обрабатывается как INPUT поле с типом ``type="file"``. Загружаемый файл стремится используя буфер, и сохраняется в папку "uploads" (находится внутри папки с приложением) с новым безопасным именем (назначаемым автоматически). Имя сохраненного файла сохраняется в поле с типом uploads.
+
+Для примера реализуйте следующую модель:
+``
+db.define_table('person',
+    Field('name', requires=IS_NOT_EMPTY()),
+    Field('image', 'upload'))
+``:code
+
+Используйте тот же контроллер действия "display_form".
+
+После того как вы добавили новую запись, форма позволяет вам просматривать загруженный файл.
+Для примера выберете какое-нибудь jpg изображение. Этот файл сохранится под именем:
+``
+applications/test/uploads/person.image.XXXXX.jpg
+``:code
+
+где "XXXXXX" это рандомный идентификатор присваиваемый файлу web2py.
+``content-disposition``:inxx
+
+-------
+Обратите внимание, по умолчанию оригинальное имя файла кодируется, используя b16encoded. Это имя появляется после обработки действия по умолчанию "download".
+-------
+
+Все что остается от файла это его расширение. Имя файла меняется исходя из требований безопасности, для исключения возможности traversal атак.
+
+Имя нового файла так же сохраняется в переменной ``form.vars.image``.
+
+При редактировании записи с помощью UPDATE-формы, было бы неплохо отобразить ссылку на загруженный файл, и web2py предоставляет такую возможность. Если вы передадите URL в конструктор SQLFORM с помощью аргумента upload, web2py воспользуется ИФК, указанной в этом URL, чтобы загрузить файл. 
+``
+def display_form():
+   record = db.person(request.args(0)) or redirect(URL('index'))
+   form = SQLFORM(db.person, record, deletable=True,
+                  upload=URL('download'))
+   if form.process().accepted:
+       response.flash = 'form accepted'
+   elif form.errors:
+       response.flash = 'form has errors'
+   return dict(form=form)
+
+def download():
+    return response.download(request, db)
+``:code
+
+Вставим новую запись в URL:
+``
+http://127.0.0.1:8000/test/default/display_form
+``:code
+
+Загрузим изображение, отправим данные формы и отредактируем вновь созданную запись, посетив URL:
+``
+http://127.0.0.1:8000/test/default/display_form/3
+``:code
+
+Здесь мы предполагаем, что id последней записи  = 3. Форма после сериализации в HTML выглядит следующим образом:
+[[image @///image/en6300.png center 300px]]
+
+``
+<td><label id="person_image__label" for="person_image">Image: </label></td>
+<td><div><input type="file" id="person_image" class="upload" name="image"
+/>[<a href="/test/default/download/person.image.0246683463831.jpg">file</a>|
+<input type="checkbox" name="image__delete" />delete]</div></td><td></td></tr>
+<tr id="delete_record__row"><td><label id="delete_record__label" for="delete_record"
+>Check to delete:</label></td><td><input type="checkbox" id="delete_record"
+class="delete" name="delete_this_record" /></td>
+``:code
+
+В ней содержится ссылка, позволяющая загрузку файла, и флажок, чтобы разрешить удаление файла из записи БД, и сохранить NULL в поле image.
+
+Почему этот механизм является незащищенным?  Зачем вам нужно писать функцию загрузки? 
+Потому, что вы хотите соблюдать некоторые механизмы идентификации в функции загрузки. См. главу 8 для примера.
+
+Обычно загружаемый файл сохраняется в папке "app/uploads", но вы можете изменить этот путь указав:
+``
+Field('image', 'upload', uploadfolder='...')
+``
+Во многих операционных системах, время доступа к файлу уменьшается с увеличением числа файлов, находящихся в той же папке, в таком случае, если вы хотите загружать более 1000 файлов, вы можете указать web2py создавать подпапки в папке загрузки:
+``
+Field('image', 'upload', uploadseparate=True)
+``
+
+#### Сохранение оригинального имени файла
+
+web2py при сохранении файла преобразовывает его имя в уникальное UUID имя и извлекает его, когда файл запрашивается для скачивания. Во время загрузки файла, оригинальное имя сохраняется в заголовке HTTP ответа.
+Все эти процедуры проходят прозрачно ни чего не нужно программировать.
+
+В случае когда вам необходимо сохранить оригинальное имя файла в поле базы данных, вам нужно модифицировать модель и добавить поле для сохранения в нем имени файла:
+``
+db.define_table('person',
+    Field('name', requires=IS_NOT_EMPTY()),
+    Field('image_filename'),
+    Field('image', 'upload'))
+``:code
+
+Тогда вам необходимо модифицировать контроллер и добавить обработчик:
+``
+def display_form():
+    record = db.person(request.args(0)) or redirect(URL('index'))
+    url = URL('download')
+    form = SQLFORM(db.person, record, deletable=True,
+                   upload=url, fields=['name', 'image'])
+    if request.vars.image!=None:
+        form.vars.image_filename = request.vars.image.filename
+    if form.process().accepted:
+        response.flash = 'form accepted'
+    elif form.errors:
+        response.flash = 'form has errors'
+    return dict(form=form)
+``:code
+
+Обратите внимание, что SQLFORM не показывает поле "image_filename". Функция контроллера "display_form" перемещает имя файла из request.vars.image в form.vars.image_filename, так что оно обрабатываются методом accepts() и сохраняется в БД. Функция загрузки, перед обслуживанием файла проверяет в БД наличие файла с оригинальным именем и использует его в контент-ориентированном заголовке.
+
+#### ``autodelete`` 
+``autodelete``:inxx
+
+Во время удаления записи с использованием``SQLFORM``, на самом деле не удаляет физически загруженный файл - соответствующий удаляемой записи. Причина этому - web2py не знает используется ли этот файл ( или имеет запись ссылающуюся на этот файл) другой записью. Если вы точно знаете, что файл необходимо удалить используйте следующий код:
+
+``
+db.define_table('image',
+    Field('name', requires=IS_NOT_EMPTY()),
+    Field('file','upload',autodelete=True))
+``:code
+
+По умолчанию атрибут ``autodelete`` имеет значение ``False``. Когда же он выставлен в ``True`` ну вы поняли да ...
+
+#### Ссылки на соответствующие записи (Links to referencing records)
+
+Теперь рассмотрим случай, когда две таблицы связаны ссылкой на соответствующее поле. Например:
+``
+db.define_table('person',
+    Field('name', requires=IS_NOT_EMPTY()))
+db.define_table('dog',
+    Field('owner', 'reference person'),
+    Field('name', requires=IS_NOT_EMPTY()))
+db.dog.owner.requires = IS_IN_DB(db,db.person.id,'%(name)s')
+``:code
+
+Человек имеет собак, и каждая собака принадлежит владельцу-человеку. Владелец собаки требует ссылки на действующий идентификатор db.person.id с помощью ``'%(name)s'``.
+
+Давайте используем appadmin-интерфейс этого приложения и добавим несколько человек, и их собак.
+
+При редактировании записи существующего человека, appadmin UPDATE-форма показывает ссылку на страницу, где перечислены собаки, принадлежащие человеку. Такое поведение может быть воспроизведено использованием аргумента linkto SQLFORM. linkto должна указывать на новую функцию, которая принимает строку запроса от SQLFORM и списки соответствующих записей. Вот пример:
+``
+def display_form():
+   record = db.person(request.args(0)) or redirect(URL('index'))
+   url = URL('download')
+   link = URL('list_records', args='db')
+   form = SQLFORM(db.person, record, deletable=True,
+                  upload=url, linkto=link)
+   if form.process().accepted:
+       response.flash = 'form accepted'
+   elif form.errors:
+       response.flash = 'form has errors'
+   return dict(form=form)
+``:code
+
+так выглядит страница.
+
+[[image @///image/en6400.png center 300px]]
+
+Существует прямая связь с именем "dog.owner". Имя этой связи может быть изменено с помощью аргумента labels SQLFORM, например:
+``
+labels = {'dog.owner':"This person's dogs"}
+``:code
+
+Если вы кликнете по ссылке, вы будете перенаправлены по URL:
+``
+/test/default/list_records/dog?query=db.dog.owner%3D%3D5
+``:code
+
+"list_records" это функция контроллера с request.args[0], устанавленным на имя ссылающейся таблицы ссылок и request.vars.query установлен на строку SQL-запроса. Строка запроса в URL содержит "dog.owner=5", надлежащим образом
+закодированную (web2py декодирует эту автоматически при разборе URL).
+Вы можете легко реализовать весьма общую функцию "list_records":
+``
+def list_records():
+    REGEX = re.compile('^(\w+)\.(\w+)\.(\w+)\=\=(\d+)$')
+    match = REGEX.match(request.vars.query)
+    if not match:
+        redirect(URL('error'))
+    table, field, id = match.group(2), match.group(3), match.group(4)
+    records = db(db[table][field]==id).select()
+    return dict(records=records)
+``:code
+
+с ассоциированным шаблоном "default/list_records.html":
+``
+{{extend 'layout.html'}}
+{{=records}}
+``:code
+
+Когда набор записей set, возвращается методом select() и сериализуется в шаблоне, он сначала превращается в объект SQLTABLE (не то же самое что Table), а затем сериализуется в HTML-таблицу, где каждому полю соответствует столбец таблицы.
+
+#### Заполнение формы перед показом (Prepopulating the form)
+
+Всегда можно заполнить поля формы перед её показом с помощью синтаксиса: 
+``
+form.vars.name = 'fieldvalue'
+``:code
+
+Утверждения, подобные этому, должны быть включены, после объявления формы и до вызова метода accepts(), с учётом того, что поле "name" явно визуализируется в форме.
+
+#### Добавление дополнительных элементов в ``SQLFORM``
+
+Иногда вы хотите добавить дополнительный элемент в вашу форму после того как она была создана. Например, вы хотите добавить флажок подтверждения согласия пользователя с условиями использования ресурсов вашего сайта:
+``
+form = SQLFORM(db.yourtable)
+my_extra_element = TR(LABEL('I agree to the terms and conditions'), \
+                      INPUT(_name='agree',value=True,_type='checkbox'))
+form[0].insert(-1,my_extra_element)
+``:code
+
+The variable ``my_extra_element`` should be adapted to the formstyle. In this example, the default ``formstyle='table3cols'`` has been assumed.
+
+After submission, ``form.vars.agree`` will contain the status of the checkbox, which could then be used in an ``onvalidation`` function, for instance.
+
+#### ``SQLFORM`` без обмена с БД(``SQLFORM`` without database IO)
+
+Есть моменты, когда вы хотите создать форму из таблицы БД таблицы, используя SQLFORM и проверить отправленную форму соответствующим образом, но вы не хотите автоматического выполнения какой-либо операции обмена с БД (INSERT/UPDATE/DELETE). 
+
+Это бывает, когда одно из полей, необходимо вычислить из значений других полей ввода, а также, когда нужно выполнить дополнительные проверки введённых данных, которые не могут быть обеспечены с помощью стандартных
+валидаторов. 
+Это можно легко сделать, разбив метод на составные части:
+``
+form = SQLFORM(db.person)
+if form.process().accepted:
+    response.flash = 'record inserted'
+``:code
+
+меняем на:
+``
+form = SQLFORM(db.person)
+if form.validate():
+    ### deal with uploads explicitly
+    form.vars.id = db.person.insert(**dict(form.vars))
+    response.flash = 'record inserted'
+``:code
+
+То же самое можно сделать для UPDATE/DELETE-форм с помощью разделения:
+``
+form = SQLFORM(db.person,record)
+if form.process().accepted:
+    response.flash = 'record updated'
+``:code
+
+меняем на:
+``
+form = SQLFORM(db.person,record)
+if form.validate():
+    if form.deleted:
+        db(db.person.id==record.id).delete()
+    else:
+        record.update_record(**dict(form.vars))
+    response.flash = 'record updated'
+``:code
+
+Здесь dbio = False - это запрет обмена с БД. косяк не тот пример.
+form = SQLFORM(db.person,record)
+if form.accepts(request.vars, session, dbio=False):
+  
+  if form.vars['delete_this_record'] or False:
+    db(db.person.id==record.id).delete()
+  else:
+    record.update_record(**dict(form.vars))
+ 
+  response.flash = 'record updated'
+В обоих случаях web2py делает сохранение и переименование загруженного файла, как если бы в сценарии было dbio=True. Имя файла находится в: form.vars['fieldname']
+Имя загружаемого файла можно найти в переменной
+``
+form.vars.fieldname
+``:code
+За более подробной информацией обратитесь к исходному коду в файле "gluon/sqlhtml.py".
+### Другие типы форм
+
+#### ``SQLFORM.factory``
+
+Есть случаи, когда вы хотите создать формы, как будто бы из таблицы БД, но вы не хотите использовать таблицы БД. Вы просто хотите воспользоваться возможностями SQLFORM генерировать приятную глазу CSS-дружественную форму и, возможно, выполнять загрузку файлов с переименованием.
+
+Это может быть сделано через form_factory. Вот пример, в котором можно создать форму, выполнить проверку, загрузить файл и сохранить всё в сессии: ``session`` :
+``
+def form_from_factory():
+    form = SQLFORM.factory(
+        Field('your_name', requires=IS_NOT_EMPTY()),
+        Field('your_image', 'upload'))
+    if form.process().accepted:
+        response.flash = 'form accepted'
+        session.your_name = form.vars.your_name
+        session.filename = form.vars.your_image
+    elif form.errors:
+        response.flash = 'form has errors'
+    return dict(form=form)
+``:code
+
+файл шаблона "default/form_from_factory.html" :
+``
+{{extend 'layout.html'}}
+{{=form}}
+``:code
+
+Вы должны использовать символ подчеркивания вместо пробела для меток полей, либо явно передать в form_factory() словарь меток, так же, как для SQLFORM.
+``
+form = SQLFORM.factory(...,table_name='other_dummy_name')
+``:code
+
+Изменение ``table_name`` необходимо если вам необходимо генерировать формы с таким же именем таблицы и вы хотите избежать конфликтов в CSS.
+
+#### Одна форма для множества таблиц
+
+It often happens that you have two tables (for example 'client' and
+'address' which are linked together by a reference and you want to
+create a single form that allows to insert info about one client and
+its default address. Here is how:
+
+model:
+``
+db.define_table('client',
+     Field('name'))
+db.define_table('address',
+    Field('client','reference client',
+          writable=False,readable=False),
+    Field('street'),Field('city'))
+``:code
+
+controller:
+``
+def register():
+    form=SQLFORM.factory(db.client,db.address)
+    if form.process().accepted:
+        id = db.client.insert(**db.client._filter_fields(form.vars))
+        form.vars.client=id
+        id = db.address.insert(**db.address._filter_fields(form.vars))
+        response.flash='Thanks for filling the form'
+    return dict(form=form)
+``:code
+
+Notice the SQLFORM.factory (it makes ONE form using public fields from
+both tables and inherits their validators too).
+On form accepts this does two inserts, some data in one table and some
+data in the other.
+
+-------
+This only works when the tables don't have field names in common.
+-------
+
+
+#### Confirmation Forms
+
+``confirm``:inxx
+
+Often you needs a form with to confirma choice. The form should be accepted if the choice is accepted and none otherwise. The form may have additional options that link other web pages. web2py provides a simple way to do this:
+
+``
+form = FORM.confirm('Are you sure?')
+if form.accepted: do_what_needs_to_be_done()
+``:code
+
+Notice that the confirm form does not need and must not call ``.accepts`` or ``.process`` because this is done internally. You can add buttons with links to the confirmation form in the form of a dictionary of ``{'value':'link'}``:
+
+``
+form = FORM.confirm('Are you sure?',{'Back':URL('other_page')})
+if form.accepted: do_what_needs_to_be_done()
+``:code
+
+#### Form to edit a dictionary
+
+Imagine a system that stores configurations options in a dictionary,
+
+``
+config = dict(color='black', language='english')
+``:code
+
+and you need a form to allow the visitor to modify this dictionary.
+This can be done with:
+
+``
+form = SQLFORM.dictform(config)
+if form.process().accepted: config.update(form.vars)
+``:code
+
+The form will display one INPUT field for each item in the dictionary. It will use dictionary keys as INPUT names and labels and current values to infer types (string, int, double, date, datetime, boolean).
+
+This works great but leave to you the logic of making the config dictionary persistent. For example you may want to store the ``config`` in a session.
+
+``
+session.config or dict(color='black', language='english')
+form = SQLFORM.dictform(session.config)
+if form.process().accepted:
+    session.config.update(form.vars)
+``:code
+
+
+### CRUD - СоЧтОбнУ
+``CRUD``:inxx ``crud.create``:inxx ``crud.update``:inxx ``crud.select``:inxx ``crud.search``:inxx ``crud.tables``:inxx ``crud.delete``:inxx
+
+Одно из последних реализций web2py это API интерфейс Create/Read/Update/Delete (CRUD), находящийся выше уровня SQLFORM.
+CRUD создает SQLFORMу, содержащую в себе все возможности sql формы + информирование, + редирект и тд все в одной функции.
+
+Первое что необходимо помнить CRUD имеет другой интерфейс API и его необходимо обязательно импортировать в проект, кроме этого в модели должно быть описание этой таблицы. Например:
+``
+from gluon.tools import Crud
+crud = Crud(db)
+``:code
+Вобщем это супер мега метод с ним скорость написания кода возрастает в разы (спасибо Massimo за это ) читайте в оригинале
+Обьект ``crud`` имеет следующее описание интерфейса API: 
+``crud.tables``:inxx ``crud.create``:inxx ``crud.read``:inxx ``crud.update``:inxx ``crud.delete``:inxx ``crud.select``:inxx .
+- ``crud.tables()`` returns a list of tables defined in the database.
+- ``crud.create(db.tablename)`` returns a create form for table tablename.
+- ``crud.read(db.tablename, id)`` returns a readonly form for tablename and record id.
+- ``crud.update(db.tablename, id)`` returns an update form for tablename and record id.
+- ``crud.delete(db.tablename, id)`` deletes the record.
+- ``crud.select(db.tablename, query)`` returns a list of records selected from the table.
+- ``crud.search(db.tablename)`` returns a tuple (form, records) where form is a search form and records is a list of records based on the submitted search form.
+- ``crud()`` returns one of the above based on the ``request.args()``.
+
+For example, the following action:
+``
+def data(): return dict(form=crud())
+``:code
+
+would expose the following URLs:
+``
+http://.../[app]/[controller]/data/tables
+http://.../[app]/[controller]/data/create/[tablename]
+http://.../[app]/[controller]/data/read/[tablename]/[id]
+http://.../[app]/[controller]/data/update/[tablename]/[id]
+http://.../[app]/[controller]/data/delete/[tablename]/[id]
+http://.../[app]/[controller]/data/select/[tablename]
+http://.../[app]/[controller]/data/search/[tablename]
+``:code
+
+However, the following action:
+
+``
+def create_tablename():
+    return dict(form=crud.create(db.tablename))
+``:code
+
+would only expose the create method
+
+``
+http://.../[app]/[controller]/create_tablename
+``:code
+
+While the following action:
+
+``
+def update_tablename():
+    return dict(form=crud.update(db.tablename, request.args(0)))
+``:code
+
+would only expose the update method
+
+``
+http://.../[app]/[controller]/update_tablename/[id]
+``:code
+
+and so on.
+
+The behavior of CRUD can be customized in two ways: by setting some attributes of the ``crud`` object or by passing extra parameters to each of its methods.
+
+#### Settings
+
+Here is a complete list of current CRUD attributes, their default values, and meaning:
+
+To enforce authentication on all crud forms:
+
+``
+crud.settings.auth = auth
+``:code
+The use is explained in chapter 9.
+
+To specify the controller that defines the ``data`` function which returns the ``crud`` object
+
+``
+crud.settings.controller = 'default'
+``:code
+
+To specify the URL to redirect to after a successful "create" record:
+
+``
+crud.settings.create_next = URL('index')
+``:code
+
+To specify the URL to redirect to after a successful "update" record:
+
+``
+crud.settings.update_next = URL('index')
+``:code
+
+To specify the URL to redirect to after a successful "delete" record:
+
+``
+crud.settings.delete_next = URL('index')
+``:code
+
+To specify the URL to be used for linking uploaded files:
+
+``
+crud.settings.download_url = URL('download')
+``:code
+
+To specify extra functions to be executed after standard validation procedures for ``crud.create`` forms:
+
+``
+crud.settings.create_onvalidation = StorageList()
+``:code
+
+``StorageList`` is the same as a ``Storage`` object, they are both defined in the file "gluon/storage.py", but it defaults to ``[]`` as opposed to ``None``. It allows the following syntax:
+
+``
+crud.settings.create_onvalidation.mytablename.append(lambda form:....)
+``:code
+
+To specify extra functions to be executed after	standard validation procedures for ``crud.update`` forms:
+
+``
+crud.settings.update_onvalidation = StorageList()
+``:code
+
+To specify extra functions to be executed after completion of ``crud.create`` forms:
+
+``
+crud.settings.create_onaccept = StorageList()
+``:code
+
+To specify extra functions to be executed after completion of ``crud.update`` forms:
+
+``
+crud.settings.update_onaccept = StorageList()
+``:code
+
+To specify extra functions to be executed after completion of ``crud.update`` if record is deleted:
+
+``
+crud.settings.update_ondelete = StorageList()
+``:code
+
+To specify extra functions to be executed after completion of ``crud.delete``:
+
+``
+crud.settings.delete_onaccept = StorageList()
+``:code
+
+To determine whether the "update" forms should have a "delete" button:
+
+``
+crud.settings.update_deletable = True
+``:code
+
+To determine whether the "update" forms should show the id of the edited record:
+
+``
+crud.settings.showid = False
+``:code
+
+To determine whether forms should keep the previously inserted values or reset to default after successful submission:
+
+``
+crud.settings.keepvalues = False
+``:code
+
+Crud always detects whether a record being edited has been modified by a third party in the time between the time when the form is displayed and the time when it is submitted. This behavior is equivalent to
+``
+form.process(detect_record_change=True)``
+
+and it is set in:
+
+``
+crud.settings.detect_record_change = True
+``:code
+and it can be changed/disabled by setting the variable to ``False``.
+
+You can change the form style by
+
+``
+crud.settings.formstyle = 'table3cols' or 'table2cols' or 'divs' or 'ul'
+``:code
+
+You can set the separator in all crud forms:
+
+``
+crud.settings.label_separator = ':'
+``:code
+
+You can add captcha to forms, using the same convention explained for auth, with:
+
+``
+crud.settings.create_captcha = None
+crud.settings.update_captcha = None
+crud.settings.captcha = None
+``:code
+
+
+#### Messages
+
+Here is a list of customizable messages:
+``
+crud.messages.submit_button = 'Submit'
+``:code
+
+sets the text of the "submit" button for both create and update forms.
+``
+crud.messages.delete_label = 'Check to delete:'
+``:code
+
+sets the label of the "delete" button in "update" forms.
+``
+crud.messages.record_created = 'Record Created'
+``:code
+
+sets the flash message on successful record creation.
+``
+crud.messages.record_updated = 'Record Updated'
+``:code
+
+sets the flash message on successful record update.
+``
+crud.messages.record_deleted = 'Record Deleted'
+``:code
+
+sets the flash message on successful record deletion.
+``
+crud.messages.update_log = 'Record %(id)s updated'
+``:code
+
+sets the log message on successful record update.
+``
+crud.messages.create_log = 'Record %(id)s created'
+``:code
+
+sets the log message on successful record creation.
+``
+crud.messages.read_log = 'Record %(id)s read'
+``:code
+
+sets the log message on successful record read access.
+``
+crud.messages.delete_log = 'Record %(id)s deleted'
+``:code
+
+sets the log message on successful record deletion.
+
+Notice that ``crud.messages`` belongs to the class ``gluon.storage.Message`` which is similar to ``gluon.storage.Storage`` but it automatically translates its values, without need for the ``T`` operator.
+
+Log messages are used if and only if CRUD is connected to Auth as discussed in Chapter 9. The events are logged in the Auth table "auth_events".
+
+#### Methods
+
+The behavior of CRUD methods can also be customized on a per call basis. Here are their signatures:
+``
+crud.tables()
+crud.create(table, next, onvalidation, onaccept, log, message)
+crud.read(table, record)
+crud.update(table, record, next, onvalidation, onaccept, ondelete, log, message, deletable)
+crud.delete(table, record_id, next, message)
+crud.select(table, query, fields, orderby, limitby, headers, **attr)
+crud.search(table, query, queries, query_labels, fields, field_labels, zero, showall, chkall)
+``:code
+- ``table`` is a DAL table or a tablename the method should act on.
+- ``record`` and ``record_id`` are the id of the record the method should act on.
+- ``next`` is the URL to redirect to after success. If the URL contains the substring "[id]" this will be replaced by the id of the record currently created/updated.
+- ``onvalidation`` has the same function as SQLFORM(..., onvalidation)
+- ``onaccept`` is a function to be called after the form submission is accepted and acted upon, but before redirection.
+- ``log`` is the log message. Log messages in CRUD see variables in the ``form.vars`` dictionary such as "%(id)s".
+- ``message`` is the flash message upon form acceptance.
+- ``ondelete`` is called in place of ``onaccept`` when a record is deleted via an "update" form.
+- ``deletable`` determines whether the "update" form should have a delete option.
+- ``query`` is the query to be used to select records.
+- ``fields`` is a list of fields to be selected.
+- ``orderby`` determines the order in which records should be selected (see Chapter 6).
+- ``limitby`` determines the range of selected records that should be displayed (see Chapter 6).
+- ``headers`` is a dictionary with the table header names.
+- ``queries`` a list like ``['equals', 'not equal', 'contains']`` containing the allowed methods in the search form.
+- ``query_labels`` a dictionary like ``query_labels=dict(equals='Equals')`` giving names to search methods.
+- ``fields`` a list of fields to be listed in the search widget.
+- ``field_labels`` a dictionary mapping field names into labels.
+- ``zero`` defaults to "choose one" is used as default option for the drop-down in the search widget.
+- ``showall`` set it to True if you want rows returned as per the query in the first call (added after 1.98.2).
+- ``chkall`` set it to True to turn on all the checkboxes in the search form (added after 1.98.2).
+
+Here is an example of usage in a single controller function:
+``
+## assuming db.define_table('person', Field('name'))
+def people():
+    form = crud.create(db.person, next=URL('index'),
+           message=T("record created"))
+    persons = crud.select(db.person, fields=['name'],
+           headers={'person.name': 'Name'})
+    return dict(form=form, persons=persons)
+``:code
+
+Here is another very generic controller function that lets you search, create and edit any records from any table where the tablename is passed request.args(0):
+``
+def manage():
+    table=db[request.args(0)]
+    form = crud.update(table,request.args(1))
+    table.id.represent = lambda id, row: \
+       A('edit:',id,_href=URL(args=(request.args(0),id)))
+    search, rows = crud.search(table)
+    return dict(form=form,search=search,rows=rows)
+``:code
+
+Notice the line ``table.id.represent=...`` that tells web2py to change the representation of the id field and display a link instead to the page itself and passes the id as request.args(1) which turns the create page into an update page.
+
+#### Record versioning
+
+Both SQLFORM and CRUD provides a utility to version database records:
+
+If you have a table (db.mytable) that needs full revision history you can just do:
+``
+form = SQLFORM(db.mytable, myrecord).process(onsuccess=auth.archive)
+``:code
+
+``
+form = crud.update(db.mytable, myrecord, onaccept=auth.archive)
+``:code
+
+``auth.archive`` defines a new table called **db.mytable_archive** (the name is derived from the name of the table to which it refers) and on updating, it stores a copy of the record (as it was before the update) in the created archive table, including a reference to the current record.
+
+Because the record is actually updated (only its previous state is archived), references are never broken.
+
+This is all done under the hood.  Should you wish to access the archive table you should define it in a model:
+``
+db.define_table('mytable_archive',
+   Field('current_record', 'reference mytable'),
+   db.mytable)
+``:code
+
+Notice the table extends ``db.mytable`` (including all its fields), and adds  a reference to the ``current_record``.
+
+``auth.archive`` does not timestamp the stored record unless your original table has timestamp fields, for example:
+
+``
+db.define_table('mytable',
+    Field('created_on', 'datetime',
+          default=request.now, update=request.now, writable=False),
+    Field('created_by', 'reference auth_user',
+          default=auth.user_id, update=auth.user_id, writable=False),
+``:code
+
+There is nothing special about these fields and you may give them any name you like. They are filled before the record is archived and are archived with each copy of the record.  The archive table name and/or reference field name can be changed like this: 
+
+``
+db.define_table('myhistory',
+    Field('parent_record', 'reference mytable'),
+    db.mytable)
+## ...
+form = SQLFORM(db.mytable,myrecord)
+form.process(onsuccess = lambda form:auth.archive(form,
+             archive_table=db.myhistory,
+             current_record='parent_record'))
+``:code
+
+### Custom forms
+
+If a form is created with SQLFORM, SQLFORM.factory or CRUD, there are multiple ways it can be embedded in a view allowing multiple degrees of customization. Consider for example the following model:
+``
+db.define_table('image',
+    Field('name'),
+    Field('file', 'upload'))
+``:code
+
+and upload action
+``
+def upload_image():
+    return dict(form=crud.create(db.image))
+``:code
+
+The simplest way to embed the form in the view for ``upload_image`` is
+``
+{{=form}}
+``:code
+
+This results in a standard table layout. If you wish to use a different layout, you can break the form into components
+``
+{{=form.custom.begin}}
+Image name: <div>{{=form.custom.widget.name}}</div>
+Image file: <div>{{=form.custom.widget.file}}</div>
+Click here to upload: {{=form.custom.submit}}
+{{=form.custom.end}}
+``:code
+
+where ``form.custom.widget[fieldname]`` gets serialized into the proper widget for the field. If the form is submitted and it contains errors, they are appended below the widgets, as usual.
+
+The above sample form is show in the image below.
+
+[[image @///image/en6500.png center 300px]]
+
+Notice that a similar result could have been obtained with:
+
+``
+crud.settings.formstyle='table2cols'
+``:code
+
+without using a custom form. Other possible ``formstyle``s are "table3cols" (the default), "divs" and "ul".
+
+If you do not wish to use the widgets serialized by web2py, you can replace them with HTML. There are some variables that will be useful for this:
+- ``form.custom.label[fieldname]`` contains the label for the field.
+- ``form.custom.comment[fieldname]`` contains the comment for the field.
+- ``form.custom.dspval[fieldname]`` form-type and field-type dependent display representation of the field.
+- ``form.custom.inpval[fieldname]`` form-type and field-type dependent values to be used in field code.
+
+It is important to follow the conventions described below.
+
+#### CSS conventions
+
+Tags in forms generated by SQLFORM, SQLFORM.factory and CRUD follow a strict CSS naming convention that can be used to further customize the forms.
+
+Given a table "mytable", and a field "myfield" of type "string", it is rendered by default by a
+``
+SQLFORM.widgets.string.widget
+``:code
+
+that looks like this:
+``
+<input type="text" name="myfield" id="mytable_myfield"
+       class="string" />
+``:code
+
+Notice that:
+- the class of the INPUT tag is the same as the type of the field. This is very important for the jQuery code in "web2py_ajax.html" to work. It makes sure that you can only have numbers in "integer" and "double" fields, and that "time", "date" and "datetime" fields display the popup calendar/datepicker.
+- the id is the name of the class plus the name of the field, joined by one underscore. This allows you to uniquely refer to the field via, for example, ``jQuery('#mytable_myfield')`` and manipulate the stylesheet of the field or bind actions associated to the field events (focus, blur, keyup, etc.).
+- the name is, as you would expect, the field name.
+
+#### Hide errors
+``hideerror``:inxx
+
+Occasionally, you may want to disable the automatic error placement and display form error messages in some place other than the default. That can be done easily.
+
+- In the case of FORM or SQLFORM, pass ``hideerror=True`` to the ``accepts`` method.
+- In the case of CRUD, set ``crud.settings.hideerror=True``
+
+You may also want to modify the views to display the error (since they are no longer displayed automatically).
+
+Here is an example where the errors are displayed above the form and not in the form.
+``
+{{if form.errors:}}
+  Your submitted form contains the following errors:
+  <ul>
+  {{for fieldname in form.errors:}}
+    <li>{{=fieldname}} error: {{=form.errors[fieldname]}}</li>
+  {{pass}}
+  </ul>
+  {{form.errors.clear()}}
+{{pass}}
+{{=form}}
+``:code
+
+The errors will displayed as in the image shown below.
+
+[[image @///image/en6600.png center 300px]]
+
+This mechanism also works for custom forms.
+
+
+### Валидаторы
+``validators``:inxx
+
+Валидаторы - это классы, используемые для проверки входных полей (в том числе форм, порожденных из таблиц БД).
+
+Вот пример использования валидатора с формой:
+``
+INPUT(_name='a', requires=IS_INT_IN_RANGE(0, 10))
+``:code
+
+Вот пример того, валидатора requires для поля таблицы:
+``
+db.define_table('person', Field('name'))
+db.person.name.requires = IS_NOT_EMPTY()
+``:code
+
+Валидаторы всегда назначают использование атрибута requires для поля. Поле может иметь один или несколько валидаторов. Несколько валидаторов становятся составной частью списка:
+``
+db.person.name.requires = [IS_NOT_EMPTY(),
+                           IS_NOT_IN_DB(db, 'person.name')]
+``:code
+
+Валидаторы вызываются с помощью функции accepts() в объекте FORM или объекте HTML-помощника, который содержит форма. Они вызываются в том порядке, в котором они перечислены в тексте.
+
+Могут быть вызваны для конкретных полей :
+``
+db.person.name.validate(value)
+``
+
+Возвращаемое значение это кортеж ``(value,error)``
+
+Встроенные валидаторы име.т конструкторы которые используют некоторые опциональные аргументы:
+``
+IS_NOT_EMPTY(error_message='cannot be empty')
+``:code
+
+аргумент error_message, позволяющий перекрыть сообщение об ошибке "по умолчанию".
+Вот пример валидатора на таблице БД:
+``
+db.person.name.requires = IS_NOT_EMPTY(error_message=T'fill this!')
+``:code
+
+тут мы выдим пример использования оператора перевода ``T`` позволяющего интернационализировать сообщение об ошибке. Помните, что сообщения по умолчанию не переведены на разные языки.
+
+Помните, что только валидаторы можно использовать для полей типа ``list:``
+- ``IS_IN_DB(...,multiple=True)``
+- ``IS_IN_SET(...,multiple=True)``
+- ``IS_NOT_EMPTY()``
+- ``IS_LIST_OF(...)``
+
+The latter can be used to apply any validator to the individual items in the list.
+
+#### Основные валидаторы
+
+##### ``IS_ALPHANUMERIC``
+``IS_ALPHANUMERIC``:inxx
+Этот валидатор проверяет, что поле содержит только символы из диапазона a-z, A-Z, or 0-9.
+``
+requires = IS_ALPHANUMERIC(error_message='must be alphanumeric!')
+``:code
+
+##### ``IS_DATE``
+``IS_DATE``:inxx
+Этот валидатор проверяет, что поле содержит правильную дату в заданном формате. Хорошей практикой является использование T-оператора для поддержки различных форматов даты в разных локалях
+``
+requires = IS_DATE(format=T('%Y-%m-%d'), error_message='must be YYYY-MM-DD!')
+``:code
+Для ознакомления с полным описанием директивы % смотрите описание валидатора IS_DATETIME.
+
+##### ``IS_DATE_IN_RANGE``
+``IS_DATE_IN_RANGE``:inxx
+
+Работа этого валидатора очень похожа на предыдущий валидатор, но дополнительно позволяет указывать диапазон дат:
+``
+requires = IS_DATE_IN_RANGE(format=T('%Y-%m-%d'),
+                   minimum=datetime.date(2008,1,1),
+                   maximum=datetime.date(2009,12,31),
+                   error_message='must be YYYY-MM-DD!')
+``:code
+
+##### ``IS_DATETIME``
+``IS_DATETIME``:inxx
+
+Этот валидатор проверяет, что поле содержит правильную дату в заданном формате. Хорошей практикой является использование T-оператора для поддержки различных форматов даты в разных локалях.
+``
+requires = IS_DATETIME(format=T('%Y-%m-%d %H:%M:%S'),
+                       error_message='must be YYYY-MM-DD HH:MM:SS!')
+``:code
+
+Следующие символы могут быть использованы для формата строки:
+``
+%Y  '1963'
+%y  '63'
+%d  '28'
+%m  '08'
+%b  'Aug'
+%b  'August'
+%H  '14'
+%I  '02'
+%p  'PM'
+%M  '30'
+%S  '59'
+``:code
+
+##### ``IS_DATETIME_IN_RANGE``
+``IS_DATETIME_IN_RANGE``:inxx
+
+Работает так же но позволяет указать диапазон необходимой даты:
+``
+requires = IS_DATETIME_IN_RANGE(format=T('%Y-%m-%d %H:%M:%S'),
+                       minimum=datetime.datetime(2008,1,1,10,30),
+                       maximum=datetime.datetime(2009,12,31,11,45),
+                       error_message='must be YYYY-MM-DD HH:MM::SS!')
+``:code
+
+##### ``IS_DECIMAL_IN_RANGE``
+``IS_DECIMAL_IN_RANGE``:inxx
+
+``
+INPUT(_type='text', _name='name', requires=IS_DECIMAL_IN_RANGE(0, 10, dot="."))
+``:code
+
+It converts the input into a Python Decimal or generates an error if
+the decimal does not fall within the specified inclusive range.
+The comparison is made with Python Decimal arithmetic.
+
+The minimum and maximum limits can be None, meaning no lower or upper limit,
+respectively.
+
+The ``dot`` argument is optional and allows you to internationalize the symbol used to separate the decimals.
+
+
+##### ``IS_EMAIL``
+``IS_EMAIL``:inxx
+
+Этот валидатор проверяет, что поле содержит значение, соответствующее правильно оформленному адресу электронной почты, однако оно не проверяется путём отправки сообщения по этому адресу.
+``
+requires = IS_EMAIL(error_message='invalid email!')
+``:code
+
+##### ``IS_EQUAL_TO``
+``IS_EQUEL_TO``:inxx
+
+Checks whether the validated value is equal to a given value (which can be a variable):
+``
+requires = IS_EQUAL_TO(request.vars.password,
+                       error_message='passwords do not match')
+``:code
+
+##### ``IS_EXPR``
+``IS_EXPR``:inxx
+
+Its first argument is a string containing a logical expression in terms of a variable value. It validates a field value if the expression evaluates to ``True``. For example:
+``
+requires = IS_EXPR('int(value)%3==0',
+                   error_message='not divisible by 3')
+``:code
+
+One should first check that the value is an integer so that an exception will not occur.
+``
+requires = [IS_INT_IN_RANGE(0, 100), IS_EXPR('value%3==0')]
+``:code
+
+##### ``IS_FLOAT_IN_RANGE``
+``IS_FLOAT_IN_RANGE``:inxx
+
+Этот валидатор проверяет, что поле содержит число с плавающей точкой, находящееся в дипазоне 0 <= value < 100 
+``
+requires = IS_FLOAT_IN_RANGE(0, 100, dot=".",
+         error_message='too small or too large!')
+``:code
+
+The ``dot`` argument is optional and allows you to internationalize the symbol used to separate the decimals.
+
+##### ``IS_INT_IN_RANGE``
+``IS_INT_IN_RANGE``:inxx
+
+Этот валидатор проверяет, что поле содержит целое число, находящееся в диапазоне 0 <= value < 100 
+
+``
+requires = IS_INT_IN_RANGE(0, 100,
+         error_message='too small or too large!')
+``:code
+
+##### ``IS_IN_SET``
+``IS_IN_SET``:inxx
+``multiple``:inxx
+
+Этот валидатор проверяет, что поле содержит значение из заданного набора. Элементы набора должны иметь тип "строка".
+``
+requires = IS_IN_SET(['a', 'b', 'c'],zero=T('choose one'),
+         error_message='must be a or b or c')
+``:code
+
+The zero argument is optional and it determines the text of the option selected by default, an option which is not accepted by the ``IS_IN_SET`` validator itself. If you do not want a "choose one" option, set ``zero=None``.
+
+The ``zero`` option was introduced in revision (1.67.1). It did not break backward compatibility in the sense that it did not break applications but it did change their behavior since, before, there was no ``zero`` option.
+
+ Если набор содержит целые числа или числа с плавающей точкой, надо использовать валидатор IS_INT_IN_RANGE (который преобразует значение в целое число) или IS_FLOAT_IN_RANGE (который преобразует значение в число с плавающей точкой)
+Например:
+``
+requires = [IS_INT_IN_RANGE(0, 8), IS_IN_SET([2, 3, 5, 7],
+          error_message='must be prime and less than 10')]
+``:code
+
+Вы можете так же использовать словарь или список кортежей для организации выпадающего списка для болшей наглядности:
+``
+#### Пример использования словаря:
+requires = IS_IN_SET({'A':'Apple','B':'Banana','C':'Cherry'},zero=None)
+#### Пример использования списка кортежей:
+requires = IS_IN_SET([('A','Apple'),('B','Banana'),('C','Cherry')])
+``:code
+
+##### ``IS_IN_SET`` and Tagging
+
+Этот валидатор имеет необязательный атрибут multiple=False. Если этот атрибут установлен в True, то поле может содержать множественные значения. Поле, в этом случае, должно иметь тип "строка". Значения в поле разделяются с помощью  вертикальной черты "|". Множественные ссылки обрабатываются автоматически при создании и обновлении записи в форме, но они "прозрачны" для DAL. Мы настоятельно рекомендуем использовать jQuery-плагин для множественного выбора.
+
+------
+Note that when ``multiple=True``, ``IS_IN_SET`` will accept ``zero`` or more values, i.e. it will accept the field when nothing has been selected. ``multiple`` can also be a tuple of the form ``(a,b)`` where ``a`` and ``b`` are the minimum and (exclusive) maximum number of items that can be selected respectively.
+------
+
+##### ``IS_LENGTH``
+``IS_LENGTH``:inxx
+
+Этот валидатор проверяет, что поле содержит значение, длина которого не превышает заданной величины. Используется для полей всех типов, но для файлов проверяет длину значения. В случае файла, значение хранится в переменной cookie.FieldStorage, так что проверяется длина данных в файле.
+
+Its arguments are:
+- maxsize: the maximum allowed length / size (has default = 255)
+- minsize: the minimum allowed length / size
+
+Examples:
+Check if text string is shorter than 33 characters:
+``
+INPUT(_type='text', _name='name', requires=IS_LENGTH(32))
+``:code
+
+Check if password string is longer than 5 characters:
+``
+INPUT(_type='password', _name='name', requires=IS_LENGTH(minsize=6))
+``:code
+
+Check if uploaded file has size between 1KB and 1MB:
+``
+INPUT(_type='file', _name='name', requires=IS_LENGTH(1048576, 1024))
+``:code
+
+For all field types except for files, it checks the length of the value. In the case of files, the value is a ``cookie.FieldStorage``, so it validates the length of the data in the file, which is the behavior one might intuitively expect.
+
+##### ``IS_LIST_OF``
+``IS_LIST_OF``:inxx
+
+Это не совсем обычный валидатор, он предназначен для случая, когда поле содержит несколько значений. Это случается, когда форма содержит разные поля с одинаковыми именами или поле для выбора множества значений. В качестве аргумента валидатор принимает другой валидатор, возвращающий список значений. Проверка осуществляется для каждого значения из списка. Например, проверяется, что в поле введён спискок и каждый элемент списка является целым числом из диапазона [0,10).
+``
+requires = IS_LIST_OF(IS_INT_IN_RANGE(0, 10))
+``:code
+
+Этот валидатор никогда не возвращает ошибки, поэтому не содержит теста сообщения об ошибке. Ошибки отслеживаются и выводятся с помощью встроенного обработчика.
+
+##### ``IS_LOWER``
+``IS_LOWER``:inxx
+
+This validator never returns an error. It just converts the value to lower case.
+``
+requires = IS_LOWER()
+``:code
+
+##### ``IS_MATCH``
+``IS_MATCH``:inxx
+
+This validator matches the value against a regular expression and returns an error if it does not match.
+Here is an example of usage to validate a US zip code:
+``
+requires = IS_MATCH('^\d{5}(-\d{4})?$',
+         error_message='not a zip code')
+``:code
+
+Пример использования валидатора для проверки IP-адреса для протокола IPv4:
+``
+requires = IS_MATCH('^\d{1,3}(\.\d{1,3}){3}$',
+         error_message='not an IP address')
+``:code
+
+Here is an example of usage to validate a US phone number:
+``
+requires = IS_MATCH('^1?((-)\d{3}-?|\(\d{3}\))\d{3}-?\d{4}$',
+         error_message='not a phone number')
+``:code
+
+For more information on Python regular expressions, refer to the official Python documentation.
+
+``IS_MATCH`` takes an optional argument ``strict`` which defaults to ``False``. When set to ``True`` it only matches the beginning of the string:
+
+``
+>>> IS_MATCH('a')('ba')
+('ba', <lazyT 'invalid expression'>) # no pass
+>>> IS_MATCH('a',strict=False)('ab')
+('a', None)                          # pass!
+``
+
+``IS_MATCH`` takes an other optional argument ``search`` which defaults to ``False``. When set to ``True``, it uses regex method ``search`` instead of method ``match`` to validate the string.
+
+##### ``IS_NOT_EMPTY``
+``IS_NOT_EMPTY``:inxx
+
+This validator checks that the content of the field value is not an empty string.
+``
+requires = IS_NOT_EMPTY(error_message='cannot be empty!')
+``:code
+
+##### ``IS_TIME``
+``IS_TIME``:inxx
+
+This validator checks that a field value contains a valid time in the specified format.
+``
+requires = IS_TIME(error_message='must be HH:MM:SS!')
+``:code
+
+##### ``IS_URL``
+``IS_URL``:inxx
+
+Валидатор отвергает строку, если выполняется одно из следующих условий: 
+  (основано на RFC 2616)
+- строка пуста "" или имеет значение None
+- в строке присутствуют символы, не разрешённые для строк c URL 
+- не соответствует требованиям синтксических правил HTTP
+- спецификация URL-схем не соответствует одной из схем: 'http' или 'https'
+- домен верхнего уровня (если специфицировано имя хоста) не существует
+
+(These rules are based on RFC 2616``RFC2616``:cite )
+
+Валидатор проверяет только URL-синтаксис. Он не проверяет, что URL ссылается на реально существующий документ. Валидатор проверяет, что строка начинается с 'http://' для символических URL (например: 'google.ca').
+
+Поведение валидатора изменяется, если используется параметр mode='generic'. Он отвергает строку, если выполняется одно из следующих условий:   (основано на RFC 2396)
+- строка пуста "" или имеет значение None
+- в строке присутствуют символы, не разрешённые для строк c URL 
+- спецификация URL-схемы (если она специфицирована) не разрешена
+
+
+Список разрешённых схем задаётся с помощью параметра allowed_schemes. Если None не входит в этот список, то символические URL (подобные "http") будут отвергнуты.
+
+The default prepended scheme is customizable with the prepend_scheme parameter. If you set prepend_scheme
+to None, then prepending will be disabled. URLs that require prepending to parse will still be accepted,
+but the return value will not be modified.
+
+IS_URL is compatible with the Internationalized Domain Name (IDN) standard specified in RFC 3490``RFC3490``:cite ). As a result, URLs can be regular strings or unicode strings.
+If the URL's domain component (e.g. google.ca) contains non-US-ASCII letters, then the domain will
+be converted into Punycode (defined in RFC 3492``RFC3492``:cite ). IS_URL goes a
+bit beyond the standards, and allows non-US-ASCII characters to be present in the path
+and query components of the URL as well. These non-US-ASCII characters will be encoded.
+For example, space will be encoded as'%20'. The unicode character with hex code 0x4e86
+will become '%4e%86'.
+
+Examples:
+``
+requires = IS_URL())
+requires = IS_URL(mode='generic')
+requires = IS_URL(allowed_schemes=['https'])
+requires = IS_URL(prepend_scheme='https')
+requires = IS_URL(mode='generic',
+                  allowed_schemes=['ftps', 'https'],
+                  prepend_scheme='https')
+``:code
+
+##### ``IS_SLUG``
+``IS_SLUG``:inxx
+``
+requires = IS_SLUG(maxlen=80, check=False, error_message='must be slug')
+``:code
+
+If ``check`` is set to ``True`` it check whether the validated value is a slug (allowing only alphanumeric characters and non-repeated dashes).
+
+If ``check`` is set to ``False`` (default) it converts the input value to a slug.
+
+##### ``IS_STRONG``
+``IS_STRONG``:inxx
+
+Используется для комплексной проверки полей ( часто это поля ввода пароля)
+
+Example:
+``
+requires = IS_STRONG(min=10, special=2, upper=2)
+``:code
+
+where
+- min is minimum length of the value
+- special is the minimum number of required special characters special characters are any of the following ``!@#$%^&*(){}[]-+``
+- upper is the minimum number of upper case characters
+
+##### ``IS_IMAGE``
+``IS_IMAGE``:inxx
+
+Этот валидатор проверяет загруженный файл, который был сохранен в одном из выбранных графических форматов и имеет размеры (ширину и высоту) в заданных пределах.
+
+Валидатор не проверяет максимальный размер файла (используйте валидатор IS_LENGTH для этого). Он возвращает ошибку проверки данных, если данные не были загружены. Он поддерживает форматы BMP, GIF, JPEG, PNG, и не требует поддержки Python Imaging Library (PIL).
+
+Часть кода взята из: http://mail.python.org/pipermail/python-list/2007-June/617126.html
+
+Он принимает следующие аргументы:
+- extensions: итерабельная последовательность, содержащая разрешённые   расширения графических файлов в нижнем регистре ( расширение 'JPG'
+  загружаемого файла заменяется на 'JPEG').
+- maxsize: итерабельная последовательность, содержащая максимальные ширину и  высоту изображения
+- minsize: итерабельная последовательность, содержащая минимальные ширину и   высоту изображения"
+
+При использовании (-1, -1) в качестве minsize можно обойти проверку размеров изображения.
+
+Несколько примеров:
+- Проверка, имеет ли загружаемый файл один из поддерживаемых графических форматов:
+``
+requires = IS_IMAGE()
+``:code
+- Проверка, имеет ли загружаемый файл одно из заданных расширений:
+``
+requires = IS_IMAGE(extensions=('jpeg', 'png'))
+``:code
+
+- Проверка, имеет ли загружаемый файл расширение PNG и максимальный размер изображения 200x200 pixels: 
+``
+requires = IS_IMAGE(extensions=('png'), maxsize=(200, 200))
+``:code
+
+- Note: on displaying an edit form for a table including ``requires = IS_IMAGE()``, a ``delete`` checkbox will NOT appear because to delete the file would cause the validation to fail. To display the ``delete`` checkbox use this validation:
+``
+requires = IS_EMPTY_OR(IS_IMAGE())
+``:code
+
+
+##### ``IS_UPLOAD_FILENAME``
+``IS_UPLOAD_FILENAME``:inxx
+
+Этот валидатор проверяет имя и расширение файла, загруженного через входной поток на совпадение с заданным регулярным выражением. Он не гарантирует тип файла в любом случае. Возвращает ошибку проверки данных,
+если файл не был загружен.
+
+Его аргументы:
+- filename: имя файла (до точки) регулярное выражение
+- extension: расширение (после точки) регулярное выражение
+- lastdot: какие точки следует использовать в качестве имени файла. 
+  Разделитель расширения: Если True - имя до последней точки, например,
+  file.png -> file / png. Если False - имя до первой точки, например,
+  file.tar.gz -> file / tar.gz
+- case: 0 - сохранить регистр строки, 1 - преобразовать строку в нижний
+  регистр (по умолчанию), 2 - преобразовать строку в верхний регистр
+
+Если точки в имени файла нет, то проверка расширения файла будет проводиться с пустой строкой, а имя файла будет проверяться в отношении полного значения имени.
+
+Примеры:
+- Проверка, имеет ли файл имеет расширение PDF (без учета регистра):
+  requires = IS_UPLOAD_FILENAME(extension='pdf')
+``
+requires = IS_UPLOAD_FILENAME(extension='pdf')
+``:code
+
+Проверка, имеет ли файл  расширение tar.gz и имя, начинающееся со строки  "backup":
+``
+requires = IS_UPLOAD_FILENAME(filename='backup.*', extension='tar.gz', lastdot=False)
+``:code
+
+ Проверка, имеет ли файл расширение и название, соответствующее README (с учетом регистра):"
+``
+requires = IS_UPLOAD_FILENAME(filename='^README$', extension='^$', case=0)
+``:code
+
+##### ``IS_IPV4``
+``IS_IPV4``:inxx
+
+Этот валидатор проверяет, является ли значение поля IPv4-адресом в десятичной форме. Может быть настроен на проверку соответствия адреса значению из заданного диапазона.
+
+IPv4 regex taken from ref.``regexlib``:cite
+Его аргументы:
+- minip: нижняя граница разрешённых адресов, например 192.168.0.1 должна быть    представлена как итерируемая последовательность (список или кортеж) целых чисел [192, 168, 0, 1] 
+- maxip: верхняя граница разрешённых адресов, аналогично нижней границе 
+
+Все три значения например равны ,  адреса преобразуются в целые числа для
+проверки с включением следующей функции:
+``
+number = 16777216 * IP[0] + 65536 * IP[1] + 256 * IP[2] + IP[3]
+``:code
+
+Примеры:
+- Проверка правильности IPv4 адреса:
+``
+requires = IS_IPV4()
+``:code
+
+Проверка правильности приватного IPv4 адреса:
+``
+requires = IS_IPV4(minip='192.168.0.1', maxip='192.168.255.255')
+``:code
+
+##### ``IS_LOWER``
+``IS_LOWER``:inxx
+
+Этот валидатор никогда не возвращает ошибки, он просто преобразует значение поля в нижний регистр.
+``
+requires = IS_LOWER()
+``:code
+
+##### ``IS_UPPER``
+``IS_UPPER``:inxx
+
+Этот валидатор никогда не возвращает ошибки, он только преобразует значение поля в верхний регистр.
+``
+requires = IS_UPPER()
+``:code
+
+##### ``IS_NULL_OR``
+``IS_NULL_OR``:inxx
+Иногда необходимо проверить значение поля на пустое значение совместно с другими ограничениями. Например, поле должно иметь тип "Дата" и не должно быть пустым.
+
+был октуален для старых версий, больше не используется замена этому валидатору это ``IS_EMPTY_OR``
+
+##### ``IS_EMPTY_OR``
+``IS_EMPTY_OR``:inxx
+
+Sometimes you need to allow empty values on a field along with other requirements. For example a field may be a date but it can also be empty.
+The ``IS_EMPTY_OR`` validator allows this:
+``
+requires = IS_EMPTY_OR(IS_DATE())
+``:code
+
+##### ``CLEANUP``
+``CLEANUP``:inxx
+
+Это больше фильтр, чем валидатор. Он никогда не возвращает ошибок. Он удаляет все символы, чьи десятичные значения не лежат в диапазоне [10, 13, 32-127]
+``
+requires = CLEANUP()
+``:code
+
+##### ``CRYPT``
+``CRYPT``:inxx
+
+Это так же больше фильтр, чем валидатор. Он преобразует значение поля в соответствующее хэш-значение и используется для хранения пароля.
+``
+requires = CRYPT()
+``:code
+
+By default, CRYPT uses 1000 iterations of the pbkdf2 algorithm combined with SHA1 to produce a 20-byte-long hash. Older versions of web2py used "md5" or HMAC+SHA512 depending on whether a key was was specified or not.
+
+If a key is specified, CRYPT uses the HMAC algorithm. The key may contain a prefix that determines the algorithm to use with HMAC, for example SHA512:
+
+``
+requires = CRYPT(key='sha512:thisisthekey')
+``:code
+
+This is the recommended syntax. The key must be a unique string associated with the database used. The key can never be changed. If you lose the key, the previously hashed values become useless.
+
+The CRYPT validator hashes its input, and this makes it somewhat special. If you need to validate a password field before it is hashed, you can use CRYPT in a list of validators, but must make sure it is the last of the list, so that it is called last. For example:
+
+``
+requires = [IS_STRONG(),CRYPT(key='sha512:thisisthekey')]
+``:code
+
+``CRYPT`` also takes a ``min_length`` argument, which defaults to zero.
+
+#### Валидаторы для проверки полей таблиц базы данных
+
+##### ``IS_NOT_IN_DB``
+``IS_NOT_IN_DB``:inxx
+
+Consider the following example:
+``
+db.define_table('person', Field('name'))
+db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
+``:code
+
+Перед вставкой в таблицу person новой записи валидатор проверяет - имеется ли в таблице person запись с таким же значением поля name? Если имеется, то вставка записи отменяется. Этот и другие валидаторы осуществляют проверку на уровне обработки формы, а не на уровне выполнения SQL-запроса к БД. Этот валидатор используется, когда есть небольшая вероятность того, что два пользователя попытаются одновременно вставить в таблицу две записи с одинаковым значением поля person.name. После одновременной проверки форм для каждого пользователя в таблицу могут записать две записи с одинаковым значением поля person.name, поэтому наиболее безопасным способом являетя наложение на поле person.name ограничения уникальности (unique) на уровне БД (или языка описания данных-DDL).
+``
+db.define_table('person', Field('name', unique=True))
+db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
+``:code
+
+Теперь БД выдаст исключение OperationalError при попытке вставить вторую запись с тем же значением поля person.name.
+
+Первый аргумент валидатора может быть либо соединением с БД, либо набором SQLSet. В последнем случае, проверяться будут только записи, имеющиеся в наборе SQLSet.
+
+В следующем коде запрещается регистрация двух пользователей с одинаковым именем name в течение 10 дней: 
+``
+import datetime
+now = datetime.datetime.today()
+db.define_table('person',
+    Field('name'),
+    Field('registration_stamp', 'datetime', default=now))
+recent = db(db.person.registration_stamp>now-datetime.timedelta(10))
+db.person.name.requires = IS_NOT_IN_DB(recent, 'person.name')
+``:code
+
+##### ``IS_IN_DB``
+``IS_IN_DB``:inxx
+
+Consider the following tables and requirement:
+Проверка обеспечивается на уровне операций INSERT/UPDATE/DELETE над формой.
+``
+db.define_table('person', Field('name', unique=True))
+db.define_table('dog', Field('name'), Field('owner', db.person)
+db.dog.owner.requires = IS_IN_DB(db, 'person.id', '%(name)s',
+                                 zero=T('choose one'))
+``:code
+
+It is enforced at the level of dog INSERT/UPDATE/DELETE forms. It requires that a ``dog.owner`` be a valid id in the field ``person.id`` in the database ``db``. Because of this validator, the ``dog.owner`` field is represented as a dropbox. The third argument of the validator is a string that describes the elements in the dropbox. In the example you want to see the person ``%(name)s`` instead of the person ``%(id)s``. ``%(...)s`` is replaced by the value of the field in brackets for each record.
+
+The ``zero`` option works very much like for the ``IS_IN_SET`` validator.
+
+The first argument of the validator can be a database connection or a DAL Set, as in ``IS_NOT_IN_DB``. This can be useful for example when wishing to limit the records in the drop-down box. In this example, we use ``IS_IN_DB`` in a controller to limit the records dynamically each time the controller is called:
+
+``
+def index():
+    (...)
+    query = (db.table.field == 'xyz') #in practice 'xyz' would be a variable
+    db.table.field.requires=IS_IN_DB(db(query),....)
+    form=SQLFORM(...)
+    if form.process().accepted: ...
+    (...)
+``:code
+
+If you want the field validated, but you do not want a dropbox, you must put the validator in a list.
+
+``
+db.dog.owner.requires = [IS_IN_DB(db, 'person.id', '%(name)s')]
+``:code
+
+``_and``:inxx
+Occasionally you want the drop-box (so you do not want to use the list syntax above) yet you want to use additional validators. For this purpose the ``IS_IN_DB`` validator takes an extra argument ``_and`` that can point to a list of other validators applied if the validated value passes the ``IS_IN_DB`` validation. For example to validate all dog owners in db that are not in a subset:
+``
+subset=db(db.person.id>100)
+db.dog.owner.requires = IS_IN_DB(db, 'person.id', '%(name)s',
+                                 _and=IS_NOT_IN_DB(subset,'person.id'))
+``:code
+
+``IS_IN_DB`` has a boolean ``distinct`` argument which defaults to ``False``. When set to ``True`` it prevents repeated values in the dropdown.
+
+``IS_IN_DB`` also takes a ``cache`` argument that works like the ``cache`` argument of select.
+
+
+##### ``IS_IN_DB`` and Tagging
+``tags``:inxx
+``multiple``:inxx
+
+Валидатор IS_IN_DB имеет необязательный атрибут multiple=False. Если установить его в True, в поле могут храниться несколько значений. Поле, в этом случае, не может быть ссылкой, но оно должно быть строкой.
+
+Множественные значения, хранятся разделенными символом "|". Множественные ссылки обрабатываются автоматически в CREATE и UPDATE-формах, но они прозрачны для DAL. Мы настоятельно рекомендуем использовать JQuery-плагин множественного для обработки множественных полей.
+
+#### Валидаторы, создаваемые разработчиком
+``custom validator``:inxx
+
+Все подобные валидаторы должны иметь следующий прототип:
+``
+class sample_validator:
+    def __init__(self, *a, error_message='error'):
+        self.a = a
+        self.e = error_message
+    def __call__(self, value):
+        if validate(value):
+            return (parsed(value), None)
+        return (value, self.e)
+    def formatter(self, value):
+        return format(value)
+``:code
+
+Когда он вызывается для проверки значения поля, то возвращает кортеж (x, y). Если y == None, то значение поля проходит проверку и содержит отпарсенное значение.
+
+Например, если валидатор требует, чтобы значение было целым числом x = int(value). Если значение не прошло проверку, x содержит исходное значение value, а y содержит сообщение об ошибке, поясняющее неудачную проверку. Это сообщение выводится на экран для того, чтобы информировать пользователя об ошибке ввода данных в форму.
+
+Валидатор может содержать метод formatter(), который вызывается для форматирования значения поля вместо его проверки. Например, рассмотрим исходный код для валидатора IS_DATE:
+``
+class IS_DATE(object):
+    def __init__(self, format='%Y-%m-%d', error_message='must be YYYY-MM-DD!'):
+        self.format = format
+        self.error_message = error_message
+    def __call__(self, value):
+        try:
+            y, m, d, hh, mm, ss, t0, t1, t2 = time.strptime(value, str(self.format))
+            value = datetime.date(y, m, d)
+            return (value, None)
+        except:
+            return (value, self.error_message)
+    def formatter(self, value):
+        return value.strftime(str(self.format))
+``:code
+
+В случае удачной проверки метод __call__ читает строку с датой из формы и пытается преобразовать её в объект  datetime.date, используя шаблон self.format, определённый в конструкторе.
+
+Метод formatter() преобразует объект datetime.date в строку, используя тот же шаблон self.format. Это метод вызывается автоматически (неявно) в форме, но вы можете вызвать его явно для преобразования объекта в его правильное строчное представление. например:
+``
+>>> db = DAL()
+>>> db.define_table('atable',
+       Field('birth', 'date', requires=IS_DATE('%m/%d/%Y')))
+>>> id = db.atable.insert(birth=datetime.date(2008, 1, 1))
+>>> row = db.atable[id]
+>>> print db.atable.formatter(row.birth)
+01/01/2008
+``:code
+
+Когда требуется выполнить несколько разных проверок одного поля используется список валидаторов. Они выполняются последовательно и выходное значение предшествующего валидатора является входным  для последующего. Цепочка проверок прерывается, когда один из валидаторов завершается ошибкой.
+
+Наоборот, когда мы вызываем модод formatter() для форматирования какого-либо поля методы formatter() соответствующих валидаторов выполняются также по цепочке, но в обратном порядке. 
+
+------
+Notice that as alternative to custom validators, you can also use the ``onvalidate`` argument of ``form.accepts(...)``, ``form.process(...)`` and ``form.validate(...)``.
+------
+
+
+#### Валидаторы с зависимостями
+
+Иногда, нам необходимо проверить значение некоторого поля формы, но валидатор зависит от значения другого поля. Такая проверка может быть осуществлена, но требует вычисления значения валидатора в том же контроллере,
+в момент, когда значение другого поля уже известно. 
+
+Например, страница генерирует регистрационную форму, которая требует от пользователя ввода логина, пароля и пароля (второй раз - для подтверждения). Надо проверить, чтобы оба поля не были пустыми и оба пароля совпадали.
+``
+def index():
+    form = SQLFORM.factory(
+        Field('username', requires=IS_NOT_EMPTY()),
+        Field('password', requires=IS_NOT_EMPTY()),
+        Field('password_again',
+              requires=IS_EQUAL_TO(request.vars.password)))
+    if form.process().accepted:
+        pass # or take some action
+    return dict(form=form)
+``:code
+
+Подобный механизм может быть использован для объектов FORM и SQLFORM, где мы имеем оператор перевода T, позволяющий производить интернационализацию. Заметим, что ошибки "по умолчанию" не переводятся на другие языки.
+
+### Виджеты (Widgets)
+
+Рассмотрим список виджетов, доступных в web2py:
+``
+SQLFORM.widgets.string.widget
+SQLFORM.widgets.text.widget
+SQLFORM.widgets.password.widget
+SQLFORM.widgets.integer.widget
+SQLFORM.widgets.double.widget
+SQLFORM.widgets.time.widget
+SQLFORM.widgets.date.widget
+SQLFORM.widgets.datetime.widget
+SQLFORM.widgets.upload.widget
+SQLFORM.widgets.boolean.widget
+SQLFORM.widgets.options.widget
+SQLFORM.widgets.multiple.widget
+SQLFORM.widgets.radio.widget
+SQLFORM.widgets.checkboxes.widget
+SQLFORM.widgets.autocomplete
+``:code
+
+The first ten of them are the defaults for the corresponding field types. The "options" widget is used when a field's requires is ``IS_IN_SET`` or ``IS_IN_DB`` with ``multiple=False`` (default behavior). The "multiple" widget is used when a field's requires is ``IS_IN_SET`` or ``IS_IN_DB`` with ``multiple=True``. The "radio" and "checkboxes" widgets are never used by default, but can be set manually. The autocomplete widget is special and discussed in its own section.
+
+For example, to have a "string" field represented by a textarea:
+``
+Field('comment', 'string', widget=SQLFORM.widgets.text.widget)
+``:code
+
+Widgets can also be assigned to fields ''a posteriori'':
+
+``
+db.mytable.myfield.widget = SQLFORM.widgets.string.widget
+``
+
+Sometimes widgets take additional arguments and one needs to specify their values. In this case one can use ``lambda``
+
+``
+db.mytable.myfield.widget = lambda field,value: \
+    SQLFORM.widgets.string.widget(field,value,_style='color:blue')
+``
+
+Widgets are helper factories and their first two arguments are always ``field`` and ``value``. The other arguments can include normal helper attributes such as ``_style``, ``_class``, etc. Some widgets also take special arguments. In particular ``SQLFORM.widgets.radio`` and ``SQLFORM.widgets.checkboxes`` take a ``style`` argument (not to be confused with ``_style``) which can be set to "table", "ul", or "divs" in order to match the ``formstyle`` of the containing form.
+
+You can create new widgets or extend existing widgets.
+
+``SQLFORM.widgets[type]`` is a class and ``SQLFORM.widgets[type].widget`` is a static member function of the corresponding class. Each widget function takes two arguments: the field object, and the current value of that field. It returns a representation of the widget. As an example, the string widget could be recoded as follows:
+``
+def my_string_widget(field, value):
+    return INPUT(_name=field.name,
+                 _id="%s_%s" % (field._tablename, field.name),
+                 _class=field.type,
+                 _value=value,
+                 requires=field.requires)
+
+Field('comment', 'string', widget=my_string_widget)
+``:code
+
+The id and class values must follow the convention described later in this chapter. A widget may contain its own validators, but it is good practice to associate the validators to the "requires" attribute of the field and have the widget get them from there.
+
+#### Autocomplete widget
+``autocomplete``:inxx
+
+There are two possible uses for the autocomplete widget: to autocomplete a field that takes a value from a list or to autocomplete a reference field (where the string to be autocompleted is a representation of the reference which is implemented as an id). 
+
+The first case is easy:
+``
+db.define_table('category',Field('name'))
+db.define_table('product',Field('name'),Field('category'))
+db.product.category.widget = SQLFORM.widgets.autocomplete(
+     request, db.category.name, limitby=(0,10), min_length=2)
+``:code
+
+Where ``limitby`` instructs the widget to display no more than 10 suggestions at the time, and ``min_length`` instructs the widget to perform an Ajax callback to fetch suggestions only after the user has typed at least 2 characters in the search box.
+
+The second case is more complex:
+``
+db.define_table('category',Field('name'))
+db.define_table('product',Field('name'),Field('category'))
+db.product.category.widget = SQLFORM.widgets.autocomplete(
+     request, db.category.name, id_field=db.category.id)
+``:code
+
+In this case the value of ``id_field`` tells the widget that even if the value to be autocompleted is a ``db.category.name``, the value to be stored is the corresponding ``db.category.id``. An optional parameter is ``orderby`` that instructs the widget on how to sort the suggestions (alphabetical by default).
+
+This widget works via Ajax. Where is the Ajax callback? Some magic is going on in this widget. The callback is a method of the widget object itself. How is it exposed? In web2py any piece of code can generate a response by raising an HTTP exception. This widget exploits this possibility in the following way: the widget sends the Ajax call to the same URL that generated the widget in the first place and puts a special token in the request.vars. Should the widget get instantiated again, it finds the token and raises an HTTP exception that responds to the request. All of this is done under the hood and hidden to the developer.
+
+### ``SQLFORM.grid`` and ``SQLFORM.smartgrid``
+
+-------
+Attention: grid and smartgrid were experimental prior web2py version 2.0 and were vulnerable to information leakage. The grid and smartgrid are no longer experimental, but we are still not promising backward compatibility of the presentation layer of the grid, only of its APIs.
+-------
+
+These are two high level gadgets that create complex CRUD controls. They provide pagination, the ability to browser, search, sort, create, update and delete records from a single gadgets.
+
+The simplest of the two is ``SQLFORM.grid``. Here is an example of usage:
+
+``
+@auth.requires_login()
+def manage_users():
+    grid = SQLFORM.grid(db.auth_user)
+    return locals()
+``
+
+which produces the following page:
+
+[[image @///image/en6700.png center 480px]]
+
+The first argument of ``SQLFORM.grid`` can be a table or a query. The grid gadget will provide access to records matching the query.
+
+Before we dive into the long list of arguments of the grid gadget we need to understand how it works. The gadget looks at ``request.args`` in order to decide what to do (browse, search, create, update, delete, etc.). Each button created by the gadget links the same function (``manage_users`` in the above case) but passes different ``request.args``. By default all the URL generated by the grid are digitally signed and verified. This means one cannot perform certain actions (create, update, delete) without being logged-in. These restrictions can be relaxed:
+
+``
+def manage_users():
+    grid = SQLFORM.grid(db.auth_user,user_signature=False)
+    return locals()
+``
+
+but we do not recommend it.
+
+-----
+Because of the way grid works one can only have one grid per controller function, unless they are embedded as components via ``LOAD``.
+-----
+
+Because the function that contains the grid may itself manipulate the command line arguments, the grid needs to know which args should be handled by the grid and which not. For example here is an example of code that allows one to manage any table:
+
+``
+@auth.requires_login()
+def manage():
+    table = request.args(0)
+    if not table in db.tables(): redirect(URL('error'))
+    grid = SQLFORM.grid(db[table],args=request.args[:1])
+    return locals()
+``
+
+the ``args`` argument of the ``grid`` specifies which ``request.args`` should be passed along and ignored by the gadget. In our case ``request.args[:1]`` is the name of the table we want to manage and it is handled by the ``manage`` function itself, not by the gadget.
+
+The complete signature for the grid is the following:
+
+``
+SQLFORM.grid(query,
+             fields=None,
+             field_id=None,
+             left=None,
+             headers={},
+             orderby=None,
+	     groupby=None,
+             searchable=True,
+             sortable=True,
+             deletable=True,
+             editable=True,
+             details=True,
+             create=True,
+             csv=True,
+             paginate=20,
+             selectable=None,
+             links=None,
+             upload = '<default>',
+             args=[],
+             user_signature = True,
+             maxtextlengths={},
+             maxtextlength=20,
+             onvalidation=None,
+             oncreate=None,
+             onupdate=None,
+             ondelete=None,
+             sorter_icons=('[^]','[v]'),
+             ui = 'web2py',
+             showbuttontext=True,
+             search_widget='default',
+             _class="web2py_grid",
+             formname='web2py_grid',
+             ignore_rw = False,
+             formstyle = 'table3cols'):
+``:code
+
+- ``fields`` is a list of fields to be fetched from the database. It is also used to determine which fields to be shown in the grid view.
+- ``field_id`` must be the field of the table to be used as ID, for example ``db.mytable.id``.
+- ``headers`` is a dictionary that maps 'tablename.fieldname' into the corresponding header label.
+- ``left`` is an optional left join expressions used to build ``...select(left=...)``.
+- ``orderby`` is used as default ordering for the rows.
+- ``searchable``, ``sortable``, ``deletable``, ``details``, ``create`` determine whether one can search, sort, delete, view details, and create new records respectively.
+- ``csv`` if set to true allows to download the grid in CSV.
+- ``paginate`` sets the max number of rows per page.
+- ``links`` is used to display new columns which can be links to other pages. The ``links`` argument must be a list of  ``dict(header='name',body=lambda row: A(...))`` where ``header`` is the header of the new column and ``body`` is a function that takes a row and returns a value. In the example, the value is a ``A(...)`` helper.
+- ``maxtextlength`` sets the maximum length of text to be displayed for each field value, in the grid view. This value can be overwritten for each field using ``maxtextlengths``, a dictionary of 'tablename.fieldname':length.
+- ``onvalidation``, ``oncreate``, ``onupdate`` and ``ondelete`` are callback functions. All but ``ondelete`` take a form object as input.
+- ``sorter_icons`` is a list of two strings (or helpers) that will be used to represent the up and down sorting options for each field.
+- ``ui`` can be set equal to 'web2py' and will generate web2py friendly class names, can be set equal to ``jquery-ui`` and will generate jquery UI friendly class names, but it can also be its own set of class names for the various grid components:
+
+``
+ui = dict(widget='',
+          header='',
+          content='',
+          default='',
+          cornerall='',
+          cornertop='',
+          cornerbottom='',
+          button='button',
+          buttontext='buttontext button',
+          buttonadd='icon plus',
+          buttonback='icon leftarrow',
+          buttonexport='icon downarrow',
+          buttondelete='icon trash',
+          buttonedit='icon pen',
+          buttontable='icon rightarrow',
+          buttonview='icon magnifier')
+``:code
+
+- ``search_widget`` allows to override the default search widget and we refer the reader the source code in "gluon/sqlhtml.py" for details.
+- ``showbutton`` allows to turn off all buttons.
+- ``_class`` is the class for the grid container.
+- ``formname``, ``ignore_rw`` and ``formstyle`` are passed to the SQLFORM objects used by the grid for create/update forms.
+
+------
+``deletable``, ``editable`` and ``details`` are usually boolean values but they can be functions which take the row object and decide whether to display the corresponding button or not.
+-----
+
+A ``SQLFORM.smartgrid`` looks a lot like a ``grid``, in fact it contains a grid but it is designed to take as input not a query but only one table and to browse said table and selected referencing tables.
+
+For example consider the following table structure:
+
+``
+db.define_table('parent',Field('name'))
+db.define_table('child',Field('name'),Field('parent','reference parent'))
+``:code
+
+With SQLFORM.grid you can list all parents:
+
+``
+SQLFORM.grid(db.parent)
+``:code
+all children:
+``
+SQLFORM.grid(db.child)
+``:code
+and all parents and children in one table:
+``
+SQLFORM.grid(db.parent,left=db.child.on(db.child.parent==db.parent.id))
+``:code
+
+With SQLFORM.smartgrid you can put all the data in one gadget that spawns both tables:
+
+``
+@auth.requires_login():
+def manage():
+    grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'])
+    return locals()
+``:code
+
+which looks like this:
+
+[[image @///image/en6800.png center 480px]]
+
+Notice the extra "children" links. One could create the extra ``links`` using a regular ``grid`` but they would point to a different action. With a ``smartgrid`` they are created automatically and handled by the same gadget.
+
+Also notice that when clicking on the "children" link for a given parent one only gets the list of children for that parent (and that is obvious) but also notice that if one now tried to add a new child, the parent value for the new child is automatically set to the selected parent (displayed in the breadcrumbs associated to the gadget). The value of this field can be overwritten. We can prevent this by making it readonly:
+
+``
+@auth.requires_login():
+def manage():
+    db.child.parent.writable = False
+    grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'])
+    return locals()
+``:code
+
+If the ``linked_tables`` argument is not specified all referencing tables are automatically linked. Anyway, to avoid accidentally exposing data we recommend explicitly listing tables that should be linked.
+
+The following code creates a very powerful management interface for all tables in the system:
+
+``
+@auth.requires_membership('managers'):
+def manage():
+    table = request.args(0) or 'auth_user'
+    if not table in db.tables(): redirect(URL('error'))
+    grid = SQLFORM.smartgrid(db[table],args=request.args[:1])
+    return locals()
+``:code
+
+The ``smartgrid`` takes the same arguments as a ``grid`` and some more with some caveats:
+
+- The first argument is a table, not a query
+- There is a extra argument ``constraints`` which is a dictionary of 'tablename':query which can be used to further restrict access to the records displayed in the 'tablename' grid.
+- There is a extra argument ``linked_tables`` which is a list of tablenames of tables that should be accessible via the smartgrid.
+- All the arguments but the table, ``args``, ``linked_tables`` and ``user_signatures`` can be dictionaries as explained below.
+
+Consider the previous grid:
+``
+grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'])
+``
+It allows one to access both a ``db.parent`` and a ``db.child``. Apart for navigation controls, for each one table, a smarttable is nothing but a grid. This means that, in this case, one smartgrid can create a grid for parent and one grid for child. We may want to pass different sets of parameters to these grids. For example different sets of ``searchable`` parameters.
+
+While for a grid we would pass a boolean:
+``
+grid = SQLFORM.grid(db.parent,searchable=True)
+``
+for a smartgrid we would pass a dictionary of booleans:
+``
+grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'],
+     searchable= dict(parent=True, child=False))
+``
+In this way we made parents searchable but children for each parent not searchable (there should not be that many to need the search widget).
+
+
+-------
+The grid and smartgrid gadgets are here to stay but they are marked experimental because the actual html layout of what they return and the exact set of parameters one can pass to them  may be subject to change as new functionalities are added.
+-------
+
+
+``grid`` and ``smartgrid`` do not automatically enforce access control like crud does but you can integrate it with ``auth`` using explicit permission checking:
+
+``
+grid = SQLFORM.grid(db.auth_user,
+     editable = auth.has_membership('managers'),
+     deletable = auth.has_membership('managers'))
+``
+
+or
+
+``
+grid = SQLFORM.grid(db.auth_user,
+     editable = auth.has_permission('edit','auth_user'),
+     deletable = auth.has_permission('delete','auth_user'))
+``
+
+The ``smartgrid`` is the only gadget in web2py that displays the table name and it need both the singular and the plural. For example one parent can have one "Child" or many "Children". Therefore a table object needs to know its own singular and plural names. web2py normally guesses them but you can set the explicitly:
+
+``
+db.define_table('child', ..., singular="Child", plural="Children")
+``:code
+
+or with: ``singular``:inxx ``plural``:inxx
+
+``
+db.define_table('child', ...)
+db.child._singular = "Child"
+db.child._plural = "Children"
+``:code
+
+They should also be internationalized using the ``T`` operator.
+
+The plural and singular values are then used by ``smartgrid`` to provide correct names for headers and links.
