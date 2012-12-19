@@ -88,6 +88,7 @@ myset.delete()
 ``:code
 
 ``Expression``:inxx
+
 **Expression** is something like an ``orderby`` or ``groupby`` expression. The Field class is derived from the Expression. Here is an example.
 ``
 myorder = db.mytable.myfield.upper() | db.mytable.id
@@ -454,6 +455,10 @@ The DAL class also takes a "migrate" argument, which determines the default valu
 
 will set the default value of migrate to False whenever ``db.define_table`` is called without a migrate argument.
 
+------
+Notice that web2py only migrates new columns, removed columns, and changes in column type (not in sqlite). web2py does not migrate changes in attributes such as changes in the values of ``default``, ``unique``, ``notnull``, and ``ondelete``.
+------
+
 Migrations can be disabled for all tables at the moment of connection:
 
 ``
@@ -518,6 +523,14 @@ Now, if you insert a record again, the counter starts again at 1 (this is back-e
 >>> db.person.insert(name="Alex")
 1
 ``:code
+
+Notice you can pass parameters to ``truncate``, for example you can tell SQLITE to restart the id counter.
+
+``
+db.person.truncate('RESTART IDENTITY CASCADE')
+``:code
+
+The argument is in raw SQL and thefeore engine specific.
 
 ``bulk_insert``:inxx
 web2py also provides a bulk_insert method
@@ -1106,13 +1119,13 @@ and the corresponding view:
 
 ``SQLFORM.grid`` and ``SQLFORM.smartgrid`` should be preferred to ``SQLTABLE`` because they are more powerful although higher level and therefore more constraining. They will be explained in more detail in chapter 8.
 
-#### ``orderby``, ``groupby``, ``limitby``, ``distinct``
+#### ``orderby``, ``groupby``, ``limitby``, ``distinct``, ``having``
 
 The ``select`` command takes five optional arguments: orderby, groupby, limitby, left and cache. Here we discuss the first three.
 
 You can fetch the records sorted by name:
 
-``orderby``:inxx
+``orderby``:inxx ``groupby``:inxx ``having``:inxx
 ``
 >>> for row in db().select(
         db.person.ALL, orderby=db.person.name):
@@ -1170,6 +1183,14 @@ Alex
 Bob
 Carl
 ``:code
+
+You can use ``having`` in conjunction with ``groupby`` to group conditionally (only those ``having`` the condition are grouped.
+
+``
+>>> print db(query1).select(db.person.ALL, groupby=db.person.name, having=query2)
+``
+
+Notice that query1 filters records to be displayed, query2 filters records to be grouped.
 
 ``distinct``:inxx
 
@@ -1238,7 +1259,9 @@ or by explicit negation with the "``~``" unary operator:
 3 Carl
 ``:code
 
+------
 Due to Python restrictions in overloading "``and``" and "``or``" operators, these cannot be used in forming queries.  The binary operators "``&``" and "``|``" must be used instead. Note that these operators (unlike "``and``" and "``or``") have higher precedence than comparison operators, so the "extra" parentheses in the above examples are mandatory.
+------
 
 It is also possible to build queries using in-place logical operators:
 
@@ -1371,6 +1394,45 @@ These methods are convenient for passing Rows to generic views and or to store R
 >>> session.rows = rows.as_list() # allowed!
 ``:code
 
+#### Combining rows
+
+Row objects can be conbined at the Python level. Here we assume:
+
+``
+>>> print rows1
+person.name
+Max
+Tim
+>>> print rows2
+person.name
+John
+Tim
+``
+
+
+You can do a union of the records in two set of rows:
+
+``
+>>> rows3 = rows1 & rows2
+>>> print rows3
+name
+Max
+Tim
+John
+Tim
+``:code
+
+You can do a union of the records and removing duplicates:
+
+``
+>>> rows3 = rows1 | rows2
+>>> print rows3
+name
+Max
+Tim
+John
+``:code
+
 #### ``find``, ``exclude``, ``sort``
 ``find``:inxx ``exclude``:inxx ``sort``:inxx
 
@@ -1415,6 +1477,8 @@ They can be combined:
 Alex
 Max
 ``:code
+
+Sort takes an optional argment ``reverse=True`` which an obvious meaning.
 
 The ``find`` method as an optional limitby argument with the same syntax and functionality as the Set select ``method``.
 
@@ -1639,27 +1703,38 @@ A virtual field defined as the one above is automatically computed for all recor
 >>> for row in db(db.item).select(): print row.total_price
 ``
 
-It is also possible to define lazy virtual fields which are calculated on-demand, when called.
+It is also possible to define method fields which are calculated on-demand, when called.
 For example:
 
 ``
->>> db.item.total_price = Field.Lazy(lambda row, discount=0.0: \
+>>> db.item.discounted_total = Field.Method(lambda row, discount=0.0: \
        row.unit_price*row.quantity*(1.0-discount/100))
 ``:code
 
-In this case ``row.total_price`` is not a value but a function. The function takes the same arguments as the function passed to the ``Lazy`` constructor except for ``row`` which is implicit (think of it as ``self`` for rows objects).
+In this case ``row.discounted_total`` is not a value but a function. The function takes the same arguments as the function passed to the ``Method`` constructor except for ``row`` which is implicit (think of it as ``self`` for rows objects).
 
 The lazy field in the example above allows one to compute the total price for each ``item``:
 
 ``
->>> for row in db(db.item).select(): print row.total_price()
+>>> for row in db(db.item).select(): print row.discounted_total()
 ``
 
 And it also allows to pass an optional ``discount`` percentage (15%):
 
 ``
->>> for row in db(db.item).select(): print row.total_price(15)
+>>> for row in db(db.item).select(): print row.discounted_total(15)
 ``
+
+Virtual and Method fields can also be defined in place when a table is defined:
+
+``
+>>> db.define_table('item',
+        Field('unit_price','double'),
+        Field('quantity','integer'),
+        Field.Virtual('total_price', lambda row: ...),
+        Field.Method('discounted_total', lambda row, discount=0.0: ...))
+``:code
+
 
 ------
 Mind that virtual fields do not have the same attributes as the other fields (default, readable, requires, etc) and they do not appear in the list of ``db.table.fields`` and are not visualized by default in tables (TABLE) and grids (SQLFORM.grid, SQLFORM.smartgrid).
@@ -2237,7 +2312,14 @@ You can serialize a single table in CSV and store it in a file "test.csv":
 >>> open('test.csv', 'w').write(str(db(db.person.id).select()))
 ``:code
 
-and you can easily read it back with:
+This is equivalent to
+
+``
+>>> rows = db(db.person.id).select()
+>>> rows.export_to_csv_file(open('test.csv', 'w'))
+``:code
+
+You can read the CSV file back with:
 ``
 >>> db.person.import_from_csv_file(open('test.csv', 'r'))
 ``:code
@@ -2445,7 +2527,8 @@ Both ``export_to_csv_file`` and ``import_from_csv_file`` accept keyword argument
 Here is some example usage:
 ``
 >>> import csv
->>> db.export_to_csv_file(open('/tmp/test.txt', 'w'),
+>>> rows = db(query).select()
+>>> rows.export_to_csv_file(open('/tmp/test.txt', 'w'),
         delimiter='|',
         quotechar='"',
         quoting=csv.QUOTE_NONNUMERIC)

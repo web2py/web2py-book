@@ -873,6 +873,8 @@ my_other_storage = Storage(dict(a=1, b=2)) # convert dictionary to Storage
 {{=BEAUTIFY(request.user_agent())}}
 ``:code
 
+- ``request.global_settings`` ``request.global_settings``:inxx contains web2py wide system settings. They are set automatically automatically and you should not change them. For example ``request.global_settings.gluon_parent`` contains the full path to the web2py folder, ``request.global_settings.is_pypy`` determines if web2py is running on PyPy.
+
 - ``request.wsgi`` is a hook that allows you to call third party WSGI applications from inside actions
 
 The latter includes:
@@ -974,6 +976,7 @@ Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi 
 ``response.include_meta``:inxx
 ``response.optimize_css``:inxx
 ``response.optimize_js``:inxx
+``response._caller``:inxx
 
 ``response`` is another instance of the ``Storage`` class. It contains the following:
 
@@ -1021,6 +1024,12 @@ Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi 
 ``response.toolbar``: a function that allows you embed a toolbar into page form debugging purposes ``{{=response.toolbar()}}``. The toolbar displays request, response, session variables and database access time for each query.
 
 ``response._vars``: this variable is accessible only in a view, not in the action. It contains the value returned by the action to the view.
+
+``response._caller``: this is a function that wraps all action calls. It defaults to the idenity function but it can be modifed in order to catch special types of exception of do extra logging;
+
+``
+response._caller = lambda f: f()
+``
 
 ``response.optimize_css``: if can be set to "concat,minify,inline" to concatenate, minify and inline the CSS files included by web2py.
 
@@ -1499,7 +1508,7 @@ redirect(...,type='auto')
 ``:code
 
 
-### ``T`` and Internationalization
+### ``T``, Internationalization, and Pluralization
 ``T``:inxx ``internationalization``:inxx
 
 The object ``T`` is the language translator. It constitutes a single global instance of the web2py class ``gluon.language.translator``. All string constants (and only string constants) should be marked by ``T``, for example:
@@ -1549,6 +1558,8 @@ T("blah %(name)s blah" % dict(name='Tim'))
 
 because translation would occur after substitution.
 
+#### Determining the language
+
 The requested language is determined by the "Accept-Language" field in the HTTP header, but this selection can be overwritten programmatically by requesting a specific file, for example:
 ``
 T.force('it-it')
@@ -1561,6 +1572,10 @@ You can also force a per-string language:
 ``
 T("Hello World", language="it-it")
 ``:code
+
+--------------
+In the case multiple languages are requested, for example "it-it, fr-ft", web2py tries to locate "it-it.py" and "fr-fr.py" translation files. If none of the requested files is present, it tries to fallback on "it.py" and "fr.py". If these files are not present it defaults to "default.py". If this is not present either, it default to no-translation. The more genral rule is that web2py tries "xx-xy-yy.py", "xx-xy.py", "xx.py", "default.py" for each of the "xx-xy-yy" accepted languages trying to find the closest match to the visitor's preferences.
+-------------
 
 You can turn off translations completely via
 
@@ -1599,6 +1614,8 @@ The currently accepted language is stored in
 T.accepted_language
 ``:code
 
+#### Translating variables
+
 Mind that T(...) does not just translate strings but can also translated variables:
 ``
 >>> a="test"
@@ -1606,6 +1623,152 @@ Mind that T(...) does not just translate strings but can also translated variabl
 ``:code
 
 In this case the word "test" is translated but, if not found and if the filesystem is writable, it will add it to the list of words to be translated in the language file.
+
+#### Comments and multiple translations
+
+It is possible that the same string appers in different contexts in the application and needs different translations based on context. In order to do this, one can add comments to the original string. The comments will not be rendered but will be used by web2py to determine the most appropriate translation. For example:
+
+``
+T("hello world ## first occurence")
+T("hello world ## second occurence")
+``:code
+
+The text folloing the ``##``, including the double ``##``, are comments.
+
+#### Pluralization engine
+
+Since version 2.0, web2py include s power pluralization system (PS). This means that when text marked for translation depends on a numeric variable, it may be translated differently based on the numeric value. For example in english we may render: 
+
+``
+x book(s)
+``
+
+with
+
+``
+a book (x==0)
+x books (x>0)
+``
+
+English has one singular form and one plural form. The plural form is constructed by adding a "-s" or "-es" or using an exceptional form. web2py provides a way to define pluralization rules for each languages, as well as exceptions to the default rules. In fact web2py already knows pluralization rules for many languages. It knows, for example, that Slovenian has one singular form and 3 plural forms (for x==1, x==3 or x==4 and x>4). These ules are encoded in "gluon/contrib/plural_rules/*.py" files and new files can be created. Explicit pluralizations for words are created by editing pluralization files using the administrative interface.
+
+By default the PS is not activated. It is triggered by the ``symbol`` argument of the ``T`` function. For example:
+
+``
+T("You have %s %%{book}", symbols=10)
+``:code
+
+Now the PS is activated for the work "book" and for the number 10.
+The result in english will be: "You have 10 words". Notice that "word" has been pluralized into "words".
+
+The PS consists from 3 parts:
+- placeholders ``%%{}`` to mark words in ``T``-messages
+- rule to give a decision which word form to use ("rules/plural_rules/*.py")
+- dictionary with word plural forms ("app/languages/plural-*.py")
+
+The value of symbols can be a single variable, a list/tuple of variables, or a dictionary.
+
+The placeholder ``%%{}`` consists of 3 parts:
+
+``
+%%{[<modifier>]<world>[<parameter>]},
+``
+
+where:
+
+``
+<modifier>::= ! | !! | !!!
+<word> ::= any world or phrase in singular in lower case (!)
+<parameter> ::= [index] | (key) | (number)
+``
+
+For example:
+
+- ``%%{word}`` is equivalent to %%{word[0]} (if no modifiers are used). 
+- ``%%{word[index]}`` is used when symbols is a tuple. symbols[index] gives us a number used to make a decision on which word form to choose.
+- ``%%{word(key)}`` is used to get the numeric parameter from symbols[key]
+- ``%%{word(number)}`` allows to set a ``number`` directly (e.g.: ``%%{word(%i)}``)
+- ``%%{?word?number}`` returns "word" if ``number==1``, returns the ``number`` otherwise
+- ``%%{?number} or %%{??number}`` returns ``number`` if ``number!=1``, return nothing otherwise
+
+``T("blabla %s %%{word}", symbols=var)``
+
+``%%{word}`` by default means ``%%{word[0]}``, 
+where ``[0]`` is an item index in symbols tuple.
+
+``T("blabla %s %s %%{word[1]}", (var1, var2))`` 
+PS is used for "word" and var2 respectively.
+
+You can use several %%{} placeholders with one index:
+
+``T("%%{this} %%{is} %s %%{book}", var)``
+
+or
+
+``T("%%{this[0]} %%{is[0]} %s %%{book[0]}", var)``
+
+Generate:
+
+``
+var  output
+------------------
+ 1   this is 1 book
+ 2   these are 2 books
+ 3   these are 2 books
+``
+
+Similarly you can pass a dictionary to symbols:
+
+``
+T("blabla %(var1)s %(wordcnt)s %%{word(wordcnt)}", 
+  dict(var1="tututu", wordcnt=20))
+``
+
+which produces 
+
+``
+blabla tututu 20 words
+``
+
+You can replace "1" with any word you wish by this placeholder ``%%{?word?number}``. 
+For example
+
+``T("%%{this} %%{is} %%{?a?%s} %%{book}", var)``
+
+produces:
+
+``
+var  output
+------------------
+ 1   this is a book
+ 2   these are 2 books
+ 3   these are 2 books
+ ... 
+``
+
+Inside ``%%{...}`` you can also use the following modifiers:
+
+- ``!`` to capitalize the text (equivalent to ``string.capitalize``)
+- ``!!`` to capitalize every word (equivalent to ``string.title``)
+- ``!!!`` to capitalize every character (equivalent to ``string.upper``)
+
+Notice you can use ``\`` to scape ``!`` and ``?``.
+
+#### Translations, plurlaization, and MARKMIN
+
+You can also use the powerful MARKMIN syntax inside translation strings by replacing
+
+``
+T("hello world")
+``:code
+
+with
+
+``
+T.M("hello world")
+``
+
+Now the string accepts MARKMIN markup as described later in the book. You can also use the pluralization system inside MARKMIN.
 
 ### ''Cookies''
 ``cookies``:inxx
@@ -1988,7 +2151,19 @@ The first variable contains the error message when an invalid application or fun
 ``routes_onerror`` work with both routing mechanisms
 -------
 
-#### Static asset management
+``error_handler``:inxx
+In "routes.py" ne can also specify an action in charge of error handling:
+
+``
+error_handler = dict(application='error',                                               
+                      controller='default',                                              
+                      function='index')
+``:code
+
+If the ``error_handler`` is specified the action is called without user redirection and the handler action will be in charge of dealing with the error. In the event that the error-handling page itself returns an error, web2py will fall back to its old static responses.
+
+
+### Static asset management
 
 Since version 2.1.0, web2py has the ability to manage static assets.
 
@@ -2064,7 +2239,6 @@ location ~* /(\w+)/static(?:/_[\d]+\.[\d]+\.[\d]+)?/(.*)$ {
    expires max;
 }
 ``
-
 
 ### Running tasks in the background
 
