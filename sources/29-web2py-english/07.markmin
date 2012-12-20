@@ -2277,6 +2277,7 @@ def manage_users():
     grid = SQLFORM.grid(db.auth_user)
     return locals()
 ``
+``:code
 
 which produces the following page:
 
@@ -2290,12 +2291,13 @@ Before we dive into the long list of arguments of the grid gadget we need to und
 def manage_users():
     grid = SQLFORM.grid(db.auth_user,user_signature=False)
     return locals()
-``
+``:code
 
 but we do not recommend it.
 
 -----
 Because of the way grid works one can only have one grid per controller function, unless they are embedded as components via ``LOAD``.
+To make the default search grid work in more than one LOADed grid, please use a different ``formname`` for each one.
 -----
 
 Because the function that contains the grid may itself manipulate the command line arguments, the grid needs to know which args should be handled by the grid and which not. For example here is an example of code that allows one to manage any table:
@@ -2307,87 +2309,121 @@ def manage():
     if not table in db.tables(): redirect(URL('error'))
     grid = SQLFORM.grid(db[table],args=request.args[:1])
     return locals()
-``
+``:code
 
 the ``args`` argument of the ``grid`` specifies which ``request.args`` should be passed along and ignored by the gadget. In our case ``request.args[:1]`` is the name of the table we want to manage and it is handled by the ``manage`` function itself, not by the gadget.
 
 The complete signature for the grid is the following:
 
 ``
-SQLFORM.grid(query,
-             fields=None,
-             field_id=None,
-             left=None,
-             headers={},
-             orderby=None,
-	     groupby=None,
-             searchable=True,
-             sortable=True,
-             deletable=True,
-             editable=True,
-             details=True,
-             create=True,
-             csv=True,
-             paginate=20,
-             selectable=None,
-             links=None,
-             upload = '<default>',
-             args=[],
-             user_signature = True,
-             maxtextlengths={},
-             maxtextlength=20,
-             onvalidation=None,
-             oncreate=None,
-             onupdate=None,
-             ondelete=None,
-             sorter_icons=('[^]','[v]'),
-             ui = 'web2py',
-             showbuttontext=True,
-             search_widget='default',
-             _class="web2py_grid",
-             formname='web2py_grid',
-             ignore_rw = False,
-             formstyle = 'table3cols'):
+SQLFORM.grid(
+    query,
+    fields=None,
+    field_id=None,
+    left=None,
+    headers={},
+    orderby=None,
+    groupby=None,
+    searchable=True,
+    sortable=True,
+    paginate=20,
+    deletable=True,
+    editable=True,
+    details=True,
+    selectable=None,
+    create=True,
+    csv=True,
+    links=None,
+    links_in_grid=True,
+    upload='<default>',
+    args=[],
+    user_signature=True,
+    maxtextlengths={},
+    maxtextlength=20,
+    onvalidation=None,
+    oncreate=None,
+    onupdate=None,
+    ondelete=None,
+    sorter_icons=(XML('&#x2191;'), XML('&#x2193;')),
+    ui = 'web2py',
+    showbuttontext=True,
+    _class="web2py_grid",
+    formname='web2py_grid',
+    search_widget='default',
+    ignore_rw = False,
+    formstyle = 'table3cols',
+    exportclasses = None,
+    formargs={},
+    createargs={},
+    editargs={},
+    viewargs={},
+    buttons_placement = 'right',
+    links_placement = 'right'
+    )
 ``:code
 
 - ``fields`` is a list of fields to be fetched from the database. It is also used to determine which fields to be shown in the grid view.
 - ``field_id`` must be the field of the table to be used as ID, for example ``db.mytable.id``.
-- ``headers`` is a dictionary that maps 'tablename.fieldname' into the corresponding header label.
 - ``left`` is an optional left join expressions used to build ``...select(left=...)``.
+- ``headers`` is a dictionary that maps 'tablename.fieldname' into the corresponding header label, e.g. ``{'auth_user.email' : 'Email Address'}``
 - ``orderby`` is used as default ordering for the rows.
-- ``searchable``, ``sortable``, ``deletable``, ``details``, ``create`` determine whether one can search, sort, delete, view details, and create new records respectively.
-- ``csv`` if set to true allows to download the grid in CSV.
+- ``groupby`` is used to group the set. Use the same syntax as you were passing in a simple ``select(groupby=...)``.
+- ``searchable``, ``sortable``, ``deletable``, ``editable``, ``details``, ``create`` determine whether one can search, sort, delete, edit, view details, and create new records respectively.
+- ``selectable`` can be used to call a custom function on multiple records (a checkbox will be inserted for every row) e.g.
+  ``
+   selectable = lambda ids : redirect(URL('default', 'mapping_multiple', vars=dict(id=ids)))
+``:code
 - ``paginate`` sets the max number of rows per page.
+- ``csv`` if set to true allows to download the grid in various format (more on that later).
 - ``links`` is used to display new columns which can be links to other pages. The ``links`` argument must be a list of  ``dict(header='name',body=lambda row: A(...))`` where ``header`` is the header of the new column and ``body`` is a function that takes a row and returns a value. In the example, the value is a ``A(...)`` helper.
-- ``maxtextlength`` sets the maximum length of text to be displayed for each field value, in the grid view. This value can be overwritten for each field using ``maxtextlengths``, a dictionary of 'tablename.fieldname':length.
+- ``links_in_grid`` if set to False, links will only be displayed in the "details" and "edit" page (so, not on the main grid)
+- ``upload`` same as SQLFORM's one. web2py uses the action at that URL to download the file
+- ``maxtextlength`` sets the maximum length of text to be displayed for each field value, in the grid view. This value can be overwritten for each field using ``maxtextlengths``, a dictionary of 'tablename.fieldname':length e.g. ``{'auth_user.email' : 50}``
 - ``onvalidation``, ``oncreate``, ``onupdate`` and ``ondelete`` are callback functions. All but ``ondelete`` take a form object as input.
 - ``sorter_icons`` is a list of two strings (or helpers) that will be used to represent the up and down sorting options for each field.
 - ``ui`` can be set equal to 'web2py' and will generate web2py friendly class names, can be set equal to ``jquery-ui`` and will generate jquery UI friendly class names, but it can also be its own set of class names for the various grid components:
-
-``
-ui = dict(widget='',
-          header='',
-          content='',
-          default='',
-          cornerall='',
-          cornertop='',
-          cornerbottom='',
-          button='button',
-          buttontext='buttontext button',
-          buttonadd='icon plus',
-          buttonback='icon leftarrow',
-          buttonexport='icon downarrow',
-          buttondelete='icon trash',
-          buttonedit='icon pen',
-          buttontable='icon rightarrow',
-          buttonview='icon magnifier')
+  ``
+ui = dict(
+    widget='',
+    header='',
+    content='',
+    default='',
+    cornerall='',
+    cornertop='',
+    cornerbottom='',
+    button='button',
+    buttontext='buttontext button',
+    buttonadd='icon plus',
+    buttonback='icon leftarrow',
+    buttonexport='icon downarrow',
+    buttondelete='icon trash',
+    buttonedit='icon pen',
+    buttontable='icon rightarrow',
+    buttonview='icon magnifier'
+    )
 ``:code
-
 - ``search_widget`` allows to override the default search widget and we refer the reader the source code in "gluon/sqlhtml.py" for details.
-- ``showbutton`` allows to turn off all buttons.
+- ``showbuttontext`` allows to have buttons without text (there will effectively be only icons)
 - ``_class`` is the class for the grid container.
+- ``showbutton`` allows to turn off all buttons.
+- ``exportclasses`` takes a dictionary of tuples: by default it's defined as 
+  ``csv_with_hidden_cols=(ExporterCSV, 'CSV (hidden cols)'),
+    csv=(ExporterCSV, 'CSV'),
+    xml=(ExporterXML, 'XML'),
+    html=(ExporterHTML, 'HTML'),
+    tsv_with_hidden_cols=(ExporterTSV, 'TSV (Excel compatible, hidden cols)'),
+    tsv=(ExporterTSV, 'TSV (Excel compatible)'))
+``:code
+  ExporterCSV, ExporterXML, ExporterHTML and ExporterTSV are all defined in gluon/sqlhtml.py. Take a look at those for creating your own exporter. 
+  If you pass a dict like
+  ``dict(
+    xml=False,
+    html=False
+    )
+``:code you will disable the xml and html export formats.
+- ``formargs`` is passed to all SQLFORM objects used by the grid, while ``createargs``,``editargs`` and ``viewargs`` are passed only to the specific create, edit and details SQLFORMs
 - ``formname``, ``ignore_rw`` and ``formstyle`` are passed to the SQLFORM objects used by the grid for create/update forms.
-
+- ``buttons_placement`` and ``links_placement`` both take a parameter ('right', 'left', 'both') that will affect where on the row the buttons (or the links) will be placed
 ------
 ``deletable``, ``editable`` and ``details`` are usually boolean values but they can be functions which take the row object and decide whether to display the corresponding button or not.
 -----
@@ -2458,23 +2494,24 @@ The ``smartgrid`` takes the same arguments as a ``grid`` and some more with some
 - The first argument is a table, not a query
 - There is a extra argument ``constraints`` which is a dictionary of 'tablename':query which can be used to further restrict access to the records displayed in the 'tablename' grid.
 - There is a extra argument ``linked_tables`` which is a list of tablenames of tables that should be accessible via the smartgrid.
+- ``divider`` allows to specify a character to use in the breadcrumb navigator, ``breadcrumbs_class`` will apply the class to the breadcrumb element
 - All the arguments but the table, ``args``, ``linked_tables`` and ``user_signatures`` can be dictionaries as explained below.
 
 Consider the previous grid:
 ``
 grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'])
-``
+``:code
 It allows one to access both a ``db.parent`` and a ``db.child``. Apart for navigation controls, for each one table, a smarttable is nothing but a grid. This means that, in this case, one smartgrid can create a grid for parent and one grid for child. We may want to pass different sets of parameters to these grids. For example different sets of ``searchable`` parameters.
 
 While for a grid we would pass a boolean:
 ``
 grid = SQLFORM.grid(db.parent,searchable=True)
-``
+````:code
 for a smartgrid we would pass a dictionary of booleans:
 ``
 grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'],
      searchable= dict(parent=True, child=False))
-``
+````:code
 In this way we made parents searchable but children for each parent not searchable (there should not be that many to need the search widget).
 
 
@@ -2489,7 +2526,7 @@ The grid and smartgrid gadgets are here to stay but they are marked experimental
 grid = SQLFORM.grid(db.auth_user,
      editable = auth.has_membership('managers'),
      deletable = auth.has_membership('managers'))
-``
+````:code
 
 or
 
@@ -2497,7 +2534,7 @@ or
 grid = SQLFORM.grid(db.auth_user,
      editable = auth.has_permission('edit','auth_user'),
      deletable = auth.has_permission('delete','auth_user'))
-``
+````:code
 
 The ``smartgrid`` is the only gadget in web2py that displays the table name and it need both the singular and the plural. For example one parent can have one "Child" or many "Children". Therefore a table object needs to know its own singular and plural names. web2py normally guesses them but you can set the explicitly:
 
