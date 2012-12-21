@@ -44,15 +44,17 @@ In this case command line options are ignored.
 Options:
   --version             show program's version number and exit
   -h, --help            show this help message and exit
-  -i IP, --ip=IP        ip address of the server (127.0.0.1)
+  -i IP, --ip=IP        IP address of the server (e.g., 127.0.0.1 or ::1);
+                        Note: This value is ignored when using the
+                        'interfaces' option.
   -p PORT, --port=PORT  port of server (8000)
   -a PASSWORD, --password=PASSWORD
                         password to be used for administration (use -a
                         "<recycle>" to reuse the last password))
   -c SSL_CERTIFICATE, --ssl_certificate=SSL_CERTIFICATE
-                        file that contains SSL certificate
+                        file that contains ssl certificate
   -k SSL_PRIVATE_KEY, --ssl_private_key=SSL_PRIVATE_KEY
-                        file that contains SSL private key
+                        file that contains ssl private key
   --ca-cert=SSL_CA_CERTIFICATE
                         Use this file containing the CA certificate to
                         validate X509 certificates from clients
@@ -90,7 +92,7 @@ Options:
                         optional)
   -B, --bpython         run web2py in interactive shell or bpython (if
                         installed) with specified appname (if app does not
-                        exist it will be created).  Use combined with --shell
+                        exist it will be created). Use combined with --shell
   -P, --plain           only use plain python shell; should be used with
                         --shell option
   -M, --import_models   auto import model files; default is False; should be
@@ -110,11 +112,11 @@ Options:
                         run doctests in web2py environment; TEST_PATH like
                         a/c/f (c,f optional)
   -W WINSERVICE, --winservice=WINSERVICE
-                        -W install|start|stop as Windows service (use with -L)
+                        -W install|start|stop as Windows service
   -C, --cron            trigger a cron run manually; usually invoked from a
                         system crontab
   --softcron            triggers the use of softcron
-  -Y, --run-cron        starts cron
+  -Y, --run-cron        start the background cron process
   -J, --cronjob         identify cron-initiated command
   -L CONFIG, --config=CONFIG
                         config file
@@ -127,11 +129,11 @@ Options:
                         option
   --no-banner           Do not print header banner
   --interfaces=INTERFACES
-                        listen on multiple addresses: "ip:port:cert:key:ca_cer
-                        t;ip2:port2:cert2:key2:ca_cert2;..." (:cert:key
-                        optional; no spaces)
+                        listen on multiple addresses: "ip1:port1:key1:cert1:ca
+                        _cert1;ip2:port2:key2:cert2:ca_cert2;..."
+                        (:key:cert:ca_cert optional; no spaces; IPv6 addresses
+                        must be in square [] brackets)
   --run_system_tests    runs web2py tests
-
 ``:code
 
 Lower-case options are used to configure the web server. The ``-L`` option tells web2py to read configuration options from a file, ``-W`` installs web2py as a windows service, while ``-S``, ``-P`` and ``-M`` options start an interactive Python shell. The ``-T`` option finds and runs controller doctests in a web2py execution environment. For example, the following example runs doctests from all controllers in the "welcome" application:
@@ -391,17 +393,27 @@ gluon/fileutils.py   gluon/portalocker.py gluon/sqlhtml.py     gluon/xmlrpc.py
 gluon/globals.py     gluon/reserved_sql_keywords.py
 ``:code
 
+------
+Notice that many of these modules, specifically ``dal`` (the Database Abstraction Layer), ``template`` (the template language), ``rocket`` (the web server), and
+``html`` (the helper) have no dependencies and can be used outside of web2py.
+-----
+
 The tar gzipped scaffolding app that ship with web2py is
 ``
 welcome.w2p
 ``:code
 
-It is created upon installation and overwritten on upgrade.
+This is created upon installation and overwritten on upgrade.
 
 -------
-The first time you start web2py, two new folders are created: deposit and applications. The "welcome" app is zipped into a "welcome.w2p" file to be used as a scaffolding app.
-The deposit folder is used as temporary storage for installing and uninstalling applications.
+The first time you start web2py, two new folders are created: deposit and applications. The deposit folder is used as temporary storage for installing and uninstalling applications.
+
+Also, the first time you start web2py and after an upgrade, the "welcome" app is zipped into a "welcome.w2p" file to be used as a scaffolding app. 
 -------
+
+When web2py is upgraded it comes with a file called "NEWINSTALL". If web2py finds this file, it understand an upgrade was performed, hence it removed the file and creates a new "welcome.w2p".
+
+The current web2py version is stored in the field "VERSION" and it follows standard semantic versioning notation where the build id is the build timestamp.
 
 web2py unit-tests are in
 ``
@@ -875,6 +887,7 @@ my_other_storage = Storage(dict(a=1, b=2)) # convert dictionary to Storage
 - ``request.body``: a read-only file stream that contains the body of the HTTP request. This is automatically parsed to get the ``request.post_vars`` and then rewinded. It can be read with ``request.body.read()``.
 - ``request.ajax`` is True if the function is being called via an Ajax request.
 - ``request.cid`` is the ``id`` of the component that generated the Ajax request (if any). You can read more about components in Chapter 12.
+- ``request.requires_https()`` prevents further code execution if the request is not over HTTPS and redirects the visitor to the current page over HTTPS.
 - ``request.restful`` this is a new and very useful decorator that can be used to change the default behavior of web2py actions by separating GET/POST/PUSH/DELETE requests. It will be discussed in some detail in Chapter 10.
 - ``request.user_agent()`` parses the user_agent field from the client and returns the information in the form of a dictionary. It is useful to detect mobile devices. It uses "gluon/contrib/user_agent_parser.py" created by Ross Peoples. To see what it does, try to embed the following code in a view:
 ``
@@ -938,9 +951,9 @@ request.env.script_name | ````
 request.env.server_name | 127.0.0.1
 request.env.server_port | 8000
 request.env.server_protocol | HTTP/1.1
-request.env.server_software | Rocket 1.2.4
+request.env.server_software | Rocket 1.2.6
 request.env.web2py_path | /Users/mdipierro/web2py
-request.env.web2py_version | Version 1.99.1
+request.env.web2py_version | Version 2.4.1
 request.env.web2py_runtime_gae | (optional, defined only if GAE detected)
 request.env.wsgi_errors | <open file, mode 'w' at >
 request.env.wsgi_input | ````
@@ -1768,7 +1781,7 @@ Inside ``%%{...}`` you can also use the following modifiers:
 - ``!!`` to capitalize every word (equivalent to ``string.title``)
 - ``!!!`` to capitalize every character (equivalent to ``string.upper``)
 
-Notice you can use ``\`` to scape ``!`` and ``?``.
+Notice you can use ``\\`` to scape ``!`` and ``?``.
 
 #### Translations, plurlaization, and MARKMIN
 
@@ -1786,8 +1799,7 @@ T.M("hello world")
 
 Now the string accepts MARKMIN markup as described later in the book. You can also use the pluralization system inside MARKMIN.
 
-### ''Cookies''
-``cookies``:inxx
+### ''Cookies'' ``cookies``:inxx
 
 web2py uses the Python cookies modules for handling cookies.
 
