@@ -2964,11 +2964,18 @@ db = DAL('sqlite://storage.sqlite',folder='path/to/app/databases',
 
 This allows us to access any ``db.table`` without need to re-define it.
 
-#### postgis and spatialite (experimental)
+#### PostGIS, SpatiaLite, and MS Geo Extensions (experimental)
 
-The DAL supports geographical APIs using postgis (for postgresql) and spatialite (for MSSQL and SQLite). This is a feature that was sponosred by the Sahana project and implemented by Denes Lengyel.
+``PostGIS``:inxx ``StatiaLite``:inxx ``Geo Extensions``:inxx
+``geometry``:inxx ``geoPoint``:inxx ``geoLine``:inxx ``geoPolygon``:inxx
+
+The DAL supports geographical APIs using PostGIS (for PostgreSQL), spatialite (for SQLite), and MSSQL and Spatial Extensions. This is a feature that was sponosred by the Sahana project and implemented by Denes Lengyel.
 
 DAL provides geometry and geography fields types and the following functions:
+
+``st_asgeojson``:inxx ``st_astext``:inxx ``st_contained``:inxx ``st_contains``:inxx
+``st_distance``:inxx ``st_equals``:inxx ``st_intersects``:inxx ``st_overlaps``:inxx
+``st_simplify``:inxx ``st_touches``:inxx ``st_within``:inxx
 
 ``
 st_asgeojson (PostGIS only)
@@ -3003,10 +3010,11 @@ sp.insert(loc=geoPolygon((0,0),(150,0),(150,150),(0,150),(0,0)))
 
 Notice that
 ``
-print db(sp.id>0).select()
+rows = db(sp.id>0).select()
 ``:code
 
-will not display the values of these fields. You can print them with:
+Always returns the geometry data serialized as text.
+You can also do the same more explicitely using ``st_astext()``:
 
 ``
 print db(sp.id>0).select(sp.id, sp.loc.st_astext())
@@ -3016,7 +3024,7 @@ spatial.id,spatial.loc.STAsText()
 3, POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))
 ``:code
 
-or serialize them as json:
+You can ask for the native representation by using ``st_asgeojson()`` (in PostGIS only):
 
 ``
 print db(sp.id>0).select(sp.id, sp.loc.st_asgeojson().with_alias('loc'))
@@ -3026,15 +3034,17 @@ spatial.id,loc
 3, [[[0, 0], [150, 0], [150, 150], [0, 150], [0, 0]]]
 ``:code
 
+(notice an array is a point, an array of arrays is a line, and an array of array of arrays is a polygon).
+
 Here are example of how to use geographical functions:
 
 ``
 query = sp.loc.st_intersects(geoLine((20,120),(60,160)))
 query = sp.loc.st_overlaps(geoPolygon((1,1),(11,1),(11,11),(11,1),(1,1)))
 query = sp.loc.st_contains(geoPoint(1,1))
-print db(query).select(sp.id,sp.loc.st_astext())
-spatial.id,spatial.loc.STAsText()
-3,"POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))"
+print db(query).select(sp.id,sp.loc)
+spatial.id,spatial.loc
+3,"POLYGNON ((0 0, 150 0, 150 150, 0 150, 0 0))"
 ``:code
 
 Computed distances can also be retrieved as floating point numbers:
@@ -3047,8 +3057,6 @@ spatial.id, dist
 2 140.714249456
 3 1.0
 ``:code
-
-New versions of web2py may include automatic conversions from promitive geographical types to Python geographical objects encoded, for example, as tuples.
 
 #### Copy data from one db into another
 

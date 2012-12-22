@@ -2395,12 +2395,20 @@ The recommended way to enable the scheduler to your app is to create a model fil
 
 ``
 from gluon.scheduler import Scheduler
-myscheduler = Scheduler(db)
-``
+scheduler = Scheduler(db)
+``:code
+
 NB: If your tasks are defined in a module (as opposed to a model) you may have to restart the workers.
+
+The task is schduled with
+
+``
+scheduler.queue_task('task_add',pvars=dict(a=1,b=2))
+``:code
 
 
 ##### Parameters
+
 The first argument of the ``Scheduler`` class must be the database to be used by the scheduler to communicate with the workers. This can be the ``db`` of the app or another dedicated ``db``, perhaps one shared by multiple apps. If you use SQLite it's recommended to use a separate db from the one used by your app in order to keep the app responsive.
 Once the tasks are defined and the ``Scheduler`` is instantiated, all that is needed to do is to start the workers. You can do that in several ways:
 
@@ -2471,14 +2479,14 @@ The meaning of the fields in this table is obvious. The "args" and "vars"" field
 ``
 args = [3, 4]
 vars = {}
-``
+``:code
 
 or
 
 ``
 args = []
 vars = {'a':3, 'b':4}
-``
+``:code
 
 The ``scheduler_task`` table is the one where tasks are organized.
 
@@ -2511,29 +2519,6 @@ Summary: you have
 - ``retry_failed`` to control how many times the task can "fail"
 - ``start_time`` and ``stop_time`` to schedule a function in a restricted timeframe
 
-
-##### Reporting percentages
-
-A special "word" encountered in the print statements of your functions clear all
-the previous output. That word is ``!clear!``.
-This, coupled with the ``sync_output`` parameter, allows to report percentages
-a breeze. Let's see how that works:
-
-``
-def reporting_percentages():
-    time.sleep(5)
-    print '50%'
-    time.sleep(5)
-    print '!clear!100%'
-    return 1
-``
-
-The function ``demo6`` sleeps for 5 seconds, outputs ``50%``.
-Then, it sleeps other 5 seconds and outputs ``100%``. Note that the output in the scheduler_run table is synced every 2 seconds and that the second print statement that contains ``!clear!100%`` gets the ``50%`` output cleared and replaced by ``100%`` only.
-
-``
-st.validate_and_insert(task_name='percentages', function_name='demo6', sync_output=2)
-``
 
 ##### Results and output
 The table "scheduler_run" stores the status of all running tasks. Each record references a task that has been picked up by a worker.  One task can have multiple runs. For example, a task scheduled to repeat 10 times an hour will probably have 10 runs (unless one fails or they take longer than 1 hour). Beware that if the task has no return values, it is removed from the scheduler_run table as soon as it is finished.
@@ -2579,13 +2564,15 @@ Hitting ctrl+c is equal to set a worker to **KILL**
 
 Everything that one can do via appadmin one can do programmatically by inserting and updating records in these tables.
 
-Anyway, one should not update records relative to ``RUNNING`` tasks as this may create an un-expected behavior. The best practice is to queue tasks using "validate_and_insert". For example:
+Anyway, one should not update records relative to ``RUNNING`` tasks as this may create an un-expected behavior. The best practice is to queue tasks using "queue_task". 
+
+For example:
 
 ``
-db.scheduler_task.validate_and_insert(
+scheduler.queur_task(
     function_name='task_add',
-    args='[]',
-    vars="{'a':3,'b':4}",
+    pargs=[],
+    pvars={'a':3,'b':4},
     repeats = 10, # run 10 times
     period = 3600, # every 1h
     timeout = 120, # should take less than 120 seconds
@@ -2603,6 +2590,30 @@ completed_runs = db(db.scheduler_run.status='COMPLETED').select()
 ------
 The scheduler is experimental because it needs more extensive testing and because the table structure may change as more features are added.
 ------
+
+##### Reporting percentages
+
+A special "word" encountered in the print statements of your functions clear all
+the previous output. That word is ``!clear!``.
+This, coupled with the ``sync_output`` parameter, allows to report percentages
+a breeze. Let's see how that works:
+
+``
+def reporting_percentages():
+    time.sleep(5)
+    print '50%'
+    time.sleep(5)
+    print '!clear!100%'
+    return 1
+``
+
+The function ``demo6`` sleeps for 5 seconds, outputs ``50%``.
+Then, it sleeps other 5 seconds and outputs ``100%``. Note that the output in the scheduler_run table is synced every 2 seconds and that the second print statement that contains ``!clear!100%`` gets the ``50%`` output cleared and replaced by ``100%`` only.
+
+``
+scheduler.queue_task(task_name='reporting_percentages', 
+                     function_name='demo6', sync_output=2)
+``:code
 
 
 ### Third party modules
