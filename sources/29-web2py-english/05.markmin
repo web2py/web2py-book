@@ -266,7 +266,7 @@ The following set of helpers:
 
 ``A``,  ``B``,  ``BEAUTIFY``,  ``BODY``,  ``BR``,  ``CAT``,  ``CENTER``,  ``CODE``,  ``COL``, ``COLGROUP``, ``DIV``,  ``EM``,  ``EMBED``,  ``FIELDSET``,  ``FORM``,  ``H1``,  ``H2``,  ``H3``,  ``H4``,  ``H5``,  ``H6``,  ``HEAD``,  ``HR``,  ``HTML``,  ``I``,  ``IFRAME``,  ``IMG``,  ``INPUT``,  ``LABEL``,  ``LEGEND``,  ``LI``,  ``LINK``,  ``MARKMIN``,  ``MENU``,  ``META``,  ``OBJECT``,  ``ON``,  ``OL``,  ``OPTGROUP``,  ``OPTION``,  ``P``,  ``PRE``,  ``SCRIPT``,  ``SELECT``,  ``SPAN``,  ``STYLE``,  ``TABLE``,  ``TAG``,  ``TBODY``,  ``TD``,  ``TEXTAREA``,  ``TFOOT``,  ``TH``,  ``THEAD``,  ``TITLE``,  ``TR``,  ``TT``, ``UL``,   ``URL``,  ``XHTML``,  ``XML``,  ``embed64``,  ``xmlescape``
 
-can be used to build complex expressions that can then be serialized to XML``xml:w``:cite ``xml:o``:cite. For example:
+can be used to build complex expressions that can then be serialized to XML``xml-w``:cite ``xml-o``:cite. For example:
 ``
 {{=DIV(B(I("hello ", "<world>"))), _class="myclass")}}
 ``:code
@@ -452,6 +452,13 @@ This helper creates a line break.
 <br />
 ``:code
 
+Notice that halpers can be repeated using the multiplication operator:
+
+``
+>>> print BR()*5
+<br /><br /><br /><br /><br />
+``:code
+
 ##### ``CAT`` (1.98.1 and up)
 ``CAT``:inxx
 
@@ -619,7 +626,7 @@ For tagging the HEAD of an HTML page.
 ``HTML``:inxx ``XHTML``:inxx
 
 This helper is a little different. In addition to making the ``<html>`` tags,
-it prepends the tag with a doctype string``xhtml:w,xhtml:o,xhtml:school``:cite .
+it prepends the tag with a doctype string``xhtml-w,xhtml-o,xhtml-school``:cite .
 ``
 >>> print HTML(BODY('<hello>', XML('<b>world</b>')))
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
@@ -1215,6 +1222,8 @@ The MENU helper takes the following optional arguments:
 - ``_class``: defaults to "web2py-menu web2py-menu-vertical" and sets the class of the outer UL elements.
 - ``ul_class``: defaults to "web2py-menu-vertical" and sets the class of the inner UL elements.
 - ``li_class``: defaults to "web2py-menu-expand" and sets the class of the inner LI elements.
+- ``li_first``: allows to add a class to the first list element.
+- ``li_last``: allows to add a class to the last list element.
 
 ``mobile``:inxx
 
@@ -1342,6 +1351,38 @@ for item in html.components: print item
 <div class="abc"><span>a</span><div>b</div></div>
 >>> for e in s.siblings(): print e
 <div>b</div>
+``:code
+
+#### Replacing elements
+
+Elements that are matched can also be replaced or removed by specifying           
+the ``replace`` argument. Notice that a 
+list of the original matching elements is still returned as usual. 
+
+``
+>>> a = DIV(SPAN('x'), DIV(SPAN('y'))
+>>> b = a.elements('span', replace=P('z')
+>>> print a                                                                       
+<div><p>z</p><div><p>z</p></div>  
+``:code
+
+``replace`` can be a callable. In this case it will be passed 
+the original element and it is expected to return the replacement element:
+
+``
+>>> a = DIV(SPAN('x'), DIV(SPAN('y'))
+>>> b = a.elements('span', replace=lambda t: P(t[0])
+>>> print a                                                                       
+<div><p>x</p><div><p>y</p></div>  
+``:code
+                                                                                      
+If ``replace=None``, matching elements will be removed completely.
+
+``
+>>> a = DIV(SPAN('x'), DIV(SPAN('y'))
+>>> b = a.elements('span', replace=None)
+>>> print a                                                                       
+<div></div>  
 ``:code
 
 #### ``flatten`` ``flatten``:inxx
@@ -1485,136 +1526,123 @@ We also recommend that you use:
 in the HTML head, since this will include the jQuery libraries and define some backward-compatible JavaScript functions for special effects and Ajax. "web2py_ajax.html" includes the ``response.meta`` tags in the view, jQuery base, the calendar datepicker, and all required CSS and JS ``response.files``.
 
 #### Default page layout
-``superfish``:inxx ``ez.css``:inxx
 
-Below is the "views/layout.html" that ships with the web2py scaffolding application **welcome** (stripped down of some optional parts). Any new application will have a similar default layout:
+``Twitter Bootstrap``:inxx
+
+The "views/layout.html" that ships with the web2py scaffolding application **welcome** (stripped down of some optional parts) is quote complex but is has the following structure:
 
 ``
 <!DOCTYPE html>
 <head>
   <meta charset="utf-8" />
   <title>{{=response.title or request.application}}</title>
-
-  <!-- http://dev.w3.org/html5/markup/meta.name.html -->
-  <meta name="application-name" content="{{=request.application}}" />
-
+  ...
   <script src="{{=URL('static','js/modernizr.custom.js')}}"></script>
 
-  <!-- include stylesheets -->
-  {{
-  response.files.append(URL('static','css/skeleton.css'))
+  {{  
   response.files.append(URL('static','css/web2py.css'))
-  response.files.append(URL('static','css/superfish.css'))
-  response.files.append(URL('static','js/superfish.js'))
+  response.files.append(URL('static','css/bootstrap.min.css'))
+  response.files.append(URL('static','css/bootstrap-responsive.min.css'))
+  response.files.append(URL('static','css/web2py_bootstrap.css'))
   }}
 
   {{include 'web2py_ajax.html'}}
-
-  <script type="text/javascript">
-    jQuery(function(){ jQuery('ul.sf-menu').supersubs({minWidth:12,maxWidth:30,extraWidth:3}).superfish(); });
-  </script>
 
   {{
   # using sidebars need to know what sidebar you want to use
   left_sidebar_enabled = globals().get('left_sidebar_enabled',False)
   right_sidebar_enabled = globals().get('right_sidebar_enabled',False)
-  middle_columns = {0:'sixteen',1:'twelve',2:'eight'}[
-     (left_sidebar_enabled and 1 or 0)+(right_sidebar_enabled and 1 or 0)]
+  middle_columns = {0:'span12',1:'span9',2:'span6'}[
+    (left_sidebar_enabled and 1 or 0)+(right_sidebar_enabled and 1 or 0)]
   }}
 
+  {{block head}}{{end}}
 </head>
+
 <body>
-  <div class="wrapper"><!-- for sticky footer -->
-
-    <div class="topbar">
-      <div class="container">
-        <div class="sixteen columns">
-          <div id="navbar">
-            {{='auth' in globals() and auth.navbar(separators=(' ',' | ',''))}}
-          </div>
-          <div id="menu">
-            {{=MENU(response.menu,
-                    _class='mobile-menu' if is_mobile else 'sf-menu',
-                    mobile=request.user_agent().is_mobile)}}
-          </div>
-        </div>
-      </div>
-    </div><!-- topbar -->
-
+  <!-- Navbar ================================================== -->
+  <div class="navbar navbar-inverse navbar-fixed-top">
     <div class="flash">{{=response.flash or ''}}</div>
-
-    <div class="header">
+    <div class="navbar-inner">
       <div class="container">
-        <div class="sixteen columns">
-          <h1 class="remove-bottom" style="margin-top: .5em;">
-          {{=response.title or request.application}}
-          </h1>
-          <h5>{{=response.subtitle or ''}}</h5>
-        </div>
-
-        <div class="sixteen columns">
-          <div class="statusbar">
-            {{block statusbar}}
-            <span class="breadcrumbs">{{=request.function}}</span>
-            {{end}}
-          </div>
-        </div>
+	{{=response.logo or ''}}
+        <ul id="navbar" class="nav pull-right">
+          {{='auth' in globals() and auth.navbar(mode="dropdown") or ''}}
+        </ul>
+        <div class="nav-collapse">
+          {{if response.menu:}}
+          {{=MENU(response.menu)}}
+          {{pass}}
+        </div><!--/.nav-collapse -->
       </div>
     </div>
+  </div><!--/top navbar -->
 
-    <div class="main">
-      <div class="container">
+  <div class="container">
+    <!-- Masthead ================================================== -->
+    <header class="mastheader row" id="header">
+        <div class="span12">
+            <div class="page-header">
+                <h1>
+                    {{=response.title or request.application}}
+                    <small>{{=response.subtitle or ''}}</small>
+                </h1>
+            </div>
+        </div>
+    </header>
+
+    <section id="main" class="main row">
         {{if left_sidebar_enabled:}}
-        <div class="four columns left-sidebar">
-          {{block left_sidebar}}
-          <h3>Left Sidebar</h3>
-          <p></p>
-          {{end}}
+        <div class="span3 left-sidebar">
+            {{block left_sidebar}}
+            <h3>Left Sidebar</h3>
+            <p></p>
+            {{end}}
         </div>
         {{pass}}
 
-        <div class="{{=middle_columns}} columns center">
-          {{block center}}
-          {{include}}
-          {{end}}
+        <div class="{{=middle_columns}}">
+            {{block center}}
+            {{include}}
+            {{end}}
         </div>
 
         {{if right_sidebar_enabled:}}
-        <div class="four columns">
-          {{block right_sidebar}}
-          <h3>Right Sidebar</h3>
-          <p></p>
-          {{end}}
+        <div class="span3">
+            {{block right_sidebar}}
+            <h3>Right Sidebar</h3>
+            <p></p>
+            {{end}}
         </div>
         {{pass}}
+    </section><!--/main-->
 
-      </div><!-- container -->
-    </div><!-- main -->
+    <!-- Footer ================================================== -->
+    <div class="row">
+        <footer class="footer span12" id="footer">
+            <div class="footer-content">
+                {{block footer}} <!-- this is default footer -->
+		...
+                {{end}}
+            </div>
+        </footer>
+    </div>
 
-    <div class="push"></div>
-  </div><!-- wrapper -->
+  </div> <!-- /container -->
 
-  <div class="footer">
-    <div class="container header">
-      <div class="sixteen columns">
-        {{block footer}} <!-- this is default footer -->
-        <div class="footer-content" >
-          {{=T('Copyright')}} &#169; 2011
-          <div style="float: right;">
-            <a href="http://www.web2py.com/">
-            <img style="padding-bottom: 0;"
-                 src="{{=URL('static','images/poweredby.png')}}"/>
-            </a>
-          </div>
-        </div>
-        {{end}}
-      </div>
-    </div><!-- container -->
-  </div><!-- footer -->
-
+  <!-- The javascript =============================================
+       (Placed at the end of the document so the pages load faster) -->
+  <script src="{{=URL('static','js/bootstrap.min.js')}}"></script>
+  <script src="{{=URL('static','js/web2py_bootstrap.js')}}"></script>
+  {{if response.google_analytics_id:}}
+    <script src="{{=URL('static','js/analytics.js')}}"></script>
+    <script type="text/javascript">
+    analytics.initialize({
+      'Google Analytics':{trackingId:'{{=response.google_analytics_id}}'} 
+    });</script>
+  {{pass}}
 </body>
 </html>
-
 ``:code
 
 There are a few features of this default layout that make it very easy to use and customize:
@@ -1622,8 +1650,8 @@ There are a few features of this default layout that make it very easy to use an
 - It is written in HTML5 and uses the "modernizr" ``modernizr``:cite library for backward compatibility. The actual layout include some extra conditional statements required by IE and they are omitted for brevity.
 - It displays both ``response.title`` and ``response.subtitle`` which can be set in a model. If they are not set, it adopts the application name as title
 - It includes the ``web2py_ajax.html`` file in the header which generated all the link and script import statements.
-- It uses a modified version of "skeleton" ``skeleton``:cite a library for flexible layouts which works on mobile devices and re-arranges columns to fit small screens.
-- It uses "superfish.js" ``superfish``:cite for dynamic cascading menus. There is an explicit script to activate the superfish cascading menu and it can be removed if not necessary.
+- It uses a modified version of Twitter Boostrap for flexible layouts which works on mobile devices and re-arranges columns to fit small screens.
+- It uses "analytics.js" to connect to Google Analytics.
 - The ``{{=auth.navbar(...)}}`` displays a welcome to the current user and links to auth functions like login, logout, register, change password, etc. depending on context. It is a helper factory and its output can be manipulated as any other helper. It is placed in a ``{{try:}}...{{except:pass}}`` in case auth is undefined.
 - The ``{{=MENU(response.menu)`` displays the menu structure as ``<ul>...</ul>``.
 - ``{{include}}`` is replaced by the content of the extending view when the page is rendered.
@@ -1631,7 +1659,7 @@ There are a few features of this default layout that make it very easy to use an
 - It uses the following classes: header, main, footer
 - It contains the following blocks: statusbar, left_sidebar, center, right_sidebar, footer.
 
-Views can turn on and fill sidebars as follows:
+In views can turn on and fill sidebars as follows:
 
 ``
 {{left_sidebar_enable=True}}
@@ -1648,10 +1676,12 @@ This text goes in sidebar
 
 ``CSS``:inxx
 
-Customizing the default layout without editing is very easy because the CSS files are documented:
+Customizing the default layout without editing is easy because the welcome application is based on Twitter Bootstrap which is well documented and supports themes. In web2py four static files which are relevant to style:
 
-- "bootstrap.min.css" contains the Twitter Boostrap CSS style ``bootstrap``:cite ``Bootstrap``:inxx
-- "web2py.css" contains web2py specific styles
+- "css/web2py.css" contains web2py specific styles
+- "css/bootstrap.min.css" contains the Twitter Boostrap CSS style ``bootstrap``:cite ``Bootstrap``:inxx
+- "css/web2py_bootstrap.css" contains with overrides some Bootstrap styles to conform to web2py needs.
+- "js/bootstrap.min.js" which includes the libraries for menu effects, modals, panels.
 
 To change colors and background images,
 try append the following code to layout.html header:

@@ -3,7 +3,7 @@
 
 ### Dependencies
 
-web2py comes with a Database Abstraction Layer (DAL), an API that maps Python objects into database objects such as queries, tables, and records. The DAL dynamically generates the SQL in real time using the specified dialect for the database back end, so that you do not have to write SQL code or learn different SQL dialects (the term SQL is used generically), and the application will be portable among different types of databases. At the time of this writing, the supported databases are SQLite (which comes with Python and thus web2py), PostgreSQL, MySQL, Oracle, MSSQL, FireBird, DB2, Informix, Ingres, the Google App Engine (SQL and NoSQL) and MongoDB. Experimentally we support more databases. Please check on the web2py web site and mailing list for more recent adapters. Google NoSQL is treated as a particular case in Chapter 13.
+web2py comes with a Database Abstraction Layer (DAL), an API that maps Python objects into database objects such as queries, tables, and records. The DAL dynamically generates the SQL in real time using the specified dialect for the database back end, so that you do not have to write SQL code or learn different SQL dialects (the term SQL is used generically), and the application will be portable among different types of databases. At the time of this writing, the supported databases are SQLite (which comes with Python and thus web2py), PostgreSQL, MySQL, Oracle, MSSQL, FireBird, DB2, Informix, Ingres, and the Google App Engine (SQL and NoSQL). Experimentally we support more databases. Please check on the web2py web site and mailing list for more recent adapters. Google NoSQL is treated as a particular case in Chapter 13.
 
 The Windows binary distribution works out of the box with SQLite and MySQL. The Mac binary distribution works out of the box with SQLite.
 To use any other database back-end, run from the source distribution and install the appropriate driver for the required back end.
@@ -24,7 +24,7 @@ FireBird | kinterbasdb ``kinterbasdb``:cite or fdb or pyodbc
 DB2 | pyodbc ``pyodbc``:cite
 Informix | informixdb ``informixdb``:cite
 Ingres | ingresdbi ``ingresdbi``:cite
-Cubrid | cubriddb ``cubriddb``:cite ``cubrid``:cite
+Cubrid | cubriddb ``cubridb``:cite ``cubridb``:cite
 Sybase | Sybase ``Sybase``:cite
 Teradata | pyodbc ``Teradata``:cite 
 SAPDB    | sapdb ``SAPDB``:cite
@@ -127,6 +127,14 @@ A connection with the database is established by creating an instance of the DAL
 Notice that in SQLite the database consists of a single file. If it does not exist, it is created. This file is locked every time it is accessed. In the case of MySQL, PostgreSQL, MSSQL, FireBird, Oracle, DB2, Ingres and Informix the database "test" must be created outside web2py. Once the connection is established, web2py will create, alter, and drop tables appropriately.
 
 It is also possible to set the connection string to ``None``. In this case DAL will not connect to any back-end database, but the API can still be accessed for testing. Examples of this will be discussed in Chapter 7.
+
+Some times you may need to generate SQL as if you had a connection but without actually connecting to the database. This can be done with
+
+``
+db = DAL(..., do_connect=False)
+``:code
+
+In this case you will be able to call ``_select``, ``_insert``, ``_update``, and ``_delete`` to generate SQL but call ``select``, ``insert``, ``update``, and ``delete``. In most of the cases you can use ``do_connect=False`` even without having the required database drivers.
 
 #### Connection pooling
 ``connection pooling``:inxx
@@ -241,6 +249,15 @@ Do not declare a field called "id", because one is created by web2py anyway. Eve
 
 ``named id field``:inxx
 Optionally you can define a field of ``type='id'`` and web2py will use this field as auto-increment id field. This is not recommended except when accessing legacy database tables. With some limitation, you can also use different primary keys and this is discussed in the section on "Legacy databases and keyed tables".
+
+Tables can be defined only once but you can force web2py to redefine an existing table:
+
+``
+db.define_table('person', Field('name'))
+db.define_table('person', Field('name'), redefine=True)
+``:code
+
+The redefinition may trigger a migration if field content is different.
 
 ----------
 Because usually in web2py models are executed before controllers, it is possible that some table are defined even if not needed. It is therefore necessary to speed up the code by making table definitions lazy. This is done by setting the ``DAL(...,lazy_tables=True)`` attributes. Tables will be actually created only when accessed.
@@ -1330,6 +1347,20 @@ The values used in queries can also be expressions
         Field('visits', 'integer', default=0),
         Field('clicks', 'integer', default=0))
 >>> db(db.person.visits == db.person.clicks + 1).delete()
+``:code
+
+#### ``case`` ``case``:inxx
+
+An expression can contain a case clause for example:
+
+``
+>>> db.define_table('person',Field('name'))
+>>> condition = db.person.name.startswith('M')
+>>> yes_or_no = condition.case('Yes','No')
+>>> for row in db().select(db.person.name, yes_or_no):
+...     print row.person.name,  row(yes_or_no)
+Max Yes
+John No
 ``:code
 
 #### ``update_record``
@@ -2768,7 +2799,14 @@ For this purpose there the Set objects have an ``update_naive`` method that work
 
 ``_enable_record_versioning``:inxx
 
-It is possible to ask web2py to save every copy of a record when the record is modified. There are many ways to do it and it can be done for all tables at once using the ``auth.enable_record_versioning`` method, discussed in the chapter about authentication, or it can be done for each individual table as discussed here.
+It is possible to ask web2py to save every copy of a record when the record is modified. There are different ways to do it and it can be done for all tables at once using the syntax:
+
+``
+auth.enable_record_versioning(db)
+``:code
+
+this requires Auth and it is discussed in the chapter about authentication. 
+It can also be done for each individual table as discussed below.
 
 Consider the following table:
 
@@ -2925,6 +2963,100 @@ db = DAL('sqlite://storage.sqlite',folder='path/to/app/databases',
 ``:code
 
 This allows us to access any ``db.table`` without need to re-define it.
+
+#### PostGIS, SpatiaLite, and MS Geo Extensions (experimental)
+
+``PostGIS``:inxx ``StatiaLite``:inxx ``Geo Extensions``:inxx
+``geometry``:inxx ``geoPoint``:inxx ``geoLine``:inxx ``geoPolygon``:inxx
+
+The DAL supports geographical APIs using PostGIS (for PostgreSQL), spatialite (for SQLite), and MSSQL and Spatial Extensions. This is a feature that was sponosred by the Sahana project and implemented by Denes Lengyel.
+
+DAL provides geometry and geography fields types and the following functions:
+
+``st_asgeojson``:inxx ``st_astext``:inxx ``st_contained``:inxx ``st_contains``:inxx
+``st_distance``:inxx ``st_equals``:inxx ``st_intersects``:inxx ``st_overlaps``:inxx
+``st_simplify``:inxx ``st_touches``:inxx ``st_within``:inxx
+
+``
+st_asgeojson (PostGIS only)
+st_astext
+st_contained
+st_contains
+st_distance
+st_equals
+st_intersects
+st_overlaps
+st_simplify (PostGIS only)
+st_touches
+st_within
+``
+
+Here are some examples:
+
+``
+from gluon.dal import DAL, Field, geoPoint, geoLine, geoPolygon
+db = DAL("mssql://user:pass@host:db")
+sp = db.define_table('spatial',
+  Field('loc','geometry()')
+)
+``:code
+
+Below we insert a point, a line, and a polygon:
+``
+sp.insert(loc=geoPoint(1,1))
+sp.insert(loc=geoLine((100,100),(20,180),(180,180)))
+sp.insert(loc=geoPolygon((0,0),(150,0),(150,150),(0,150),(0,0)))
+``:code
+
+Notice that
+``
+rows = db(sp.id>0).select()
+``:code
+
+Always returns the geometry data serialized as text.
+You can also do the same more explicitely using ``st_astext()``:
+
+``
+print db(sp.id>0).select(sp.id, sp.loc.st_astext())
+spatial.id,spatial.loc.STAsText()
+1, POINT (1 2)"
+2, LINESTRING (100 100, 20 180, 180 180)
+3, POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))
+``:code
+
+You can ask for the native representation by using ``st_asgeojson()`` (in PostGIS only):
+
+``
+print db(sp.id>0).select(sp.id, sp.loc.st_asgeojson().with_alias('loc'))
+spatial.id,loc
+1, [1, 2]
+2, [[100, 100], [20 180], [180, 180]]
+3, [[[0, 0], [150, 0], [150, 150], [0, 150], [0, 0]]]
+``:code
+
+(notice an array is a point, an array of arrays is a line, and an array of array of arrays is a polygon).
+
+Here are example of how to use geographical functions:
+
+``
+query = sp.loc.st_intersects(geoLine((20,120),(60,160)))
+query = sp.loc.st_overlaps(geoPolygon((1,1),(11,1),(11,11),(11,1),(1,1)))
+query = sp.loc.st_contains(geoPoint(1,1))
+print db(query).select(sp.id,sp.loc)
+spatial.id,spatial.loc
+3,"POLYGNON ((0 0, 150 0, 150 150, 0 150, 0 0))"
+``:code
+
+Computed distances can also be retrieved as floating point numbers:
+
+``
+dist = sp.loc.st_distance(geoPoint(-1,2)).with_alias('dist')
+print db(sp.id>0).select(sp.id, dist)
+spatial.id, dist
+1 2.0
+2 140.714249456
+3 1.0
+``:code
 
 #### Copy data from one db into another
 

@@ -44,15 +44,17 @@ In this case command line options are ignored.
 Options:
   --version             show program's version number and exit
   -h, --help            show this help message and exit
-  -i IP, --ip=IP        ip address of the server (127.0.0.1)
+  -i IP, --ip=IP        IP address of the server (e.g., 127.0.0.1 or ::1);
+                        Note: This value is ignored when using the
+                        'interfaces' option.
   -p PORT, --port=PORT  port of server (8000)
   -a PASSWORD, --password=PASSWORD
                         password to be used for administration (use -a
                         "<recycle>" to reuse the last password))
   -c SSL_CERTIFICATE, --ssl_certificate=SSL_CERTIFICATE
-                        file that contains SSL certificate
+                        file that contains ssl certificate
   -k SSL_PRIVATE_KEY, --ssl_private_key=SSL_PRIVATE_KEY
-                        file that contains SSL private key
+                        file that contains ssl private key
   --ca-cert=SSL_CA_CERTIFICATE
                         Use this file containing the CA certificate to
                         validate X509 certificates from clients
@@ -90,7 +92,7 @@ Options:
                         optional)
   -B, --bpython         run web2py in interactive shell or bpython (if
                         installed) with specified appname (if app does not
-                        exist it will be created).  Use combined with --shell
+                        exist it will be created). Use combined with --shell
   -P, --plain           only use plain python shell; should be used with
                         --shell option
   -M, --import_models   auto import model files; default is False; should be
@@ -110,11 +112,11 @@ Options:
                         run doctests in web2py environment; TEST_PATH like
                         a/c/f (c,f optional)
   -W WINSERVICE, --winservice=WINSERVICE
-                        -W install|start|stop as Windows service (use with -L)
+                        -W install|start|stop as Windows service
   -C, --cron            trigger a cron run manually; usually invoked from a
                         system crontab
   --softcron            triggers the use of softcron
-  -Y, --run-cron        starts cron
+  -Y, --run-cron        start the background cron process
   -J, --cronjob         identify cron-initiated command
   -L CONFIG, --config=CONFIG
                         config file
@@ -127,11 +129,11 @@ Options:
                         option
   --no-banner           Do not print header banner
   --interfaces=INTERFACES
-                        listen on multiple addresses: "ip:port:cert:key:ca_cer
-                        t;ip2:port2:cert2:key2:ca_cert2;..." (:cert:key
-                        optional; no spaces)
+                        listen on multiple addresses: "ip1:port1:key1:cert1:ca
+                        _cert1;ip2:port2:key2:cert2:ca_cert2;..."
+                        (:key:cert:ca_cert optional; no spaces; IPv6 addresses
+                        must be in square [] brackets)
   --run_system_tests    runs web2py tests
-
 ``:code
 
 Lower-case options are used to configure the web server. The ``-L`` option tells web2py to read configuration options from a file, ``-W`` installs web2py as a windows service, while ``-S``, ``-P`` and ``-M`` options start an interactive Python shell. The ``-T`` option finds and runs controller doctests in a web2py execution environment. For example, the following example runs doctests from all controllers in the "welcome" application:
@@ -391,17 +393,27 @@ gluon/fileutils.py   gluon/portalocker.py gluon/sqlhtml.py     gluon/xmlrpc.py
 gluon/globals.py     gluon/reserved_sql_keywords.py
 ``:code
 
+------
+Notice that many of these modules, specifically ``dal`` (the Database Abstraction Layer), ``template`` (the template language), ``rocket`` (the web server), and
+``html`` (the helper) have no dependencies and can be used outside of web2py.
+-----
+
 The tar gzipped scaffolding app that ship with web2py is
 ``
 welcome.w2p
 ``:code
 
-It is created upon installation and overwritten on upgrade.
+This is created upon installation and overwritten on upgrade.
 
 -------
-The first time you start web2py, two new folders are created: deposit and applications. The "welcome" app is zipped into a "welcome.w2p" file to be used as a scaffolding app.
-The deposit folder is used as temporary storage for installing and uninstalling applications.
+The first time you start web2py, two new folders are created: deposit and applications. The deposit folder is used as temporary storage for installing and uninstalling applications.
+
+Also, the first time you start web2py and after an upgrade, the "welcome" app is zipped into a "welcome.w2p" file to be used as a scaffolding app. 
 -------
+
+When web2py is upgraded it comes with a file called "NEWINSTALL". If web2py finds this file, it understand an upgrade was performed, hence it removed the file and creates a new "welcome.w2p".
+
+The current web2py version is stored in the field "VERSION" and it follows standard semantic versioning notation where the build id is the build timestamp.
 
 web2py unit-tests are in
 ``
@@ -443,7 +455,7 @@ queue.example.yaml
 
 are example configuration files used for deployment on the Google App Engine. You can read more about them in the Deployment Recipes chapter and on the Google Documentation pages.
 
-There are also additional libraries, usually developed by a third party:
+There are also additional libraries, some developed by a third party:
 
 **feedparser**``feedparser``:cite  by Mark Pilgrim for reading RSS and Atom feeds:
 ``
@@ -572,6 +584,12 @@ A Bayesian classifier to populate the database with dummy data for testing purpo
 gluon/contrib/populate.py
 ``:code
 
+A file with API for running on Heroku.com ``heroku``:inxx:
+
+``
+gluon/contrib/heroku.py
+``:code
+
 A file that allows interaction with the taskbar in windows, when web2py is running as a service:
 ``
 gluon/contrib/taskbar_widget.py
@@ -604,6 +622,7 @@ web2py also contains a folder with useful scripts including
 scripts/setup-web2py-fedora.sh
 scripts/setup-web2py-ubuntu.sh
 scripts/setup-web2py-nginx-uwsgi-ubuntu.sh
+scripts/setup-web2py-heroku.sh
 scripts/update-web2py.sh
 scripts/make_min_web2py.py
 ...
@@ -875,6 +894,7 @@ my_other_storage = Storage(dict(a=1, b=2)) # convert dictionary to Storage
 - ``request.body``: a read-only file stream that contains the body of the HTTP request. This is automatically parsed to get the ``request.post_vars`` and then rewinded. It can be read with ``request.body.read()``.
 - ``request.ajax`` is True if the function is being called via an Ajax request.
 - ``request.cid`` is the ``id`` of the component that generated the Ajax request (if any). You can read more about components in Chapter 12.
+- ``request.requires_https()`` prevents further code execution if the request is not over HTTPS and redirects the visitor to the current page over HTTPS.
 - ``request.restful`` this is a new and very useful decorator that can be used to change the default behavior of web2py actions by separating GET/POST/PUSH/DELETE requests. It will be discussed in some detail in Chapter 10.
 - ``request.user_agent()`` parses the user_agent field from the client and returns the information in the form of a dictionary. It is useful to detect mobile devices. It uses "gluon/contrib/user_agent_parser.py" created by Ross Peoples. To see what it does, try to embed the following code in a view:
 ``
@@ -938,9 +958,9 @@ request.env.script_name | ````
 request.env.server_name | 127.0.0.1
 request.env.server_port | 8000
 request.env.server_protocol | HTTP/1.1
-request.env.server_software | Rocket 1.2.4
+request.env.server_software | Rocket 1.2.6
 request.env.web2py_path | /Users/mdipierro/web2py
-request.env.web2py_version | Version 1.99.1
+request.env.web2py_version | Version 2.4.1
 request.env.web2py_runtime_gae | (optional, defined only if GAE detected)
 request.env.wsgi_errors | <open file, mode 'w' at >
 request.env.wsgi_input | ````
@@ -1110,7 +1130,11 @@ session.secure()
 
 which tells web2py to set the session cookie to be a secure cookie. This should be set if the app is going over https. By setting the session cookie to be secure, the server is asking the browser not to send the session cookie back to the server unless over an https connection.
 
-The other method is ``connect``:
+The other method is ``connect``.
+By default sessions are stored on the filesystem and a session cookie is used to store and retrieve the ``session.id``. Using the connect method it is possible to tell web2y to store sessions in the database or in the cookies thus eliminating need to access the filesystem for session management.
+
+For example to **store sessions in the database**:
+
 ``
 session.connect(request, response, db, masterapp=None)
 ``:code
@@ -1134,11 +1158,26 @@ The option ``masterapp=None``, by default, tells web2py to try to retrieve an ex
 
 If you want two or more applications to share sessions, set ``masterapp`` to the name of the master application.
 
+
+To **store sessions in cookies** instead you can do:
+
+``
+session.connect(request,response,cookie_key='yoursecret',compression_level=None)
+``:code
+
+Here ``cookie_key`` is a symmetric encryption key.
+``compression_level`` is an optionl ``zlib`` encryption level.
+
+While sessions in cookie are often recommended for scalability reason they are limited in size. Large sessions will result in broken cookies.
+
 You can check the state of your application at any time by printing the ``request``, ``session`` and ``response`` system variables. One way to do it is to create a dedicated action:
 ``
 def status():
     return dict(request=request, session=session, response=response)
 ``:code
+
+In the "generic.html" view this is done using ``{{=response.toolbar()}}``.
+
 
 #### Separate sessions
 
@@ -1768,7 +1807,7 @@ Inside ``%%{...}`` you can also use the following modifiers:
 - ``!!`` to capitalize every word (equivalent to ``string.title``)
 - ``!!!`` to capitalize every character (equivalent to ``string.upper``)
 
-Notice you can use ``\`` to scape ``!`` and ``?``.
+Notice you can use ``\\`` to scape ``!`` and ``?``.
 
 #### Translations, plurlaization, and MARKMIN
 
@@ -1786,7 +1825,8 @@ T.M("hello world")
 
 Now the string accepts MARKMIN markup as described later in the book. You can also use the pluralization system inside MARKMIN.
 
-### ''Cookies''
+### ''Cookies'' 
+
 ``cookies``:inxx
 
 web2py uses the Python cookies modules for handling cookies.
@@ -2385,12 +2425,20 @@ The recommended way to enable the scheduler to your app is to create a model fil
 
 ``
 from gluon.scheduler import Scheduler
-myscheduler = Scheduler(db)
-``
+scheduler = Scheduler(db)
+``:code
+
 NB: If your tasks are defined in a module (as opposed to a model) you may have to restart the workers.
+
+The task is schduled with
+
+``
+scheduler.queue_task('task_add',pvars=dict(a=1,b=2))
+``:code
 
 
 ##### Parameters
+
 The first argument of the ``Scheduler`` class must be the database to be used by the scheduler to communicate with the workers. This can be the ``db`` of the app or another dedicated ``db``, perhaps one shared by multiple apps. If you use SQLite it's recommended to use a separate db from the one used by your app in order to keep the app responsive.
 Once the tasks are defined and the ``Scheduler`` is instantiated, all that is needed to do is to start the workers. You can do that in several ways:
 
@@ -2461,20 +2509,20 @@ The meaning of the fields in this table is obvious. The "args" and "vars"" field
 ``
 args = [3, 4]
 vars = {}
-``
+``:code
 
 or
 
 ``
 args = []
 vars = {'a':3, 'b':4}
-``
+``:code
 
 The ``scheduler_task`` table is the one where tasks are organized.
 
 All tasks follow a lifecycle
 
-[[scheduler tasks http://yuml.me/ce8edcc3.jpg center]]
+[[scheduler tasks @///image/ce8edcc3.png center]]
 
 Let's go with order. By default, when you send a task to the scheduler, you'll want that to be executed. It's in **QUEUED** status.
 If you need it to be executed later, use the ``start_time`` parameter (default = now).
@@ -2493,7 +2541,7 @@ NB: the time is not calculated between the END of the first round and the START 
 
 Another nice addition, you can set how many times the function can raise an exception (i.e. requesting data from a sloooow webservice) and be queued again instead of stopping in **FAILED**  status with the parameter ``retry_failed`` (default = 0, -1 = unlimited).
 
-[[task repeats http://yuml.me/7d8b85e4.jpg center]]
+[[task repeats @///image/7d8b85e4.png center]]
 
 Summary: you have
 - ``period`` and ``repeats`` to get an automatically rescheduled function
@@ -2501,29 +2549,6 @@ Summary: you have
 - ``retry_failed`` to control how many times the task can "fail"
 - ``start_time`` and ``stop_time`` to schedule a function in a restricted timeframe
 
-
-##### Reporting percentages
-
-A special "word" encountered in the print statements of your functions clear all
-the previous output. That word is ``!clear!``.
-This, coupled with the ``sync_output`` parameter, allows to report percentages
-a breeze. Let's see how that works:
-
-``
-def reporting_percentages():
-    time.sleep(5)
-    print '50%'
-    time.sleep(5)
-    print '!clear!100%'
-    return 1
-``
-
-The function ``demo6`` sleeps for 5 seconds, outputs ``50%``.
-Then, it sleeps other 5 seconds and outputs ``100%``. Note that the output in the scheduler_run table is synced every 2 seconds and that the second print statement that contains ``!clear!100%`` gets the ``50%`` output cleared and replaced by ``100%`` only.
-
-``
-st.validate_and_insert(task_name='percentages', function_name='demo6', sync_output=2)
-``
 
 ##### Results and output
 The table "scheduler_run" stores the status of all running tasks. Each record references a task that has been picked up by a worker.  One task can have multiple runs. For example, a task scheduled to repeat 10 times an hour will probably have 10 runs (unless one fails or they take longer than 1 hour). Beware that if the task has no return values, it is removed from the scheduler_run table as soon as it is finished.
@@ -2565,17 +2590,19 @@ As tasks, workers can be in some fixed statuses : ACTIVE, DISABLED, TERMINATE or
 name suggest, are more "commands" than real statuses.
 Hitting ctrl+c is equal to set a worker to **KILL**
 
-[[workers statuses http://yuml.me/bd891eed.jpg center]]
+[[workers statuses @///image/bd891eed.png center]]
 
 Everything that one can do via appadmin one can do programmatically by inserting and updating records in these tables.
 
-Anyway, one should not update records relative to ``RUNNING`` tasks as this may create an un-expected behavior. The best practice is to queue tasks using "validate_and_insert". For example:
+Anyway, one should not update records relative to ``RUNNING`` tasks as this may create an un-expected behavior. The best practice is to queue tasks using "queue_task". 
+
+For example:
 
 ``
-db.scheduler_task.validate_and_insert(
+scheduler.queur_task(
     function_name='task_add',
-    args='[]',
-    vars="{'a':3,'b':4}",
+    pargs=[],
+    pvars={'a':3,'b':4},
     repeats = 10, # run 10 times
     period = 3600, # every 1h
     timeout = 120, # should take less than 120 seconds
@@ -2594,13 +2621,37 @@ completed_runs = db(db.scheduler_run.status='COMPLETED').select()
 The scheduler is experimental because it needs more extensive testing and because the table structure may change as more features are added.
 ------
 
+##### Reporting percentages
+
+A special "word" encountered in the print statements of your functions clear all
+the previous output. That word is ``!clear!``.
+This, coupled with the ``sync_output`` parameter, allows to report percentages
+a breeze. Let's see how that works:
+
+``
+def reporting_percentages():
+    time.sleep(5)
+    print '50%'
+    time.sleep(5)
+    print '!clear!100%'
+    return 1
+``
+
+The function ``demo6`` sleeps for 5 seconds, outputs ``50%``.
+Then, it sleeps other 5 seconds and outputs ``100%``. Note that the output in the scheduler_run table is synced every 2 seconds and that the second print statement that contains ``!clear!100%`` gets the ``50%`` output cleared and replaced by ``100%`` only.
+
+``
+scheduler.queue_task(task_name='reporting_percentages', 
+                     function_name='demo6', sync_output=2)
+``:code
+
 
 ### Third party modules
 ``import``:inxx
 
 web2py is written in Python, so it can import and use any Python module, including third party modules. It just needs to be able to find them. As with any Python application, modules can be installed in the official Python "site-packages" directory, and they can then be imported from anywhere inside your code.
 
-Modules in the "site-packages" directory are, as the name suggests, site-level packages. Applications requiring site-packages are not portable unless these modules are installed separately. The advantage of having modules in "site-packages" is that multiple applications can share them. Let's consider, for example, the plotting package called "matplotlib". You can install it from the shell using the PEAK ``easy_install`` command ``easy_install``:cite (or its modern replacement ``pip`` ``PIP``:cite ):
+Modules in the "site-packages" directory are, as the name suggests, site-level packages. Applications requiring site-packages are not portable unless these modules are installed separately. The advantage of having modules in "site-packages" is that multiple applications can share them. Let's consider, for example, the plotting package called "matplotlib". You can install it from the shell using the PEAK ``easy_install`` command ``easy-install``:cite (or its modern replacement ``pip`` ``PIP``:cite ):
 ``
 easy_install py-matplotlib
 ``:code
