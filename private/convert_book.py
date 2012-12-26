@@ -9,7 +9,7 @@ sys.path.append('/Users/massimodipierro/Dropbox/web2py')
 
 HEADER = r"""
 \documentclass[justified,sixbynine,notoc]{tufte-book}
-\title{web2py\\{\small Full-Stack Web Framework, 4th Edition}}
+\title{web2py\\{\small Complete Reference Manual, 5th Edition}}
 \author{Massimo Di Pierro}
 \publisher{Experts4Solutions}
 
@@ -59,24 +59,14 @@ keywords={A,B,BEAUTIFY,BODY,BR,CENTER,CLEANUP,CODE,CRYPT,DAL,DIV,EM,EMBED,FIELDS
 \vskip 1in
 Copyright 2008-2013 by Massimo Di Pierro. All rights reserved.
 \vskip 1cm
-No part of this publication may be reproduced, stored in a retrieval
-system, or transmitted in any form or by any means, electronic,
-mechanical, photocopying, recording, scanning, or otherwise, except
-as permitted under Section 107 or 108 of the 1976 United States
-Copyright Act, without either the prior written permission of the
-Publisher, or authorization through payment of the appropriate
-per-copy fee to the Copyright Clearance Center, Inc., 222 Rosewood
-Drive, Danvers, MA 01923, (978) 750-8400, fax (978) 646-8600, or on
-the web at www.copyright.com. Requests to the Copyright owner for
-permission should be addressed to:
-\begin{verbatim}
-Massimo Di Pierro
-School of Computing
-DePaul University
-243 S Wabash Ave
-Chicago, IL 60604 (USA)
-Email: massimo.dipierro@gmail.com
-\end{verbatim}
+
+THE CONTENT OF THIS BOOK IS PROVIDED UNDER THE TERMS OF THE CREATIVE COMMONS PUBLIC LICENSE BY-NC-ND 3.0.
+
+\url{http://creativecommons.org/licenses/by-nc-nd/3.0/legalcode}
+
+THE WORK IS PROTECTED BY COPYRIGHT AND/OR OTHER APPLICABLE LAW. ANY USE OF THE WORK OTHER THAN AS AUTHORIZED UNDER THIS LICENSE OR COPYRIGHT LAW IS PROHIBITED.
+
+BY EXERCISING ANY RIGHTS TO THE WORK PROVIDED HERE, YOU ACCEPT AND AGREE TO BE BOUND BY THE TERMS OF THIS LICENSE. TO THE EXTENT THIS LICENSE MAY BE CONSIDERED TO BE A CONTRACT, THE LICENSOR GRANTS YOU THE RIGHTS CONTAINED HERE IN CONSIDERATION OF YOUR ACCEPTANCE OF SUCH TERMS AND CONDITIONS.
 
 Limit of Liability/Disclaimer of Warranty: While the publisher and
 author have used their best efforts in preparing this book, they
@@ -90,6 +80,17 @@ suitable for your situation. You should consult with a professional
 where appropriate.  Neither the publisher nor author shall be liable 
 for any loss of profit or any other commercial damages, including
 but not limited to special, incidental, consequential, or other damages. \\ \\
+
+For more information about appropriate use of this material contact:
+
+\begin{verbatim}
+Massimo Di Pierro
+School of Computing
+DePaul University
+243 S Wabash Ave
+Chicago, IL 60604 (USA)
+Email: massimo.dipierro@gmail.com
+\end{verbatim}
 
 Library of Congress Cataloging-in-Publication Data: \\ \\
 ISBN: 978-0-578-09793-0 \\

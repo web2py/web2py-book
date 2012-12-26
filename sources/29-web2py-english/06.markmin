@@ -1610,12 +1610,77 @@ Notice that the computed value is stored in the db and it is not computed on ret
 
 ### Virtual fields
 
-#### Old style virtual fields
-``virtualfields``:inxx
+``virtual fields``:inxx
 
 Virtual fields are also computed fields (as in the previous subsection) but they differ from those because they are ''virtual'' in the sense that they are not stored in the db and they are computed each time records are extracted from the database. They can be used to simplify the user's code without using additional storage but they cannot be used for searching.
 
-In order to define one or more virtual fields, you have to define a container class, instantiate it and link it to a table or to a select. For example, consider the following table:
+#### New style virtual fields
+
+web2py provides a new and easier way to define virtual fields and lazy virtual fields. This section is marked experimental because they APIs may still change a little from what is described here.
+
+Here we will consider the same example as in the previous subsection. In particular we consider the following model:
+
+``
+>>> db.define_table('item',
+        Field('unit_price','double'),
+        Field('quantity','integer'),
+``:code
+
+One can define a ``total_price`` virtual field as
+
+``
+>>> db.item.total_price = Field.Virtual(lambda row: row.unit_price*row.quantity)
+``:code
+
+i.e. by simply defining a new field ``total_price`` to be a ``Field.Virtual``. The only argument of the constructor is a function that takes a row and returns the computed values.
+
+A virtual field defined as the one above is automatically computed for all records when the records are selected:
+
+``
+>>> for row in db(db.item).select(): print row.total_price
+``
+
+It is also possible to define method fields which are calculated on-demand, when called.
+For example:
+
+``
+>>> db.item.discounted_total = Field.Method(lambda row, discount=0.0: \
+       row.unit_price*row.quantity*(1.0-discount/100))
+``:code
+
+In this case ``row.discounted_total`` is not a value but a function. The function takes the same arguments as the function passed to the ``Method`` constructor except for ``row`` which is implicit (think of it as ``self`` for rows objects).
+
+The lazy field in the example above allows one to compute the total price for each ``item``:
+
+``
+>>> for row in db(db.item).select(): print row.discounted_total()
+``
+
+And it also allows to pass an optional ``discount`` percentage (15%):
+
+``
+>>> for row in db(db.item).select(): print row.discounted_total(15)
+``
+
+Virtual and Method fields can also be defined in place when a table is defined:
+
+``
+>>> db.define_table('item',
+        Field('unit_price','double'),
+        Field('quantity','integer'),
+        Field.Virtual('total_price', lambda row: ...),
+        Field.Method('discounted_total', lambda row, discount=0.0: ...))
+``:code
+
+
+------
+Mind that virtual fields do not have the same attributes as the other fields (default, readable, requires, etc) and they do not appear in the list of ``db.table.fields`` and are not visualized by default in tables (TABLE) and grids (SQLFORM.grid, SQLFORM.smartgrid).
+------
+
+#### Old style virtual fields
+
+In order to define one or more virtual fields, you can also define a container class, instantiate it and link it to a table or to a select. For example, consider the following table:
+
 ``
 >>> db.define_table('item',
         Field('unit_price','double'),
@@ -1706,70 +1771,6 @@ or shorter using a lambda function:
             return lambda self=self: self.item.unit_price \
                 * self.item.quantity
 ``:code
-
-
-#### New style virtual fields (experimental)
-
-web2py provides a new and easier way to define virtual fields and lazy virtual fields. This section is marked experimental because they APIs may still change a little from what is described here.
-
-Here we will consider the same example as in the previous subsection. In particular we consider the following model:
-
-``
->>> db.define_table('item',
-        Field('unit_price','double'),
-        Field('quantity','integer'),
-``:code
-
-One can define a ``total_price`` virtual field as
-
-``
->>> db.item.total_price = Field.Virtual(lambda row: row.unit_price*row.quantity)
-``:code
-
-i.e. by simply defining a new field ``total_price`` to be a ``Field.Virtual``. The only argument of the constructor is a function that takes a row and returns the computed values.
-
-A virtual field defined as the one above is automatically computed for all records when the records are selected:
-
-``
->>> for row in db(db.item).select(): print row.total_price
-``
-
-It is also possible to define method fields which are calculated on-demand, when called.
-For example:
-
-``
->>> db.item.discounted_total = Field.Method(lambda row, discount=0.0: \
-       row.unit_price*row.quantity*(1.0-discount/100))
-``:code
-
-In this case ``row.discounted_total`` is not a value but a function. The function takes the same arguments as the function passed to the ``Method`` constructor except for ``row`` which is implicit (think of it as ``self`` for rows objects).
-
-The lazy field in the example above allows one to compute the total price for each ``item``:
-
-``
->>> for row in db(db.item).select(): print row.discounted_total()
-``
-
-And it also allows to pass an optional ``discount`` percentage (15%):
-
-``
->>> for row in db(db.item).select(): print row.discounted_total(15)
-``
-
-Virtual and Method fields can also be defined in place when a table is defined:
-
-``
->>> db.define_table('item',
-        Field('unit_price','double'),
-        Field('quantity','integer'),
-        Field.Virtual('total_price', lambda row: ...),
-        Field.Method('discounted_total', lambda row, discount=0.0: ...))
-``:code
-
-
-------
-Mind that virtual fields do not have the same attributes as the other fields (default, readable, requires, etc) and they do not appear in the list of ``db.table.fields`` and are not visualized by default in tables (TABLE) and grids (SQLFORM.grid, SQLFORM.smartgrid).
-------
 
 ### One to many relation
 ``one to many``:inxx
@@ -1993,7 +1994,7 @@ Curt
 
 A lighter alternative to Many 2 Many relations is tagging. Tagging is discussed in the context of the ``IS_IN_DB`` validator. Tagging works even on database backends that do not support JOINs like the Google App Engine NoSQL.
 
-### Many to many, ``list:<type>``, and ``contains``
+### ``list:<type>``, and ``contains``
 ``list:string``:inxx
 ``list:integer``:inxx
 ``list:reference``:inxx
@@ -2964,7 +2965,7 @@ db = DAL('sqlite://storage.sqlite',folder='path/to/app/databases',
 
 This allows us to access any ``db.table`` without need to re-define it.
 
-#### PostGIS, SpatiaLite, and MS Geo Extensions (experimental)
+#### PostGIS, SpatiaLite, and MS Geo (experimental)
 
 ``PostGIS``:inxx ``StatiaLite``:inxx ``Geo Extensions``:inxx
 ``geometry``:inxx ``geoPoint``:inxx ``geoLine``:inxx ``geoPolygon``:inxx
