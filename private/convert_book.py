@@ -37,13 +37,14 @@ HEADER = r"""
 \lstset{language=Python,
 keywords={A,B,BEAUTIFY,BODY,BR,CENTER,CLEANUP,CODE,CRYPT,DAL,DIV,EM,EMBED,FIELDSET,FORM,Field,H1,H2,H3,H4,H5,H6,HEAD,HR,HTML,HTTP,I,IFRAME,IMG,INPUT,IS\_ALPHANUMERIC,IS\_DATE,IS\_DATETIME,IS\_DATETIME\_IN\_RANGE,IS\_DATE\_IN\_RANGE,IS\_DECIMAL\_IN\_RANGE,IS\_EMAIL,IS\_EMPTY\_OR,IS\_EQUAL\_TO,IS\_EXPR,IS\_FLOAT\_IN\_RANGE,IS\_IMAGE,IS\_INT\_IN\_RANGE,IS\_IN\_DB,IS\_IN\_SET,IS\_IPV4,IS\_LENGTH,IS\_LIST\_OF,IS\_LOWER,IS\_MATCH,IS\_NOT\_EMPTY,IS\_NOT\_IN\_DB,IS\_NULL\_OR,IS\_SLUG,IS\_STRONG,IS\_TIME,IS\_UPLOAD\_FILENAME,IS\_UPPER,IS\_URL,LABEL,LEGEND,LI,LINK,LOAD,MARKMIN,MENU,META,OBJECT,OL,ON,OPTGROUP,OPTION,P,PRE,SCRIPT,SELECT,SPAN,SQLDB,SQLFORM,SQLField,SQLTABLE,STYLE,T,TABLE,TAG,TBODY,TD,TEXTAREA,TFOOT,TH,THEAD,TITLE,TR,TT,UL,URL,XHTML,XML,cache,embed64,local\_import,redirect,request,response,session,xmlescape},
    breaklines=true, basicstyle=\ttfamily\color{black}\footnotesize,
-   keywordstyle=\bf\ttfamily, %\color{Orange},                                                                             
-   commentstyle=\it\ttfamily, %\color{OliverGreen},                                                                       
-   stringstyle=\color{dg}\it\ttfamily, %\color{Purple},                                                                  
-   numbers=left, numberstyle=\color{dg}\tiny, stepnumber=1, numbersep=5pt,                                                
-   backgroundcolor=\color{lg}, tabsize=4, showspaces=false,                                                             
+   keywordstyle=\bf\ttfamily,
+   commentstyle=\it\ttfamily,
+   stringstyle=\color{dg}\it\ttfamily,
+   numbers=left, numberstyle=\color{dg}\tiny, stepnumber=1, numbersep=5pt,
+   frame=single,
+   % backgroundcolor=\color{lg},
+   tabsize=4, showspaces=false,
    showstringspaces=false}
-
 \setcounter{secnumdepth}{4}
 \setcounter{tocdepth}{4}
 % Generates the index
