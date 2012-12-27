@@ -20,7 +20,11 @@ HEADER = r"""
 \usepackage{tocloft}
 \usepackage{parskip}
 \usepackage{upquote}
+%\setlength\parskip{33pt}  % our strange value
 %\usepackage{CJK}
+
+\usepackage{natbib}
+\setlength{\bibsep}{0.0pt}
 
 \makeindex
 \usepackage{listings}
@@ -44,7 +48,10 @@ keywords={A,B,BEAUTIFY,BODY,BR,CAT,CENTER,CLEANUP,CODE,COL,COLGROUP,CRYPT,DAL,DI
    frame=single,
    % backgroundcolor=\color{lg},
    tabsize=4, showspaces=false,
-   showstringspaces=false}
+   showstringspaces=false
+   aboveskip=6pt,
+   belowskip=0pt
+}
 \setcounter{secnumdepth}{4}
 \setcounter{tocdepth}{4}
 % Generates the index
