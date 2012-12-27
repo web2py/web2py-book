@@ -846,18 +846,10 @@ response.meta.keywords = 'bla bla bla'
 response.menu = [ [ 'Index', False, URL('index') ] ]
 ``:code
 
-### A wiki
+### A simple wiki
 ``wiki``:inxx ``RSS``:inxx ``Ajax``:inxx ``XMLRPC``:inxx
 
-In web2py you can create a complete Wiki with tags, tag could, search, media files, and oembed support using only one line of code:
-
-``
-def index(): return auth.wiki()
-``:code
-
-This function is documented later in this book and can be used to add a wiki to any existing application.
-
-In this section, we build a wiki from scratch using only low level APIs. The visitor will be able to create pages, search them (by title), and edit them. The visitor will also be able to post comments (exactly as in the previous applications), and also post documents (as attachments to the pages) and link them from the pages. As a convention, we adopt the Markmin syntax for our wiki syntax. We will also implement a search page with Ajax, an RSS feed for the pages, and a handler to search the pages via XML-RPC``xmlrpc``:cite .
+In this section, we build a simple wiki from scratch using only low level APIs (as opposed to using the built-in wiki capabilities of web2py demonstrated in the next section). The visitor will be able to create pages, search them (by title), and edit them. The visitor will also be able to post comments (exactly as in the previous applications), and also post documents (as attachments to the pages) and link them from the pages. As a convention, we adopt the Markmin syntax for our wiki syntax. We will also implement a search page with Ajax, an RSS feed for the pages, and a handler to search the pages via XML-RPC``xmlrpc``:cite .
 
 The following diagram lists the actions that we need to implement and the links we intend to build among them.
 
@@ -1219,6 +1211,276 @@ Mind that by default English is not translated because web2py assumes the applic
 T.current_languages = ['null']
 ``
 ------
+
+### The built-in web2py wiki
+
+Now you can forget the code we have built-in the previous section (not what you have learned about web2py APIs, just the code of the specific example) as we are going to provide and example of the built-in web2py wiki.
+
+In fact, web2py comes with wiki capabilities including media attachments, tags, tag cloud, page permissions, and support for oembed ``oembed``:cite and components (chapter 14). This wiki can be used with any web2py application.
+
+Here we assume we are starting from cratch from a simple clone of the "welcome" application called "wikidemo". Edit the controller and replace the "index" action with
+
+``
+def index(): return auth.wiki()
+``:code
+
+Done! You have a fully working wiki. At this point no page has been created and in order to create pages you must be logged-in and you must be member of a group called "wiki-editor" or "wiki-author". If you are logged as administrator the "wiki-editor" group is created automatically and you are made a member. The difference between editors and authors is that the editors can create pages, edit and delete any page, while the authors can create pages (with some optional restrictions) and can only edit/delete the pages they have created.
+
+The ``auth.wiki()`` function returns in a dictionary with a key ``content`` which is undesrtood by the scaffolding "views/default/index.html". You man make your own view for the this action:
+
+``
+{{extend 'layout.html'}}
+{{=content}}
+``:code
+
+and add extra HTML or code as needed. There is no need to call the action "index".
+
+To try the wiki, simply login into admin, visit the page
+
+``
+http://127.0.0.1:8000/wikidemo/default/index
+``
+
+Then choose a slug (in the publishing business, a slug is a short name given to an article that is in production) and you will be redirected to an empty page where you can edit the content using MARKMIN wiki syntax. A new menu item called "[wiki]" will allow you create, search, and edit pages. Wiki pages have RULS like:
+
+``
+http://127.0.0.1:8000/wikidemo/default/index/[slug]
+``
+
+Service pages have names which start by underscore:
+
+``
+http://127.0.0.1:8000/wikidemo/default/index/_create
+http://127.0.0.1:8000/wikidemo/default/index/_search
+http://127.0.0.1:8000/wikidemo/default/index/_could
+http://127.0.0.1:8000/wikidemo/default/index/_recent
+http://127.0.0.1:8000/wikidemo/default/index/_edit/...
+http://127.0.0.1:8000/wikidemo/default/index/_editmedia/...
+http://127.0.0.1:8000/wikidemo/default/index/_preview/...
+``
+
+Try create more pages such as "index", "aboutus", and "contactus".
+Try edit them. 
+
+
+The ``wiki`` method takes some optional arguments:
+
+- ``render`` which defaults to ``'markmin'`` but can be set equal to ``'html'``. It termines the syntax of the wiki. We will discuss the makrmin wiki markup later. If you change it to HTML you may want to use a wysiwyg javascript editor such as TinyMCE of NicEdit.
+- ``manage_permissions``. This is set to ``False`` by default and only recognizes permissions for "wiki-editor" and "wiki-author". If you change it to ``True`` the create/edit page will give the option to specify by names the groups whose members have permssion to read and edit the page. In this case is a group "everybody" to give read permission to everybody.
+- ``force_prefix``. If set to something like ``'%(id)s-'`` it will restict authors (not editors) to create page with a prefix like "[user id]-[page name]". The prefix can contain the id ("%(id)s") or the username ("%(username)s") or any other field from the auth_user table, as long as the corresponding column contains valid string that would pass URL validation.
+- ``restrict_search``. This default to ``False`` and any logged-in user can search all wiki pages (but not necessary read or edit them). If set to ``True``, authors can search only their own pages, editors can search everything, other users cannot search anything.
+- ``menugroups``. This defaults to ``None`` and it indictates that wiki management menu (search, create, edit, etc.) is always displayed. You can set it to a list of group names whose members only can see this menu, for exmaple ``['wiki-editor','wiki-author']``. Notice that even if the menu is exposed to everybody does not mean everybody is allowed to perform actions listed in the menu since they are regulated by the access control system.
+
+The ``wiki`` method has some additional parameters which will be explained later: ``slug``, ``env``, and ``extra``.
+
+
+
+#### MARKMIN basics
+
+The MARKMIN syntax allows you to markup **bold** text using ``**bold**``, ''italic'' text with ``''italic''``, ``code`` text with ``\`\`code\`\```. Titles must be prefixed by a #, sections by ##, and sub-sections by ###. Use a minus(-) to prefix an un-ordered item and plus(+) to prefix an ordered item. URLs are automatically into links. For example:
+
+``
+# This is title
+## this is a section title
+### this is a subsection title
+
+Text can be **bold**, ''italic'', !`!!`!code!`!!`! etc.
+Learn more at:
+
+http://web2py.com
+``:code
+
+
+You can use the ``extra`` parameter of ``auth.wiki`` to pass extra rendering rules to the MARKMIN helper. For example:
+
+``
+auth.wiki(extra=dict(verbatim=lambda text: verbatim))
+``
+
+In the varbatim function will preprocess all the input marked as varbatim
+
+``
+!`!!`!
+hello world
+!`!!`!:verbatim
+``
+
+You can find more information about the MARKMIN syntax in chapter 5.
+``auth.wiki`` is more powerful than the barebone MARKMIN helpers. In fact it supports oembed and components.
+
+You can use theS ``env`` parameter of ``auth.wiki`` to expose functions to your wiki.
+For example:
+
+``
+auth.wiki(env=dict(join=lambda a,b,c:"%s-%s-%s" % (a,b,c)))
+``
+
+allows you to use the markup syntax:
+
+``
+@(join:1,2,3)
+``
+
+
+This call the join function passed as extra with parameters ``a,b,c=1,2,3`` and will be redered as ``1-2-3``.
+
+#### Oembed protocol
+
+You can type in (or cut-and-paste) any URL into a wiki page it normally is rendered as a link to the URL. There are exceptions:
+
+- If the URL has an image extension, the link is embedded as an image, ``<img/>``.
+- If the URL has an audio extension, the link is embedded as HTML5 audio ``<audio/>``.
+- If the URL has a video extension, the link is embedded as HTML5 video ``<video/>``.
+- If the URL has a MS Office or PDF extension, Google Doc Viewer is embedded, showing the content of the document (only works for public documents).
+- If the URL points to a Youtube page, a Viemo page, or a Flickr page, web2py contacts the corrsponding web service and queries it about the propor way to embed the contect. This is done using the ``oembed`` protocol.
+
+Here is a complete list of supported formats:
+``
+Image (.PNG, .GIF, .JPG, .JPEG)
+Audio (.WAV, .OGG, .MP3)
+Video (.MOV, .MPE, .MP4, .MPG, .MPG2, .MPEG, .MPEG4, .MOVIE)
+``
+
+Supported via Google Doc Viewer:
+``
+Microsoft Excel (.XLS and .XLSX)                                                
+Microsoft PowerPoint 2007 / 2010 (.PPTX)                                        
+Apple Pages (.PAGES)                                                            
+Adobe PDF (.PDF)                                                                
+Adobe Illustrator (.AI)                                                         
+Adobe Photoshop (.PSD)                                                          
+Autodesk AutoCad (.DXF)                                                         
+Scalable Vector Graphics (.SVG)                                                 
+PostScript (.EPS, .PS)                                                          
+TrueType (.TTF)                                                                 
+XML Paper Specification (.XPS)                                                  
+``
+
+Supported by oembed:
+``                                                                                
+flickr.com                                                                      
+youtube.com                                                                     
+hulu.com                                                                        
+vimeo.com                                                                       
+slideshare.net                                                                  
+qik.com                                                                         
+polleverywhere.com                                                              
+wordpress.com                                                                   
+revision3.com                                                                   
+viddler.com 
+``
+
+This is implemeneted in the web2py file ``gluon.contrib.autolinks`` and specifically in the function ``expand_one``. You can extend oembed support by registering more services. This is done by appending an entry to the ``EMBED_MAPS`` list:
+
+``
+from gluon.contrib.autlinks import EMBED_MAPS
+EMBED_MAPS.append((re.compile('http://vimeo.com/\S*'),
+                   'http://vimeo.com/api/oembed.json'))
+``:code
+
+#### Referencing wiki content
+
+If you create a wiki page with slug "contactus" you can refer to this page as
+
+``
+@////contactus
+``:code
+
+Here ``@////`` stands for
+
+``
+@/app/controller/function/
+``:code
+
+but "app", "controller", and "function" are omitted thus assuming default.
+
+Similarly you can use the wiki menu to upload a media file (for example an image) linked to the page. The "manage media" page will show all files you have uploaded and will show the proper expression to link the media file. If, for example you upload a file "test.jpg" with title "beach", the link expression will somthing like:
+
+``
+@////15/beach.jpg
+``:code
+
+``@////`` is the same prefix described before. ``15`` is the id of the record storing the media file. ``beach`` is the title. ``.jpg`` is the extension of the original file.
+
+If you cut and paste ``@////15/beach.jpg`` into wiki pages you embed the image.
+
+Mind that media files are linked to pages and inherit access permission from the pages.
+
+#### Wiki menus
+
+If you create a page with slug "wiki-menu" page it will be interpreted as a description of the menu. Here is an example:
+
+``
+- Home > @////index
+- Info > @////info
+- web2py > http://google.com
+- - About us > @////aboutus
+- - Countact us > @////contactus
+``
+
+Each line a menu item. We used double dash for nested menu ites. The ``>`` symbols separates the menu item title from the menu item link.
+
+Mind that the menu is appended to ``response.menu``. It does not replace it. The ``[wiki]`` menu tem with service functions is added automatically.
+
+#### Service functions
+
+If, for example, you want to use the wiki to create an editable sidebar you could create a page with ``slug="sidebar"`` and then embed it in your layout.html with
+
+``
+{{=auth.wiki(slug='sidebar')}}
+``:code
+
+Notice that there is nothing special with the word "sidebar". Any wiki page can be retrieved and emebdded in any point in your code. This allows you mix and match wiki functionalities with regular web2py functionalities.
+
+You can also embed special wiki functions as the search by tags:
+
+``
+{{=auth.wiki('_search')}}
+``:code
+
+or the tag cloud:
+
+``
+{{=auth.wiki('_cloud')}}
+``:code
+
+#### Components
+
+One of the most powerful function of the new web2py consists in the ability of embedding an action inside another action. We call this a component.
+
+Consider the following model:
+
+``
+db.define_table('thing',Field('name',requires=IS_NOT_EMPTY()))
+``:code
+
+and the following action:
+
+``
+@auth.requires_login()
+def manage_things():
+    return SQLFORM.grid(db.thing)
+``:code
+
+This action is special because it returns a widget/helper not a dict of objects. Now we can embed this ``manage_things`` action into any view, with
+
+``
+{{=LOAD('default','manage_things',ajax=True)}}
+``:code
+
+This allows the visitor interact with the component via Ajax without reloadin the host page that embeds the widget. Basically the action is called via Ajax, inherits the stile of the host page, and capture all forms submissions and flash messages so that thye are handled within the current page. On top of this the ``SQLFORM.grid`` widget uses digitally signed URLs to restrict access. More informaiton about components can be found in chapter 13.
+
+Components like the one above can be embedded into wiki pages using the MARKMIN syntax:
+
+``
+@{component:default/manage_things}
+``
+
+This simply tells web2py that we want to incude the "manage_things" action defined in the "default" controller as an Ajax "component".
+
+---------
+Most users will be able to build relatively complex applications simply by using ``auth.wiki`` to create pages and menus, and embedded custom components into wiki pages. Wiki can be tough as a mechanism to allow members of the group to create pages but they calso be though as a way to develop applications in a modular way.
+---------
 
 ### More on **admin**
 ``admin``:inxx
