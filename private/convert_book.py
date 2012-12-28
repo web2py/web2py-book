@@ -171,7 +171,7 @@ def assemble(path):
         reference = getreference(os.path.join(path,'references',item))
         bibliography.append((item,reference['source_url'])) 
     txtitems = '\n'.join('\\bibitem{%s} \\url{%s}' % item for item in bibliography)
-    body = body.place('\@/','@/')
+    body = body.replace('\@/','@/')
     return HEADER + body + FOOTER.replace('@BIBITEMS',txtitems)
 
 if __name__=='__main__':
