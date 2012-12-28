@@ -432,7 +432,7 @@ Once the strings are indentified and marked up, web2py takes care of almost evry
 ### An image blog
 ``upload``:inxx
 
-Here, as another example, we wish to create a web application that allows the administrator to post images and give them a name, and allows the visitors of the web site to view the named images and submit comments.
+Here, as another example, we wish to create a web application that allows the administrator to post images and give them a name, and allows the visitors of the web site to view the named images and submit comments (posts).
 
 As before, from the **site** page in **admin**, create a new application called ``images``, and navigate to the ''edit'' page:
 
@@ -455,19 +455,19 @@ db.define_table('image',
    Field('file', 'upload'),
    format = '%(title)s')
 
-db.define_table('comment',
+db.define_table('post',
    Field('image_id', 'reference image'),
    Field('author'),
    Field('email'),
    Field('body', 'text'))
 
 db.image.title.requires = IS_NOT_IN_DB(db, db.image.title)
-db.comment.image_id.requires = IS_IN_DB(db, db.image.id, '%(title)s')
-db.comment.author.requires = IS_NOT_EMPTY()
-db.comment.email.requires = IS_EMAIL()
-db.comment.body.requires = IS_NOT_EMPTY()
+db.post.image_id.requires = IS_IN_DB(db, db.image.id, '%(title)s')
+db.post.author.requires = IS_NOT_EMPTY()
+db.post.email.requires = IS_EMAIL()
+db.post.body.requires = IS_NOT_EMPTY()
 
-db.comment.image_id.writable = db.comment.image_id.readable = False
+db.post.image_id.writable = db.post.image_id.readable = False
 ``:code
 
 Let's analyze this line by line.
@@ -489,8 +489,8 @@ Line 6 defines a format string for the table. It determines how a record should 
 format=lambda row: row.title
 ``:code
 
-Lines 8-12 define another table called "comment".
-A comment has an "author", an "email" (we intend to store the email address of the author of the comment), a "body" of type "text" (we intend to use it to store the actual comment posted by the author), and an "image_id" field of type reference that points to ``db.image`` via the "id" field.
+Lines 8-12 define another table called "post".
+A post has an "author", an "email" (we intend to store the email address of the author of the post), a "body" of type "text" (we intend to use it to store the actual comment posted by the author), and an "image_id" field of type reference that points to ``db.image`` via the "id" field.
 
 In line 14, ``db.image.title`` represents the field "title" of table "image". The attribute ``requires`` allows you to set requirements/constraints that will be enforced by web2py forms. Here we require that the "title" is unique:
 
@@ -501,17 +501,17 @@ In line 14, ``db.image.title`` represents the field "title" of table "image". Th
 The objects representing these constraints are called validators. Multiple validators can be grouped in a list. Validators are executed in the order they appear.
 ``IS_NOT_IN_DB(a, b)`` is a special validator that checks that the value of a field ``b`` for a new record is not already in ``a``.
 
-Line 15 requires that the field "image_id" of table "comment" is in ``db.image.id``. As far as the database is concerned, we had already declared this  when we defined the table "comment".
+Line 15 requires that the field "image_id" of table "post" is in ``db.image.id``. As far as the database is concerned, we had already declared this  when we defined the table "post".
 Now we are explicitly telling the model that this condition should be enforced by web2py, too, at the form processing level when a new comment is posted, so that invalid values do not propagate from input forms to the database. We also require that the "image_id" be represented by the "title", ``'%(title)s'``, of the corresponding record.
 
-Line 20 indicates that the field "image_id" of table "comment" should not be shown in forms, ``writable=False`` and not even in readonly forms, ``readable=False``.
+Line 20 indicates that the field "image_id" of table "post" should not be shown in forms, ``writable=False`` and not even in readonly forms, ``readable=False``.
 
 The meaning of the validators in lines 15-17 should be obvious.
 
 ``format``:inxx
 Notice that the validator
 ``
-db.comment.image_id.requires = IS_IN_DB(db, db.image.id, '%(title)s')
+db.post.image_id.requires = IS_IN_DB(db, db.image.id, '%(title)s')
 ``:code
 
 can be omitted (and would be automatic) if we specify a format for referenced table:
@@ -666,11 +666,11 @@ def index():
 
 def show():
     image = db.image(request.args(0,cast=int)) or redirect(URL('index'))
-    db.comment.image_id.default = image.id
-    form = SQLFORM(db.comment)
+    db.post.image_id.default = image.id
+    form = SQLFORM(db.post)
     if form.process().accepted:
         response.flash = 'your comment is posted'
-    comments = db(db.comment.image_id==image.id).select()
+    comments = db(db.post.image_id==image.id).select()
     return dict(image=image, comments=comments, form=form)
 
 def download():
@@ -702,9 +702,9 @@ db(db.image.id==...).select().first()
 The "download" action expects a filename in ``request.args(0)``, builds a path to the location where that file is supposed to be, and sends it back to the client. If the file is too large, it streams the file without incurring any memory overhead.
 
 Notice the following statements:
-- Line 7 creates an insert form SQLFORM for the ``db.comment`` table using only the specified fields.
+- Line 7 creates an insert form SQLFORM for the ``db.post`` table using only the specified fields.
 - Line 8 sets the value for the reference field, which is not part of the input form because it is not in the list of fields specified above.
-- Line 9 processes the submitted form (the submitted form variables are in ``request.vars``) within the current session (the session is used to prevent double submissions, and to enforce navigation). If the submitted form variables are validated, the new comment is inserted in the ``db.comment`` table; otherwise the form is modified to include error messages (for example, if the author's email address is invalid). This is all done in line 9!.
+- Line 9 processes the submitted form (the submitted form variables are in ``request.vars``) within the current session (the session is used to prevent double submissions, and to enforce navigation). If the submitted form variables are validated, the new comment is inserted in the ``db.post`` table; otherwise the form is modified to include error messages (for example, if the author's email address is invalid). This is all done in line 9!.
 - Line 10 is only executed if the form is accepted, after the record is inserted into the database table. ``response.flash`` is a web2py variable that is displayed in the views and used to notify the visitor that something happened.
 - Line 11 selects all comments that reference the current image.
 
@@ -724,8 +724,8 @@ Edit this new file and replace its content with the following:
 </center>
 {{if len(comments):}}
   <h2>Comments</h2><br /><p>
-  {{for comment in comments:}}
-    <p>{{=comment.author}} says <i>{{=comment.body}}</i></p>
+  {{for post in comments:}}
+    <p>{{=post.author}} says <i>{{=post.body}}</i></p>
   {{pass}}</p>
 {{else:}}
   <h2>No comments posted yet</h2>
@@ -810,7 +810,7 @@ We can improve this further using the ``SQLFORM.grid`` and ``SQLFORM.smartgrid``
 ``
 @auth.requires_membership('manager')
 def manage():
-    grid = SQLFORM.smartgrid(db.image,linked_tables=['comment'])
+    grid = SQLFORM.smartgrid(db.image,linked_tables=['post'])
     return dict(grid=grid)
 ``:code
 
@@ -876,7 +876,7 @@ db.define_table('page',
     Field('created_by', 'reference auth_user', default=auth.user_id),
     format='%(title)s')
 
-db.define_table('comment',
+db.define_table('post',
     Field('page_id', 'reference page'),
     Field('body', 'text'),
     Field('created_on', 'datetime', default=request.now),
@@ -895,10 +895,10 @@ db.page.body.requires = IS_NOT_EMPTY()
 db.page.created_by.readable = db.page.created_by.writable = False
 db.page.created_on.readable = db.page.created_on.writable = False
 
-db.comment.body.requires = IS_NOT_EMPTY()
-db.comment.page_id.readable = db.comment.page_id.writable = False
-db.comment.created_by.readable = db.comment.created_by.writable = False
-db.comment.created_on.readable = db.comment.created_on.writable = False
+db.post.body.requires = IS_NOT_EMPTY()
+db.post.page_id.readable = db.post.page_id.writable = False
+db.post.created_by.readable = db.post.created_by.writable = False
+db.post.created_on.readable = db.post.created_on.writable = False
 
 db.document.name.requires = IS_NOT_IN_DB(db, 'document.name')
 db.document.page_id.readable = db.document.page_id.writable = False
@@ -936,9 +936,9 @@ def create():
 def show():
      "shows a wiki page"
      this_page = db.page(request.args(0,cast=int)) or redirect(URL('index'))
-     db.comment.page_id.default = this_page.id
-     form = SQLFORM(db.comment).process() if auth.user else None
-     pagecomments = db(db.comment.page_id==this_page.id).select()
+     db.post.page_id.default = this_page.id
+     form = SQLFORM(db.post).process() if auth.user else None
+     pagecomments = db(db.post.page_id==this_page.id).select()
      return dict(page=this_page, comments=pagecomments, form=form)
 
 @auth.requires_login()
@@ -1037,9 +1037,9 @@ Here is the code for the view "default/show.html":
 | {{=A('documents', _href=URL('documents', args=request.args))}} ]<br />
 {{=MARKMIN(page.body)}}
 <h2>Comments</h2>
-{{for comment in comments:}}
-  <p>{{=db.auth_user[comment.created_by].first_name}} on {{=comment.created_on}}
-          says <I>{{=comment.body}}</i></p>
+{{for post in comments:}}
+  <p>{{=db.auth_user[post.created_by].first_name}} on {{=post.created_on}}
+     says <i>{{=post.body}}</i></p>
 {{pass}}
 <h2>Post a comment</h2>
 {{=form}}
@@ -1655,7 +1655,7 @@ If you are running from source and you have the Mercurial version control librar
 easy_install mercurial
 ``:code
 
-then the administrative interface shows one more menu item called "Versioning". It automatically creates a local Mercurial repository for the application. Pressing the "commit" button in the page will commit the current application. Mercurial creates and stores information about changes you make in your code into a hidden folder ".hg" in your app subfolder. Every app has its own ".hg" folder and its own ".hgignore" file (tells Mercurial which files to ignore).
+then the administrative interface shows one more menu item called "Versioning". It automatically creates a local Mercurial repository for the application. Pressing the "comment" button in the page will commit the current application. Mercurial creates and stores information about changes you make in your code into a hidden folder ".hg" in your app subfolder. Every app has its own ".hg" folder and its own ".hgignore" file (tells Mercurial which files to ignore).
 
 The Mercurial web interface does allow you to browse previous commit and diff files but we do recommend you use Mercurial directly from the shell or one of the many GUI-based Mercurial clients since they are more powerful. For example they will allow you sync your app with a remote source repository:
 
@@ -1760,7 +1760,7 @@ To delete a record, click the corresponding checkbox to confirm that you are sur
 
 **appadmin** can also perform joins if the SQL FILTER contains a SQL condition that involves two or more tables. For example, try:
 ``
-db.image.id == db.comment.image_id
+db.image.id == db.post.image_id
 ``:code
 
 web2py passes this along to the DAL, and it understands that the query links two tables; hence, both tables are selected with an INNER JOIN. Here is the output:
