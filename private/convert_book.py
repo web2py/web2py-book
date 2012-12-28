@@ -50,7 +50,7 @@ keywords={A,B,BEAUTIFY,BODY,BR,CAT,CENTER,CLEANUP,CODE,COL,COLGROUP,CRYPT,DAL,DI
    tabsize=4, showspaces=false,
    showstringspaces=false
    aboveskip=6pt,
-   belowskip=0pt
+   belowskip=-3pt
 }
 \setcounter{secnumdepth}{4}
 \setcounter{tocdepth}{4}
