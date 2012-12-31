@@ -9,7 +9,7 @@ sys.path.append('/Users/massimodipierro/Dropbox/web2py')
 
 HEADER = r"""
 \documentclass[justified,sixbynine,notoc]{tufte-book}
-\title{web2py\\{\small Complete Reference Manual, 5th Edition}}
+\title{web2py (draft 2012-12-31)\\{\small Complete Reference Manual, 5th Edition}}
 \author{Massimo Di Pierro}
 \publisher{Experts4Solutions}
 
