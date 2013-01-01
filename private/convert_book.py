@@ -45,8 +45,8 @@ keywords={A,B,BEAUTIFY,BODY,BR,CAT,CENTER,CLEANUP,CODE,COL,COLGROUP,CRYPT,DAL,DI
    commentstyle=\it\ttfamily,
    stringstyle=\color{dg}\it\ttfamily,
    numbers=left, numberstyle=\color{dg}\tiny, stepnumber=1, numbersep=5pt,
-   frame=single,
-   % backgroundcolor=\color{lg},
+   % frame=lr,
+   backgroundcolor=\color{lg},
    tabsize=4, showspaces=false,
    showstringspaces=false
    aboveskip=6pt,
