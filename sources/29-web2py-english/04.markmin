@@ -149,12 +149,15 @@ import os
 
 ip = '0.0.0.0'
 port = 80
-interfaces=[('0.0.0.0',80)]
-#interfaces.append(('0.0.0.0',443,'ssl_private_key.pem','ssl_certificate.pem'))
+interfaces = [('0.0.0.0', 80)]
+               #,('0.0.0.0',443,'ssl_private_key.pem','ssl_certificate.pem')]
 password = '<recycle>'  # ## <recycle> means use the previous password
 pid_filename = 'httpserver.pid'
 log_filename = 'httpserver.log'
 profiler_filename = None
+ssl_certificate = None  # 'ssl_certificate.pem'  # ## path to certificate file
+ssl_private_key = None  # 'ssl_private_key.pem'  # ## path to private key file
+#numthreads = 50 # ## deprecated; remove
 minthreads = None
 maxthreads = None
 server_name = socket.gethostname()
@@ -163,7 +166,7 @@ timeout = 30
 shutdown_timeout = 5
 folder = os.getcwd()
 extcron = None
-runcron = False
+nocron = None
 ``:code
 
 This file contains the web2py defaults. If you edit this file, you need to import it explicitly with the ``-L`` command-line option. It only works if you run web2py as a Windows Service.
@@ -571,7 +574,7 @@ A Bayesian classifier to populate the database with dummy data for testing purpo
 gluon/contrib/populate.py
 ``:code
 
-A file with API for running on Heroku.com ``heroku``:inxx:
+A file with API for running on Heroku.com : ``heroku``:inxx
 
 ``
 gluon/contrib/heroku.py
@@ -978,80 +981,48 @@ Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi 
 
 ``response`` is another instance of the ``Storage`` class. It contains the following:
 
-``response.body``: a ``StringIO`` object into which web2py writes the output page body. NEVER CHANGE THIS VARIABLE.
+- ``response.body``: a ``StringIO`` object into which web2py writes the output page body. NEVER CHANGE THIS VARIABLE.
+- ``response.cookies``: similar to ``request.cookies``, but while the latter contains the cookies sent from the client to the server, the former contains cookies sent by the server to the client. The session cookie is handled automatically.
+- ``response.download(request, db)``: a method used to implement the controller function that allows downloading of uploaded files. ``request.download`` expects the last ``arg`` in ``request.args`` to be the encoded filename (i.e., the filename generated at upload time and stored in the upload field). It extracts the upload field name and table name as well as the original filename from the encoded filename. ``response.download`` takes two optional arguments: ``chunk_size`` sets the size in bytes for chunked streaming (defaults to 64K), and ``attachments`` determines whether the downloaded file should be treated as an attachment or not (default to ``True``). Note, ``response.download`` is specifically for downloading files associated with ``db`` upload fields. Use ``response.stream`` (see below) for other types of file downloads and streaming. Also, note that it is not necessary to use ``response.download`` to access files uploaded to the /static folder -- static files can (and generally should) be accessed directly via URL (e.g., /app/static/files/myfile.pdf).
+- ``response.files``: a list of .css, .js, coffee, and .less files required by the page. They will automatically be linked in the head of the standard "layout.html" via the included "web2py_ajax.html". To include a new CSS, JS, COFFEE, or LESS file, just append it to this list. It will handle duplicates. The order is significant.
+- ``response.include_files()`` generates html head tags to includes all ``response.files`` (used in "views/web2py_ajax.html").
+- ``response.flash``: optional parameter that may be included in the views. Normally used to notify the user about something that happened.
+- ``response.headers``: a ``dict`` for HTTP response headers. Web2py sets some headers by default, including "Content-Length", "Content-Type", and "X-Powered-By" (set equal to web2py). Web2py also sets the "Cache-Control", "Expires", and "Pragma" headers to prevent client-side caching, except for static file requests, for which client-side caching is enabled. The headers that web2py sets can be overwritten or removed, and new headers can be added (e.g., ``response.headers['Cache-Control'] = 'private'``). You can remove a header removing its key from the response.headers dict, e.g.``del response.headers['Custom-Header']``, however web2py's default headers will be re-added just before returning the response. To avoid this behavior, just set the header value to None, e.g. to remove the default Content-Type header, ``response.headers['Content-Type'] = None``
+- ``response.menu``: optional parameter that may be included in the views, normally used to pass a navigation menu tree to the view. It can be rendered by the MENU helper.
+- ``response.meta``: a storage object (like a dict) that contains optional meta information like ``response.meta.author``, ``.description``, and/or ``.keywords``. The content of each meta variable is automatically placed in the proper ``META`` tag by the code in "views/web2py_ajax.html", which is included by default in "views/layout.html".
+- ``response.include_meta()`` generates a string that includes all ``response.meta`` headers serialized (used in "views/web2py_ajax.html").
+- ``response.postprocessing``: this is a list of functions, empty by default. These functions are used to filter the response object at the output of an action, before the output is rendered by the view. It can be used to implement support for other template languages.
+- ``response.render(view, vars)``: a method used to call the view explicitly inside the controller. ``view`` is an optional parameter which is the name of the view file, ``vars`` is a dictionary of named values passed to the view.
+- ``response.session_file``: file stream containing the session.
+- ``response.session_file_name``: name of the file where the session will be saved.
+- ``response.session_id``: the id of the current session. It is determined automatically. NEVER CHANGE THIS VARIABLE.
+- ``response.session_id_name``: the name of the session cookie for this application. NEVER CHANGE THIS VARIABLE.
+- ``response.status``: the HTTP status code integer to be passed to the response. Default is 200 (OK).
+- ``response.stream(file, chunk_size, request=request, attachment=False, filename=None, headers=None)``: when a controller returns it, web2py streams the file content back to the client in blocks of size ``chunk_size``. The ``request`` parameter is required to use the chunk start in the HTTP header. ``file`` should be a file path (for backward compatibility, it can also be an open file object, but this is not recommended). As noted above, ``response.download`` should be used to retrieve files stored via an upload field. ``response.stream`` can be used in other cases, such as returning a temporary file or StringIO object created by the controller. If ``attachment`` is True, the Content-Disposition header will be set to "attachment", and if ``filename`` is also provided, it will be added to the Content-Disposition header as well (but only when ``attachment`` is True). If not already included in ``response.headers``, the following response headers will be set automatically: Content-Type, Content-Length, Cache-Control, Pragma, and Last-Modified (the latter three are set to allow browser caching of the file). To override any of these automatic header settings, simply set them in ``response.headers`` before calling ``response.stream``.
+- ``response.subtitle``: optional parameter that may be included in the views. It should contain the subtitle of the page.
+- ``response.title``: optional parameter that may be included in the views. It should contain the title of the page and should be rendered by the HTML title TAG in the header.
+- ``response.toolbar``: a function that allows you embed a toolbar into page form debugging purposes ``{{=response.toolbar()}}``. The toolbar displays request, response, session variables and database access time for each query.
+- ``response._vars``: this variable is accessible only in a view, not in the action. It contains the value returned by the action to the view.
+- ``response._caller``: this is a function that wraps all action calls. It defaults to the identity function, but it can be modifed in order to catch special types of exception to do extra logging;
+  ``
+  response._caller = lambda f: f()
+  ``
+- ``response.optimize_css``: if can be set to "concat,minify,inline" to concatenate, minify and inline the CSS files included by web2py.
+- ``response.optimize_js``: if can be set to "concat,minify,inline" to concatenate, minify and inline the JavaScript files included by web2py.
+- ``response.view``: the name of the view template that must render the page. This is set by default to:
+  ``
+  "%s/%s.%s" % (request.controller, request.function, request.extension)
+  ``:code
+  or, if the above file cannot be located, to
+  ``
+  "generic.%s" % (request.extension)
+  ``:code
+  Change the value of this variable to modify the view file associated with a particular action.
 
-``response.cookies``: similar to ``request.cookies``, but while the latter contains the cookies sent from the client to the server, the former contains cookies sent by the server to the client. The session cookie is handled automatically.
-
-``response.download(request, db)``: a method used to implement the controller function that allows downloading of uploaded files. ``request.download`` expects the last ``arg`` in ``request.args`` to be the encoded filename (i.e., the filename generated at upload time and stored in the upload field). It extracts the upload field name and table name as well as the original filename from the encoded filename. ``response.download`` takes two optional arguments: ``chunk_size`` sets the size in bytes for chunked streaming (defaults to 64K), and ``attachments`` determines whether the downloaded file should be treated as an attachment or not (default to ``True``). Note, ``response.download`` is specifically for downloading files associated with ``db`` upload fields. Use ``response.stream`` (see below) for other types of file downloads and streaming. Also, note that it is not necessary to use ``response.download`` to access files uploaded to the /static folder -- static files can (and generally should) be accessed directly via URL (e.g., /app/static/files/myfile.pdf).
-
-``response.files``: a list of .css, .js, coffee, and .less files required by the page. They will automatically be linked in the head of the standard "layout.html" via the included "web2py_ajax.html". To include a new CSS, JS, COFFEE, or LESS file, just append it to this list. It will handle duplicates. The order is significant.
-
-``response.include_files()`` generates html head tags to includes all ``response.files`` (used in "views/web2py_ajax.html").
-
-``response.flash``: optional parameter that may be included in the views. Normally used to notify the user about something that happened.
-
-``response.headers``: a ``dict`` for HTTP response headers. Web2py sets some headers by default, including "Content-Length", "Content-Type", and "X-Powered-By" (set equal to web2py). Web2py also sets the "Cache-Control", "Expires", and "Pragma" headers to prevent client-side caching, except for static file requests, for which client-side caching is enabled. The headers that web2py sets can be overwritten or removed, and new headers can be added (e.g., ``response.headers['Cache-Control'] = 'private'``). You can remove a header removing its key from the response.headers dict, e.g.``del response.headers['Custom-Header']``, however web2py's default headers will be re-added just before returning the response. To avoid this behavior, just set the header value to None, e.g. to remove the default Content-Type header, ``response.headers['Content-Type'] = None``
-
-``response.menu``: optional parameter that may be included in the views, normally used to pass a navigation menu tree to the view. It can be rendered by the MENU helper.
-
-
-``response.meta``: a storage object (like a dict) that contains optional meta information like ``response.meta.author``, ``.description``, and/or ``.keywords``. The content of each meta variable is automatically placed in the proper ``META`` tag by the code in "views/web2py_ajax.html", which is included by default in "views/layout.html".
-
-``response.include_meta()`` generates a string that includes all ``response.meta`` headers serialized (used in "views/web2py_ajax.html").
-
-``response.postprocessing``: this is a list of functions, empty by default. These functions are used to filter the response object at the output of an action, before the output is rendered by the view. It can be used to implement support for other template languages.
-
-``response.render(view, vars)``: a method used to call the view explicitly inside the controller. ``view`` is an optional parameter which is the name of the view file, ``vars`` is a dictionary of named values passed to the view.
-
-``response.session_file``: file stream containing the session.
-
-``response.session_file_name``: name of the file where the session will be saved.
-
-``response.session_id``: the id of the current session. It is determined automatically. NEVER CHANGE THIS VARIABLE.
-
-``response.session_id_name``: the name of the session cookie for this application. NEVER CHANGE THIS VARIABLE.
-
-``response.status``: the HTTP status code integer to be passed to the response. Default is 200 (OK).
-
-``response.stream(file, chunk_size, request=request, attachment=False, filename=None, headers=None)``: when a controller returns it, web2py streams the file content back to the client in blocks of size ``chunk_size``. The ``request`` parameter is required to use the chunk start in the HTTP header. ``file`` should be a file path (for backward compatibility, it can also be an open file object, but this is not recommended). As noted above, ``response.download`` should be used to retrieve files stored via an upload field. ``response.stream`` can be used in other cases, such as returning a temporary file or StringIO object created by the controller. If ``attachment`` is True, the Content-Disposition header will be set to "attachment", and if ``filename`` is also provided, it will be added to the Content-Disposition header as well (but only when ``attachment`` is True). If not already included in ``response.headers``, the following response headers will be set automatically: Content-Type, Content-Length, Cache-Control, Pragma, and Last-Modified (the latter three are set to allow browser caching of the file). To override any of these automatic header settings, simply set them in ``response.headers`` before calling ``response.stream``.
-
-``response.subtitle``: optional parameter that may be included in the views. It should contain the subtitle of the page.
-
-``response.title``: optional parameter that may be included in the views. It should contain the title of the page and should be rendered by the HTML title TAG in the header.
-
-``response.toolbar``: a function that allows you embed a toolbar into page form debugging purposes ``{{=response.toolbar()}}``. The toolbar displays request, response, session variables and database access time for each query.
-
-``response._vars``: this variable is accessible only in a view, not in the action. It contains the value returned by the action to the view.
-
-``response._caller``: this is a function that wraps all action calls. It defaults to the identity function, but it can be modifed in order to catch special types of exception to do extra logging;
-
-``
-response._caller = lambda f: f()
-``
-
-``response.optimize_css``: if can be set to "concat,minify,inline" to concatenate, minify and inline the CSS files included by web2py.
-
-``response.optimize_js``: if can be set to "concat,minify,inline" to concatenate, minify and inline the JavaScript files included by web2py.
-
-``response.view``: the name of the view template that must render the page. This is set by default to:
-``
-"%s/%s.%s" % (request.controller, request.function, request.extension)
-``:code
-
-or, if the above file cannot be located, to
-``
-"generic.%s" % (request.extension)
-``:code
-
-Change the value of this variable to modify the view file associated with a particular action.
-
-``response.delimiters`` defaults to ``('{{','}}')``. It allows you to change the delimiter of code embedded in views.
-
-``response.xmlrpc(request, methods)``: when a controller returns it, this function exposes the methods via XML-RPC``xmlrpc``:cite . This function is deprecated since a better mechanism is available and described in Chapter 10.
-
-``response.write(text)``: a method to write text into the output page body.
-
-``response.js`` can contain Javascript code. This code will be executed if and only if the response is received by a web2py component as discussed in Chapter 12.
+- ``response.delimiters`` defaults to ``('{{','}}')``. It allows you to change the delimiter of code embedded in views.
+- ``response.xmlrpc(request, methods)``: when a controller returns it, this function exposes the methods via XML-RPC``xmlrpc``:cite . This function is deprecated since a better mechanism is available and described in Chapter 10.
+- ``response.write(text)``: a method to write text into the output page body.
+- ``response.js`` can contain Javascript code. This code will be executed if and only if the response is received by a web2py component as discussed in Chapter 12.
 
 Since ``response`` is a ``gluon.storage.Storage`` object, it can be used to store other attributes that you may want to pass to the view. While there is no technical restriction, our recommendation is to store only variables that are to be rendered by all pages in the overall layout ("layout.html").
 
@@ -2231,7 +2202,7 @@ Just include the files the way you used to, for example
 {{response.files.append(URL('static','layout.css'))}}
 ``
 and in models set
-``:code
+``
 response.static_version = '1.2.3'
 ``:code
 This will rewrite automatically every "/myapp/static/layout.css" url as "/myapp/static/_1.2.3/layout.css", for every file included in ``response.files``.
@@ -2388,6 +2359,10 @@ def task_add(a,b):
 
 Tasks will always be called in the same environment seen by controllers and therefore they see all the global variables defined in models, including database connections (``db``). Tasks differ from a controller action because they are not associated with an HTTP request and therefore there is no ``request.env``.
 
+------
+NB: remind to call a db.commit() at the end of every task if it involves inserts/updates to the database. Web2py commits by default at the end of a successful function call but the scheduler doesn't
+------
+
 To enable the scheduler you should put into a model its instantiation.
 The recommended way to enable the scheduler to your app is to create a model file named ``scheduler.py`` and define your function there. After the functions, you can put the following code into the model:
 
@@ -2401,7 +2376,7 @@ NB: If your tasks are defined in a module (as opposed to a model) you may have t
 The task is scheduled with
 
 ``
-scheduler.queue_task('task_add',pvars=dict(a=1,b=2))
+scheduler.queue_task(task_add,pvars=dict(a=1,b=2))
 ``:code
 
 
@@ -2421,7 +2396,7 @@ python web2py.py -K myapp:group1:group2,myotherapp:group1
 
 If you have a model called ``scheduler.py`` you can start/stop the workers from web2py's default window (the one you use to set the ip address and the port).
 
-One last nice addition: if you use the embedded webserver, you can start the webserver and the scheduler with just one line of code (this assumes you don't want the web2py window popping up, or you can use the "Schedulers" menu instead)
+One last nice addition: if you use the embedded webserver, you can start the webserver and the scheduler with just one line of code (this assumes you don't want the web2py window popping up, else you can use the "Schedulers" menu instead)
 
 ``
 python web2py.py -a yourpass -K myapp -X
@@ -2447,19 +2422,26 @@ Scheduler(
 Let's see them in order:
 
 - ``db`` is the database DAL instance were you want the scheduler tables be placed.
-- ``tasks`` can be a dict. Must be defined if you want to call a function not by his name, i.e. ``tasks=dict(mynameddemo1=demo1)`` will let you execute function demo1 with ``st.insert(task_name='mytask', function_name='mynameddemo1')`` or ``st.insert(task_name='mytask', function_name='demo1')``. If you don't pass this parameter, function will be searched in the app environment.
+- ``tasks`` can be a dict. Must be defined if you want to call a function not by his name, i.e. ``tasks=dict(mynameddemo1=task_add)`` will let you execute function demo1 with ``scheduler.queue_task('mynameddemo1')`` instead of ``scheduler.queue_task('task_add')``. If you don't pass this parameter, function will be searched in the app environment.
 - ``worker_name`` is None by default. As soon as the worker is started, a worker name is generated as hostname-uuid. If you want to specify that, be sure that it's unique.
 - ``group_names`` is by default set to **[main]**. All tasks have a ``group_name`` parameter, set to **main** by default. Workers can only pick up tasks of their assigned group.
+
+------
 NB: This is useful if you have different workers instances (e.g. on different machines) and you want to assign tasks to a specific worker.
+
 NB2: It's possible to assign a worker more groups, and they can be also all the same, as
+------
 ``['mygroup','mygroup']``. Tasks will be distributed taking into consideration that
 a worker with group_names ``['mygroup','mygroup']`` is able to process the double of the tasks
 a worker with group_names ``['mygroup']`` is.
 - ``heartbeat`` is by default set to 3 seconds. This parameter is the one controlling how often a scheduler will check its status on the ``scheduler_worker`` table and see if there are any **ASSIGNED** tasks to itself to process.
 - ``max_empty_runs`` is 0 by default, that means that the worker will continue to process tasks as soon as they are **ASSIGNED**. If you set this to a value of, let's say, 10, a worker will die automatically if it's **ACTIVE** and no tasks are **ASSIGNED** to it for 10 loops. A loop is when a worker searches for tasks, every 3 seconds (or the set ``heartbeat``)
 - ``discard_results`` is False by default. If set to True, no scheduler_run records will be created.
-NB: scheduler_run records will be created as before for **FAILED**, **TIMEOUT** and
-**STOPPED** tasks's statuses.
+
+------
+NB: scheduler_run records will be created as before for **FAILED**, **TIMEOUT** and **STOPPED** tasks's statuses.
+------
+
 - ``utc_time`` is False by default. If you need to coordinate with workers living in different timezones, or don't have problems with solar/DST times, supplying datetimes from different countries, etc, you can set this to True. The scheduler will honor the UTC time and work leaving the local time aside. Caveat: you need to schedule tasks with UTC times (for start_time, stop_time, and so on.)
 
 Now we have the infrastructure in place: defined the tasks, told the scheduler about them, started the worker(s). What remains is to actually schedule the tasks
@@ -2505,7 +2487,10 @@ Tasks with no stop_time set or picked up **BEFORE** stop_time are **ASSIGNED** t
 
 Additionally, you can control how many times a task should be repeated (i.e. you need to aggregate some data at specified intervals). To do so, set the ``repeats``
 parameter (default = 1 time only, 0 = unlimited). You can influence how many seconds should pass between executions with the ``period`` parameter (default = 60 seconds).
+
+------
 NB: the time is not calculated between the END of the first round and the START of the next, but from the START time of the first round to the START time of the next cycle)
+------
 
 Another nice addition, you can set how many times the function can raise an exception (i.e. requesting data from a slow webservice) and be queued again instead of stopping in **FAILED**  status with the parameter ``retry_failed`` (default = 0, -1 = unlimited).
 
@@ -2516,6 +2501,48 @@ Summary: you have
 - ``timeout`` to be sure that a function doesn't exceed a certain amount of time
 - ``retry_failed`` to control how many times the task can "fail"
 - ``start_time`` and ``stop_time`` to schedule a function in a restricted timeframe
+
+##### queue_task() and task_status()
+- ``scheduler.queue_task(function, pargs=[], pvars={}, **kwargs)`` : accepts a lot of arguments, to make your life easier....
+ -- ``function`` : required. This can be a string as ``'demo2'`` or directly the function, i.e. you can use ``scheduler.queue_task(demo2)``
+ -- ``pargs`` : p stands for "positional". pargs will accept your args as a list, without the need to jsonify them first.
+ ------
+ ``scheduler.queue_task(demo1, [1,2])``
+ 
+ does the exact same thing as 
+
+ ``st.validate_and_insert(function_name = 'demo1', args=dumps([1,2]))``
+
+ and in a lot less characters
+
+ **NB**: if you do ``scheduler.queue_task(demo1, [1,2], args=dumps([2,3]))`` , ``args`` will prevail and the task will be queued with **2,3**
+ ------
+ -- ``pvars`` : as with ``pargs``, will accept your vars as a dict, without the need to jsonify them first.
+ ------
+ ``scheduler.queue_task(demo1, [], {'a': 1, 'b' : 2})`` or ``scheduler.queue_task(demo1, pvars={'a': 1, 'b' : 2})``
+ 
+ does the exact same thing as
+ 
+ ``st.validate_and_insert(function_name = 'demo1', vars=dumps({'a': 1, 'b' : 2}))``
+ 
+ **NB**:  if you do ``scheduler.queue_task(demo1, None, {'a': 1, 'b': 2}, vars=dumps({'a': 2, 'b' : 3}))`` , ``vars`` will prevail and the task will be queued with **{'a': 2, 'b' : 3}**
+ ------
+ -- ``kwargs`` : all other scheduler_task columns can be passed as keywords arguments, e.g. :
+  ... ``
+       scheduler.queue_task(
+          demo1, [1,2], {a: 1, b : 2},
+          repeats = 0,
+          period = 180,
+       ....
+      )``:python
+
+The method returns the result of validate_and_insert, with the ``uuid`` of the task you queued (can be the one you passed or the auto-generated one).
+
+``<Row {'errors': {}, 'id': 1, 'uuid': '08e6433a-cf07-4cea-a4cb-01f16ae5f414'}>``
+ 
+If there are errors (e.g. you used ``period = 'a'``), you'll get the result of the validation, and id and uuid will be None
+
+``<Row {'errors': {'period': 'enter an integer greater than or equal to 0'}, 'id': None, 'uuid': None}>``
 
 
 ##### Results and output
@@ -2562,7 +2589,7 @@ Hitting ctrl+c is equal to set a worker to **KILL**
 
 Everything that one can do via appadmin one can do programmatically by inserting and updating records in these tables.
 
-Anyway, one should not update records relative to ``RUNNING`` tasks as this may create an un-expected behavior. The best practice is to queue tasks using "queue_task".
+Anyway, one should not update records relative to ``RUNNING`` tasks as this may create an un-expected behavior. The best practice is to queue tasks using the "queue_task" method.
 
 For example:
 
@@ -2582,7 +2609,7 @@ Notice that fields "times_run", "last_run_time" and "assigned_worker_name" are n
 You can also retrieve the output of completed tasks:
 
 ``
-completed_runs = db(db.scheduler_run.status='COMPLETED').select()
+completed_runs = db(db.scheduler_run.run_status='COMPLETED').select()
 ``:code
 
 ------
@@ -2605,12 +2632,12 @@ def reporting_percentages():
     return 1
 ``
 
-The function ``demo6`` sleeps for 5 seconds, outputs ``50%``.
+The function ``reporting_percentages`` sleeps for 5 seconds, outputs ``50%``.
 Then, it sleeps other 5 seconds and outputs ``100%``. Note that the output in the scheduler_run table is synced every 2 seconds and that the second print statement that contains ``!clear!100%`` gets the ``50%`` output cleared and replaced by ``100%`` only.
 
 ``
-scheduler.queue_task(task_name='reporting_percentages',
-                     function_name='demo6', sync_output=2)
+scheduler.queue_task(reporting_percentages,
+                     sync_output=2)
 ``:code
 
 
