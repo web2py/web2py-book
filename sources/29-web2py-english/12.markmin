@@ -33,12 +33,9 @@ Our goal is to be able to develop web applications by assembling components into
 Consider a simple web2py app "test" that extends the default scaffolding app with a custom model in file "models/db_comments.py":
 
 ``
-db.define_table('post',
+db.define_table('comment_post',
    Field('body','text',label='Your comment'),
-   Field('posted_on','datetime',default=request.now),
-   Field('posted_by',db.auth_user,default=auth.user_id))
-db.post.posted_on.writable = db.post.posted_on.readable = False
-db.post.posted_by.writable = db.post.posted_by.readable = False
+   auth.signature)
 ``:code
 
 one action in "controllers/comments.py"
@@ -46,8 +43,8 @@ one action in "controllers/comments.py"
 ``
 @auth.requires_login()
 def post():
-    return dict(form=SQLFORM(db.post).process(),
-                comments=db(db.post).select())
+    return dict(form=SQLFORM(db.comment_post).process(),
+                comments=db(db.comment_post).select())
 ``:code
 
 and the corresponding "views/comments/post.html"
@@ -56,7 +53,7 @@ and the corresponding "views/comments/post.html"
 {{extend 'layout.html'}}
 {{for post in comments:}}
 <div class="post">
-  on {{=post.posted_on}} {{=post.posted_by.first_name}}
+  On {{=post.created_on}} {{=post.created_by.first_name}}
   says <span class="post_body">{{=post.body}}</span>
 </div>
 {{pass}}
@@ -69,18 +66,15 @@ You can access it as usual at:
 http://127.0.0.1:8000/test/comments/post
 ``:code
 
-[[image @///image/en7900.png center 480px]]
-
 So far there is nothing special in this action, but we can turn it into a component by defining a new view with extension ".load" that does not extend the layout.
 
 Hence we create a "views/comments/post.load":
 
 ``
-{{#extend 'layout.html' <- notice this is commented out!}}
 {{for post in comments:}}
 <div class="post">
-  on {{=post.posted_on}} {{=post.posted_by.first_name}}
-  says <span class="post_body">{{=post.body}}</span>
+  On {{=post.created_on}} {{=post.created_by.first_name}}
+  says <blockquote class="post_body">{{=post.body}}</blockquote>
 </div>
 {{pass}}
 {{=form}}
@@ -91,10 +85,6 @@ We can access it at the URL
 ``
 http://127.0.0.1:8000/test/comments/post.load
 ``:code
-
-and it will look like this:
-
-[[image @///image/en8000.png center 480px]]
 
 This is a component that we can embed into any other page by simply doing
 
@@ -113,7 +103,6 @@ and in the corresponding view add the component:
 
 ``
 {{extend 'layout.html'}}
-<p>{{='bla '*100}}</p>
 {{=LOAD('comments','post.load',ajax=True)}}
 ``:code
 
@@ -375,6 +364,7 @@ By following the above rules we can make sure that:
 
 The rules above do not solve the problem of plugin versions and dependencies. That is beyond our scope.
 
+
 #### Component plugins
 ``component plugin``:inxx
 
@@ -387,12 +377,7 @@ First, we create a model called "models/plugin_comments.py":
 ``
 db.define_table('plugin_comments_comment',
    Field('body','text', label='Your comment'),
-   Field('posted_on', 'datetime', default=request.now),
-   Field('posted_by', db.auth_user, default=auth.user_id))
-db.plugin_comments_comment.posted_on.writable=False
-db.plugin_comments_comment.posted_on.readable=False
-db.plugin_comments_comment.posted_by.writable=False
-db.plugin_comments_comment.posted_by.readable=False
+   auth.signature)
 
 def plugin_comments():
     return LOAD('plugin_comments','post',ajax=True)
@@ -402,8 +387,9 @@ def plugin_comments():
 Second, we define a "controllers/plugin_comments.py"
 
 ``
-@auth.requires_login()
 def post():
+    if not auth.user:
+        return A('login to comment',_href=URL('default','user/login'))
     comment = db.plugin_comments_comment
     return dict(form=SQLFORM(comment).process(),
                 comments=db(comment).select())
@@ -414,7 +400,7 @@ Third, we create a view called "views/plugin_comments/post.load":
 ``
 {{for comment in comments:}}
 <div class="comment">
-  on {{=comment.posted_on}} {{=comment.posted_by.first_name}}
+  on {{=comment.created_on}} {{=comment.created_by.first_name}}
   says <span class="comment_body">{{=comment.body}}</span>
 </div>
 {{pass}}
@@ -452,25 +438,18 @@ Here is how we can do it:
 First, rewrite the plugin "models/plugin_comments.py" in this way:
 
 ``
-db.define_table('plugin_comments_comment',
-   Field('body','text',label=plugin_comments.comments.body_label),
-   Field('posted_on', 'datetime', default=request.now),
-   Field('posted_by', db.auth_user, default=auth.user_id))
-
-def plugin_comments()
+def _():
     from gluon.tools import PluginManager
     plugins = PluginManager('comments', body_label='Your comment')
 
-    comment = db.plugin_comments_comment
-    comment.label=plugins.comments.body_label
-    comment.posted_on.writable=False
-    comment.posted_on.readable=False
-    comment.posted_by.writable=False
-    comment.posted_by.readable=False
-    return LOAD('plugin_comments','post.load',ajax=True)
+    db.define_table('plugin_comments_comment',
+        Field('body','text',label=plugins.comments.body_label),
+        auth.signature)
+    return lambda: LOAD('plugin_comments','post.load',ajax=True)
+plugin_comments = _()
 ``:code
 
-Notice how all the code except the table definition is encapsulated in a single function. Also notice how the function creates an instance of a ``PluginManager``.
+Notice how all the code except the table definition is encapsulated in a single function called ``_`` so that it does not pollute the global namespace. Also notice how the function creates an instance of a ``PluginManager``.
 
 Now in any other model in your app, for example in "models/db.py", you can configure this plugin as follows:
 
@@ -531,3 +510,18 @@ Third, modify the "views/layout.html" so that it simply reads:
 ``:code
 
 The benefit of this design is that users of this plugin can install multiple layouts and choose which one to apply simply by editing "views/layout.html". Moreover, "views/layout.html" will not be packed by **admin** together with the plugin, so there is no risk that the plugin will override the user's code in the previously installed layout.
+
+#### Plugins repositories
+
+While there is no single repository of web2py plugins you can find many of them at one of the following to URLs:
+
+``
+http://dev.s-cubism.com/web2py_plugins
+http://web2py.com/plugins
+http://web2py.com/layouts
+``:code
+
+Here is a screenshot from the s-cubism repository:
+
+[[image @///image/plugins.png center 480px]]
+
