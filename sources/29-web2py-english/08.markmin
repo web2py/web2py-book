@@ -293,6 +293,11 @@ imapdb.define_tables()
 
 Note that ``<imapdb>.define_tables()`` returns a dictionary of strings mapping DAL tablenames to the server mailbox names with the structure ``{<tablename>: <server mailbox name>, ...}``, so you can get the actual mailbox name in the IMAP server.
 
+If you want to set you own tablename/mailbox configuration and skip the automatic name configuration, you can pass a custom dictionary to the adapter in this way:
+
+``
+imapdb.define_tables({"inbox": "MAILBOX", "trash", "SPAM"})
+``:code
 
 To handle the different native mailbox names for the user interface,  the following attributes give access to the adapter auto mailbox mapped names (which native mailbox has what table name and vice versa):
 
@@ -335,7 +340,15 @@ Usual query operators are implemented, including belongs
 messages = imapdb(imapdb.INBOX.uid.belongs(<uid sequence>)).select()
 ``:code
 
-**Note**: It's strongly advised that you keep the query results below a given data size threshold to avoid jamming the server with large select commands. As of now, the messages are retrieved entirely by the adapter before any filter by field can be applied.
+**Note**: It's strongly advised that you keep the query results below a given data size threshold to avoid jamming the server with large select commands.
+
+To perform faster email queries, it is recommended to pass a filtered set of fields:
+``
+fields = ["INBOX.uid", "INBOX.sender", "INBOX.subject", "INBOX.created"]
+rows = imapdb(q).select(*fields)
+``:code
+
+The adapter knows when to retrieve partial message payloads (fields like ``content``, ``size`` and ``attachments`` require retrieving the complete message data)
 
 It is possible to filter query select results with limitby and sequences of mailbox fields
 ``
@@ -402,7 +415,8 @@ seen | boolean  | Flag
 subject | string| ````
 mime | string | The mime header declaration
 email | string | The complete RFC822 message**
-attachments | list:string | Each non text decoded part as string
+attachments | list | Each non text decoded part as dictionary
+encoding | string | The message's main detected charset
 ---------------------------------------------------
 
 *At the application side it is measured as the length of the RFC822
