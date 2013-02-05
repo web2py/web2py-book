@@ -9,7 +9,7 @@ sys.path.append('/Users/massimodipierro/Dropbox/web2py')
 
 HEADER = r"""
 \documentclass[justified,sixbynine,notoc]{tufte-book}
-\title{web2py (draft 2012-12-31)\\{\small Complete Reference Manual, 5th Edition}}
+\title{web2py\\{\small Complete Reference Manual, 5th Edition}}
 \author{Massimo Di Pierro}
 \publisher{Experts4Solutions}
 
@@ -20,6 +20,7 @@ HEADER = r"""
 \usepackage{tocloft}
 \usepackage{parskip}
 \usepackage{upquote}
+
 %\setlength\parskip{33pt}  % our strange value
 %\usepackage{CJK}
 
@@ -31,7 +32,7 @@ HEADER = r"""
 \usepackage{url}
 \usepackage[utf8x]{inputenc}
 
-\sloppy
+\sloppy\raggedbottom
 
 \definecolor{lg}{rgb}{0.9,0.9,0.9}
 \definecolor{dg}{rgb}{0.3,0.3,0.3}
@@ -172,6 +173,7 @@ def assemble(path):
         bibliography.append((item,reference['source_url'])) 
     txtitems = '\n'.join('\\bibitem{%s} \\url{%s}' % item for item in bibliography)
     body = body.replace('\@/','@/')
+    body = body.replace('\\begin{center}','\\goodbreak\\begin{center}')
     return HEADER + body + FOOTER.replace('@BIBITEMS',txtitems)
 
 if __name__=='__main__':
