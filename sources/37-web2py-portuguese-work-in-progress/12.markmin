@@ -1,4 +1,3 @@
-
 ## Components and plugins
 ``component``:inxx
 ``plugin``:inxx
@@ -34,12 +33,9 @@ Our goal is to be able to develop web applications by assembling components into
 Consider a simple web2py app "test" that extends the default scaffolding app with a custom model in file "models/db_comments.py":
 
 ``
-db.define_table('comment',
+db.define_table('comment_post',
    Field('body','text',label='Your comment'),
-   Field('posted_on','datetime',default=request.now),
-   Field('posted_by',db.auth_user,default=auth.user_id))
-db.comment.posted_on.writable=db.comment.posted_on.readable=False
-db.comment.posted_by.writable=db.comment.posted_by.readable=False
+   auth.signature)
 ``:code
 
 one action in "controllers/comments.py"
@@ -47,18 +43,18 @@ one action in "controllers/comments.py"
 ``
 @auth.requires_login()
 def post():
-    return dict(form=crud.create(db.comment),
-                comments=db(db.comment).select())
+    return dict(form=SQLFORM(db.comment_post).process(),
+                comments=db(db.comment_post).select())
 ``:code
 
 and the corresponding "views/comments/post.html"
 
 ``
 {{extend 'layout.html'}}
-{{for comment in comments:}}
-<div class="comment">
-  on {{=comment.posted_on}} {{=comment.posted_by.first_name}}
-  says <span class="comment_body">{{=comment.body}}</span>
+{{for post in comments:}}
+<div class="post">
+  On {{=post.created_on}} {{=post.created_by.first_name}}
+  says <span class="post_body">{{=post.body}}</span>
 </div>
 {{pass}}
 {{=form}}
@@ -70,18 +66,15 @@ You can access it as usual at:
 http://127.0.0.1:8000/test/comments/post
 ``:code
 
-[[image @///image/en7900.png center 480px]]
-
 So far there is nothing special in this action, but we can turn it into a component by defining a new view with extension ".load" that does not extend the layout.
 
 Hence we create a "views/comments/post.load":
 
 ``
-{{#extend 'layout.html' <- notice this is commented out!}}
-{{for comment in comments:}}
-<div class="comment">
-  on {{=comment.posted_on}} {{=comment.posted_by.first_name}}
-  says <span class="comment_body">{{=comment.body}}</span>
+{{for post in comments:}}
+<div class="post">
+  On {{=post.created_on}} {{=post.created_by.first_name}}
+  says <blockquote class="post_body">{{=post.body}}</blockquote>
 </div>
 {{pass}}
 {{=form}}
@@ -92,10 +85,6 @@ We can access it at the URL
 ``
 http://127.0.0.1:8000/test/comments/post.load
 ``:code
-
-and it will look like this:
-
-[[image @///image/en8000.png center 480px]]
 
 This is a component that we can embed into any other page by simply doing
 
@@ -114,7 +103,6 @@ and in the corresponding view add the component:
 
 ``
 {{extend 'layout.html'}}
-<p>{{='bla '*100}}</p>
 {{=LOAD('comments','post.load',ajax=True)}}
 ``:code
 
@@ -147,6 +135,7 @@ LOAD(c=None, f='index', args=[], vars={},
      extension=None, target=None,
      ajax=False, ajax_trap=False,
      url=None,user_signature=False,
+     timeout=None, times=1,
      content='loading...',**attr):
 ``:code
 
@@ -159,6 +148,8 @@ Here:
 - ``ajax_trap=True`` means that any form submission in the DIV must be captured and submitted via Ajax, and the response must be rendered inside the DIV. ``ajax_trap=False`` indicates that forms must be submitted normally, thus reloading the entire page. ``ajax_trap`` is ignored and assumed to be ``True`` if ``ajax=True``.
 - ``url``, if specified, overrides the values of ``c``, ``f``, ``args``, ``vars``, and ``extension`` and loads the component at the ``url``. It is used to load as components pages served by other applications (which my or may not be created with web2py).
 - ``user_signature`` defaults to False but, if you are logged in, it should be set to True. This will make sure the ajax callback is digitally signed. This is documented in chapter 4.
+- ``times`` specifies how many times the component is to be requested. Use "infinity" to keep loading the component continuously. This option is useful for triggering regular routines for a given document request.
+- ``timeout`` sets the time to wait in milliseconds before starting the request or the frequency if ``times`` is greater than 1.
 - ``content`` is the content to be displayed while performing the ajax call. It can be a helper as in ``content=IMG(..)``.
 - optional ``**attr`` (attributes) can be passed to the contained ``DIV``.
 
@@ -373,6 +364,7 @@ By following the above rules we can make sure that:
 
 The rules above do not solve the problem of plugin versions and dependencies. That is beyond our scope.
 
+
 #### Component plugins
 ``component plugin``:inxx
 
@@ -385,12 +377,7 @@ First, we create a model called "models/plugin_comments.py":
 ``
 db.define_table('plugin_comments_comment',
    Field('body','text', label='Your comment'),
-   Field('posted_on', 'datetime', default=request.now),
-   Field('posted_by', db.auth_user, default=auth.user_id))
-db.plugin_comments_comment.posted_on.writable=False
-db.plugin_comments_comment.posted_on.readable=False
-db.plugin_comments_comment.posted_by.writable=False
-db.plugin_comments_comment.posted_by.readable=False
+   auth.signature)
 
 def plugin_comments():
     return LOAD('plugin_comments','post',ajax=True)
@@ -400,10 +387,11 @@ def plugin_comments():
 Second, we define a "controllers/plugin_comments.py"
 
 ``
-@auth.requires_login()
 def post():
+    if not auth.user:
+        return A('login to comment',_href=URL('default','user/login'))
     comment = db.plugin_comments_comment
-    return dict(form=crud.create(comment),
+    return dict(form=SQLFORM(comment).process(),
                 comments=db(comment).select())
 ``:code
 
@@ -412,7 +400,7 @@ Third, we create a view called "views/plugin_comments/post.load":
 ``
 {{for comment in comments:}}
 <div class="comment">
-  on {{=comment.posted_on}} {{=comment.posted_by.first_name}}
+  on {{=comment.created_on}} {{=comment.created_by.first_name}}
   says <span class="comment_body">{{=comment.body}}</span>
 </div>
 {{pass}}
@@ -450,25 +438,18 @@ Here is how we can do it:
 First, rewrite the plugin "models/plugin_comments.py" in this way:
 
 ``
-db.define_table('plugin_comments_comment',
-   Field('body','text',label=plugin_comments.comments.body_label),
-   Field('posted_on', 'datetime', default=request.now),
-   Field('posted_by', db.auth_user, default=auth.user_id))
-
-def plugin_comments()
+def _():
     from gluon.tools import PluginManager
     plugins = PluginManager('comments', body_label='Your comment')
 
-    comment = db.plugin_comments_comment
-    comment.label=plugins.comments.body_label
-    comment.posted_on.writable=False
-    comment.posted_on.readable=False
-    comment.posted_by.writable=False
-    comment.posted_by.readable=False
-    return LOAD('plugin_comments','post.load',ajax=True)
+    db.define_table('plugin_comments_comment',
+        Field('body','text',label=plugins.comments.body_label),
+        auth.signature)
+    return lambda: LOAD('plugin_comments','post.load',ajax=True)
+plugin_comments = _()
 ``:code
 
-Notice how all the code except the table definition is encapsulated in a single function. Also notice how the function creates an instance of a ``PluginManager``.
+Notice how all the code except the table definition is encapsulated in a single function called ``_`` so that it does not pollute the global namespace. Also notice how the function creates an instance of a ``PluginManager``.
 
 Now in any other model in your app, for example in "models/db.py", you can configure this plugin as follows:
 
@@ -530,611 +511,17 @@ Third, modify the "views/layout.html" so that it simply reads:
 
 The benefit of this design is that users of this plugin can install multiple layouts and choose which one to apply simply by editing "views/layout.html". Moreover, "views/layout.html" will not be packed by **admin** together with the plugin, so there is no risk that the plugin will override the user's code in the previously installed layout.
 
-### ``plugin_wiki``
-``plugin_wiki``:inxx ``wiki``:inxx
+#### Plugins repositories
 
------
-DISCLAIMER: plugin_wiki is still very much under development and therefore we do not promise backward compatibility to the same level as for web2py core functions.
------
-
-**plugin_wiki** is a plugin on steroids.  What we mean is that it defines multiple useful components and it may change the way you develop your applications:
-
-You can download it from
+While there is no single repository of web2py plugins you can find many of them at one of the following to URLs:
 
 ``
-http://web2py.com/examples/static/web2py.plugin.wiki.w2p
+http://dev.s-cubism.com/web2py_plugins
+http://web2py.com/plugins
+http://web2py.com/layouts
 ``:code
 
-The idea behind **plugin_wiki** is that most applications include pages that are semi-static. These are pages that do not include complex custom logic. They contain structured text (think of a help page), images, audio, video, crud forms, or a set of standard components (comments, tags, charts, maps), etc. These pages may be public, require login or have other authorization restrictions. These pages may be linked by a menu or only be reachable via wizard form. **plugin_wiki** provides an easy way to add pages that fit in this category to your regular web2py applications.
+Here is a screenshot from the s-cubism repository:
 
-In particular **plugin_wiki** provides:
-``widget in plugin_wiki``:inxx
-
-- A wiki-like interface that allows to add pages to your app and reference them by a slug. These pages (which we will refer to as wiki pages) have versions and are stored in the database.
-- Public and private pages (require login). If a page requires login, it may also require that the user have a particular group membership.
-- Three levels: 1,2,3. At level 1, pages can only include text, images, audio and video. At level 2, pages can also include widgets (these are components as defined in the previous section that can be embedded in wiki pages). At level 3, pages can also include web2py template code.
-- A choice of editing pages with the markmin syntax or in HTML using a WYSIWYG editor.
-- A collection of widgets: implemented as components. They are self documenting and they can be embedded as regular components in normal web2py views or, using a simplified syntax, into wiki pages.
-- A set of special pages (``meta-code``, ``meta-menu``, etc.) that can be used to customize the plugin (for example define code the plugin should run, customize the menu, etc.)
-
-------
-The **welcome** app plus the **plugin_wiki** can be thought of as a development environment in itself that is suitable for building simple web applications such as a blog.
-------
-
-From here on we will assume the **plugin_wiki** is applied to a copy of the **welcome** scaffolding app.
-
-The first thing you notice after installing the plugin is that it adds a new menu item called ''pages''.
-
-Click on the ''pages'' menu item and you will be redirected to the plugin action:
-
-``
-http://127.0.0.1:8000/myapp/plugin_wiki/index
-``:code
-
-[[image @///image/en8400.png center 480px]]
-
-The plugin index page lists the pages created using the plugin itself and allows you to create new ones by choosing a ''slug''. Try creating a ``home`` page. You will be redirected to
-
-``
-http://127.0.0.1:8000/myapp/plugin_wiki/page/home
-``:code
-
-Click on ''create page'' to edit its content.
-
-[[image @///image/en8500.png center 480px]]
-
------
-By default, the plugin is at level 3, which means you can insert widgets as well as code in pages. By default it uses the markmin syntax to describe the page content.
------
-
-#### ``MARKMIN`` syntax
-``MARKMIN syntax``:inxx
-
-Here is a primer for the markmin syntax:
-
-------
-**markmin** | **html**
-``# title`` | ``<h1>title</h1>``
-``## subtitle`` | ``<h2>subtitle</h2>``
-``### subsubtitle`` | ``<h3>subsubtitle</h3>``
-``**bold**`` | ``<strong>bold</strong>``
-``''italic''`` | ``<i>italic</i>``
-``http://...`` | ``<a href="http://...com">http:...</a>``
-``http://...png`` | ``<img src="http://...png" />``
-``http://...mp3`` | ``<audio src="http://...mp3"></audio>``
-``http://...mp4`` | ``<video src="http://...mp4"></video>``
-``qr:http://...`` | ``<a href="http://..."><img src="qr code"/></a>``
-``embed:http://...`` | ``<iframe src="http://..."></iframe>``
-------
-
-Notice that links, images, audio, and video files are embedded automatically. For more information on MARKMIN syntax, please refer to Chapter 5.
-
-If the page does not exist, you will be asked to create one.
-
-The edit page allows you to add attachments to pages (i.e. static files)
-
-[[image @///image/en8600.png center 480px]]
-
-and you can link to them as
-
-``
-[[mylink name attachment:3.png]]
-``:code
-
-or embed them with
-
-``
-[[myimage attachment:3.png center 200px]]
-``:code
-
-The size (``200px``) is optional. ``center`` is not optional but it may be replaced by ``left`` or ``right``.
-
-You can embed blockquoted text with
-
-``
------
-this is blockquoted
------
-``:code
-
-as well as tables
-
-``
------
-0 | 0 | X
-0 | X | 0
-X | 0 | 0
------
-``:code
-
-and verbatim text
-
-``
-!`!!`!
-verbatim text
-!`!!`!
-``:code
-
-You can also prepend an optional ``:class`` to the final ``-----`` or the final ``!`!!`!``. For blockquoted text and tables it will be translated in the class of the tag, for example:
-
-``
------
-test
------:abc
-``:code
-
-renders as
-
-``
-<blockquote class="abc">test</blockquote>
-``:code
-
-For verbatim text the class can be used to embed content of different types.
-
-You can, for example, embed code with syntax highlighting by specifying the language with ``:code_``''language''
-
-``
-!`!!`!
-def index(): return 'hello world'
-!`!!`!:code_python
-``:code
-
-You can embed widgets:
-
-``
-!`!!`!
-name: widget_name
-attribute1: value1
-attribute2: value2
-!`!!`!:widget
-``:code
-
-From the edit page you can click on "widget builder" to insert widgets from a list, interactively:
-
-[[image @///image/en8700.png center 480px]]
-
-(for a list of widgets see the next subsection).
-
-You can also embed web2py template language code:
-
-``
-!`!!`!
-{{for i in range(10):}}<h1>{{=i}}</h1>{{pass}}
-!`!!`!:template
-``:code
-
-#### Page permissions
-
-When editing a page you will find the following fields:
-- **active** (defaults to ``True``). If a page is not active, it will not be accessible to visitors (even if public).
-- **public** (defaults to ``True``). If a page is public, it can be accessed by visitors without logging in.
-- **role** (defaults to None). If a page has a role, the page can be accessed only by visitors who are logged in and are members of the group with the corresponding role.
-
-#### Special pages
-``menu in plugin_wiki``:inxx
-
-**meta-menu** contains the menu. If this page does not exist, web2py uses the ``response.menu`` defined in "models/menu.py". The content of the meta-menu page overrides the menu. The syntax is the following:
-
-``
-Item 1 Name http://link1.com
-   Submenu Item 11 Name http://link11.com
-   Submenu Item 12 Name http://link12.com
-   Submenu Item 13 Name http://link13.com
-Item 2 Name http://link1.com
-   Submenu Item 21 Name http://link21.com
-      Submenu Item 211 Name http://link211.com
-      Submenu Item 212 Name http://link212.com
-   Submenu Item 22 Name http://link22.com
-   Submenu Item 23 Name http://link23.com
-``:code
-
-where the indentation determines the submenu structure. Each item is composed of the text of the menu item followed by a link. A link can be ``page:``''slug''. A link ``None`` does not link to any page. Extra spaces are ignored.
-
-Here is another example:
-
-``
-Home             page:home
-Search Engines   None
-   Yahoo         http://yahoo.com
-   Google        http://google.com
-   Bing          http://bing.com
-Help             page:help
-``:code
-
-This renders as follows:
-
-[[image @///image/en8800.png center 480px]]
-
-``meta-menu``:inxx ``meta-code``:inxx ``meta-header``:inxx ``meta-sidebar``:inxx ``meta-footer``:inxx
-**meta-code** is another special page and it must contain web2py code. This is an extension of your models, and in fact you can put model code here. It is executed when "models/plugin_wiki.py" code is executed.
-
-You can define tables in ``meta-code``.
-
-For example, you can create a simple table "friends" by placing this in ``meta-code``:
-
-``
-db.define_table('friend',Field('name',requires=IS_NOT_EMPTY()))
-``:code
-
-and you can create a friend-management interface by embedding in a page of your choice the following code:
-``jqGrid``:inxx ``CRUD``:inxx
-
-``
-## List of friends
-!`!!`!
-name: jqgrid
-table: friend
-!`!!`!:widget
-
-## New friend
-!`!!`!
-name: create
-table: friend
-!`!!`!:widget
-
-``:code
-
-The page has two headers (starting with #): "List of friends" and "New friend". The page contains two widgets (under the corresponding headers): a jqgrid widget that lists friends and a crud create widget to add a new friend.
-
-[[image @///image/en8900.png center 480px]]
-
-``meta-header``, ``meta-footer``, ``meta-sidebar`` are not used by the default layout in "welcome/views/layout.html". If you want to use them, edit "layout.html" using **admin** (or the shell) and place the following tags in the appropriate places:
-
-``
-{{=plugin_wiki.embed_page('meta-header') or ''}}
-{{=plugin_wiki.embed_page('meta-sidebar') or ''}}
-{{=plugin_wiki.embed_page('meta-footer') or ''}}
-``:code
-
-In this way, the content of those pages will show up in the header, sidebar and footer in the layout.
-
-#### Configuring plugin_wiki
-
-As with any other plugins in "models/db.py" you can do
-
-``
-from gluon.tools import PluginManager
-plugins = PluginManager()
-plugins.wiki.editor = auth.user.email == mail.settings.sender
-plugins.wiki.level = 3
-plugins.wiki.mode = 'markmin' or 'html'
-plugins.wiki.theme = 'ui-darkness'
-``:code
-
-where
-- **editor** is true if the current logged-in user is authorized to edit plugin_wiki pages
-- **level** is the permission: 1 to edit regular pages, 2 to embed widgets in pages, 3 to embed code
-- **mode** determines whether to use a "markmin" editor or a WYSIWYG "html" editor. ``WYSIWYG``:inxx
-- **theme** is the name of the required jQuery UI Theme. By default only the color-neutral "ui-darkness" is installed.
-
-You can add themes here:
-
-``
-static/plugin_wiki/ui/%(theme)s/jquery-ui-1.8.1.custom.css
-``:code
-
-#### Current widgets
-
-Each widget can be embedded both in plugin_wiki pages and in normal web2py templates.
-
-For example, to embed a YouTube video in a plugin_wiki page, you can do
-
-``
-!`!!`!
-name: youtube
-code: l7AWnfFRc7g
-!`!!`!:widget
-``
-
-or to embed the same widget in a web2py view, you can do:
-
-``
-{{=plugin_wiki.widget('youtube',code='l7AWnfFRc7g')}}
-``:code
-
-In either case, this is the output:
-
-[[image @///image/en9000.png center 480px]]
-
-Widget arguments that do not have a default value are required.
-
-Here is a list of all current widgets:
-
-**read**
-``
-read(table,record_id=None)
-``:code
-
-Reads and displays a record
-- ``table`` is the name of a table
-- ``record_id`` is a record number
-
-**create**
-``
-create(table,message='',next='',readonly_fields='',
-       hidden_fields='',default_fields='')
-``:code
-
-Displays a record create form
-- ``table`` is the name of a table
-- ``message`` is a the message to be displayed after record is created
-- ``next`` is where to redirect, example "page/index/[id]"
-- ``readonly_fields`` is a list of comma separated fields
-- ``hidden_fields`` is a list of comma separated fields
-- ``default_fields`` is a list of comma separated ``fieldname=value``
-
-**update**
-``
-update(table,record_id='',message='',next='',
-       readonly_fields='',hidden_fields='',default_fields='')
-``:code
-
-Displays a record update form
-- ``table`` is the name of a table
-- ``record_id`` is he record to be updated or ``{{=request.args(-1)}}``
-- ``message`` is a the message to be displayed after record is created
-- ``next`` is where to redirect, example "page/index/[id]"
-- ``readonly_fields`` is a list of comma separated fields
-- ``hidden_fields`` is a list of comma separated fields
-- ``default_fields`` is a list of comma separated ``fieldname=value``
-
-**select**
-``
-select(table,query_field='',query_value='',fields='')
-``:code
-
-Lists all records in the table
-- ``table`` is the name of a table
-- ``query_field`` and ``query_value`` if present will filter records by according to the query ``query_field == query_value``
-- ``fields`` is a list of comma separate fields to be displayed
-
-**search**
-``
-search(table,fields='')
-``:code
-
-Widgets for selecting records
-- ``table`` is the name of a table
-- ``fields`` is a list of comma separated fields to be displayed
-
-**jqgrid**
-``jqGrid``:inxx
-``
-jqgrid(table,fieldname=None,fieldvalue=None,col_widths='',
-       colnames=None,_id=None,fields='',col_width=80,width=700,height=300)
-``:code
-
-Embeds a jqGrid plugin
-- ``table`` is the table name
-- ``fieldname``, ``fieldvalue`` are an optional filter: ``fieldname==fieldvalue``
-- ``col_widths`` is the width of each column
-- ``colnames`` is a list of column names that are displayed
-- ``_id`` is the "id" of the TABLE that contains the jqGrid
-- ``fields`` is a list of columns to be displayed
-- ``col_width`` is the default width of columns
-- ``height`` is the height of the jqGrid
-- ``width`` is the width of the jqGrid
-
-Once you have the plugin_wiki installed, you can easily use the jqGrid in your other views too. Example usage (displays yourtable filtered by fk_id==47):
-``
-{{=plugin_wiki.widget('jqgrid','yourtable','fk_id',47,'70,150',
-    'Id,Comments',None,'id,notes',80,300,200)}}
-``:code
-
-**latex**
-``latex``:inxx
-``
-latex(expression)
-``:code
-
-Uses Google charting API to embed LaTeX
-
-**pie_chart**
-``pie chart``:inxx
-``
-pie_chart(data='1,2,3',names='a,b,c',width=300,height=150,align='center')
-``:code
-
-Embed a pie chart
-- ``data`` is a list of comma separated values
-- ``names`` is a list of comma separated labels (one for data item)
-- ``width`` is the width of the image
-- ``height`` is the height of the image
-- ``align`` determines the alignment of the image
-
-**bar_chart**
-``bar chart``:inxx
-``
-bar_chart(data='1,2,3',names='a,b,c',width=300,height=150,align='center')
-``:code
-
-Uses Google charting API to embed a bar chart
-- ``data`` is a list of comma separated values
-- ``names`` is a list of comma separated labels (one for data item)
-- ``width`` is the width of the image
-- ``height`` is the height of the image
-- ``align`` determines the alignment of the image
-
-**slideshow**
-``slideshow``:inxx
-``
-slideshow(table, field='image', transition='fade', width=200, height=200)
-``:code
-
-Embeds a slideshow. It gets the images from a table.
-
-- ``table`` is the table name
-- ``field`` is the upload field in the table that contains images
-- ``transition`` determines the type of transition, e.g. fade, etc.
-- ``width`` is the width of the image
-- ``height`` is the height of the image
-
-**youtube**
-``YouTube``:inxx
-``
-youtube(code, width=400, height=250)
-``:code
-
-Embeds a YouTube video (by code)
-- ``code`` is the code of the video
-- ``width`` is the width of the image
-- ``height`` is the height of the image
-
-**vimeo**
-``Vimeo``:inxx
-``
-vimeo(code, width=400, height=250)
-``:code
-
-Embeds a Vimeo video (by code)
-- ``code`` is the code of the video
-- ``width`` is the width of the image
-- ``height`` is the height of the image
-
-**mediaplayer**
-``flash mediaplayer``:inxx
-``
-mediaplayer(src, width=400, height=250)
-``:code
-
-Embeds a media file (such as Flash video or an mp3 file)
-- ``src`` is the src of the video
-- ``width`` is the width of the image
-- ``height`` is the height of the image
-
-**comments**
-``comments``:inxx
-``
-comments(table='None', record_id=None)
-``:code
-
-Embeds comments in the page
-
-Comments can be linked to a table and/or a record
-
-- ``table`` is the table name
-- ``record_id`` is the id of the record
-
-**tags**
-``tags``:inxx
-``
-tags(table='None', record_id=None)
-``:code
-
-Embeds tags in the page
-
-tags can be linked to a table and/or a record
-
-- ``table`` is the table name
-- ``record_id`` is the id of the record
-
-**tag_cloud**
-``tag cloud``:inxx
-``
-tag_cloud()
-``:code
-
-Embeds a tag cloud
-
-**map**
-``Google map``:inxx
-``
-map(key='....', table='auth_user', width=400, height=200)
-``:code
-Embeds a Google map.
-
-It gets points on the map from a table
-
-- ``key`` is the google map api key (default works for 127.0.0.1)
-- ``table`` is the table name
-- ``width`` is the map width
-- ``height`` is the map height
-
-The table must have columns: ``latitude``, ``longitude`` and ``map_popup``.
-When clicking on a dot, the ``map_popup`` message will appear.
-
-**iframe**
-``iframe``:inxx
-``
-iframe(src, width=400, height=300)
-``:code
-
-Embeds a page in an ``<iframe></iframe>``
-
-
-**load_url**
-``load_url``:inxx
-``
-load_url(src)
-``:code
-
-Loads the content of the url using the LOAD function
-
-**load_action**
-``load_action``:inxx
-``
-load_action(action, controller='', ajax=True)
-``:code
-
-Loads the content of URL(request.application, controller, action) using the LOAD function
-
-
-#### Extending widgets
-
-Widgets to plugin_wiki can be added by creating a new model file called "models/plugin_wiki_"''name'' where ''name'' is arbitrary and the file contains something like:
-
-``
-class PluginWikiWidgets(PluginWikiWidgets):
-    @staticmethod
-    def my_new_widget(arg1, arg2='value', arg3='value'):
-        """
-        document the widget
-	"""
-        return "body of the widget"
-``:code
-
-The first line states that you are extending the list of widgets. Inside the class, you can define as many functions as needed. Each static function is a new widget, except for functions that start with underscores. The function can take an arbitrary number of arguments which may or not have default values. The docstring of the function must document the function using the markmin syntax itself.
-
-When widgets are embedded into plugin_wiki pages, arguments will be passed to the widget as strings. This means the widget function must be able to accept strings for every argument and eventually convert them into the required representation. You can decide what the string representation must be - just make sure this is documented in the docstring.
-
-The widget can return a string of web2py helpers. In this latter case they will be serialized using ``.xml()``.
-
-Notice how the new widget can access any variable declared in the global namespace.
-
-As an example, we are going to create a new widget that display the "contact/ask" form created at the beginning of this chapter. This can be done by creating a file "models/plugin_wiki_contact" that contains:
-
-``
-class PluginWikiWidgets(PluginWikiWidgets):
-    @staticmethod
-    def ask(email_label='Your email', question_label='question'):
-        """
-	This plugin will display a contact us form that allows
-	the visitor to ask a question.
-	The question will be emailed to you and the widget will
-	disappear from the page.
-	The arguments are
-
-	- email_label: the label of the visitor email field
-	- question_label: the label of the question field
-
-	"""
-        form=SQLFORM.factory(
-           Field('your_email', requires=IS_EMAIL(), label=email_label),
-           Field('question', requires=IS_NOT_EMPTY()), label=question_label)
-        if form.process().accepted:
-           if mail.send(to='admin@example.com',
-                        subject='from %s' % form.vars.your_email,
-                        message = form.vars.question):
-	       command="jQuery('#%s').hide()" % div_id
-               response.flash = 'Thank you'
-               response.js = "jQuery('#%s').hide()" % request.cid
-        else:
-            form.errors.your_email="Unable to send the email"
-        return form.xml()
-``:code
-
--------
-plugin_wiki widgets are not rendered by a view unless the ``response.render(...)`` function is called explicitly by the widget.
--------
-
+[[image @///image/plugins.png center 480px]]
 
