@@ -2476,6 +2476,14 @@ Tasks with no stop_time set or picked up **BEFORE** stop_time are **ASSIGNED** t
 - **FAILED** when an exception is detected
 - **COMPLETED** when all went ok
 
+Values for ``start_time`` and ``stop_time`` should be datetime objects. To schedule "mytask" to run at 30 seconds from the current time, for example, you would do the following:
+
+``
+from datetime import timedelta as timed
+scheduler.queue_task('mytask',
+    start_time=request.now + timed(seconds=30))
+``:code
+
 Additionally, you can control how many times a task should be repeated (i.e. you need to aggregate some data at specified intervals). To do so, set the ``repeats``
 parameter (default = 1 time only, 0 = unlimited). You can influence how many seconds should pass between executions with the ``period`` parameter (default = 60 seconds).
 
@@ -2526,6 +2534,7 @@ Summary: you have
           period = 180,
        ....
       )``:python
+ -- since version 2.4.1 if you pass an additional parameter ``immediate=True`` it will force the main worker to reassign tasks. Until 2.4.1, the worker checks for new tasks every 5 cycles (so, ``5*heartbeats`` seconds). If you had an app that needed to check frequently for new tasks, to get a ''snappy'' behaviour you were forced to lower the ``heartbeat`` parameter, putting the db under pressure for no reason. With ``immediate=True`` you can force the check for new tasks: it will happen at most as ``heartbeat`` seconds are passed   
 
 The method returns the result of validate_and_insert, with the ``uuid`` of the task you queued (can be the one you passed or the auto-generated one).
 
@@ -2577,6 +2586,21 @@ name suggest, are more "commands" than real statuses.
 Hitting ctrl+c is equal to set a worker to **KILL**
 
 [[workers statuses @///image/bd891eed.png center]]
+
+There are a few commodity functions since version 2.4.1 (self-explanatory)
+``
+scheduler.disable()
+scheduler.resume()
+scheduler.terminate()
+scheduler.kill()
+``:code
+
+each function take an optional parameter, that can be a string or a list, to manage workers based on their ``group_names``. It defaults to the ``group_names`` defined in the scheduler istantiation.
+
+An example is better than a thousand words: ``scheduler.terminate('high_prio')`` will TERMINATE all the workers that are processing the ``high_prio`` tasks, while ``scheduler.terminate(['high_prio', 'low_prio'])`` will terminate all ``high_prio`` and ``low_prio`` workers.
+------
+Watch out: if you have a worker processing ``high_prio`` and ``low_prio``, ``scheduler.terminate('high_prio')`` will terminate the worker alltogether, even if you didn't want to terminate ``low_prio`` too.
+------ 
 
 Everything that one can do via appadmin one can do programmatically by inserting and updating records in these tables.
 
