@@ -3,7 +3,7 @@
 
 ### Dependencies
 
-web2py comes with a Database Abstraction Layer (DAL), an API that maps Python objects into database objects such as queries, tables, and records. The DAL dynamically generates the SQL in real time using the specified dialect for the database back end, so that you do not have to write SQL code or learn different SQL dialects (the term SQL is used generically), and the application will be portable among different types of databases. At the time of this writing, the supported databases are SQLite (which comes with Python and thus web2py), PostgreSQL, MySQL, Oracle, MSSQL, FireBird, DB2, Informix, Ingres, MongoDB, and the Google App Engine (SQL and NoSQL). Experimentally we support more databases. Please check on the web2py web site and mailing list for more recent adapters. Google NoSQL is treated as a particular case in Chapter 13.
+web2py comes with a Database Abstraction Layer (DAL), an API that maps Python objects into database objects such as queries, tables, and records. The DAL dynamically generates the SQL in real time using the specified dialect for the database back end, so that you do not have to write SQL code or learn different SQL dialects (the term SQL is used generically), and the application will be portable among different types of databases. A partial list of supported databases is show in the table below. Please check on the web2py web site and mailing list for more recent adapters. Google NoSQL is treated as a particular case in Chapter 13.
 
 The Windows binary distribution works out of the box with SQLite and MySQL. The Mac binary distribution works out of the box with SQLite.
 To use any other database back-end, run from the source distribution and install the appropriate driver for the required back end.
@@ -36,7 +36,7 @@ IMAP | imaplib ``IMAP``:cite
 
 web2py defines the following classes that make up the DAL:
 
-**DAL** represents a database connection. For example:
+The **DAL** object represents a database connection. For example:
 ``sqlite``:inxx
 ``
 db = DAL('sqlite://storage.db')
@@ -149,21 +149,18 @@ otherwise you'll get UnicodeDecodeErrors tickets.
 
 The second argument of the DAL constructor is the ``pool_size``; it defaults to zero.
 
-As it is rather slow to establish a new database connection for each request, web2py implements a mechanism for connection pooling. Once a connection is established and the page has been served and the transaction completed, the connection is not closed but goes into a pool. When the next http request arrives, web2py tries to obtain a connection from the pool and use that for the new transaction. If there are no available connections in the pool, a new connection is established.
-
-The ``pool_size`` parameter is ignored by SQLite and Google App Engine.
-
-Connections in the pools are shared sequentially among threads, in the sense that they may be used by two different but not simultaneous threads. There is only one pool for each web2py process.
+As it is rather slow to establish a new database connection for each request, web2py implements a mechanism for connection pooling. Once a connection is established and the page has been served and the transaction completed, the connection is not closed but goes into a pool. When the next http request arrives, web2py tries to recycle a connection from the pool and use that for the new transaction. If there are no available connections in the pool, a new connection is established.
 
 When web2py starts, the pool is always empty. The pool grows up to the minimum between the value of ``pool_size`` and the max number of concurrent requests. This means that if ``pool_size=10`` but our server never receives more than 5 concurrent requests, then the actual pool size will only grow to 5. If ``pool_size=0`` then connection pooling is not used.
 
+Connections in the pools are shared sequentially among threads, in the sense that they may be used by two different but not simultaneous threads. There is only one pool for each web2py process.
+
+The ``pool_size`` parameter is ignored by SQLite and Google App Engine.
 Connection pooling is ignored for SQLite, since it would not yield any benefit.
 
 #### Connection failures
 
 If web2py fails to connect to the database it waits 1 seconds and tries again up to 5 times before declaring a failure. In case of connection pooling it is possible that a pooled connection that stays open but unused for some time is closed by the database end. Thanks to the retry feature web2py tries to re-establish these dropped connections.
-
-When using connection pooling a connection is used, put back in the pool and then recycled. It is possible that while the connection is idle in pool the connection is closed by the database server. This can be because of a malfunction or a timeout. When this happens web2py detects it and re-establish the connection.
 
 #### Replicated databases
 
@@ -181,7 +178,7 @@ in Chapter 13 in the context of scalability.
 ### Reserved keywords
 ``reserved Keywords``:inxx
 
-There is also another argument that can be passed to the DAL constructor to check table names and column names against reserved SQL keywords in target back-end databases.
+``check_reserved`` is yet another argument that can be passed to the DAL constructor. It tells it to check table names and column names against reserved SQL keywords in target back-end databases.
 
 This argument is ``check_reserved`` and it defaults to None.
 
@@ -214,7 +211,7 @@ The following database backends support reserved words checking.
 
 ### ``DAL``, ``Table``, ``Field``
 
-The best way to understand the DAL API is to try each function yourself. This can be done interactively via the web2py shell, although ultimately, DAL code goes in the models and controllers.
+You can experiment with the DAL API using the web2py shell.
 
 Start by creating a connection. For the sake of example, you can use SQLite. Nothing in this discussion changes when you change the back-end engine.
 
@@ -342,7 +339,7 @@ Decimal requires and returns values as ``Decimal`` objects, as defined in the Py
 
 The ``big-id`` and, ``big-reference`` are only supported by some of the database engines and are experimental. They are not normally used as field types unless for legacy tables, however, the DAL constructor has a ``bigint_id`` argument that when set to ``True`` makes the ``id`` fields and ``reference`` fields ``big-id`` and ``big-reference`` respectively.
 
-The ``list:`` fields are special because they are designed to take advantage of certain denormalization features on NoSQL (in the case of Google App Engine NoSQL, the field types ``ListProperty`` and ``StringListProperty``) and back-port them all the other supported relational databases. On relational databases lists are stored as a ``text`` field. The items are separated by a ``|`` and each ``|`` in string item is escaped as a ``||``. They are discussed in their own section.
+The ``list:<type>`` fields are special because they are designed to take advantage of certain denormalization features on NoSQL (in the case of Google App Engine NoSQL, the field types ``ListProperty`` and ``StringListProperty``) and back-port them all the other supported relational databases. On relational databases lists are stored as a ``text`` field. The items are separated by a ``|`` and each ``|`` in string item is escaped as a ``||``. They are discussed in their own section.
 
 The ``json`` field type is pretty much explanatory. It can store any json serializable object. It is designed to work specifically for MongoDB and backported to the other database adapters for portability.
 
@@ -356,14 +353,18 @@ Notice that ``requires=...`` is enforced at the level of forms, ``required=True`
 - ``notnull=True`` translates into the "NOT NULL" SQL statement. It prevents the database from inserting null values for the field.
 - ``unique=True`` translates into the "UNIQUE" SQL statement and it makes sure that values of this field are unique within the table. It is enforced at the database level.
 - ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
-- ``uploadfolder`` defaults to the application's "uploads/" folder. If set to a different path, files will uploaded to a different folder. For example, uploadfolder=os.path.join(request.folder,'static/temp') will upload files to the web2py/applications/myapp/static/temp folder.
-- ``uploadseparate`` if set to True will upload files under different subfolders of the ''uploadfolder'' folder. This is optimized to avoid too many files under the same folder/subfolder. ATTENTION: You cannot change the value of ``uploadseparate`` from True to False without breaking the system. web2py either uses the separate subfolders or it does not. Changing the behavior after files have been uploaded will prevent web2py from being able to retrieve those files. If this happens it is possible to move files and fix the problem but this is not described here.
-- ``uploadfs`` allows you specify a different file system where to upload files, including an Amazon S3 storage or a remote FTP storage. This option requires PyFileSystem installed. ``uploadfs`` must point to ``PyFileSystem``. ``PyFileSystem``:inxx ``uploadfs``:idxx
+- ``uploadfolder`` defaults to the application's "uploads/" folder. If set to a different path, files will uploaded to a different folder. For example,
+``
+Field(...,uploadfolder=os.path.join(request.folder,'static/temp'))
+``:code
+will upload files to the "web2py/applications/myapp/static/temp" folder.
+- ``uploadseparate`` if set to True will upload files under different subfolders of the ''uploadfolder'' folder. This is optimized to avoid too many files under the same folder/subfolder. ATTENTION: You cannot change the value of ``uploadseparate`` from True to False without breaking links to existing uploads. web2py either uses the separate subfolders or it does not. Changing the behavior after files have been uploaded will prevent web2py from being able to retrieve those files. If this happens it is possible to move files and fix the problem but this is not described here.
+- ``uploadfs`` allows you specify a different file system where to upload files, including an Amazon S3 storage or a remote SFTP storage. This option requires PyFileSystem installed. ``uploadfs`` must point to ``PyFileSystem``. ``PyFileSystem``:inxx ``uploadfs``:idxx
 - ``widget`` must be one of the available widget objects, including custom widgets, for example: ``SQLFORM.widgets.string.widget``. A list of available widgets will be discussed later. Each field type has a default widget.
-- ``label`` is a string (or something that can be serialized to a string) that contains the label to be used for this field in auto-generated forms.
-- ``comment``  is a string (or something that can be serialized to a string) that contains a comment associated with this field, and will be displayed to the right of the input field in the autogenerated forms.
-- ``writable`` if a field is writable, it can be edited in autogenerated create and update forms.
-- ``readable`` if a field is readable, it will be visible in read-only forms. If a field is neither readable nor writable, it will not be displayed in create and update forms.
+- ``label`` is a string (or a helper or something that can be serialized to a string) that contains the label to be used for this field in auto-generated forms.
+- ``comment``  is a string (or a helper or something that can be serialized to a string) that contains a comment associated with this field, and will be displayed to the right of the input field in the autogenerated forms.
+- ``writable`` declares whether a field is writable in forms.
+- ``readable`` declares whether a field is readable in forms. If a field is neither readable nor writable, it will not be displayed in create and update forms.
 - ``update`` contains the default value for this field when the record is updated.
 - ``compute`` is an optional function. If a record is inserted or updated, the compute function will be executed and the field will be populated with the function result. The record is passed to the compute function as a ``dict``, and the dict will not include the current value of that, or any other compute field.
 - ``authorize`` can be used to require access control on the corresponding field, for "upload" fields only. It will be discussed more in detail in the context of Authentication and Authorization.
@@ -486,10 +487,10 @@ The DAL class also takes a "migrate" argument, which determines the default valu
 will set the default value of migrate to False whenever ``db.define_table`` is called without a migrate argument.
 
 ------
-Notice that web2py only migrates new columns, removed columns, and changes in column type (not in sqlite). web2py does not migrate changes in attributes such as changes in the values of ``default``, ``unique``, ``notnull``, and ``ondelete``.
+Notice that web2py only migrates new columns, removed columns, and changes in column type (except in sqlite). web2py does not migrate changes in attributes such as changes in the values of ``default``, ``unique``, ``notnull``, and ``ondelete``.
 ------
 
-Migrations can be disabled for all tables at the moment of connection:
+Migrations can be disabled for all tables at once:
 
 ``
 db = DAL(...,migrate_enabled=False)
@@ -525,7 +526,8 @@ Migration problems can also be fixed for all tables at once:
 db = DAL(...,fake_migrate_all=True)
 ``:code
 
-Although if this fails, it will not help in narrowing down the problem.
+This also fails if the model describes tables that do not exist in the database,
+but it can help narrowing down the problem.
 
 ### ``insert``
 
@@ -721,9 +723,7 @@ The easiest way is when these conditions are met:
 - Each table must have a unique auto-increment integer field called "id"
 - Records must be referenced exclusively using the "id" field.
 
--------
 When accessing an existing table, i.e., a table not created by web2py in the current application, always set ``migrate=False``.
--------
 
 If the legacy table has an auto-increment integer field but it is not called "id", web2py can still access it but the table definition must contain explicitly as ``Field('....','id')`` where ... is the name of the auto-increment integer field.
 
@@ -746,7 +746,7 @@ db.define_table('account',
 - The ``update_record`` function is not available for Rows of keyed tables.
 
 -------
-Note that currently this is only available for DB2, MS-SQL, Ingres and Informix, but others can be easily added.
+Currently keyed tables are only supported for DB2, MS-SQL, Ingres and Informix, but others engines will be added.
 -------
 
 At the time of writing, we cannot guarantee that the ``primarykey`` attribute works with every existing legacy table and every supported database backend.
@@ -1191,7 +1191,7 @@ rows=db(...).select().sort(lambda row: random.random())
 ``:code
 -----
 
-And you can sort the records according to multiple fields by concatenating them with a "|":
+You can sort the records according to multiple fields by concatenating them with a "|":
 ``
 >>> for row in db().select(
         db.person.ALL, orderby=db.person.name|db.person.id):
@@ -1410,7 +1410,7 @@ The insert can be done using the following syntax:
 
 ``
 db[tablename].insert(**{fieldname:value})
-``:
+``:code
 
 The update of record with given id can be done with: ``_id``:inxx
 
@@ -1497,7 +1497,7 @@ John
 #### ``find``, ``exclude``, ``sort``
 ``find``:inxx ``exclude``:inxx ``sort``:inxx
 
-There are times when one needs to perform two selects and one contains a subset of a previous select. In this case it is pointless to access the database again. The ``find``, ``exclude`` and ``sort`` objects allow you to manipulate a Rows objects and generate another one without accessing the database. More specifically:
+Some times you to perform two selects and one contains a subset of a previous select. In this case it is pointless to access the database again. The ``find``, ``exclude`` and ``sort`` objects allow you to manipulate a Rows objects and generate another one without accessing the database. More specifically:
 - ``find`` returns a new set of Rows filtered by a condition and leaves the original unchanged.
 - ``exclude`` returns a new set of Rows filtered by a condition and removes them from the original Rows.
 - ``sort`` returns a new set of Rows sorted by a condition and leaves the original unchanged.
@@ -2357,7 +2357,7 @@ generated by the DAL.
 
 #### CSV (one Table at a time)
 
-When a DALRows object is converted to a string it is automatically
+When a Rows object is converted to a string it is automatically
 serialized in CSV:
 
 ``csv``:inxx
@@ -2372,14 +2372,14 @@ person.id,person.name,thing.id,thing.name,thing.owner
 
 You can serialize a single table in CSV and store it in a file "test.csv":
 ``
->>> open('test.csv', 'w').write(str(db(db.person.id).select()))
+>>> open('test.csv', 'wb').write(str(db(db.person.id).select()))
 ``:code
 
 This is equivalent to
 
 ``
 >>> rows = db(db.person.id).select()
->>> rows.export_to_csv_file(open('test.csv', 'w'))
+>>> rows.export_to_csv_file(open('test.csv', 'wb'))
 ``:code
 
 You can read the CSV file back with:
@@ -2454,7 +2454,7 @@ must:
 
 This can be achieved without modifying web2py. Here is what to do:
 
-**1.** Change the above model into:
+Change the above model into:
 
 ``
 db.define_table('person',
@@ -2479,10 +2479,10 @@ if not db(db.person.id).count():
 ``:code
 
 -------
-Note, in the above table definitions, the default value for the two 'uuid' fields is set to a lambda function, which returns a UUID (converted to a string). The lambda function is called once for each record inserted, ensuring that each record gets a unique UUID, even if multiple records are inserted in a single transaction.
+Notice that in the above table definitions, the default value for the two ``uuid`` fields is set to a lambda function, which returns a UUID (converted to a string). The lambda function is called once for each record inserted, ensuring that each record gets a unique UUID, even if multiple records are inserted in a single transaction.
 -------
 
-**2.** Create a controller action to export the database:
+Create a controller action to export the database:
 
 ``
 def export():
@@ -2492,12 +2492,12 @@ def export():
     return s.getvalue()
 ``:code
 
-**3.** Create a controller action to import a saved copy of the other database and sync records:
+Create a controller action to import a saved copy of the other database and sync records:
 
 ``
 def import_and_sync():
     form = FORM(INPUT(_type='file', _name='data'), INPUT(_type='submit'))
-    if form.process(session=None).accepted:
+    if form.process().accepted:
         db.import_from_csv_file(form.vars.data.file,unique=False)
         # for every table
         for table in db.tables:
@@ -2512,12 +2512,8 @@ def import_and_sync():
     return dict(form=form)
 ``:code
 
-Notice that ``session=None`` disables the CSRF protection since this URL is intended to be accessed from outside.
+Optionally you should create an index manually to make the search by uuid faster.
 
-**4.** Create an index manually to make the search by uuid faster.
-
-Notice that steps 2 and 3 work for every database model; they are not
-specific for this example.
 
 ``XML-RPC``:inxx
 Alternatively, you can use XML-RPC to export/import the file.
@@ -2526,8 +2522,8 @@ If the records reference uploaded files, you also need to export/import the cont
 
 #### HTML and XML (one Table at a time)
 
-``DALRows objects``:inxx
-DALRows objects also have an ``xml`` method (like helpers) that serializes it to XML/HTML:
+``Rows objects``:inxx
+Rows objects also have an ``xml`` method (like helpers) that serializes it to XML/HTML:
 
 ``HTML``:inxx
 
@@ -2557,8 +2553,8 @@ DALRows objects also have an ``xml`` method (like helpers) that serializes it to
 </table>
 ``:code
 
-``DALRows custom tags``:inxx
-If you need to serialize the DALRows in any other XML format with custom tags, you can easily do that using the universal TAG helper and the * notation:
+``Rows custom tags``:inxx
+If you need to serialize the Rows in any other XML format with custom tags, you can easily do that using the universal TAG helper and the * notation:
 ``XML``:inxx
 
 ``
@@ -2626,10 +2622,6 @@ If you do not need these methods you can speed up selects a lot by setting the c
 ``
 rows = db(query).select(cacheable=True)
 ``:code
-
--------
-The results of a ``select`` are normally complex, un-pickleable objects; they cannot be stored in a session and cannot be cached in any other way than the one explained here unless the ``cache`` attribute is set or ``cacheable=True``.
--------
 
 When the ``cache`` argument is set but ``cacheable=False`` (default) only the database results are cached, not the actual Rows object. When the ``cache`` argument is used in conjunction with ``cacheable=True`` the entire Rows object is cached and this results in much faster caching:
 
@@ -2831,7 +2823,7 @@ For this purpose there the Set objects have an ``update_naive`` method that work
 
 ``_enable_record_versioning``:inxx
 
-It is possible to ask web2py to save every copy of a record when the record is modified. There are different ways to do it and it can be done for all tables at once using the syntax:
+It is possible to ask web2py to save every copy of a record when the record is individually modified. There are different ways to do it and it can be done for all tables at once using the syntax:
 
 ``
 auth.enable_record_versioning(db)
@@ -2953,7 +2945,8 @@ db(query, ignore_common_filters=True).select(...)
 
 ``SQLCustomType``:inxx
 
-It is possible to define new/custom field types. For example we consider here the example if a field that contains binary data in compressed form:
+Aside for using ``filter_in`` and ``filter_out``, it is possible to define new/custom field types.
+For example we consider here the example if a field that contains binary data in compressed form:
 
 ``
 from gluon.dal import SQLCustomType
@@ -3005,7 +2998,7 @@ The DAL supports geographical APIs using PostGIS (for PostgreSQL), spatialite (f
 
 DAL provides geometry and geography fields types and the following functions:
 
-``st_asgeojson``:inxx ``st_astext``:inxx ``st_contained``:inxx ``st_contains``:inxx
+``st_asgeojson``:inxx ``st_astext``:inxx ``st_contains``:inxx
 ``st_distance``:inxx ``st_equals``:inxx ``st_intersects``:inxx ``st_overlaps``:inxx
 ``st_simplify``:inxx ``st_touches``:inxx ``st_within``:inxx
 
@@ -3172,7 +3165,7 @@ db._adapter.execute(query)
 
 where the first line builds the query and the second executes it.
 
-``BaseAdapter`` define the interface for all adapters.
+``BaseAdapter`` defines the interface for all adapters.
 
 "gluon/dal.py" at the moment of writing this book, contains the following adapters:
 
@@ -3241,7 +3234,7 @@ class MySQLAdapter(BaseAdapter):
 
 ``:code
 
-Looking at the various adapters as examples should be easy to write new ones.
+Looking at the various adapters as example should be easy to write new ones.
 
 When ``db`` instance is created:
 
