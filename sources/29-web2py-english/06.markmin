@@ -1035,7 +1035,7 @@ Consider the previous table person and a new table "thing" referencing a "person
 ``
 >>> db.define_table('thing',
         Field('name'),
-        Field('owner','reference person'))
+        Field('owner_id','reference person'))
 ``:code
 
 and a simple select from this table:
@@ -1054,10 +1054,10 @@ where ``._id`` is a reference to the primary key of the table. Normally ``db.thi
 
 For each Row of things it is possible to fetch not just fields from the selected table (thing) but also from linked tables (recursively):
 ``
->>> for thing in things: print thing.name, thing.owner.name
+>>> for thing in things: print thing.name, thing.owner_id.name
 ``:code
 
-Here ``thing.owner.name`` requires one database select for each thing in things and it is therefore inefficient. We suggest using joins whenever possible instead of recursive selects, nevertheless this is convenient and practical when accessing individual records.
+Here ``thing.owner_id.name`` requires one database select for each thing in things and it is therefore inefficient. We suggest using joins whenever possible instead of recursive selects, nevertheless this is convenient and practical when accessing individual records.
 
 You can also do it backwards, by selecting the things referenced by a person:
 
@@ -1070,7 +1070,7 @@ for thing in person.thing.select(orderby=db.thing.name):
 In this last expressions ``person.thing`` is a shortcut for
 
 ``
-db(db.thing.owner==person.id)
+db(db.thing.owner_id==person.id)
 ``:code
 
 i.e. the Set of ``thing``s referenced by the current ``person``. This syntax breaks down if the referencing table has multiple references to the referenced table. In this case one needs to be more explicit and use a full Query.
@@ -1813,38 +1813,38 @@ To illustrate how to implement one to many relations with the web2py DAL, define
                     format='%(name)s')
 >>> db.define_table('thing',
                     Field('name'),
-                    Field('owner', 'reference person'),
+                    Field('owner_id', 'reference person'),
                     format='%(name)s')
 ``:code
 
-Table "thing" has two fields, the name of the thing and the owner of the thing. The "owner" field id a reference field. A reference type can be specified in two equivalent ways:
+Table "thing" has two fields, the name of the thing and the owner of the thing. The "owner_id" field id a reference field. A reference type can be specified in two equivalent ways:
 
 ``
-Field('owner', 'reference person')
-Field('owner', db.person)
+Field('owner_id', 'reference person')
+Field('owner_id', db.person)
 ``:code
 
 The latter is always converted to the former. They are equivalent except in the case of lazy tables, self references or other types of cyclic references where the former notation is the only allowed notation.
 
 When a field type is another table, it is intended that the field reference the other table by its id. In fact, you can print the actual type value and get:
 ``
->>> print db.thing.owner.type
+>>> print db.thing.owner_id.type
 reference person
 ``:code
 
 Now, insert three things, two owned by Alex and one by Bob:
 ``
->>> db.thing.insert(name='Boat', owner=1)
+>>> db.thing.insert(name='Boat', owner_id=1)
 1
->>> db.thing.insert(name='Chair', owner=1)
+>>> db.thing.insert(name='Chair', owner_id=1)
 2
->>> db.thing.insert(name='Shoes', owner=2)
+>>> db.thing.insert(name='Shoes', owner_id=2)
 3
 ``:code
 
 You can select as you did for any other table:
 ``
->>> for row in db(db.thing.owner==1).select():
+>>> for row in db(db.thing.owner_id==1).select():
         print row.name
 Boat
 Chair
@@ -1872,7 +1872,7 @@ Another way to achieve a similar result is by using a join, specifically an INNE
 
 ``Rows``:inxx ``inner join``:inxx ``join``:inxx
 ``
->>> rows = db(db.person.id==db.thing.owner).select()
+>>> rows = db(db.person.id==db.thing.owner_id).select()
 >>> for row in rows:
         print row.person.name, 'has', row.thing.name
 Alex has Boat
@@ -1897,7 +1897,7 @@ row.thing.name
 
 There is an alternative syntax for INNER JOINS:
 ``
->>> rows = db(db.person).select(join=db.thing.on(db.person.id==db.thing.owner))
+>>> rows = db(db.person).select(join=db.thing.on(db.person.id==db.thing.owner_id))
 >>> for row in rows:
     print row.person.name, 'has', row.thing.name
 Alex has Boat
@@ -1910,11 +1910,11 @@ While the output is the same, the generated SQL in the two cases can be differen
 ``
 >>> db.define_table('thing',
         Field('name'),
-        Field('owner1','reference person'),
-        Field('owner2','reference person'))
+        Field('owner_id1','reference person'),
+        Field('owner_id2','reference person'))
 >>> rows = db(db.person).select(
-    join=[db.person.with_alias('owner1').on(db.person.id==db.thing.owner1).
-          db.person.with_alias('owner2').on(db.person.id==db.thing.owner2)])
+    join=[db.person.with_alias('owner_id1').on(db.person.id==db.thing.owner_id1).
+          db.person.with_alias('owner_id2').on(db.person.id==db.thing.owner_id2)])
 ``
 
 The value of ``join`` can be list of ``db.table.on(...)`` to join.
@@ -1927,7 +1927,7 @@ Notice that Carl did not appear in the list above because he has no things. If y
 ``
 >>> rows=db().select(
         db.person.ALL, db.thing.ALL,
-        left=db.thing.on(db.person.id==db.thing.owner))
+        left=db.thing.on(db.person.id==db.thing.owner_id))
 >>> for row in rows:
         print row.person.name, 'has', row.thing.name
 Alex has Boat
@@ -1952,7 +1952,7 @@ When doing joins, sometimes you want to group rows according to certain criteria
 ``grouping``:inxx
 ``
 >>> count = db.person.id.count()
->>> for row in db(db.person.id==db.thing.owner).select(
+>>> for row in db(db.person.id==db.thing.owner_id).select(
         db.person.name, count, groupby=db.person.name):
         print row.person.name, row[count]
 Alex 2
@@ -2232,11 +2232,11 @@ In those cases where a nested select is required and the look-up field is a refe
 
 ``
 db.define_table('person',Field('name'))
-db.define_table('thing',Field('owner'),Field('owner','reference thing'))
-db(db.thing.owner.belongs(db.person.name=='Jonathan')).select()
+db.define_table('thing,Field('name'), Field('owner_id','reference thing'))
+db(db.thing.owner_id.belongs(db.person.name=='Jonathan')).select()
 ``:code
 
-In this case it is obvious that the next select only needs the field referenced by the ``db.thing.owner`` field so we do not need the more verbose ``_select`` notation.
+In this case it is obvious that the next select only needs the field referenced by the ``db.thing.owner_id`` field so we do not need the more verbose ``_select`` notation.
 
 ``nested_select``:inxx
 
@@ -2244,7 +2244,7 @@ A nested select can also be used as insert/update value but in this case the syn
 
 ``
 lazy = db(db.person.name=='Jonathan').nested_select(db.person.id)
-db(db.thing.id==1).update(owner = lazy)
+db(db.thing.id==1).update(owner_id = lazy)
 ``:code
 
 In this case ``lazy`` is a nested expression that computes the ``id`` of person "Jonathan". The two lines result in one single SQL query.
@@ -2362,9 +2362,9 @@ serialized in CSV:
 
 ``csv``:inxx
 ``
->>> rows = db(db.person.id==db.thing.owner).select()
+>>> rows = db(db.person.id==db.thing.owner_id).select()
 >>> print rows
-person.id,person.name,thing.id,thing.name,thing.owner
+person.id,person.name,thing.id,thing.name,thing.owner_id
 1,Alex,1,Boat,1
 1,Alex,2,Chair,1
 2,Bob,3,Shoes,2
@@ -2432,13 +2432,13 @@ db.define_table('person',
     Field('name'),
     format='%(name)s')
 db.define_table('thing',
-    Field('owner', 'reference person'),
+    Field('owner_id', 'reference person'),
     Field('name'),
     format='%(name)s')
 
 if not db(db.person).count():
     id = db.person.insert(name="Massimo")
-    db.thing.insert(owner=id, name="Chair")
+    db.thing.insert(owner_id=id, name="Chair")
 ``:code
 
 Each record is identified by an ID and referenced by that ID. If you
@@ -2466,16 +2466,16 @@ db.define_table('person',
 db.define_table('thing',
     Field('uuid', length=64, default=lambda:str(uuid.uuid4())),
     Field('modified_on', 'datetime', default=now),
-    Field('owner', length=64),
+    Field('owner_id', length=64),
     Field('name'),
     format='%(name)s')
 
-db.thing.owner.requires = IS_IN_DB(db,'person.uuid','%(name)s')
+db.thing.owner_id.requires = IS_IN_DB(db,'person.uuid','%(name)s')
 
 if not db(db.person.id).count():
     id = uuid.uuid4()
     db.person.insert(name="Massimo", uuid=id)
-    db.thing.insert(owner=id, name="Chair")
+    db.thing.insert(owner_id=id, name="Chair")
 ``:code
 
 -------
@@ -2537,7 +2537,7 @@ Rows objects also have an ``xml`` method (like helpers) that serializes it to XM
       <th>person.name</th>
       <th>thing.id</th>
       <th>thing.name</th>
-      <th>thing.owner</th>
+      <th>thing.owner_id</th>
     </tr>
   </thead>
   <tbody>
