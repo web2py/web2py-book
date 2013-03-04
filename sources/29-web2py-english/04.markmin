@@ -184,7 +184,7 @@ The web2py workflow is the following:
 - If the action returns a string, this is returned to the client (or if the action returns a web2py HTML helper object, it is serialized and returned to the client).
 - If the action returns an iterable, this is used to loop and stream the data to the client.
 - If the action returns a dictionary, web2py tries to locate a view to render the dictionary. The view must have the same name as the action (unless specified otherwise) and the same extension as the requested page (defaults to .html); on failure, web2py may pick up a generic view (if available and if enabled). The view sees every variable defined in the models as well as those in the dictionary returned by the action, but does not see global variables defined in the controller.
-- The entire user code is executed in a single transaction unless specified otherwise.
+- The entire user code is executed in a single database transaction unless specified otherwise.
 - If the user code succeeds, the transaction is committed.
 - If the user code fails, the traceback is stored in a ticket, and a ticket ID is issued to the client. Only the system administrator can search and read the tracebacks in tickets.
 
@@ -370,7 +370,7 @@ Notice that the controller and the view are executed in different copies of the 
 
 If an exception (other than HTTP) is raised, web2py does the following:
 - Stores the traceback in an error file and assigns a ticket number to it.
-- Rolls back all open transactions.
+- Rolls back all open database transactions.
 - Returns an error page reporting the ticket number.
 
 If the exception is an ``HTTP`` exception, this is assumed to be the intended behavior (for example, an ``HTTP`` redirect), and all open database transactions are committed. The behavior after that is specified by the ``HTTP`` exception itself. The ``HTTP`` exception class is not a standard Python exception; it is defined by web2py.
@@ -409,10 +409,10 @@ This is created upon installation and overwritten on upgrade.
 -------
 The first time you start web2py, two new folders are created: deposit and applications. The deposit folder is used as temporary storage for installing and uninstalling applications.
 
-Also, the first time you start web2py and after an upgrade, the "welcome" app is zipped into a "welcome.w2p" file to be used as a scaffolding app.
+The first time you start web2py and after an upgrade, the "welcome" app is zipped into a "welcome.w2p" file to be used as a scaffolding app.
 -------
 
-When web2py is upgraded it comes with a file called "NEWINSTALL". If web2py finds this file, it understand an upgrade was performed, hence it removed the file and creates a new "welcome.w2p".
+When web2py is upgraded it comes with a file called "NEWINSTALL". If web2py finds this file, it understands an upgrade was performed, hence it removed the file and creates a new "welcome.w2p".
 
 The current web2py version is stored in the field "VERSION" and it follows standard semantic versioning notation where the build id is the build timestamp.
 
@@ -553,12 +553,12 @@ gluon/contrib/stripe.py
 gluon/contrib/AuthorizeNet.py
 ``:code
 
-**Dowcommerce** ``dowcommerce``:cite credit cart processing API:
+**Dowcommerce** ``dowcommerce``:cite credit card processing API:
 ``
 gluon/contrib/DowCommerce.py
 ``:code
 
-**PaymentTech** credit cart processing API:
+**PaymentTech** credit card processing API:
 
 ``
 gluon/contrib/paymentech.py
@@ -628,7 +628,7 @@ scripts/access.wsgi
 scripts/cpdb.py
 ``:code
 
-The first three are particularly useful because they attempt a complete installation and setup of a web2py production environment from scratch.
+The ``setup-web2py-*`` are particularly useful because they attempt a complete installation and setup of a web2py production environment from scratch.
 Some of these are discussed in Chapter 14, but all of them contain a documentation string inside that explains their purpose and usage.
 
 Finally web2py includes these files required to build the binary distributions.
@@ -673,7 +673,7 @@ cache        errors       upload     sessions  static
 
 "__init__.py" is an empty file which is required in order to allow Python (and web2py) to import the modules in the ``modules`` directory.
 
-Notice that the **admin** application simply provides a web interface to web2py applications on the server file system. web2py applications can also be created and developed from the command-line; you don't have to use the browser **admin** interface.  A new application can be created manually by replicating the above directory structure under ,e.g., "applications/newapp/" (or simply untar the ``welcome.w2p`` file into your new application directory). Application files can also be created and edited from the command-line without having to use the web **admin** interface.
+Notice that the **admin** application simply provides a web interface to web2py applications on the server file system. web2py applications can also be created and developed from the command-line or your preferred text editor/IDE; you don't have to use the browser **admin** interface.  A new application can be created manually by replicating the above directory structure under ,e.g., "applications/newapp/" (or simply untar the ``welcome.w2p`` file into your new application directory). Application files can also be created and edited from the command-line without having to use the web **admin** interface.
 
 ### API
 
@@ -751,7 +751,7 @@ from gluon.tools import Auth, Crud, Service
 
 #### Accessing the API from Python modules
 
-Your models or controller may import python modules, and these may need to use some of the web2py API. The way for them to do it is importing them:
+Your models or controller may import python modules, and these may need to use some of the web2py API. The way to do it is by importing them:
 
 ``
 from gluon import *
@@ -787,8 +787,13 @@ For uniformity with normal Python behavior, by default web2py does not reload mo
 from gluon.custom_import import track_changes; track_changes(True)
 ``:code
 
-From now on, every time a module is imported, the importer will check if the Python source file (.py) has changed. If it has changed, the module will be reloaded. This applies to all Python modules, even Python modules outside web2py. The mode is global and applies to all applications. Changes made to models, controllers, and views are always reloaded regardless of the mode used. To turn the mode off, use the same function with ``False`` as the argument. To know the actual tracking state, use the ``is_tracking_changes()`` function, also from ``gluon.custom_import``.
+From now on, every time a module is imported, the importer will check if the Python source file (.py) has changed. If it has changed, the module will be reloaded. 
 
+------
+Do not call track_changes in the modules themselves.
+------
+
+Track changes only tracks changes for modules that are stored in the application.
 Modules that import ``current`` can access:
 - ``current.request``
 - ``current.response``
@@ -803,14 +808,12 @@ from gluon import current
 current.auth = auth
 ``
 
-and now all modules imported can access
-
-- ``current.auth``
+and now all modules imported can access ``current.auth``.
 
 ``current`` and ``import`` create a powerful mechanism to build extensible and reusable modules for your applications.
 
 -------
-There is one major caveat. Given ``from gluon import current``, it is correct to use ``current.request`` and any of the other thread local objects but one should never assign them to global variables in the module, such as in
+Beware! Given ``from gluon import current``, it is correct to use ``current.request`` and any of the other thread local objects but one should never assign them to global variables in the module, such as in
 ``
 request = current.request # WRONG! DANGER!
 ``
@@ -858,17 +861,17 @@ my_other_storage = Storage(dict(a=1, b=2)) # convert dictionary to Storage
 -----
 
 ``request`` has the following items/attributes, some of which are also an instance of the ``Storage`` class:
-- ``request.cookies``: a ``Cookie.SimpleCookie()`` object containing the cookies passed with the HTTP request. It acts like a dictionary of cookies. Each cookie is a Morsel object (see http://docs.python.org/2/library/cookie.html#id2).
+- ``request.cookies``: a ``Cookie.SimpleCookie()`` object containing the cookies passed with the HTTP request. It acts like a dictionary of cookies. Each cookie is a Morsel object ``morsel``:cite.
 - ``request.env``: a ``Storage`` object containing the environment variables passed to the controller, including HTTP header variables from the HTTP request and standard WSGI parameters. The environment variables are all converted to lower case, and dots are converted to underscores for easier memorization.
-- ``request.application``: the name of the requested application (parsed from ``request.env.path_info``).
-- ``request.controller``: the name of the requested controller (parsed from the ``request.env.path_info``).
-- ``request.function``: the name of the requested function (parsed from the ``request.env.path_info``).
+- ``request.application``: the name of the requested application.
+- ``request.controller``: the name of the requested controller.
+- ``request.function``: the name of the requested function.
 - ``request.extension``: the extension of the requested action. It defaults to "html". If the controller function returns a dictionary and does not specify a view, this is used to determine the extension of the view file that will render the dictionary (parsed from the ``request.env.path_info``).
 - ``request.folder``: the application directory. For example if the application is "welcome", ``request.folder`` is set to the absolute path "/path/to/welcome". In your programs, you should always use this variable and the ``os.path.join`` function to build paths to the files you need to access. Although web2py always uses absolute paths, it is a good rule never to explicitly  change the current working folder (whatever that is) since this is not a thread-safe practice.
 - ``request.now``: a ``datetime.datetime`` object storing the datetime of the current request.
 - ``request.utcnow``: a ``datetime.datetime`` object storing the UTC datetime of the current request.
 - ``request.args``: A list of the URL path components following the controller function name; equivalent to ``request.env.path_info.split('/')[3:]``
-- ``request.vars``: a ``gluon.storage.Storage`` object containing the HTTP GET and HTTP POST query variables.
+- ``request.vars``: a ``gluon.storage.Storage`` object containing both the HTTP GET and HTTP POST query variables.
 - ``request.get_vars``: a ``gluon.storage.Storage`` object containing only the HTTP GET query variables.
 - ``request.post_vars``: a ``gluon.storage.Storage`` object containing only the HTTP POST query variables.
 - ``request.client``: The ip address of the client as determined by, if present, ``request.env.http_x_forwarded_for`` or by ``request.env.remote_addr`` otherwise. While this is useful it should not be trusted because the ``http_x_forwarded_for`` can be spoofed.
@@ -884,7 +887,7 @@ my_other_storage = Storage(dict(a=1, b=2)) # convert dictionary to Storage
 {{=BEAUTIFY(request.user_agent())}}
 ``:code
 
-- ``request.global_settings`` ``request.global_settings``:inxx contains web2py wide system settings. They are set automatically automatically and you should not change them. For example ``request.global_settings.gluon_parent`` contains the full path to the web2py folder, ``request.global_settings.is_pypy`` determines if web2py is running on PyPy.
+- ``request.global_settings`` ``request.global_settings``:inxx contains web2py system wide settings. They are set automatically and you should not change them. For example ``request.global_settings.gluon_parent`` contains the full path to the web2py folder, ``request.global_settings.is_pypy`` determines if web2py is running on PyPy.
 
 - ``request.wsgi`` is a hook that allows you to call third party WSGI applications from inside actions
 
@@ -984,12 +987,12 @@ Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi 
 - ``response.body``: a ``StringIO`` object into which web2py writes the output page body. NEVER CHANGE THIS VARIABLE.
 - ``response.cookies``: similar to ``request.cookies``, but while the latter contains the cookies sent from the client to the server, the former contains cookies sent by the server to the client. The session cookie is handled automatically.
 - ``response.download(request, db)``: a method used to implement the controller function that allows downloading of uploaded files. ``request.download`` expects the last ``arg`` in ``request.args`` to be the encoded filename (i.e., the filename generated at upload time and stored in the upload field). It extracts the upload field name and table name as well as the original filename from the encoded filename. ``response.download`` takes two optional arguments: ``chunk_size`` sets the size in bytes for chunked streaming (defaults to 64K), and ``attachments`` determines whether the downloaded file should be treated as an attachment or not (default to ``True``). Note, ``response.download`` is specifically for downloading files associated with ``db`` upload fields. Use ``response.stream`` (see below) for other types of file downloads and streaming. Also, note that it is not necessary to use ``response.download`` to access files uploaded to the /static folder -- static files can (and generally should) be accessed directly via URL (e.g., /app/static/files/myfile.pdf).
-- ``response.files``: a list of .css, .js, coffee, and .less files required by the page. They will automatically be linked in the head of the standard "layout.html" via the included "web2py_ajax.html". To include a new CSS, JS, COFFEE, or LESS file, just append it to this list. It will handle duplicates. The order is significant.
+- ``response.files``: a list of ``.css``, ``.js``, ``coffee``, and ``.less`` files required by the page. They will automatically be linked in the head of the standard "layout.html" via the included "web2py_ajax.html". To include a new CSS, JS, COFFEE, or LESS file, just append it to this list. It will handle duplicates. The order is important.
 - ``response.include_files()`` generates html head tags to include all ``response.files`` (used in "views/web2py_ajax.html").
 - ``response.flash``: optional parameter that may be included in the views. Normally used to notify the user about something that happened.
-- ``response.headers``: a ``dict`` for HTTP response headers. Web2py sets some headers by default, including "Content-Length", "Content-Type", and "X-Powered-By" (set equal to web2py). Web2py also sets the "Cache-Control", "Expires", and "Pragma" headers to prevent client-side caching, except for static file requests, for which client-side caching is enabled. The headers that web2py sets can be overwritten or removed, and new headers can be added (e.g., ``response.headers['Cache-Control'] = 'private'``). You can remove a header removing its key from the response.headers dict, e.g.``del response.headers['Custom-Header']``, however web2py's default headers will be re-added just before returning the response. To avoid this behavior, just set the header value to None, e.g. to remove the default Content-Type header, ``response.headers['Content-Type'] = None``
+- ``response.headers``: a ``dict`` for HTTP response headers. Web2py sets some headers by default, including "Content-Length", "Content-Type", and "X-Powered-By" (set equal to web2py). Web2py also sets the "Cache-Control", "Expires", and "Pragma" headers to prevent client-side caching, except for static file requests, for which client-side caching is enabled. The headers that web2py sets can be overwritten or removed, and new headers can be added (e.g., ``response.headers['Cache-Control'] = 'private'``). You can remove a header by removing its key from the response.headers dict, e.g.``del response.headers['Custom-Header']``, however web2py's default headers will be re-added just before returning the response. To avoid this behavior, just set the header value to None, e.g. to remove the default Content-Type header, ``response.headers['Content-Type'] = None``
 - ``response.menu``: optional parameter that may be included in the views, normally used to pass a navigation menu tree to the view. It can be rendered by the MENU helper.
-- ``response.meta``: a storage object (like a dict) that contains optional meta information like ``response.meta.author``, ``.description``, and/or ``.keywords``. The content of each meta variable is automatically placed in the proper ``META`` tag by the code in "views/web2py_ajax.html", which is included by default in "views/layout.html".
+- ``response.meta``: a Storage object that contains optional ``<meta>`` information like ``response.meta.author``, ``.description``, and/or ``.keywords``. The content of each meta variable is automatically placed in the proper ``META`` tag by the code in "views/web2py_ajax.html", which is included by default in "views/layout.html".
 - ``response.include_meta()`` generates a string that includes all ``response.meta`` headers serialized (used in "views/web2py_ajax.html").
 - ``response.postprocessing``: this is a list of functions, empty by default. These functions are used to filter the response object at the output of an action, before the output is rendered by the view. It can be used to implement support for other template languages.
 - ``response.render(view, vars)``: a method used to call the view explicitly inside the controller. ``view`` is an optional parameter which is the name of the view file, ``vars`` is a dictionary of named values passed to the view.
@@ -1003,7 +1006,7 @@ Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi 
 - ``response.title``: optional parameter that may be included in the views. It should contain the title of the page and should be rendered by the HTML title TAG in the header.
 - ``response.toolbar``: a function that allows you to embed a toolbar into page for debugging purposes ``{{=response.toolbar()}}``. The toolbar displays request, response, session variables and database access time for each query.
 - ``response._vars``: this variable is accessible only in a view, not in the action. It contains the value returned by the action to the view.
-- ``response._caller``: this is a function that wraps all action calls. It defaults to the identity function, but it can be modifed in order to catch special types of exception to do extra logging;
+- ``response._caller``: this is a function that wraps all action calls. It defaults to the identity function, but it can be modified in order to catch special types of exception to do extra logging;
   ``
   response._caller = lambda f: f()
   ``
@@ -1040,7 +1043,7 @@ response.meta.*
 
 because this will make it easier for you to replace the standard "layout.html" file that comes with web2py with another layout file, one that uses the same set of variables.
 
-Old versions of web2py user ``response.author`` instead of ``response.meta.author`` and similar for the other meta attributes.
+Old versions of web2py used ``response.author`` instead of ``response.meta.author`` and similar for the other meta attributes.
 
 ### ``session``
 ``session``:inxx ``session.connect``:inxx ``session.forget``:inxx ``session.secure``:inxx
@@ -1054,14 +1057,14 @@ can be retrieved at a later time:
 a = session.myvariable
 ``:code
 
-as long as the code is executed within the same session by the same user (provided the user has not deleted session cookies and the session did not expire). Because ``session`` is a ``Storage`` object, trying to access an attribute/key that has not been set does not raise an exception; it returns ``None`` instead.
+as long as the code is executed within the same session by the same user (provided the user has not deleted session cookies and the session has not expired). Because ``session`` is a ``Storage`` object, trying to access an attribute/key that has not been set does not raise an exception; it returns ``None`` instead.
 
 The session object has three important methods. One is ``forget``:
 ``
 session.forget(response)
 ``:code
 
-It tells web2py not to save the session. This should be used in those controllers whose actions are called often and do not need to track user activity. ``session.forget()`` prevents the session file from being written, regardless of whether it has been modified. ``session.forget(response)`` additionally unlocks and closes the session file. You rarely need to call this method since sessions are not saved when they are not changed. However, if the page makes multiple simultaneous Ajax requests, it is a good idea for the actions called via Ajax to call ``session.forget(response)`` (assuming the session is not needed by the action). Otherwise, each Ajax action will have to wait for the previous one to complete (and unlock the session file) before proceeding, which will slow down the page loading. Notice that sessions are not locked when stored in database.
+It tells web2py not to save the session. This should be used in those controllers whose actions are called often and do not need to track user activity. ``session.forget()`` prevents the session file from being written, regardless of whether it has been modified. ``session.forget(response)`` additionally unlocks and closes the session file. You rarely need to call this method since sessions are not saved when they are not changed. However, if the page makes multiple simultaneous Ajax requests, it is a good idea for the actions called via Ajax to call ``session.forget(response)`` (assuming the session is not needed by the action). Otherwise, each Ajax action will have to wait for the previous one to complete (and unlock the session file) before proceeding, which will slow down the page loading. Notice that sessions are not locked when stored in the database.
 
 Another method is:
 
@@ -1123,6 +1126,7 @@ In the "generic.html" view this is done using ``{{=response.toolbar()}}``.
 #### Separate sessions
 
 If you are storing sessions on filesystems and you have lots of them, the file system access may become a bottle-neck. One solution is the following:
+If you are storing sessions on filesystem and you have lots of them, the file system access may become a bottle-neck. One solution is the following:
 ``
 session.connect(request, response, separate=True)
 ``:code
@@ -1171,7 +1175,7 @@ def cache_in_ram_and_disk():
     return dict(time=t, link=A('click me', _href=request.url))
 ``:code
 
-The output of ``lambda: time.ctime()`` is cached on disk (using the shelve module) and then in RAM for 5 seconds. web2py looks in RAM first and if not there it looks on disk. If it is not in RAM or on disk, ``lambda: time.ctime()`` is executed and the cache is updated. This technique is useful in a multiprocess environment. The two times do not have to be the same.
+The output of ``lambda: time.ctime()`` is cached on disk (using the shelve module) and then in RAM for 5 seconds. web2py looks in RAM first and if not there it looks on disk. If it is not in RAM or on disk, ``lambda: time.ctime()`` is executed and the cache is updated. This technique is useful in a multiprocessor environment. The two times do not have to be the same.
 
 The following example is caching in RAM the output of the controller function (but not the view):
 
@@ -1184,7 +1188,7 @@ def cache_controller_in_ram():
     return dict(time=t, link=A('click me', _href=request.url))
 ``:code
 
-The dictionary returned by ``cache_controller_in_ram`` is cached in RAM for 5 seconds. Note that the result of a database select cannot be cached without first being serialized. A better way is to cache the database select directly using the ``select`` method ``cache`` argument.
+The dictionary returned by ``cache_controller_in_ram`` is cached in RAM for 5 seconds. Note that the result of a database select cannot be cached without first being serialized. A better way is to cache the database select directly using the ``select`` method's ``cache`` argument.
 
 The following example is caching the output of the controller function on disk (but not the view):
 ``
@@ -1232,7 +1236,7 @@ You can clear one or more cache variables with
 cache.ram.clear(regex='...')
 ``:code
 
-where ``regex`` is a regular expression matching all the keys you want removed from the cache. You can also clear an single item with:
+where ``regex`` is a regular expression matching all the keys you want removed from the cache. You can also clear a single item with:
 ``
 cache.ram(key, None)
 ``:code
@@ -1242,7 +1246,7 @@ where ``key`` is the key of the cached item.
 It is also possible to define other caching mechanisms such as memcache. Memcache is available via ``gluon.contrib.memcache`` and is discussed in more details in Chapter 14.
 
 ------
-Be careful when caching that caching is usually at the app-level not at the user level. If you need, for example, to cache user specific content, choose a key that includes the user id.
+Be careful when caching to remeber that caching is usually at the app-level not at the user level. If you need, for example, to cache user specific content, choose a key that includes the user id.
 ------
 
 
@@ -1496,7 +1500,7 @@ redirect(...,type='auto')
 ``:code
 
 
-### ``T``, Internationalization, and Pluralization
+### Internationalization, and Pluralization with ``T``
 ``T``:inxx ``internationalization``:inxx
 
 The object ``T`` is the language translator. It constitutes a single global instance of the web2py class ``gluon.language.translator``. All string constants (and only string constants) should be marked by ``T``, for example:
@@ -1506,7 +1510,7 @@ a = T("hello world")
 
 Strings that are marked with ``T`` are identified by web2py as needing language translation and they will be translated when the code (in the model, controller, or view) is executed. If the string to be translated is not a constant but a variable, it will be added to the translation file at runtime (except on GAE) to be translated later.
 
-The ``T`` object can also contain interpolated variables and support multiple equivalent syntax:
+The ``T`` object can also contain interpolated variables and supports multiple equivalent syntaxes:
 ``
 a = T("hello %s", ('Tim',))
 a = T("hello %(name)s", dict(name='Tim'))
@@ -1556,7 +1560,7 @@ T("Hello World", language="it-it")
 ``:code
 
 --------------
-In the case multiple languages are requested, for example "it-it, fr-ft", web2py tries to locate "it-it.py" and "fr-fr.py" translation files. If none of the requested files is present, it tries to fallback on "it.py" and "fr.py". If these files are not present it defaults to "default.py". If this is not present either, it default to no-translation. The more general rule is that web2py tries "xx-xy-yy.py", "xx-xy.py", "xx.py", "default.py" for each of the "xx-xy-yy" accepted languages trying to find the closest match to the visitor's preferences.
+In the case multiple languages are requested, for example "it-it, fr-ft", web2py tries to locate "it-it.py" and "fr-fr.py" translation files. If none of the requested files is present, it tries to fall back on "it.py" and "fr.py". If these files are not present it defaults to "default.py". If this is not present either, it default to no-translation. The more general rule is that web2py tries "xx-xy-yy.py", "xx-xy.py", "xx.py", "default.py" for each of the "xx-xy-yy" accepted languages trying to find the closest match to the visitor's preferences.
 -------------
 
 You can turn off translations completely via
@@ -1598,7 +1602,7 @@ T.accepted_language
 
 #### Translating variables
 
-Mind that T(...) does not just translate strings but can also translated variables:
+T(...) does not only translate strings but it can also transate values stored in variables:
 ``
 >>> a="test"
 >>> print T(a)
@@ -1627,7 +1631,7 @@ The text following the ``##``, including the double ``##``, are comments.
 
 #### Pluralization engine
 
-Since version 2.0, web2py includes a powerful pluralization system (PS). This means that when text marked for translation depends on a numeric variable, it may be translated differently based on the numeric value. For example in english we may render:
+Since version 2.0, web2py includes a powerful pluralization system (PS). This means that when text marked for translation depends on a numeric variable, it may be translated differently based on the numeric value. For example in English we may render:
 
 ``
 x book(s)
@@ -1636,8 +1640,8 @@ x book(s)
 with
 
 ``
-a book (x==0)
-x books (x>0)
+a book (x==1)
+5 books (x==5)
 ``
 
 English has one singular form and one plural form. The plural form is constructed by adding a "-s" or "-es" or using an exceptional form. web2py provides a way to define pluralization rules for each languages, as well as exceptions to the default rules. In fact web2py already knows pluralization rules for many languages. It knows, for example, that Slovenian has one singular form and 3 plural forms (for x==1, x==3 or x==4 and x>4). These rules are encoded in "gluon/contrib/plural_rules/*.py" files and new files can be created. Explicit pluralizations for words are created by editing pluralization files using the administrative interface.
@@ -1649,9 +1653,9 @@ T("You have %s %%{book}", symbols=10)
 ``:code
 
 Now the PS is activated for the word "book" and for the number 10.
-The result in english will be: "You have 10 books". Notice that "book" has been pluralized into "books".
+The result in English will be: "You have 10 books". Notice that "book" has been pluralized into "books".
 
-The PS consists from 3 parts:
+The PS consists of 3 parts:
 - placeholders ``%%{}`` to mark words in ``T``-messages
 - rule to give a decision which word form to use ("rules/plural_rules/*.py")
 - dictionary with word plural forms ("app/languages/plural-*.py")
@@ -1674,7 +1678,7 @@ where:
 
 For example:
 
-- ``%%{word}`` is equivalent to %%{word[0]} (if no modifiers are used).
+- ``%%{word}`` is equivalent to ``%%{word[0]}`` (if no modifiers are used).
 - ``%%{word[index]}`` is used when symbols is a tuple. symbols[index] gives us a number used to make a decision on which word form to choose.
 - ``%%{word(key)}`` is used to get the numeric parameter from symbols[key]
 - ``%%{word(number)}`` allows to set a ``number`` directly (e.g.: ``%%{word(%i)}``)
@@ -1689,7 +1693,7 @@ where ``[0]`` is an item index in symbols tuple.
 ``T("blabla %s %s %%{word[1]}", (var1, var2))``
 PS is used for "word" and var2 respectively.
 
-You can use several %%{} placeholders with one index:
+You can use several ``%%{}`` placeholders with one index:
 
 ``T("%%{this} %%{is} %s %%{book}", var)``
 
@@ -1697,7 +1701,7 @@ or
 
 ``T("%%{this[0]} %%{is[0]} %s %%{book[0]}", var)``
 
-Generate:
+They generate:
 
 ``
 var  output
@@ -1732,7 +1736,7 @@ var  output
 ------------------
  1   this is a book
  2   these are 2 books
- 3   these are 2 books
+ 3   these are 3 books
  ...
 ``
 
@@ -1742,7 +1746,7 @@ Inside ``%%{...}`` you can also use the following modifiers:
 - ``!!`` to capitalize every word (equivalent to ``string.title``)
 - ``!!!`` to capitalize every character (equivalent to ``string.upper``)
 
-Notice you can use ``\\`` to escape ``!`` and ``?``.
+Notice you can use \ to escape ``!`` and ``?``.
 
 #### Translations, pluralization, and MARKMIN
 
@@ -1846,15 +1850,11 @@ Notice that if you edit routes.py, you must reload it. This can be done in two w
 
 The parameter-based (parametric) router provides easy access to several "canned" URL-rewrite methods. Its capabilities include:
 
-* Omitting default application, controller and function names from externally-visible URLs (those created by the URL() function)
-
-* Mapping domains (and/or ports) to applications or controllers
-
-* Embedding a language selector in the URL
-
-* Removing a fixed prefix from incoming URLs and adding it back to outgoing URLs
-
-* Mapping root files such as /robots.txt to an applications static directory
+- Omitting default application, controller and function names from externally-visible URLs (those created by the URL() function)
+- Mapping domains (and/or ports) to applications or controllers
+- Embedding a language selector in the URL
+- Removing a fixed prefix from incoming URLs and adding it back to outgoing URLs
+- Mapping root files such as /robots.txt to an applications static directory
 
 The parametric router also provides somewhat more flexible validation of incoming URLs.
 
@@ -2231,7 +2231,7 @@ location ~* /(\w+)/static(?:/_[\d]+\.[\d]+\.[\d]+)?/(.*)$ {
 
 ### Running tasks in the background
 
-In web2py, every http request is served in its own thread. Threads are recycled for efficiency and managed by the web server. For security, the web server sets a time-out on each request. This means that actions should not run tasks that take too long, should not create new threads, and should not fork processes (it is possible but not recommended).
+In web2py, every HTTP request is served in its own thread. Threads are recycled for efficiency and managed by the web server. For security, the web server sets a time-out on each request. This means that actions should not run tasks that take too long, should not create new threads, and should not fork processes (it is possible but not recommended).
 
 The proper way to run time-consuming tasks is doing it in the background. There is not a single way of doing it, but here we describe three mechanisms that are built into web2py: **cron**, **homemade task queues**, and **scheduler**.
 
@@ -2331,7 +2331,7 @@ In chapter 8, we will provide an example of how to use the above method to send 
 #### Scheduler (experimental)
 
 The web2py scheduler works very much like the task queue described in the previous sub-section with some differences:
-- It provides a standard mechanism for creating and scheduling tasks.
+- It provides a standard mechanism for creating, scheduling, and monitoring tasks.
 - There is not a single background process but a set of workers processes.
 - The job of worker nodes can be monitored because their state, as well as the state of the tasks, is stored in the database.
 - It works without web2py but that is not documented here.
@@ -2350,10 +2350,10 @@ def task_add(a,b):
 Tasks will always be called in the same environment seen by controllers and therefore they see all the global variables defined in models, including database connections (``db``). Tasks differ from a controller action because they are not associated with an HTTP request and therefore there is no ``request.env``.
 
 ------
-NB: remind to call db.commit() at the end of every task if it involves inserts/updates to the database. Web2py commits by default at the end of a successful function call but the scheduler doesn't
+Remember to call ``db.commit()`` at the end of every task if it involves inserts/updates to the database. web2py commits by default at the end of a successful action but the scheduler tasks are not actions.
 ------
 
-To enable the scheduler you should put into a model its instantiation.
+To enable the scheduler you must instantiate the Scheduler class in a model.
 The recommended way to enable the scheduler to your app is to create a model file named ``scheduler.py`` and define your function there. After the functions, you can put the following code into the model:
 
 ``
@@ -2361,7 +2361,7 @@ from gluon.scheduler import Scheduler
 scheduler = Scheduler(db)
 ``:code
 
-NB: If your tasks are defined in a module (as opposed to a model) you may have to restart the workers.
+If your tasks are defined in a module (as opposed to a model) you may have to restart the workers.
 
 The task is scheduled with
 
@@ -2411,8 +2411,8 @@ Scheduler(
 
 Let's see them in order:
 
-- ``db`` is the database DAL instance were you want the scheduler tables be placed.
-- ``tasks`` can be a dict. Must be defined if you want to call a function not by his name, i.e. ``tasks=dict(mynameddemo1=task_add)`` will let you execute function demo1 with ``scheduler.queue_task('mynameddemo1')`` instead of ``scheduler.queue_task('task_add')``. If you don't pass this parameter, function will be searched in the app environment.
+- ``db`` is the database DAL instance where you want the scheduler tables be placed.
+- ``tasks`` is a dictionary that maps task names into functions. If you do not pass this parameter, function will be searched in the app environment.
 - ``worker_name`` is None by default. As soon as the worker is started, a worker name is generated as hostname-uuid. If you want to specify that, be sure that it's unique.
 - ``group_names`` is by default set to **[main]**. All tasks have a ``group_name`` parameter, set to **main** by default. Workers can only pick up tasks of their assigned group.
 
@@ -2464,25 +2464,36 @@ All tasks follow a lifecycle
 
 [[scheduler tasks @///image/ce8edcc3.png center]]
 
-Let's go with order. By default, when you send a task to the scheduler, you'll want that to be executed. It's in **QUEUED** status.
+By default, when you send a task to the scheduler, 
+it is in the **QUEUED** status.
 If you need it to be executed later, use the ``start_time`` parameter (default = now).
-If for some reason you need to be sure that the task don't get executed after a certain point in time (maybe a request to a webservice
+If for some reason you need to be sure that the task does not 
+get executed after a certain point in time (maybe a request to a web service
 that shuts down at 1AM, a mail that needs to be sent not after the working hours, etc...) you can set a ``stop_time`` (default = None) for it.
-If your task is NOT picked up by a worker before stop_time, it will be set as **EXPIRED**.
-Tasks with no stop_time set or picked up **BEFORE** stop_time are **ASSIGNED** to a worker. When a workers picks up them, they become **RUNNING**.
+If your task is NOT picked up by a worker before ``stop_time``, it will be set as **EXPIRED**.
+Tasks with no ``stop_time`` set or picked up **BEFORE** stop_time are **ASSIGNED** to a worker. When a workers picks up a task, its status is set to **RUNNING**.
+
 **RUNNING** tasks may end up:
-- **TIMEOUT** when more than n seconds passed with ``timeout`` parameter (default = 60 seconds)
-- **FAILED** when an exception is detected
-- **COMPLETED** when all went ok
+- **TIMEOUT** when more than ``n`` seconds passed with ``timeout`` parameter (default = 60 seconds).
+- **FAILED** when an exception is detected,
+- **COMPLETED** when they successfully complete.
+
+Values for ``start_time`` and ``stop_time`` should be datetime objects. To schedule "mytask" to run at 30 seconds from the current time, for example, you would do the following:
+
+``
+from datetime import timedelta as timed
+scheduler.queue_task('mytask',
+    start_time=request.now + timed(seconds=30))
+``:code
 
 Additionally, you can control how many times a task should be repeated (i.e. you need to aggregate some data at specified intervals). To do so, set the ``repeats``
 parameter (default = 1 time only, 0 = unlimited). You can influence how many seconds should pass between executions with the ``period`` parameter (default = 60 seconds).
 
 ------
-NB: the time is not calculated between the END of the first round and the START of the next, but from the START time of the first round to the START time of the next cycle)
+The time period is not calculated between the END of the first round and the START of the next, but from the START time of the first round to the START time of the next cycle)
 ------
 
-Another nice addition, you can set how many times the function can raise an exception (i.e. requesting data from a slow webservice) and be queued again instead of stopping in **FAILED**  status with the parameter ``retry_failed`` (default = 0, -1 = unlimited).
+You can also set how many times the function can raise an exception (i.e. requesting data from a slow web service) and be queued again instead of stopping in **FAILED**  status using the parameter ``retry_failed`` (default = 0, -1 = unlimited).
 
 [[task repeats @///image/7d8b85e4.png center]]
 
@@ -2492,50 +2503,71 @@ Summary: you have
 - ``retry_failed`` to control how many times the task can "fail"
 - ``start_time`` and ``stop_time`` to schedule a function in a restricted timeframe
 
-##### queue_task() and task_status()
-- ``scheduler.queue_task(function, pargs=[], pvars={}, **kwargs)`` : accepts a lot of arguments, to make your life easier....
- -- ``function`` : required. This can be a string as ``'demo2'`` or directly the function, i.e. you can use ``scheduler.queue_task(demo2)``
- -- ``pargs`` : p stands for "positional". pargs will accept your args as a list, without the need to jsonify them first.
- ------
- ``scheduler.queue_task(demo1, [1,2])``
+##### ``queue_task`` and ``task_status``
+
+The method:
+``
+scheduler.queue_task(function, pargs=[], pvars={}, **kwargs)
+``:code
+allows you to queue tasks to be executed by workers. It takes the following parameters:
+
+- ``function`` (required): It can be a task name or a reference to an actual function.
+- ``pargs``: are the arguments to be passed to the task, stored as a Python list.
+- ``pvars`` : are the named arguments to be passed to the task, stored as a Python dictionary.
+- ``kwargs`` : all other scheduler_task columns can be passed as keywords arguments (for example repeats, period, timeout).
+
+For example:
+
+``
+scheduler.queue_task('demo1', [1,2])
+``
  
- does the exact same thing as 
+does the exact same thing as 
 
- ``st.validate_and_insert(function_name = 'demo1', args=dumps([1,2]))``
+``
+scheduler.queue_task('demo1', pvars={'a':1, 'b':2})
+``:code
 
- and in a lot less characters
+as
 
- **NB**: if you do ``scheduler.queue_task(demo1, [1,2], args=dumps([2,3]))`` , ``args`` will prevail and the task will be queued with **2,3**
- ------
- -- ``pvars`` : as with ``pargs``, will accept your vars as a dict, without the need to jsonify them first.
- ------
- ``scheduler.queue_task(demo1, [], {'a': 1, 'b' : 2})`` or ``scheduler.queue_task(demo1, pvars={'a': 1, 'b' : 2})``
+``
+st.validate_and_insert(function_name='demo1', args=json.dumps([1,2]))
+``:code
+
+and as:
+
+``
+st.validate_and_insert(function_name='demo1', vars=json.dumps({'a':1,'b':2}))
+``:code
+
+Here is a more complex complete example:
+``
+def task_add(a,b):
+    return a+b
+
+secheduler = Scheduler(db, tasks=dict(demo1=task_add))
+
+scheduler.queue_task('demo1', pvars=dict(a=1,b=2),
+                     repeats = 0, period = 180)
+``:code
+
+Since version 2.4.1 if you pass an additional parameter ``immediate=True`` it will force the main worker to reassign tasks. Until 2.4.1, the worker checks for new tasks every 5 cycles (so, ``5*heartbeats`` seconds). If you had an app that needed to check frequently for new tasks, to get a ''snappy'' behaviour you were forced to lower the ``heartbeat`` parameter, putting the db under pressure for no reason. With ``immediate=True`` you can force the check for new tasks: it will happen at most as ``heartbeat`` seconds are passed   
+
+A call to ``scheduler.queue_task`` returns the task ``id`` and ``uuid`` of the task you queued (can be the one you passed or the auto-generated one), and possible ``errors``:
+
+``
+<Row {'errors': {}, 'id': 1, 'uuid': '08e6433a-cf07-4cea-a4cb-01f16ae5f414'}>
+``
  
- does the exact same thing as
- 
- ``st.validate_and_insert(function_name = 'demo1', vars=dumps({'a': 1, 'b' : 2}))``
- 
- **NB**:  if you do ``scheduler.queue_task(demo1, None, {'a': 1, 'b': 2}, vars=dumps({'a': 2, 'b' : 3}))`` , ``vars`` will prevail and the task will be queued with **{'a': 2, 'b' : 3}**
- ------
- -- ``kwargs`` : all other scheduler_task columns can be passed as keywords arguments, e.g. :
-  ... ``
-       scheduler.queue_task(
-          demo1, [1,2], {a: 1, b : 2},
-          repeats = 0,
-          period = 180,
-       ....
-      )``:python
+If there are errors (usually syntax error os input validation errors),
+you get the result of the validation, and id and uuid will be None
 
-The method returns the result of validate_and_insert, with the ``uuid`` of the task you queued (can be the one you passed or the auto-generated one).
-
-``<Row {'errors': {}, 'id': 1, 'uuid': '08e6433a-cf07-4cea-a4cb-01f16ae5f414'}>``
- 
-If there are errors (e.g. you used ``period = 'a'``), you'll get the result of the validation, and id and uuid will be None
-
-``<Row {'errors': {'period': 'enter an integer greater than or equal to 0'}, 'id': None, 'uuid': None}>``
-
+``
+<Row {'errors': {'period': 'enter an integer greater than or equal to 0'}, 'id': None, 'uuid': None}>
+``
 
 ##### Results and output
+
 The table "scheduler_run" stores the status of all running tasks. Each record references a task that has been picked up by a worker.  One task can have multiple runs. For example, a task scheduled to repeat 10 times an hour will probably have 10 runs (unless one fails or they take longer than 1 hour). Beware that if the task has no return values, it is removed from the scheduler_run table as soon as it is finished.
 
 Possible run statuses are:
@@ -2557,25 +2589,41 @@ Using appadmin, one can check all ``RUNNING`` tasks, the output of ``COMPLETED``
 The scheduler also creates one more table called "scheduler_worker", which stores the workers' heartbeat and their status. Possible worker statuses are:
 
 ##### Managing processes
+
 Worker fine management is hard. This module tries not to leave behind any platform (Mac, Win, Linux) .
 
-When you start a worker, you may want later to:
+When you start a worker, you may later want to:
 - kill it "no matter what it's doing"
-- kill it only if it's not processing tasks
+- kill it only if it is not processing tasks
 - put it to sleep
 Maybe you have yet some tasks queued, and you want to save some resources.
 You know you want them processed every hour, so, you'll want to:
 - process all queued tasks and die automatically
 All of these things are possible managing ``Scheduler`` parameters or the ``scheduler_worker`` table.
-To be more precise, for started workers you will change the ``status`` value of any worker to influence
+To be more precise, for started workers you can change the ``status`` value of any worker to influence
 its behavior.
-As tasks, workers can be in some fixed statuses : ACTIVE, DISABLED, TERMINATE or KILLED.
+As for tasks, workers can be in one of the following statuses: ACTIVE, DISABLED, TERMINATE or KILLED.
 
 **ACTIVE** and **DISABLED** are "persistent", while **TERMINATE** or **KILL**, as statuses
 name suggest, are more "commands" than real statuses.
 Hitting ctrl+c is equal to set a worker to **KILL**
 
 [[workers statuses @///image/bd891eed.png center]]
+
+There are a few commodity functions since version 2.4.1 (self-explanatory)
+``
+scheduler.disable()
+scheduler.resume()
+scheduler.terminate()
+scheduler.kill()
+``:code
+
+each function take an optional parameter, that can be a string or a list, to manage workers based on their ``group_names``. It defaults to the ``group_names`` defined in the scheduler istantiation.
+
+An example is better than a thousand words: ``scheduler.terminate('high_prio')`` will TERMINATE all the workers that are processing the ``high_prio`` tasks, while ``scheduler.terminate(['high_prio', 'low_prio'])`` will terminate all ``high_prio`` and ``low_prio`` workers.
+------
+Watch out: if you have a worker processing ``high_prio`` and ``low_prio``, ``scheduler.terminate('high_prio')`` will terminate the worker alltogether, even if you didn't want to terminate ``low_prio`` too.
+------ 
 
 Everything that one can do via appadmin one can do programmatically by inserting and updating records in these tables.
 
@@ -2603,7 +2651,7 @@ completed_runs = db(db.scheduler_run.run_status='COMPLETED').select()
 ``:code
 
 ------
-The scheduler is experimental because it needs more extensive testing and because the table structure may change as more features are added.
+The scheduler is considered experimental because it needs more extensive testing and because the table structure may change as more features are added.
 ------
 
 ##### Reporting percentages
@@ -2611,7 +2659,9 @@ The scheduler is experimental because it needs more extensive testing and becaus
 A special "word" encountered in the print statements of your functions clear all
 the previous output. That word is ``!clear!``.
 This, coupled with the ``sync_output`` parameter, allows to report percentages
-a breeze. Let's see how that works:
+a breeze. 
+
+Here is an example:
 
 ``
 def reporting_percentages():

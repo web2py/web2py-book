@@ -6,7 +6,7 @@ In this chapter we consider the following issues:
 - Production deployment (Apache, Nginx, Lighttpd, Cherokee)
 - Security
 - Scalability using Redis and a load balancer.
-- Deployment on PythonAnywhere, Heroku, and on the Google App Engine platform(GAE``gae``:cite )
+- Deployment on PythonAnywhere, Heroku, Amazon EC2, and on the Google App Engine platform(GAE``gae``:cite )
 
 ``Apache``:inxx ``CGI``:inxx ``mod_python``:inxx ``mod_wsgi``:inxx ``mod_proxy``:inxx
 ``WSGI``:inxx ``Nginx``:inxx ``Heroku``:inxx ``PythonAnywhere``:inxx
@@ -50,7 +50,7 @@ Even if there are multiple web servers, there must be one, and only one, databas
 
 In the rest of the chapter, we consider various recipes that may provide an improvement over this naive approach, including:
 - Store sessions in the database, in cache or do not store sessions at all.
-- Store tickets on local filesystems and move them into the database in batches.
+- Store tickets on local filesystem and move them into the database in batches.
 - Use memcache instead of cache.ram and cache.disk.
 - Store uploaded files in the database instead of the shared filesystem.
 
@@ -149,12 +149,12 @@ The Apache logs are in:
 
 Download and unzip web2py source on the machine where you installed the web server above.
 
-Install web2py under ``/users/www-data/``, for example, and give ownership to user www-data and group www-data. These steps can be performed with the following shell commands:
+Install web2py under ``/home/www-data/``, for example, and give ownership to user www-data and group www-data. These steps can be performed with the following shell commands:
 ``
-cd /users/www-data/
+cd /home/www-data/
 sudo wget http://web2py.com/examples/static/web2py_src.zip
 sudo unzip web2py_src.zip
-sudo chown -R www-data:www-data /user/www-data/web2py
+sudo chown -R www-data:www-data /home/www-data/web2py
 ``:code
 
 To set up web2py with mod_wsgi, create a new Apache configuration file:
@@ -168,9 +168,9 @@ and include the following code:
   ServerName web2py.example.com
   WSGIDaemonProcess web2py user=www-data group=www-data display-name=%{GROUP}
   WSGIProcessGroup web2py
-  WSGIScriptAlias / /users/www-data/web2py/wsgihandler.py
+  WSGIScriptAlias / /home/www-data/web2py/wsgihandler.py
 
-  <Directory /users/www-data/web2py>
+  <Directory /home/www-data/web2py>
     AllowOverride None
     Order Allow,Deny
     Deny from all
@@ -1379,7 +1379,7 @@ sessions generated (so for 1000 sessions, 1002 keys).
 If ``session_expiry`` is not set, sessions will be handled as usual, you'd need to [[cleanup sessions as usual @///chapter/13#Cleaning-up-sessions]] once a while.
 
 However, when ``session_expiry`` is set will delete automatically sessions after n seconds
-(e.g. if set to 3600, session will expire exactly on hour later having been updated the last time)
+(e.g. if set to 3600, session will expire exactly one hour later having been updated the last time)
 You should however occasionally run sessions2trash.py just to clean the key holding the set of all
 the sessions previously issued (for ~1M sessions, cleaning up requires 3 seconds)
 
@@ -1441,7 +1441,7 @@ Browsers can decompress content on-the-fly, so compressing content for those bro
 Nowadays most web servers can compress your content on the fly and send it to the browsers requesting gzipped content.
 However, for static files, you are wasting CPU cycles to compress the same content over and over.
 
-You can use ''scripts/zip_static_files.py'' to create gzipped versions of your static files and serve those without loosing CPU.
+You can use ''scripts/zip_static_files.py'' to create gzipped versions of your static files and serve those without wasting CPU.
 Run as ``python web2py.py -S myapp -R scripts/zip_static_files.py`` in cron. The script takes care to create (or update) the gzipped version and saves them along with your files, appending a .gz to their name.
 You just need to let your webserver know when to send those files ``apache-content-negotiation``:cite ``nginx-gzipstatic``:cite
 
@@ -1455,8 +1455,16 @@ PythonAnywhere is a Python development and hosting environment that displays in 
 and they support web2py specifically. In our experience PythonAnywhere is easy to use, fast, and powerful. They also provide MySQL databases, python shells and Dropbox integration. 
 Professional hosting is available if the free basic one is not enough for you.
 
-In order to use PythonAnywhere you need to create an account, login, then use the provided web Dashboard to add a new Web App of type web2py. Few seconds later, answer with a password for its 
-administrative interface. 
+In order to use PythonAnywhere you need to create an account, login, then use the provided web Dashboard to add a new Web App of type web2py. 
+
+[[image @///image/pythonanywhere1.png center 300px]]
+[[image @///image/pythonanywhere2.png center 300px]]
+
+The interface also ask you for an admistrative password.
+
+[[image @///image/pythonanywhere3.png center 300px]]
+
+The web2py folder will be created in your user folder.
 
 Alternatively, you can also use the web based BASH shell to install web2py as you normally do:
 
@@ -1471,20 +1479,20 @@ Always from the shell you should create an admin password for later use:
 python -c "from gluon.main import save_password; save_password(raw_input('admin  password: '),433)"
 ``:code
 
-Then visit the "Web" panel using the web interface and edit the "wsgi.py" file. This is the enty point for your program (in our case web2py) and, as you may guess, it is based onthe WSGI protocol.
+Then visit the "Web" panel using the web interface and edit the "/var/www/<username>_pythonanywhere_com_wsgi.py" file. This is the entry point for your program (in our case web2py) and, as you may guess, it is based on the WSGI protocol.
 
-Edit the "wsgi.py" file and write in it:
+Edit the "/var/www/<username>_pythonanywhere_com_wsgi.py" file and write in it:
 
 ``
 import sys
-path = '/home/youusername/web2py'
+path = '/home/<username>/web2py'
 if path not in sys.path: sys.path.append(path)
 from wsgihandler import application # the web2py handler
 ``:code
 
-Here "yourusername" is your PythonAnywhere username.
+Here "<username>" is your PythonAnywhere username.
 
-After you've installed web2py, notice that you do not need to start or configure a web server. PythonAnywhere provides one and it is reloaded when you edit the ``wsgi.py`` config file 
+After you've installed web2py, notice that you do not need to start or configure a web server. PythonAnywhere provides one and it is reloaded when you edit the above config file.
 or press the "Reload web app" button on the Dashboard. Everyone can immediately access it at the url:
 
 ``
@@ -1502,13 +1510,13 @@ We thank the PythonAnywhere team for their help and support.
 ### Deploying on Heroku
 ``heroku``:cite ``Heroku``:inxx
 
-Heroku is a modern and agile multiplatform hosting solution. It allows to push your applications to a server cloud using Git. In order to user Heroku you must have Git installed and you must have the Heroku SDK installed. You interact heroku using the SDK locally and your commans will be pushed and executed on the server.
+Heroku is a modern and agile multiplatform hosting solution. It allows to push your applications to a server cloud using Git. In order to user Heroku you must have Git installed and you must have the Heroku SDK installed. You interact heroku using the SDK locally and your commands will be pushed and executed on the server.
 
 Applications running on Heroku cannot rely on a persistent filesystem since it is refreshed periodically. For this reason only the application code can be stored on the file system. All data must be stored in the database. Heroku relies on PostgreSQL. Yet the PostgreSQL is also configured using the Heroku SDK and the URI for the database is assigned dynamically at run-time and stored in an environment variable.
 
 This means that web2py applications must be modified to work on Heroku in order to use the database.
 
-Web2py provides a "heroku.py" script to help you. ALl you need to do is replace:
+Web2py provides a "heroku.py" script to help you. All you need to do is replace:
 
 ``
 db = DAL(...)
@@ -1523,11 +1531,11 @@ db = get_db(name=None, pool_size=10)
 
 Here ``name`` is the environment variable containing the Heroku PostgreSQL URI (something like ``HEROKU_POSTGRESQL_RED_URL``). It defaults to ``None`` and if there is only one ``HEROKU_POSTGRESQL_*_URL`` environment variable it will use that. ``pool_size`` is the usual DAL pool size.
 
-When non-running on the Heorku platform ``get_db`` will use a development database "sqlite://heroku.test.sqlite".
+When non-running on the Heroku platform ``get_db`` will use a development database "sqlite://heroku.test.sqlite".
 
 In both cases sessions will be stored in database.
 
-Web2py provides a script "scripts/setup-web2py-heroku.py" to deply your web2py installation on heroku. It performs the following steps:
+Web2py provides a script "scripts/setup-web2py-heroku.py" to deploy your web2py installation on heroku. It performs the following steps:
 
 It installs virtualenv and the psycopg2 driver:
 ``
@@ -1546,7 +1554,7 @@ Then creates a requirement file:
 pip freeze > requirements.txt
 ``:code
 
-And creates a "Procfile" which tells Heorku how to start web2py:
+And creates a "Procfile" which tells Heroku how to start web2py:
 
 ``
 echo "web: python web2py.py -a 'yourpassword' -i 0.0.0.0 -p \$PORT" > Procfile
@@ -1563,7 +1571,7 @@ git add Procfile
 git commit -a -m "first commit"
 ``:code
 
-pushes everything to Heorku, and starts it:
+pushes everything to Heroku, and starts it:
 
 ``
 heroku create
@@ -1577,6 +1585,17 @@ heroku open
 
 We thank Craig Krestiens from Heroku for his help with this recipe.
 
+### Deploying on EC2
+``Amazon EC2``:inxx
+
+Amazon Elastic Compute Cloud (Amazon EC2) is a web service that provides resizable computing capacity in the cloud. It is one of the largest and most popular clouds. Many other cloud platforms run on EC2. You can run any application on EC2 by creating and deploying a disk image. Amazon then provides API to replicate the image while sharing part of the file system.
+
+A description of the entire process is beyond the scope of this book but, assuming you have an existing Amazon EC2 account, you can use the Turnkey Hub find and deploy a ready made web2py image:
+
+``https://hub.turnkeylinux.org/amazon/launch/web2py/``
+
+Once your image is deployed you can login into it as a normal VPS and you can manage (backup/restore/copy) it via the Amazon EC2 web interface.
+
 ### Deploying on Google App Engine
 ``Google App Engine``:inxx
 
@@ -1586,7 +1605,7 @@ GAE supports two versions of Python: 2.5 (default) and 2.7 (beta). web2y support
 
 GAE also supports a Google SQL database (compatible with MySQL) and a Google NoSQL (referred to as "Datastore").
 
-web2py supports both. If you wish to use Google SQL database follow the instructions on Chapter 6. This section assues you will be using the Google Datastore.
+web2py supports both. If you wish to use Google SQL database follow the instructions on Chapter 6. This section assumes you will be using the Google Datastore.
 
 The GAE platform provides several advantages over normal hosting solutions:
 
@@ -1605,7 +1624,7 @@ and some Datastore specific disadvantages:
 - No multiple ``OR`` sub-queries unless they involve one and the same field.
 
 
-Because of the readonly filesystem, web2py cannot store sessions, error tickets, cache files and uploaded files in the filesystem; they must be stored in the datastore and not in the filesystem.
+Because of the read-only filesystem, web2py cannot store sessions, error tickets, cache files and uploaded files in the filesystem; they must be stored in the datastore and not in the filesystem.
 
 Here we provide a quick overview of GAE and we focus on web2py specific issues, we refer you to the official GAE documentation online for details.
 

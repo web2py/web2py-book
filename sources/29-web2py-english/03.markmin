@@ -29,7 +29,7 @@ c:/Python27/python.exe web2py.exe
 ``:code
 
 ------
-Attention, to run web2py on Windows from source you must install first Mark Hammond's [[Python for Windows extensions http://sourceforge.net/projects/pywin32/]]
+Attention, to run web2py on Windows from source you must install first Mark Hammond's win32 extensions from ``http://sourceforge.net/projects/pywin32/``.
 ------
 
 The web2py program accepts various command line options which are discussed later.
@@ -67,7 +67,7 @@ web2py comes with three applications:
 ``admin``:inxx ``examples``:inxx ``welcome``:inxx ``scaffolding``:inxx
 - An **admin** application, the one you are using right now.
 - An **examples** application, with the online interactive documentation and a replica of the web2py official website.
-- A **welcome** application. This is the basic template for any other web2py application. It is referred to as the scaffolding application. This is also the application that welcomes a user at startup.
+- A **welcome** application. This is the basic template for any other web2py application. It is referred to as the ''scaffolding application''. This is also the application that welcomes a user at startup.
 
 ``appliances``:inxx
 Ready-to-use web2py applications are referred to as web2py ''appliances''.  You can download many freely available appliances from ``appliances``:cite . web2py users are encouraged to submit new appliances, either in open-source or closed-source (compiled and packed) form.
@@ -78,10 +78,11 @@ From the **admin** application's ''site'' page, you can perform the following op
 - **create** a new application by choosing a name and clicking "create".
 - **package** an application for distribution by clicking on the corresponding button. A downloaded application is a tar file containing everything, including the database. You should not untar this file; it is automatically unpackaged by web2py when installed with **admin**.
 - **clean up** an application's temporary files, such as sessions, errors and cache files.
+- **enable/disable** each application. When an application is disabled it cannot be called remotely but it is not disabled form localhost. This means disabled applications can still be accessed behind a proxy. An application is disabled by creating a file called "DISABLED" in the application folder. Users who try to access a disabled application will receive a 503 HTTP error. You can use routes_onerror to customize the error page.
 - **EDIT** an application.
 
 -----
-When you create a new application using **admin**, it starts as a clone of the "welcome" scaffolding app with a "models/db.py" that creates a SQLite database, connects to it, instantiates Auth, Crud, and Service, configures them. It also provides a "controller/default.py" which exposes actions "index", "download", "user" for user management, and "call" for services. In the following, we assume that these files have been removed; we will be creating apps from scratch.
+When you create a new application using **admin**, it starts as a clone of the "welcome" scaffolding app with a "models/db.py" that creates a SQLite database, connects to it, instantiates Auth, Crud, and Service, and configures them. It also provides a "controller/default.py" which exposes actions "index", "download", "user" for user management, and "call" for services. In the following, we assume that these files have been removed; we will be creating apps from scratch.
 -----
 
 web2py also comes with a **wizard**, described later in this chapter, that can write an alternate scaffolding code for you based on layouts and plugins available on the web and based on high level description of the models.
@@ -122,7 +123,7 @@ Every web2py application consists of certain files, most of which fall into one 
 
 Everything is neatly organized following the Model-View-Controller design pattern. Each section in the ''edit'' page corresponds to a subfolder in the application folder.
 
-Notice that section headings will toggle their content. Folder names under static files are also collapsible.
+Notice that clicking on section headings will toggle their content. Folder names under static files are also collapsible.
 
 -------
 Each file listed in the section corresponds to a file physically located in the subfolder. Any operation performed on a file via the **admin** interface (create, edit, delete) can be performed directly from the shell using your favorite editor.
@@ -169,9 +170,11 @@ Also from the ''edit'' page, edit the view "default/index.html" (the view file a
 
 Now the action returns a dictionary defining a ``message``. When an action returns a dictionary, web2py looks for a view with the name
 
-``[controller]/[function].[extension]``:code
+``
+[controller]/[function].[extension]
+``:code
 
- and executes it. Here [extension] is the requested extension. If no extension is specified, it defaults to "html", and that is what we will assume here. Under this assumption, the view is an HTML file that embeds Python code using special {{ }} tags. In particular, in the example, the ``{{=message}}`` instructs web2py to replace the tagged code with the value of the ``message`` returned by the action. Notice that ``message`` here is not a web2py keyword but is defined in the action. So far we have not used any web2py keywords.
+and executes it. Here ``[extension]`` is the requested extension. If no extension is specified, it defaults to "html", and that is what we will assume here. Under this assumption, the view is an HTML file that embeds Python code using special {{ }} tags. In particular, in the example, the ``{{=message}}`` instructs web2py to replace the tagged code with the value of the ``message`` returned by the action. Notice that ``message`` here is not a web2py keyword but is defined in the action. So far we have not used any web2py keywords.
 
 If web2py does not find the requested view, it uses the "generic.html" view that comes with every application.
 
@@ -194,7 +197,10 @@ If you go back to "EDIT" and click on index, you will now see the following HTML
 
 [[image @///image/en1200.png center 480px]]
 
-For debugging purposes you can always append
+#### Debugging toolbar
+``toolbar``:inxx
+
+For debugging purposes you can insert
 
 ``
 {{=response.toolbar()}}
@@ -279,7 +285,7 @@ Finally, create a view "default/second.html" for the second action:
 ``:code
 
 ``layout``:inxx
-In both views we have extended the basic "layout.html" view that comes with web2py. The layout view keeps the look and feel of the two pages coherent. The layout file can be edited and replaced easily, since it mainly contains HTML code.
+In both views we have extended the basic "layout.html" view that comes with web2py. The layout view keeps the look and feel of the two pages consistent. The layout file can be edited and replaced easily, since it mainly contains HTML code.
 
 If you now visit the first page, type your name:
 
@@ -328,7 +334,7 @@ and the "default/second.html" view needs to retrieve the data from the ``session
 
 From the point of view of the visitor, the self-submission behaves exactly the same as the previous implementation. We have not added validation yet, but it is now clear that validation should be performed by the first action.
 
-This approach is better also because the name of the visitor stays in the session, and can be accessed by all actions and views in the applications without having to be passed around explicitly.
+This approach is better also because the name of the visitor stays in the session, and can be accessed by all actions and views in the application without having to be passed around explicitly.
 
 Note that if the "second" action is ever called before a visitor name is set, it will display "Hello anonymous" because  ``session.visitor_name`` returns ``None``. Alternatively we could have added the following code in the controller (inside the ``second`` function):
 
@@ -337,7 +343,7 @@ if not request.function=='first' and not session.visitor_name:
     redirect(URL('first'))
 ``:code
 
-This is a general mechanism that you can use to enforce authorization on controllers, though see Chapter 9 for a more powerful method.
+This is an ''ad hoc''  mechanism that you can use to enforce authorization on controllers, though see Chapter 9 for a more powerful method.
 
 ``FORM``:inxx ``INPUT``:inxx ``requires``:inxx ``IS_NOT_EMPTY``:inxx ``accepts``:inxx
 
@@ -381,7 +387,7 @@ The ``form.process()`` method applies the validators and returns the form itself
 
 In the next section we will show how forms can be generated automatically from a model.
 
-In all or examples we have used the session to pass the user name from the first action to the second. We could have used a different mechanism and pass data as part of a redirect URL:
+In all our examples we have used the session to pass the user name from the first action to the second. We could have used a different mechanism and passed data as part of a redirect URL:
 
 ``
 def first():
@@ -396,11 +402,13 @@ def second():
     return dict(name=name)
 ``:code
 
+Mind that in general it is not a good idea to pass data from one action to another using the URL. It makes it harder to secure the application. It is safer to store the data in a session.
+
 #### Internationalization
 
-You code is likely to include hardcoded strings such as "What is your name?". You should be able to customize strings without editing the code and in particular insert translations for these strings in different languages. In this way if a visitor has the language preference of the browser set to "Italian", web2py will use the Italian translation for the strings, if available. This feature of web2py is called "internationalization" and it is described in more detail in the next chapter.
+Your code is likely to include hardcoded strings such as "What is your name?". You should be able to customize strings without editing the code and in particular insert translations for these strings in different languages. In this way if a visitor has the language preference of the browser set to "Italian", web2py will use the Italian translation for the strings, if available. This feature of web2py is called "internationalization" and it is described in more detail in the next chapter.
 
-Here we just observe that in order to use this feature you should markup strings that needs translation. This is done by wrapping a a quoted string in code such as
+Here we just observe that in order to use this feature you should markup strings that needs translation. This is done by wrapping a quoted string in code such as
 
 ``
 "What is your name?"
@@ -413,7 +421,7 @@ T("What is your name?")
 ``:code
 
 
-You can also mark fo translations strings hardcoded in views. For example
+You can also mark for translations strings hardcoded in views. For example
 
 ``
 <h1>What is your name?</h1>
@@ -428,6 +436,10 @@ becomes
 It is good practice to do this for every string in the code (field labels, flash messages, etc.) except for tables and field names.
 
 Once the strings are identified and marked up, web2py takes care of almost everything else. The admin interface also provides a page where you can translate each string in the languages you desire to support.
+
+-----------
+web2py includes a powerful pluralization engine which is described in the next chapter. It is integrated with both the internationalization engine and the markmin renderer.
+-----------
 
 ### An image blog
 ``upload``:inxx
@@ -472,9 +484,9 @@ db.post.image_id.writable = db.post.image_id.readable = False
 
 Let's analyze this line by line.
 
-Line 1 defines a global variable called ``db`` that represents the database connection. In this case it is a connection to a SQLite database stored in the file  "applications/images/databases/storage.sqlite". In the SQLite case, if the database does not exist, it is created. You can change the name of the file, as well as the name of the global variable ``db``, but it is convenient to give them the same name, to make it easy to remember.
+Line 1 defines a global variable called ``db`` that represents the database connection. In this case it is a connection to a SQLite database stored in the file  "applications/images/databases/storage.sqlite". When using SQLite, if the database file does not exist, it is created. You can change the name of the file, as well as the name of the global variable ``db``, but it is convenient to give them the same name, to make it easy to remember.
 
-Lines 3-5 define a table "image". ``define_table`` is a method of the ``db`` object. The first argument, "image", is the name of the table we are defining. The other arguments are the fields belonging to that table. This table has a field called "title", a field called "file", and a field called "id" that serves as the table primary key ("id" is not explicitly declared because all tables have an id field by default). The field "title" is a string, and the field "file" is of type "upload". "upload" is a special type of field used by the web2py Data Abstraction Layer (DAL) to store the names of uploaded files. web2py knows how to upload files (via streaming if they are large), rename them safely, and store them.
+Lines 3-6 define a table "image". ``define_table`` is a method of the ``db`` object. The first argument, "image", is the name of the table we are defining. The other arguments are the fields belonging to that table. This table has a field called "title", a field called "file", and a field called "id" that serves as the table primary key ("id" is not explicitly declared because all tables have an id field by default). The field "title" is a string, and the field "file" is of type "upload". "upload" is a special type of field used by the web2py Data Abstraction Layer (DAL) to store the names of uploaded files. web2py knows how to upload files (via streaming if they are large), rename them safely, and store them.
 
 When a table is defined, web2py takes one of several possible actions:
 - if the table does not exist, the table is created;
@@ -504,9 +516,9 @@ The objects representing these constraints are called validators. Multiple valid
 Line 15 requires that the field "image_id" of table "post" is in ``db.image.id``. As far as the database is concerned, we had already declared this  when we defined the table "post".
 Now we are explicitly telling the model that this condition should be enforced by web2py, too, at the form processing level when a new comment is posted, so that invalid values do not propagate from input forms to the database. We also require that the "image_id" be represented by the "title", ``'%(title)s'``, of the corresponding record.
 
-Line 20 indicates that the field "image_id" of table "post" should not be shown in forms, ``writable=False`` and not even in readonly forms, ``readable=False``.
+Line 20 indicates that the field "image_id" of table "post" should not be shown in forms, ``writable=False`` and not even in read-only forms, ``readable=False``.
 
-The meaning of the validators in lines 15-17 should be obvious.
+The meaning of the validators in lines 17-18 should be obvious.
 
 ``format``:inxx
 Notice that the validator
@@ -556,7 +568,7 @@ and renders the result.
 
 [[image @///image/en2400.png center 480px]]
 
-You can select a different set of records by editing the SQL query and pressing [Submit].
+You can select a different set of records by editing the DAL query and pressing [Submit].
 
 To edit or delete a single record, click on the record id number.
 
@@ -689,7 +701,7 @@ in "default/index.html", can be accessed as:
 
 ``request.args(0,cast=int)``
 
-from the "show" action. The ``cast=int`` argument is optional but very important. It attempts to cast the string value passed in the PATH_INFO into an int. On failure it raise a proper exception instead of causing a ticket. One can also specify a redirect in case of failure to cast:
+from the "show" action. The ``cast=int`` argument is optional but very important. It attempts to cast the string value passed in the PATH_INFO into an int. On failure it raises a proper exception instead of causing a ticket. One can also specify a redirect in case of failure to cast:
 
 ``request.args(0,cast=int,otherwise=URL('error'))``
 
@@ -908,8 +920,8 @@ db.document.created_on.readable = db.document.created_on.writable = False
 
 Edit the controller "default.py" and create the following actions:
 - index: list all wiki pages
-- create: post another wiki page
-- show: show a wiki page and its comments, and append comments
+- create: add a new wiki page
+- show: show a wiki page and its comments, and add new comments
 - edit: edit an existing page
 - documents: manage the documents attached to a page
 - download: download a document (as in the images example)
@@ -929,12 +941,12 @@ def index():
 
 @auth.requires_login()
 def create():
-     "creates a new empty wiki page"
+     """creates a new empty wiki page"""
      form = SQLFORM(db.page).process(next=URL('index'))
      return dict(form=form)
 
 def show():
-     "shows a wiki page"
+     """shows a wiki page"""
      this_page = db.page(request.args(0,cast=int)) or redirect(URL('index'))
      db.post.page_id.default = this_page.id
      form = SQLFORM(db.post).process() if auth.user else None
@@ -943,7 +955,7 @@ def show():
 
 @auth.requires_login()
 def edit():
-     "edit an existing wiki page"
+     """edit an existing wiki page"""
      this_page = db.page(request.args(0,cast=int)) or redirect(URL('index'))
      form = SQLFORM(db.page, this_page).process(
          next = URL('show',args=request.args))
@@ -951,7 +963,7 @@ def edit():
 
 @auth.requires_login()
 def documents():
-     "browser, edit all documents attached to a certain page"
+     """browser, edit all documents attached to a certain page"""
      page = db.page(request.args(0,cast=int)) or redirect(URL('index'))
      db.document.page_id.default = page.id
      db.document.page_id.writable = False
@@ -962,17 +974,17 @@ def user():
      return dict(form=auth())
 
 def download():
-     "allows downloading of documents"
+     """allows downloading of documents"""
      return response.download(request, db)
 
 def search():
-     "an ajax wiki search page"
+     """an ajax wiki search page"""
      return dict(form=FORM(INPUT(_id='keyword',_name='keyword',
               _onkeyup="ajax('callback', ['keyword'], 'target');")),
               target_div=DIV(_id='target'))
 
 def callback():
-     "an ajax callback that returns a <ul> of links to wiki pages"
+     """an ajax callback that returns a <ul> of links to wiki pages"""
      query = db.page.title.contains(request.vars.keyword)
      pages = db(query).select(orderby=db.page.title)
      links = [A(p.title, _href=URL('show',args=p.id)) for p in pages]
@@ -980,16 +992,16 @@ def callback():
 ``:code
 
 
-Lines 2-6 provide a comment for the index action. Lines 4-5 inside the comment are interpreted by python as test code (doctest). Tests can be run via the admin interface. In this case the tests verify that the index action runs without errors.
+Lines 2-6 constitute a comment for the index action. Lines 4-5 inside the comment are interpreted by python as test code (doctest). Tests can be run via the admin interface. In this case the tests verify that the index action runs without errors.
 
 Lines 18, 27, and 35 try to fetch a ``page`` record with the id in
 ``request.args(0)``.
 
-Lines 13, 20 define and process create forms for a new page and a new comment and.
+Lines 13, 20 define and process create forms for a new page and a new comment and
 
 Line 28 defines and processes an update form for a wiki page.
 
-Line 38 creates a ``grid`` object that allows to browser, add and update the comments linked to a page.
+Line 38 creates a ``grid`` object that allows to view, add and update the comments linked to a page.
 
 Some magic happens in line 51. The ``onkeyup`` attribute of the INPUT tag "keyword" is set. Every time the visitor releases a key, the JavaScript code inside the ``onkeyup`` attribute is executed, client-side. Here is the JavaScript code:
 ``
@@ -1048,10 +1060,10 @@ Here is the code for the view "default/show.html":
 If you wish to use markdown syntax instead of markmin syntax:
 
 ``
-from gluon.contrib.markdown import WIKI
+from gluon.contrib.markdown import WIKI as MARKDOWN
 ``:code
 
-and use ``WIKI`` instead of the ``MARKMIN`` helper.
+and use ``MARKDOWN`` instead of the ``MARKMIN`` helper.
 Alternatively, you can choose to accept raw HTML instead of markmin syntax. In this case you would replace:
 ``
 {{=MARKMIN(page.body)}}
@@ -1063,7 +1075,7 @@ with:
 ``:code
 
 ``sanitize``:inxx
-(so that the XML does not get escaped, as by default web2py behavior).
+(so that the XML does not get escaped, which web2py normally does by default for security reasons).
 
 This can be done better with:
 ``
@@ -1122,10 +1134,10 @@ If you look at the page source you see the HTML returned by the callback:
 ``:code
 
 ``rss``:inxx
-Generating an RSS feed from the stored pages using web2py is easy because web2py includes ``gluon.contrib.rss2``. Just append the following action to the default controller:
+Generating an RSS feed of your wiki pages using web2py is easy because web2py includes ``gluon.contrib.rss2``. Just append the following action to the default controller:
 ``
 def news():
-    "generates rss feed form the wiki pages"
+    """generates rss feed form the wiki pages"""
     response.generic_patterns = ['.rss']
     pages = db().select(db.page.ALL, orderby=db.page.title)
     return dict(
@@ -1152,6 +1164,14 @@ you see the feed (the exact output depends on the feed reader). Notice that the 
 
 web2py also includes feedparser to read third-party feeds.
 
+Notice that the line:
+
+``
+response.generic_patterns = ['.rss']
+``:code
+
+instructs web2py to use generic views (in our case "views/generic.rss") when the URL ends in the glob pattern ".rss". By default generic views are only allowed from localhost for development purposes.
+
 ``XMLRPC``:inxx
 Finally, let's add an XML-RPC handler that allows searching the wiki programmatically:
 ``
@@ -1159,11 +1179,11 @@ service = Service()
 
 @service.xmlrpc
 def find_by(keyword):
-     "finds pages that contain keyword for XML-RPC"
+     """finds pages that contain keyword for XML-RPC"""
      return db(db.page.title.contains(keyword)).select().as_list()
 
 def call():
-    "exposes all registered services, including XML-RPC"
+    """exposes all registered services, including XML-RPC"""
     return service()
 ``:code
 
@@ -1183,9 +1203,9 @@ The handler can be accessed from many other programming languages that understan
 
 #### On ``date``, ``datetime`` and ``time`` format
 
-There are three different representation for each of the field types ``date``, ``datetime`` and ``time``:
+There are three different representations for each of the field types ``date``, ``datetime`` and ``time``:
 - the database representation
-- the internal web2py prepresentation
+- the internal web2py representation
 - the string representation in forms and tables
 
 The database representation is an internal issue and does not affect the code. Internally, at the web2py level, they are stored as ``datetime.date``, ``datetime.datetime`` and ``datetime.time`` object respectively and they can be manipulated as such:
@@ -1200,25 +1220,25 @@ When dates are converted to strings in forms they are converted using the ISO re
 %Y-%m-%d %H:%M:%S
 ``
 
-yet this representation in internationalized and you can use the admin stranslation page to change the format to an alternate one. For example:
+yet this representation is internationalized and you can use the admin translation page to change the format to an alternate one. For example:
 
 ``
 %m/%b/%Y %H:%M:%S
 ``
 
-Mind that by default English is not translated because web2py assumes the applications is already written in English. If you want internationalization to work for English you need to create the translation file (using admin) and you need declare that the application current language is something other than english, for example:
+Mind that by default English is not translated because web2py assumes the applications are written in English. If you want internationalization to work for English you need to create the translation file (using admin) and you need to declare that the application's current language is something other than english, for example:
 ``
 T.current_languages = ['null']
 ``
 
 ### The built-in web2py wiki
 
-Now you can forget the code we have built-in the previous section (not what you have learned about web2py APIs, just the code of the specific example) as we are going to provide and example of the built-in web2py wiki.
+Now you can forget the code we have built-in the previous section (not what you have learned about web2py APIs, just the code of the specific example) as we are going to provide an example of the built-in web2py wiki.
 
 In fact, web2py comes with wiki capabilities including media attachments, tags, tag cloud, page permissions, and support for oembed ``oembed``:cite and components (chapter 14). This wiki can be used with any web2py application.
 
 ------
-Notice the API of the built-in wiki are still considered experimental and small changes are still possible.
+Notice the API of the built-in wiki is still considered experimental and small changes are still possible.
 ------
 
 Here we assume we are starting from scratch from a simple clone of the "welcome" application called "wikidemo". Edit the controller and replace the "index" action with
@@ -1227,16 +1247,16 @@ Here we assume we are starting from scratch from a simple clone of the "welcome"
 def index(): return auth.wiki()
 ``:code
 
-Done! You have a fully working wiki. At this point no page has been created and in order to create pages you must be logged-in and you must be member of a group called "wiki-editor" or "wiki-author". If you are logged as administrator the "wiki-editor" group is created automatically and you are made a member. The difference between editors and authors is that the editors can create pages, edit and delete any page, while the authors can create pages (with some optional restrictions) and can only edit/delete the pages they have created.
+Done! You have a fully working wiki. At this point no page has been created and in order to create pages you must be logged-in and you must be member of a group called "wiki-editor" or "wiki-author". If you are logged-in as administrator the "wiki-editor" group is created automatically and you are made a member. The difference between editors and authors is that the editors can create pages, edit and delete any page, while the authors can create pages (with some optional restrictions) and can only edit/delete the pages they have created.
 
-The ``auth.wiki()`` function returns in a dictionary with a key ``content`` which is understood by the scaffolding "views/default/index.html". You man make your own view for this action:
+The ``auth.wiki()`` function returns in a dictionary with a key ``content`` which is understood by the scaffolding "views/default/index.html". You can make your own view for this action:
 
 ``
 {{extend 'layout.html'}}
 {{=content}}
 ``:code
 
-and add extra HTML or code as needed. There is no need to call the action "index".
+and add extra HTML or code as needed. You do not have to use the "index" action to expose the wiki. You can use an action with a different name.
 
 To try the wiki, simply login into admin, visit the page
 
@@ -1244,7 +1264,7 @@ To try the wiki, simply login into admin, visit the page
 http://127.0.0.1:8000/wikidemo/default/index
 ``
 
-Then choose a slug (in the publishing business, a slug is a short name given to an article that is in production) and you will be redirected to an empty page where you can edit the content using MARKMIN wiki syntax. A new menu item called "[wiki]" will allow you create, search, and edit pages. Wiki pages have RULS like:
+Then choose a slug (in the publishing business, a slug is a short name given to an article that is in production) and you will be redirected to an empty page where you can edit the content using MARKMIN wiki syntax. A new menu item called "[wiki]" will allow you to create, search, and edit pages. Wiki pages have URLs like:
 
 ``
 http://127.0.0.1:8000/wikidemo/default/index/[slug]
@@ -1262,8 +1282,8 @@ http://127.0.0.1:8000/wikidemo/default/index/_editmedia/...
 http://127.0.0.1:8000/wikidemo/default/index/_preview/...
 ``
 
-Try create more pages such as "index", "aboutus", and "contactus".
-Try edit them.
+Try to create more pages such as "index", "aboutus", and "contactus".
+Try to edit them.
 
 
 The ``wiki`` method has the following signature:
@@ -1277,11 +1297,12 @@ def wiki(self, slug=None, env=None, render='markmin',
 
 It takes the following arguments:
 
-- ``render`` which defaults to ``'markmin'`` but can be set equal to ``'html'``. It termines the syntax of the wiki. We will discuss the markmin wiki markup later. If you change it to HTML you may want to use a wysiwyg javascript editor such as TinyMCE of NicEdit.
-- ``manage_permissions``. This is set to ``False`` by default and only recognizes permissions for "wiki-editor" and "wiki-author". If you change it to ``True`` the create/edit page will give the option to specify by names the groups whose members have permission to read and edit the page. In this case is a group "everybody" to give read permission to everybody.
-- ``force_prefix``. If set to something like ``'%(id)s-'`` it will restrict authors (not editors) to create page with a prefix like "[user id]-[page name]". The prefix can contain the id ("%(id)s") or the username ("%(username)s") or any other field from the auth_user table, as long as the corresponding column contains valid string that would pass URL validation.
-- ``restrict_search``. This default to ``False`` and any logged-in user can search all wiki pages (but not necessary read or edit them). If set to ``True``, authors can search only their own pages, editors can search everything, other users cannot search anything.
-- ``menugroups``. This defaults to ``None`` and it indicates that wiki management menu (search, create, edit, etc.) is always displayed. You can set it to a list of group names whose members only can see this menu, for example ``['wiki-editor','wiki-author']``. Notice that even if the menu is exposed to everybody does not mean everybody is allowed to perform actions listed in the menu since they are regulated by the access control system.
+- ``render`` which defaults to ``'markmin'`` but can be set equal to ``'html'``. It determines the syntax of the wiki. We will discuss the markmin wiki markup later. If you change it to HTML you can use a wysiwyg javascript editor such as TinyMCE or NicEdit.
+- ``manage_permissions``. This is set to ``False`` by default and only recognizes permissions for "wiki-editor" and "wiki-author". If you change it to ``True`` the create/edit page will give the option to specify by name the group(s) whose members have permission to read and edit the page. There is a group "everybody" which includes all users.
+
+- ``force_prefix``. If set to something like ``'%(id)s-'`` it will restrict authors (not editors) to creating pages with a prefix like "[user id]-[page name]". The prefix can contain the id ("%(id)s") or the username ("%(username)s") or any other field from the auth_user table, as long as the corresponding column contains a valid string that would pass URL validation.
+- ``restrict_search``. This defaults to ``False`` and any logged-in user can search all wiki pages (but not necessary read or edit them). If set to ``True``, authors can search only their own pages, editors can search everything, other users cannot search anything.
+- ``menu_groups``. This defaults to ``None`` and it indicates that wiki management menu (search, create, edit, etc.) is always displayed. You can set it to a list of group names whose members only can see this menu, for example ``['wiki-editor','wiki-author']``. Notice that even if the menu is exposed to everybody that does not mean everybody is allowed to perform actions listed in the menu since they are regulated by the access control system.
 
 The ``wiki`` method has some additional parameters which will be explained later: ``slug``, ``env``, and ``extra``.
 
@@ -1289,10 +1310,10 @@ The ``wiki`` method has some additional parameters which will be explained later
 
 #### MARKMIN basics
 
-The MARKMIN syntax allows you to markup **bold** text using ``**bold**``, ''italic'' text with ``''italic''``, ``code`` text with ``\`\`code\`\```. Titles must be prefixed by a #, sections by ##, and sub-sections by ###. Use a minus(-) to prefix an un-ordered item and plus(+) to prefix an ordered item. URLs are automatically into links. For example:
+The MARKMIN syntax allows you to markup **bold** text using ``**bold**``, ''italic'' text with ``''italic''``, and ``code`` text should be delimited by double inverted quotes. Titles must be prefixed by a #, sections by ##, and sub-sections by ###. Use a minus(-) to prefix an un-ordered item and plus(+) to prefix an ordered item. URLs are automatically converted into links. Here is an example of markmin text:
 
 ``
-# This is title
+# This is a title
 ## this is a section title
 ### this is a subsection title
 
@@ -1309,7 +1330,7 @@ You can find more information about the MARKMIN syntax in chapter 5.
 
 ``auth.wiki`` is more powerful than the barebones MARKMIN helpers, supporting oembed and components.
 
-You can use theS ``env`` parameter of ``auth.wiki`` to expose functions to your wiki.
+You can use the ``env`` parameter of ``auth.wiki`` to expose functions to your wiki.
 For example:
 
 ``
@@ -1323,17 +1344,17 @@ allows you to use the markup syntax:
 ``
 
 
-This call the join function passed as extra with parameters ``a,b,c=1,2,3`` and will be rendered as ``1-2-3``.
+This calls the join function passed as extra with parameters ``a,b,c=1,2,3`` and will be rendered as ``1-2-3``.
 
 #### Oembed protocol
 
-You can type in (or cut-and-paste) any URL into a wiki page it normally is rendered as a link to the URL. There are exceptions:
+You can type in (or cut-and-paste) any URL into a wiki page and it is rendered as a link to the URL. There are exceptions:
 
 - If the URL has an image extension, the link is embedded as an image, ``<img/>``.
 - If the URL has an audio extension, the link is embedded as HTML5 audio ``<audio/>``.
 - If the URL has a video extension, the link is embedded as HTML5 video ``<video/>``.
 - If the URL has a MS Office or PDF extension, Google Doc Viewer is embedded, showing the content of the document (only works for public documents).
-- If the URL points to a Youtube page, a Vimeo page, or a Flickr page, web2py contacts the corresponding web service and queries it about the proper way to embed the content. This is done using the ``oembed`` protocol.
+- If the URL points to a YouTube page, a Vimeo page, or a Flickr page, web2py contacts the corresponding web service and queries it about the proper way to embed the content. This is done using the ``oembed`` protocol.
 
 Here is a complete list of supported formats:
 ``
@@ -1389,7 +1410,7 @@ If you create a wiki page with slug "contactus" you can refer to this page as
 \@////contactus
 ``:code
 
-Here ``\@////`` stands for
+Here @````//// stands for
 
 ``
 \@/app/controller/function/
@@ -1423,7 +1444,7 @@ If you create a page with slug "wiki-menu" page it will be interpreted as a desc
 
 Each line a menu item. We used double dash for nested menu items. The ``>`` symbols separates the menu item title from the menu item link.
 
-Mind that the menu is appended to ``response.menu``. It does not replace it. The ``[wiki]`` menu tem with service functions is added automatically.
+Mind that the menu is appended to ``response.menu``. It does not replace it. The ``[wiki]`` menu item with service functions is added automatically.
 
 #### Service functions
 
@@ -1433,14 +1454,14 @@ If, for example, you want to use the wiki to create an editable sidebar you coul
 {{=auth.wiki(slug='sidebar')}}
 ``:code
 
-Notice that there is nothing special with the word "sidebar". Any wiki page can be retrieved and embedded in any point in your code. This allows you mix and match wiki functionalities with regular web2py functionalities.
+Notice that there is nothing special with the word "sidebar". Any wiki page can be retrieved and embedded at any point in your code. This allows you mix and match wiki functionalities with regular web2py functionalities.
 
 ------
 Also note that ``auth.wiki('sidebar')``:code is the same as ``auth.wiki(slug='sidebar')``:code, since the slug kwarg is the first in the method signature. The former gives a slightly simpler syntax.
 ------
 
 
-You can also embed special wiki functions as the search by tags:
+You can also embed special wiki functions such as the search by tags:
 
 ``
 {{=auth.wiki('_search')}}
@@ -1470,7 +1491,7 @@ Note that you still have to call auth.wiki() in the controller or view in order 
 ------
 
 
-Also, by setting resolve to ``False`` in the method call, the wiki tables will be now accesible trough the app's default db interface at ``<app>/appadmin`` for managing wiki records.
+Also, by setting resolve to ``False`` in the method call, the wiki tables will be now accessible through the app's default db interface at ``<app>/appadmin`` for managing wiki records.
 
 
 Another customization possible is adding extra fields to the standard wiki tables (in the same way as with the ``auth_user`` table, as described in Chapter 9). Here is how:
@@ -1485,7 +1506,7 @@ The line above adds a ``blob`` field to the ``wiki_page`` table. There is no nee
 
 #### Components
 
-One of the most powerful function of the new web2py consists in the ability of embedding an action inside another action. We call this a component.
+One of the most powerful functions of the new web2py consists in the ability of embedding an action inside another action. We call this a component.
 
 Consider the following model:
 
@@ -1507,7 +1528,7 @@ This action is special because it returns a widget/helper not a dict of objects.
 {{=LOAD('default','manage_things',ajax=True)}}
 ``:code
 
-This allows the visitor interact with the component via Ajax without reloading the host page that embeds the widget. Basically the action is called via Ajax, inherits the stile of the host page, and capture all forms submissions and flash messages so that they are handled within the current page. On top of this the ``SQLFORM.grid`` widget uses digitally signed URLs to restrict access. More information about components can be found in chapter 13.
+This allows the visitor interact with the component via Ajax without reloading the host page that embeds the widget. The action is called via Ajax, inherits the style of the host page, and captures all form submissions and flash messages so that they are handled within the current page. On top of this the ``SQLFORM.grid`` widget uses digitally signed URLs to restrict access. More information about components can be found in chapter 13.
 
 Components like the one above can be embedded into wiki pages using the MARKMIN syntax:
 
@@ -1515,7 +1536,7 @@ Components like the one above can be embedded into wiki pages using the MARKMIN 
 @{component:default/manage_things}
 ``
 
-This simply tells web2py that we want to incude the "manage_things" action defined in the "default" controller as an Ajax "component".
+This simply tells web2py that we want to include the "manage_things" action defined in the "default" controller as an Ajax "component".
 
 ---------
 Most users will be able to build relatively complex applications simply by using ``auth.wiki`` to create pages and menus and embedded custom components into wiki pages. Wikis can be thought of as a mechanism to allow members of the group to create pages, but they can also be thought of as a way to develop applications in a modular way.
@@ -1539,7 +1560,7 @@ The following form allows uploading an existing application from either a local 
 allows you to install multiple copies of the same application). You can try, for example, to upload the Movuca Social Networking application app created by Bruno Rocha:
 
 ``
-http://code.google.com/p/instant-press/
+https://github.com/rochacbruno/Movuca
 ``
 
 or Instant Press CMS created by Martin Mulone:
@@ -1555,7 +1576,7 @@ http://web2py.com/appliances
 ``
 
 ------
-Web2py files are packages as ``.w2p`` files. These ones are tar gzipped files. Web2py uses the ``.w2p`` extension instead of the ``.tgz`` extension to prevent the browser from unzipping on download. They can be uncompressed manually with ``tar zxvf [filename]`` although this is never necessary.
+Web2py files are packages as ``.w2p`` files. These are tar gzipped files. Web2py uses the ``.w2p`` extension instead of the ``.tgz`` extension to prevent the browser from unzipping on download. They can be uncompressed manually with ``tar zxvf [filename]`` although this is never necessary.
 ------
 
 [[image @///image/en4100.png center 444px]]
@@ -1584,8 +1605,8 @@ For each application installed you can use the ''site'' page to:
 - Jump to the ''errors'' page (read below).
 - Clean up temporary files (sessions, errors, and cache.disk files).
 - Pack all. This returns a tar file containing a complete copy of the application. We suggest that you clean up temporary files before packing an application.
-- Compile the application. If there are no errors, this option will bytecode-compile all models, controllers and views. Because views can extend and include other views in a tree, before bytecode compilation, the view tree for every controller is collapsed into a single file. The net effect is that a bytecode-compiled application is faster, because there is no more parsing of templates or string substitutions occurring at runtime.
-- Pack compiled. This option is only present for bytecode-compiled applications. It allows packing the application without source code for distribution as closed source. Note that Python (as any other programming language) can technically be decompiled; therefore compilation does not provide complete protection of the source code. Nevertheless, decompilation can be difficult and can be illegal.
+- Compile the application. If there are no errors, this option will bytecode-compiles all models, controllers and views. Because views can extend and include other views in a tree, before bytecode compilation, the view tree for every controller is collapsed into a single file. The net effect is that a bytecode-compiled application is faster, because there is no more parsing of templates or string substitutions occurring at runtime.
+- Pack compiled. This option is only present for bytecode-compiled applications. It allows packing the application without source code for distribution as closed source. Note that Python (as any other programming language) can technically be decompiled; therefore compilation does not provide complete protection of the source code. Nevertheless, de-compilation can be difficult and can be illegal.
 - Remove compiled. It simply removes the byte-code compiled models, views and controllers from the application. If the application was packaged with source code or edited locally, there is no harm in removing the bytecode-compiled files, and the application will continue to work. If the application was installed form a packed compiled file, then this is not safe, because there is no source code to revert to, and the application will no longer work.
 
 ``admin.py``:inxx
@@ -1651,7 +1672,7 @@ creation and connections. For activities like these (i.e. if you need persistenc
 -------
 ##### Crontab
 
-Also under the controllers tab in ''edit'' there is a "crontab" link. By clicking on this link you will be able to edit the web2py crontab file. This follows the same syntax as the unix crontab but does not rely on unix. In fact, it only requires web2py, and it works on Windows. It allows you to register actions that need to be executed in background at scheduled times.
+Also under the controllers tab in ''edit'' there is a "crontab" link. By clicking on this link you will be able to edit the web2py crontab file. This follows the same syntax as the Unix crontab but does not rely on Unix. In fact, it only requires web2py, and it works on Windows. It allows you to register actions that need to be executed in background at scheduled times.
 For more information about this, see the next chapter.
 
 #### Errors
@@ -1677,7 +1698,7 @@ Only the administrator can access the ticket:
 
 The ticket shows the traceback, and the content of the file that caused the problem, and the complete state of system (variables, request, session, etc.) If the error occurs in a view, web2py shows the view converted from HTML into Python code. This allows to easily identify the logical structure of the file.
 
-By default tickets are stored on filesystem and group by traceback. The administrative interface provides an aggregate views (type of traceback and number of occurrence) and a detailed view (all tickets are listed by ticket id). The administrator can switch between the two views.
+By default tickets are stored on filesystem and displayed grouped by traceback. The administrative interface provides an aggregate views (type of traceback and number of occurrence) and a detailed view (all tickets are listed by ticket id). The administrator can switch between the two views.
 
 Notice that everywhere **admin** shows syntax-highlighted code (for example, in error reports, web2py keywords are shown in orange). If you click on a web2py keyword, you are redirected to a documentation page about the keyword.
 
@@ -1767,18 +1788,18 @@ In any case the wizard is a handy tool for fast prototyping and it can be used t
 
 #### Configuring **admin**
 
-Normally there is no need to perform any configuration of admin but a few customizations are possible. After you login into admin you can edit the admin configuration file via the URL:
+Normally there is no need to perform any configuration of **admin** but a few customizations are possible. After you login into admin you can edit the admin configuration file via the URL:
 ``
 http://127.0.0.1:8000/admin/default/edit/admin/models/0.py
 ``
 Notice that **admin** can be used to edit itself. In fact **admin** is an app as any other one.
 
-The file "0.py" is very much self documented and if you are opening probably you already know what you are looking for. Anyway few customizations exist that are more important than others:
+The file "0.py" is more or less self documented, anyway, here are some of the most important possible customizations:
 
 ``
 GAE_APPCFG = os.path.abspath(os.path.join('/usr/local/bin/appcfg.py'))
 ``
-This should point to the location of the "appcfg.py" file that comes with the Google App Engine SDK. If you have the SDK you may want to change this config parameters to the correct value. It will allow you to deploy to GAE from the admin interface.
+This should point to the location of the "appcfg.py" file that comes with the Google App Engine SDK. If you have the SDK you may want to change these config parameters to the correct value. It will allow you to deploy to GAE from the admin interface.
 
 ``DEMO_MODE``:inxx
 
@@ -1787,7 +1808,7 @@ You can also set web2py admin in demo mode:
 DEMO_MODE = True
 FILTER_APPS = ['welcome']
 ``
-And only the apps listed in filter apps will be accessible and they will be only accessible in read-only mode.
+And only the apps listed in FILTER_APPS will be accessible and they will be only accessible in read-only mode.
 
 ``MULTI_USER_MODE``:inxx
 ``virtual laboratory``:inxx
@@ -1798,13 +1819,15 @@ MULTI_USER_MODE = True
 ``
 In this way students will be required to login and will only be able to access their own apps via admin. You, as first user/teacher, will be able to access them all.
 
-In multi user mode, you can register students using the "bulk register" link in admin and manage them using the "manage students" link. The system also keep track of when students login and how many lines of code add/remove to/from their code. This data is presented to the administrator as charts under the application "about" page.
+In multi user mode, you can register students using the "bulk register" link in admin and manage them using the "manage students" link. The system also keeps track of when students login and how many lines of code they add/remove to/from their code. This data is presented to the administrator as charts under the application "about" page.
 
 Mind that this mechanism still assumes all users are trusted. All the apps created under admin run under the same credentials on the same filesystem. It is possible for an app created by a student to access the data and the source of an app created by another student. It is also possible for a student to create an app that locks the server.
 
 #### Mobile **admin**
 
-Notice that the admin application includes "plugin_jqmodile" which packages jQuery Mobile. When admin is accessed from a mobile device; this is detected by web2py and the interface is displayed using a mobile-friendly layout.
+Notice that the admin application includes "plugin_jqmobile" which packages jQuery Mobile. When admin is accessed from a mobile device; this is detected by web2py and the interface is displayed using a mobile-friendly layout:
+
+[[image @///image/mobile.png center 306px]]
 
 ### More on **appadmin**
 
@@ -1842,8 +1865,6 @@ If you click on the number of a reference field, you get an edit page for the re
 
 You cannot update or delete rows selected by a join, because they involve records from multiple tables and this would be ambiguous.
 
-In addition to its database administration capabilities, **appadmin** also enables you to view details about the contents of the application's ``cache`` (at ``/yourapp/appadmin/ccache``) as well as the contents of the current ``request``, ``response``, and ``session`` objects (at ``/yourapp/appadmin/state``).
+In addition to its database administration capabilities, **appadmin** also enables you to view details about the contents of the application's ``cache`` (at ``/yourapp/appadmin/cache``) as well as the contents of the current ``request``, ``response``, and ``session`` objects (at ``/yourapp/appadmin/state``).
 
-------
 **appadmin** replaces ``response.menu`` with its own menu, which provides links to the application's **edit** page in **admin**, the **db** (database administration) page, the **state** page, and the **cache** page. If your application's layout does not generate a menu using ``response.menu``, then you will not see the **appadmin** menu. In that case, you can modify the appadmin.html file and add ``{{=MENU(response.menu)}}`` to display the menu.
-------
