@@ -160,6 +160,7 @@ def assemble(path):
     path1 = os.path.join(path,'??.markmin')
     text = '\n\n'.join(open(f,'r').read() for f in glob.glob(path1))
     text = text.replace('@///image',os.path.join(path,'images'))
+    
     body, title, authors = render(text)
     body = body.replace('\\section{','\\chapter{'
                         ).replace('subsection{','section{')
@@ -173,6 +174,7 @@ def assemble(path):
         bibliography.append((item,reference['source_url'])) 
     txtitems = '\n'.join('\\bibitem{%s} \\url{%s}' % item for item in bibliography)
     body = body.replace('\@/','@/')
+    body = body.replace('{\\textbackslash}@/','@/')
     body = body.replace('\\begin{center}','\\goodbreak\\begin{center}')
     return HEADER + body + FOOTER.replace('@BIBITEMS',txtitems)
 
