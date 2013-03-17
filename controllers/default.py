@@ -2,6 +2,14 @@
 import os, datetime
 session.forget()
 
+TIME_EXPIRE = 60*60*24
+FORCE_RENDER = False
+
+# this is for checking new content instantly in development
+if request.is_local:
+    TIME_EXPIRE = -1
+    FORCE_RENDER = True
+
 response.title = 'web2py'
 response.subtitle = 'Full Stack Web Framework, 4th Ed.\nwritten by Massimo Di Pierro in English'
 response.menu = []
@@ -74,7 +82,7 @@ def convert2html(book_id,text):
 def index():
     books = {}
     for subfolder in FOLDERS:
-        books[subfolder] = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=60*60*24)
+        books[subfolder] = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
     return locals()
 
 def calc_date(now=request.utcnow.date()):
@@ -88,14 +96,15 @@ def calc_date(now=request.utcnow.date()):
 def chapter():
     book_id, chapter_id = request.args(0), request.args(1,cast=int,default='0')
     subfolder = get_subfolder(book_id)
-    info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=60*60*24)
-    chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=60*60*24)
+    info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
+    chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=TIME_EXPIRE)
     filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
     dest = os.path.join(request.folder, 'static_chaps', subfolder, '%.2i.html' % chapter_id)
-    response.headers['Cache-Control'] = 'public, must-revalidate'
-    response.headers['Expires'] = calc_date()
-    response.headers['Pragma'] = None
-    if not os.path.isfile(dest):
+    if not FORCE_RENDER:
+        response.headers['Cache-Control'] = 'public, must-revalidate'
+        response.headers['Expires'] = calc_date()
+        response.headers['Pragma'] = None
+    if (not os.path.isfile(dest)) or FORCE_RENDER:
         content = open(filename).read()
         content = convert2html(book_id,content).xml()
         if not os.path.exists(os.path.dirname(dest)):
@@ -111,8 +120,8 @@ def search():
     book_id = request.args(0) or redirect(URL('index'))
     search = request.vars.search or redirect(URL('chapter',args=book_id))
     subfolder = get_subfolder(book_id)
-    info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=60*60*24)
-    chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=60*60*24)
+    info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
+    chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=TIME_EXPIRE)
     results = []
     content = H2('No results for "%s"' % search)
     for chapter in chapters:
