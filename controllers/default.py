@@ -100,9 +100,10 @@ def chapter():
     chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=TIME_EXPIRE)
     filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
     dest = os.path.join(request.folder, 'static_chaps', subfolder, '%.2i.html' % chapter_id)
-    response.headers['Cache-Control'] = 'public, must-revalidate'
-    response.headers['Expires'] = calc_date()
-    response.headers['Pragma'] = None
+    if not FORCE_RENDER:
+        response.headers['Cache-Control'] = 'public, must-revalidate'
+        response.headers['Expires'] = calc_date()
+        response.headers['Pragma'] = None
     if (not os.path.isfile(dest)) or FORCE_RENDER:
         content = open(filename).read()
         content = convert2html(book_id,content).xml()
