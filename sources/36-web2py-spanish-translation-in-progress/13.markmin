@@ -1,105 +1,113 @@
-## Deployment recipes
+## Recetas de implementación
 
-There are multiple ways to deploy web2py in a production environment. The details depend on the configuration and the services provided by the host.
+Hay múltiples formas de desplegar web2py en producción. Los detalles dependen de la configuración y de los servicios disponibles en el sistema de alojamiento y su infraestructura.
 
-In this chapter we consider the following issues:
-- Production deployment (Apache, Lighttpd, Cherokee)
-- Security
-- Scalability
-- Deployment on the Google App Engine platform(GAE``gae``:cite )
+En este capítulo vamos a tratar sobre los siguientes aspectos:
+
+- Despliegue en producción (Apache, Nginx, Lighttpd, Cherokee)
+- Seguridad
+- Escalabilidad utilizando Redis y un ''load balancer''
+- Despliegue en PythonAnywhere, Heroku, Amazon EC2, y en la plataforma Google App Engine (GAE``gae``:cite)
 
 ``Apache``:inxx ``CGI``:inxx ``mod_python``:inxx ``mod_wsgi``:inxx ``mod_proxy``:inxx
-``WSGI``:inxx
+``WSGI``:inxx ``Nginx``:inxx ``Heroku``:inxx ``PythonAnywhere``:inxx
 
-web2py comes with an SSL``ssl``:cite  enabled web server, the Rocket wsgiserver``rocket``:cite . While this is a fast web server, it has limited configuration capabilities. For this reason it is best to deploy web2py behind Apache``apache``:cite , Lighttpd``lighttpd``:cite  or Cherokee``cherokee``:cite . These are free and open-source web servers that are customizable and have been proven to be reliable in high traffic production environments. They can be configured to serve static files directly, deal with HTTPS, and pass control to web2py for dynamic content.
+web2py viene con un servidor web apto para SSL``ssl``:cite, Rocket wsgiserver``rocket``:cite. Si bien se trata de un servidor web veloz, tiene una capacidad de configuración limitada. Por esta razón es preferible desplegar web2py sobre Apache``apache``:cite, Nginx``Nginx``:cite, Lighttpd``lighttpd``:cite o Cherokee``cherokee``:cite. Estos son servidores web libres y de código abierto, personalizables y que son conocidos por su rendimiento y fiabilidad en entornos de producción de alto tráfico. Se pueden configurar para servir archivos directamente, manejar HTTPS y relegar el control a web2py para producir contenido en forma dinámica.
 
-Until a few years ago, the standard interface for communication between web servers and web applications was the Common Gateway Interface (CGI)``cgi``:cite . The main problem with CGI is that it creates a new process for each HTTP request. If the web application is written in an interpreted language, each HTTP request served by the CGI scripts starts a new instance of the interpreter. This is slow, and it should be avoided in a production environment. Moreover, CGI can only handle simple responses. It cannot handle, for example, file streaming.
+Hasta hace algunos años atrás, la interfaz estándar para comunicaciones entre servidores web y aplicaciones era el ''Common Gateway Interface'' (CGI)``cgi``:cite. El problema principal con CGI es que crea un nuevo proceso para cada consulta HTTP. Si la aplicación está escrita en un lenguaje interpretado, cada consulta HTTP servida con el script CGI inicia una nueva instancia del intérprete. Esto resulta lento, y debería evitarse en un entorno de producción. Más aún, CGI puede manejar únicamente respuestas simples. No puede manejar por ejemplo, ''streaming'' de archivos.
 
-web2py provides a file ``cgihandler.py`` to interface to CGI.
+web2py provee de un archivo ``cgihandler.py`` como interfaz con CGI.
 
-One solution to this problem is to use the mod_python module for Apache. We discuss it here because its use is still very common, though the mod_python project has officially been abandoned by the Apache Software Foundation. mod_python starts one instance of the Python interpreter when Apache starts, and serves each HTTP request in its own thread without having to restart Python each time. This is a better solution than CGI, but it is not an optimal solution, since mod_python uses its own interface for communication between the web server and the web application. In mod_python, all hosted applications run under the same user-id/group-id, which presents security issues.
+Una solución a este problema es el uso del módulo mod_python de Apache. Lo mencionamos aqui porque su uso sigue siendo muy común en la actualidad, aunque el proyecto mod_python ha sido oficialmente abandonado por la Apache Software Foundation. mod_python inicia una instancia del intérprete cuando se inicia Apache, y sirve cada solicitud HTTP en su propio hilo sin la necesidad de reiniciar Python para cada vez. Esta es una solución más apropiada que CGI, pero no es óptima, ya que mod_python usa su propia interfaz para la comunicación entre el servidor y la aplicación web. En mod_python, todas las aplicaciones alojadas corren bajo los mismos id de usuario y grupo, que implica problemas de seguridad.
 
-web2py provides a file ``modpythonhandler.py`` to interface to mod_python.
+web2py provee de un archivo ``modpythonhandler.py`` que sirve como interfaz con mod_python.
 
-In the last few years, the Python community has come together behind a new standard interface for communication between web servers and web applications written in Python. It is called Web Server Gateway Interface (WSGI)``wsgi-w``:cite ``wsgi-o``:cite . web2py was built on WSGI, and it provides handlers for using other interfaces when WSGI is not available.
 
-Apache supports WSGI via the module mod_wsgi``modwsgi``:cite  developed by Graham Dumpleton.
+En los últimos años, la comunidad de Python ha adoptado una nueva interfaz estándar para la comunicación entre los servidores web y las aplicaciones web escritas en Python. Se llama ''Web Server Gateway Interface'' (WSGI)``wsgi-w``:cite ``wsgi-o``:cite. web2py fue construido en base a WSGI, y provee de manejadores para el uso de otras interfaces cuando WSGI no está disponible.
 
-web2py provides a file ``wsgihandler.py`` to interface to WSGI.
+Apache soporta WSGI a través del módulo mod_wsgi``modwsgi``:cite desarrollado por Graham Dumpleton.
 
-Some web hosting services do not support mod_wsgi. In this case, we must use Apache as a proxy and forward all incoming requests to the web2py built-in web server (running for example on localhost:8000).
+web2py incluye un archivo ``wsgihandler.py`` para la interfaz con WSGI.
 
-In both cases, with mod_wsgi and/or mod_proxy, Apache can be configured to serve static files and deal with SSL encryption directly, taking the burden off web2py.
+Algunos servicios de alojamiento no tienen soporte para mod_wsgi. En este caso, debemos usar Apache como proxy y reenviar todas las solicitudes entrantes al servidor incorporado de web2py (corriendo por ejemplo en localhost:8000).
 
-The Lighttpd web server does not currently support the WSGI interface, but it does support the FastCGI``fastcgi``:cite  interface, which is an improvement over CGI. FastCGI's main aim is to reduce the overhead associated with interfacing the web server and CGI programs, allowing a server to handle more HTTP requests at once.
+En ambos casos, con mod_wsgi y/o con mod_proxy, Apache se puede configurar para servir archivos estáticos y manejar el cifrado SSL en forma directa, liberando a web2py de esa tarea.
 
-According to the Lighttpd web site, "Lighttpd powers several popular Web 2.0 sites such as YouTube and Wikipedia. Its high speed IO-infrastructure allows them to scale several times better with the same hardware than with alternative web-servers". Lighttpd with FastCGI is, in fact, faster than Apache with mod_wsgi.
+Nginx usa uWSGI en lugar de WSGI, un protocolo similar aunque con ciertas diferencias que require su propio adaptador python.
 
-web2py provides a file ``fcgihandler.py`` to interface to FastCGI.
+El servidor Lighttpd no soporta actualmente la interfaz WSGI, pero si soporta la interfaz FastCGI``fastcgi``:cite, que es una mejora sobre CGI. FastCGI pretende reducir la sobrecarga asociada a la interfaz entre servidores web y programas CGI, permitiendo al servidor manejar una mayor cantidad de solicitudes al mismo tiempo.
 
-web2py also includes a ``gaehandler.py`` to interface with the
-Google App Engine (GAE). On GAE, web applications run "in the cloud". This means that the framework completely abstracts any hardware details. The web application is automatically replicated as many times as necessary to serve all concurrent requests. Replication in this case means more than multiple threads on a single server; it also means multiple processes on different servers. GAE achieves this level of scalability by blocking write access to the file system, and all persistent information must be stored in the Google BigTable datastore or in memcache.
+Según el sitio web de Lighttpd, "Lighttpd es utilizado por gran cantidad de sitios Web 2.0 como YouTube y Wikipedia. Su infraestructura de E/S de alta velocidad les permite una escalabilidad muchas veces mejor con el mismo hardware en relación con otros servidores web alternativos". Lighttpd con FastCGI es, de hecho, más rápido que Apache con mod_wsgi.
 
-On non-GAE platforms, scalability is an issue that needs to be addressed, and it may require some tweaks in the web2py applications. The most common way to achieve scalability is by using multiple web servers behind a load-balancer (a simple round robin, or something more sophisticated, receiving heartbeat feedback from the servers).
+web2py provee de un archivo ``fcgihandler.py`` para la interfaz con FastCGI.
 
-Even if there are multiple web servers, there must be one, and only one, database server. By default, web2py uses the file system for storing sessions, error tickets, uploaded files, and the cache. This means that in the default configuration, the corresponding folders have to be shared folders:
+Además web2py incluye un script ``gaehandler.py`` para la interfaz con el servicio Google App Engine (GAE). Sobre GAE, las aplicaciones corren "en la nube". Esto significa que el entorno o ''framework'', abstrae completamente todo detalle del hardware. La aplicación web es automáticamente replicada tantas veces como sea necesario para servir todas las solicitudes simultáneas. Replicación en este caso quiere decir más que múltiples hilos en el mismo servidor; también implica múltiples procesos en distintos servidores. GAE logra este nivel de escalabilidad bloqueando el acceso de escritura al sistema de archivos, y toda información permanente se debe almacenar en el sistema BigTable de Google o en memcache.
+
+Salvo en plataformas como GAE, la escalabilidad es una cuestión que hay que resolver, y puede llegar a tomar más de un reajuste en las aplicaciones web2py. La forma más común de lograr escalabilidad es usando múltiples servidores detrás de un balanceador de carga  o ''load-balancer'' (un simple algoritmo de selección o algo más sofisticado recibiendo pulsaciones de los distintos servidores).
+
+Incluso si hubiera múltiples servidores web, debe haber uno, y sólo un servidor de la base de datos. Por defecto, web2py usa el sistema de archivos para almacenar las sesiones, informes de error, archivos subidos y caché. Esto implica que con la configuración por defecto, esas carpetas deben ser compartidas.
+
 
 [[image @///image/en9100.png center 300px]]
 
-In the rest of the chapter, we consider various recipes that may provide an improvement over this naive approach, including:
-- Store sessions in the database, in cache or do not store sessions at all.
-- Store tickets on local filesystems and move them into the database in batches.
-- Use memcache instead of cache.ram and cache.disk.
-- Store uploaded files in the database instead of the shared filesystem.
+En lo que sigue del capítulo, tratamos varias recetas que pueden servir como mejoras a implementaciones elementales, incluyendo:
+- Almacenamiento de sesiones en la base de datos, en caché u omisión por completo de su almacenamiento.
+- Almacenamiento de los informes de error o ''ticket'' en el sistema local de archivos y la transferencia de esos informes a la base de datos en un proceso por lotes.
+- Uso de memcache en lugar de cache.ram y cache.disk.
+- Almacenamiento de archivos subidos en la base de datos en lugar del sistema compartido de archivos.
 
-While we recommend following the first three recipes, the fourth recipe may provide an advantage mainly in the case of small files, but may be counterproductive for large files.
+Si bien recomendamos seguir las primeras tres recetas, la cuarta receta puede ser de provecho principalmente para el caso de pequeños archivos, pero puede implicar una reducción de la performance en archivos extensos.
 
-#### ``anyserver.py``
 
-``anyserver``:inxx ``bjoern``:inxx ``cgi``:inxx ``cherrypy``:inxx ``diesel``:inxx ``eventlet``:inxx ``fapws``:inxx ``flup``:inxx ``gevent``:inxx ``gunicorn``:inxx ``mongrel2``:inxx ``paste``:inxx `` ``tornado``:inxx ``twisted``:inxx ``wsgiref
+### ``anyserver.py``
 
-Web2py comes with a file called ``anyserver.py`` that implements WSGI interfaces to the following popular servers: bjoern, cgi, cherrypy, diesel, eventlet,
-fapws, flup, gevent, gunicorn, mongrel2, paste,
-rocket, tornado,  twisted, wsgiref
+``anyserver``:inxx ``bjoern``:inxx ``cgi``:inxx ``cherrypy``:inxx ``diesel``:inxx ``eventlet``:inxx ``fapws``:inxx ``flup``:inxx ``gevent``:inxx ``gunicorn``:inxx ``mongrel2``:inxx ``paste``:inxx ``tornado``:inxx ``twisted``:inxx ``wsgiref``:inxx
 
-You can use any of these servers, for example Tornado, simply by doing:
+Web2py viene con un archivo llamado ``anyserver.py`` que implementa interfaces WSGI con los siguientes servidores más utilizados: bjoern, cgi, cherrypy, diesel, eventlet, fapws, flup, gunicorn, mongrel2, paste, rocket, tornado, twisted, wsgiref.
+
+Puedes usar cualquiera de esos servidores, por ejemplo Tornado, con solo hacer:
+
 
 ``
 python anyserver.py -s tornado -i 127.0.0.1 -p 8000 -l -P
 ``
 
-(``-l`` for logging and ``-P`` for profiler.
-For information on all the command line options use "-h":
+Aquí ``-l`` es para el registro ''log'' y ``-P`` es para el ''profiler''.
+Para consultar la lista de todos las opciones de la línea de comandos usa "-h":
 
 ``
 python anyserver.py -h
 ``:code
 
-### Linux and Unix
+### Linux y Unix
 
-#### One step production deployment
+#### Despliegue en producción en un solo paso
 
-Here are some steps to install apache+python+mod_wsgi+web2py+postgresql from scratch.
+Aquí presentamos instrucciones para instalar apache+python+mod_wsgi+web2py+postgresql en pocos pasos desde cero.
 
-On Ubuntu:
+
+En Ubuntu:
 ``
 wget http://web2py.googlecode.com/hg/scripts/setup-web2py-ubuntu.sh
 chmod +x setup-web2py-ubuntu.sh
 sudo ./setup-web2py-ubuntu.sh
 ``
-On Fedora:
+
+En Fedora:
 ``
 wget http://web2py.googlecode.com/hg/scripts/setup-web2py-fedora.sh
 chmod +x setup-web2py-fedora.sh
 sudo ./setup-web2py-fedora.sh
 ``
-Both of these scripts should run out of the box, but every Linux installation is a bit different, so make sure you check the source code of these scripts before you run them. In the case of Ubuntu, most of what they do is explained below. They do not implement the scalability optimizations discussed below.
 
-#### Apache setup
+Los dos script deberían andar en forma instantánea, pero cada instalación de Linux es un tanto diferente, por lo que deberías asegurarte de revisar el código fuente antes de ejecutarlos. Para el caso de Ubuntu, gran parte de lo que se hace se explica a continuación. Estos comandos no implementan optimizaciones para escalabilidad, tratados más abajo.
 
-In this section, we use Ubuntu 8.04 Server Edition as the reference platform. The configuration commands are very similar on other Debian-based Linux distribution, but they may differ for Fedora-based systems (which uses ``yum`` instead of ``apt-get``).
+#### Configuración con Apache
 
-First, make sure all the necessary Python and Apache packages are installed by typing the following shell commands:
+En esta sección, usaremos Ubuntu 8.04 Server Edition como plataforma de referencia. Los comandos de configuración son realmente parecidos a los de otras distribuciones de Linux basadas en Debian, pero pueden diferir para los sistemas basados en Fedora (que usan ``yum`` en lugar de ``apt-get``).
+
+Primero, asegúrate de que se han instalado los paquetes para Python y Apache tipeando los siguientes comandos en la consola:
+
 ``
 sudo apt-get update
 sudo apt-get -y upgrade
@@ -111,9 +119,9 @@ sudo apt-get -y install libapache2-mod-wsgi
 sudo apt-get -y install libapache2-mod-proxy-html
 ``:code
 
-Then, enable the SSL module, the proxy module, and the WSGI module in Apache:
+Luego, habilita el módulo SSL, el módulo para proxy, y el módulo para WSGI en Apache:
 ``
-sudo ln -s /etc/apache2/mods-available/proxy_http.load \
+sudo ln -s /etc/apache2/mods-available/proxy_http.load \\
            /etc/apache2/mods-enabled/proxy_http.load
 sudo a2enmod ssl
 sudo a2enmod proxy
@@ -121,55 +129,54 @@ sudo a2enmod proxy_http
 sudo a2enmod wsgi
 ``:code
 
-Create the SSL folder, and put the SSL certificates inside it:
+Crea una carpeta para SSL, y coloca allí los certificados SSL:
 ``
 sudo mkdir /etc/apache2/ssl
 ``:code
 
-You should obtain your SSL certificates from a trusted Certificate Authority such as verisign.com, but, for testing purposes, you can generate your own self-signed certificates following the instructions in ref.``openssl``:cite
+Deberías obtener tus certificados SSL por medio de una Autoridad en Certificados confiable como verisign.com, pero, para realizar pruebas, puedes crear tus certificados autofirmados siguiendo las instrucciones en ref.``openssl``:cite
 
-Then restart the web server:
+Ahora reinicia el servidor web:
 ``
 sudo /etc/init.d/apache2 restart
 ``:code
 
-The Apache configuration file is:
+El archivo de configuración de Apache es:
 ``
 /etc/apache2/sites-available/default
 ``:code
 
-The Apache logs are in:
+Los ''log'' de apache están en:
 ``
 /var/log/apache2/
 ``:code
 
 #### mod_wsgi
 
-Download and unzip web2py source on the machine where you installed the web server above.
+Descarga y descomprime el código fuente de web2py en la máquina donde tienes instalado el servidor según se describe más arriba.
 
-Install web2py under ``/users/www-data/``, for example, and give ownership to user www-data and group www-data. These steps can be performed with the following shell commands:
+Instala web2py dentro de ``/home/www-data/``, por ejemplo, y hazlo propietario del usuario www-data y el grupo www-data. Estos pasos se pueden realizar de la siguiente forma:
 ``
-cd /users/www-data/
+cd /home/www-data/
 sudo wget http://web2py.com/examples/static/web2py_src.zip
 sudo unzip web2py_src.zip
-sudo chown -R www-data:www-data /user/www-data/web2py
+sudo chown -R www-data:www-data /home/www-data/web2py
 ``:code
 
-To set up web2py with mod_wsgi, create a new Apache configuration file:
+Para configurar web2py con mod_wsgi, crea un nuevo archivo de configuración de Apache:
 ``
 /etc/apache2/sites-available/web2py
 ``:code
 
-and include the following code:
+e incluye el código siguiente:
 ``
 <VirtualHost *:80>
   ServerName web2py.example.com
-  WSGIDaemonProcess web2py user=www-data group=www-data \
-                           display-name=%{GROUP}
+  WSGIDaemonProcess web2py user=www-data group=www-data display-name=%{GROUP}
   WSGIProcessGroup web2py
-  WSGIScriptAlias / /users/www-data/web2py/wsgihandler.py
+  WSGIScriptAlias / /home/www-data/web2py/wsgihandler.py
 
-  <Directory /users/www-data/web2py>
+  <Directory /home/www-data/web2py>
     AllowOverride None
     Order Allow,Deny
     Deny from all
@@ -178,7 +185,7 @@ and include the following code:
     </Files>
   </Directory>
 
-  AliasMatch ^/([^/]+)/static/(.*) \
+  AliasMatch ^/([^/]+)/static/(.*) \\
            /users/www-data/web2py/applications/$1/static/$2
   <Directory /users/www-data/web2py/applications/*/static/>
     Order Allow,Deny
@@ -198,55 +205,44 @@ and include the following code:
 </VirtualHost>
 ``:code
 
-When you restart Apache, it should pass all the requests to web2py without going through the Rocket wsgiserver.
+Cuando inicies Apache, este debería pasar toda consulta a web2py sin pasar previamente por el servidor Rocket wsgiserver.
 
-Here are some explanations:
+Aquí haremos algunas aclaraciones:
+
 ``
-WSGIDaemonProcess web2py user=www-data group=www-data
-                         display-name=%{GROUP}
+WSGIDaemonProcess web2py user=www-data group=www-data display-name=%{GROUP}
 ``:code
 
-defines a daemon process group in context of "web2py.example.com". By
-defining this inside of the virtual host, only this virtual host can access this using WSGIProcessGroup, including any virtual host with the same server name but on a different
-port. The "user" and "group"
-options should be set to the user who has write access to the
-directory where web2py was setup. You do not need to set "user" and
-"group" if you made the web2py installation directory writable by
-the default user that Apache runs as. The "display-name" option
-makes the process name appears in ``ps`` output as "(wsgi-web2py)"
-instead of as name of Apache web server executable. As no "processes"
-or "threads" options are specified, the daemon process group will have a
-single process with 15 threads running within that process. This is
-usually more than adequate for most sites and should be left as is.
-If overriding it, do not use "processes=1" as doing so will disable
-any in-browser WSGI debugging tools that check the "wsgi.multiprocess"
-flag. This is because any use of the "processes" option will cause
-that flag to be set to true, even a single process, and such tools
-expect that it be set to false. Note: if your application code
-or third party extension module is not
-thread safe, use options "processes=5 threads=1" instead. This will
-create five processes in the daemon process group where each process
-is single threaded. You might consider using "maximum-requests=1000"
-if your application leaks Python objects because it is unable to garbage collect properly.
+define un grupo para el demonio en el contexto de "web2py.example.com". Al definir esto en el ''virtual host'', solo este virtual host puede acceder a él usando WSGIProcessGroup, incluyendo a todo virtual host para el mismo nombre de servidor pero con distinto número de puerto.
+
+Las opciones "user" y "group" se deberían establecer como el usuario que tiene acceso de escritura a la ubicación donde se ha configurado. No necesitas establecer "user" y "group" si has configurado el directorio de la instalación de web2py con derechos de escritura para el usuario que utiliza Apache.
+
+La opción "display-name" hace que el nombre del proceso se visualice en la salida de ``ps`` como "(wsgi-web2py)" en lugar del nombre del ejecutable del servidor web Apache. Como no se especifican las opciones de "processes" y "threads", el grupo del proceso demonio tendrá un único proceso con 15 hilos corriendo en el ámbito de ese proceso. Esto suele ser más que suficiente para la mayoría de los sitios y debería dejarse sin modificaciones. Si se sobreescribe, no uses "processes=1" porque al hacerlo se deshabilitará toda utilidad de depuración de WSGI para navegador que compruebe el parámetro o ''flag'' "wsgi.multiprocess". Esto se debe a que todo uso de la opción "processes" hará que ese flag se establezca como true, incluso para un solo proceso, y esas utilidades requieren que se establezca como false.
+
+Ten en cuenta que si el código de tu aplicación o módulo de extensión de terceros no es apta para funcionamiento con hilos (''thread-safe''), deberías en cambio usar "processes=5 threads=1". Esto creará cinco procesos en el grupo del proceso demonio, donde cada proceso tiene un hilo único.
+
+Considera el uso de "maximum-requests=1000" si tu aplicación tiene fugas o ''leaks'' de objetos de Python en caso de que no sea capaz de realizar la recolección de basura en forma adecuada.
+
 ``
 WSGIProcessGroup web2py
 ``:code
 
-delegates running of all WSGI applications to the daemon process group
-that was configured using the WSGIDaemonProcess directive.
+le pasa la tarea de correr toda aplicación WSGI al grupo del proceso demonio que se configuró usando la instrucción WSGIDaemonProcess.
+
 ``
 WSGIScriptAlias / /users/www-data/web2py/wsgihandler.py
 ``:code
 
-mounts the web2py application. In this case it is mounted at the root
-of the web site.
+ensambla (''mount'') la aplicación web2py. Es este caso es montada en la raíz del sitio web.
+
 ``
 <Directory /users/www-data/web2py>
   ...
 </Directory>
 ``:code
 
-gives Apache permission to access the WSGI script file.
+le da a Apache permisos para acceder al archivo del script WSGI.
+
 ``
 <Directory /users/www-data/web2py/applications/*/static/>
   Order Allow,Deny
@@ -254,7 +250,8 @@ gives Apache permission to access the WSGI script file.
 </Directory>
 ``:code
 
-Instructs Apache to bypass web2py when searching static files.
+Le indica a Apache que omita web2py en las búsquedas de archivos estáticos.
+
 ``
 <Location /admin>
   Deny from all
@@ -268,35 +265,44 @@ and
 </LocationMatch>
 ``:code
 
-blocks public access to **admin** and **appadmin**
+bloquea el acceso público a **admin** y **appadmin**
 
-Normally we would just allow permission to the whole directory where the WSGI
-script file is located, but web2py places
-the WSGI script file in a directory which contains other source code,
-including the admin interface password. Opening up
-the whole directory would cause security issues, because technically
-Apache would be given permission to serve all the files up to any user
-who traversed to that directory via a mapped URL.
-To avoid security problems, explicitly deny access to the contents of
-the directory, except for the WSGI script file, and prohibit a user
-from doing any overrides from a .htaccess file to be extra safe.
 
-You can find a completed, commented, Apache wsgi configuration file in:
+Normalmente daríamos acceso a todo el directorio donde está ubicado el script WSGI, pero web2py ubica el archivo del script en un directorio que contiene otro código fuente, incluyendo la contraseña de la interfaz de administración. El permitir el acceso a todo el directorio implicaría una serie de problemas de seguridad, porque técnicamente Apache tendría permiso para servir todos los archivos a cualquier usuario que se abra paso hacia ese directorio por mapeo de URL.
+
+Para evitar problemas de seguridad, niega explícitamente a los contenidos del directorio, excepto para el caso del archivo del script WSGI, y, para mayor seguridad, prohibe al usuario que haga cualquier sobreescritura desde un archivo .htaccess.
+
+
+Puedes encontrar una configuración completamente comentada y documentada en:
+
 ``
 scripts/web2py-wsgi.conf
 ``:code
 
-This section was created with help from Graham Dumpleton, developer of mod_wsgi.
+Esta sección se ha creado con la ayuda de Graham Dumpleton, desarrollador de mod_wsgi.
 
-#### mod_wsgi and SSL
 
-To force some applications (for example **admin** and **appadmin**) to go over HTTPS, store the SSL certificate and key files:
+#### Configurando contraseñas
+
+En producción puede llegar a ser necesario establecer la contraseña de administración al vuelo, en forma programática.
+
+Esto se puede hacer desde una shell Bash con
+
+``
+sudo -u www-data python -c "from gluon.main import save_password; save_password(raw_input('admin password: '),443)"
+``:code
+
+#### mod_wsgi y SSL
+
+Para forzar algunas aplicaciones para sólo se corran sobre HTTPS  (por ejemplo **admin** y **appadmin**), almacena los archivos del certificado y clave SSL:
+
 ``
 /etc/apache2/ssl/server.crt
 /etc/apache2/ssl/server.key
 ``:code
 
-and edit the Apache configuration file ``web2py.conf`` and append:
+y edita la configuración de Apache ``web2py.conf`` agregando:
+
 ``
 <VirtualHost *:443>
   ServerName web2py.example.com
@@ -317,7 +323,7 @@ and edit the Apache configuration file ``web2py.conf`` and append:
     </Files>
   </Directory>
 
-  AliasMatch ^/([^/]+)/static/(.*) \
+  AliasMatch ^/([^/]+)/static/(.*) \\
         /users/www-data/web2py/applications/$1/static/$2
 
   <Directory /users/www-data/web2py/applications/*/static/>
@@ -331,7 +337,7 @@ and edit the Apache configuration file ``web2py.conf`` and append:
 </VirtualHost>
 ``:code
 
-Restart Apache and you should be able to access:
+Reinicia Apache y deberías poder acceder a las siguientes direcciones:
 
 ``
 https://www.example.com/admin
@@ -339,7 +345,7 @@ https://www.example.com/examples/appadmin
 http://www.example.com/examples
 ``:code
 
-but not:
+pero no a estas otras:
 
 ``
 http://www.example.com/admin
@@ -348,20 +354,23 @@ http://www.example.com/examples/appadmin
 
 #### mod_proxy
 
-Some Unix/Linux distributions can run Apache, but do not support mod_wsgi. In this case, the simplest solution is to run Apache as a proxy and have Apache deal with static files only.
 
-Here is a minimalist Apache configuration:
+Algunas distribuciones de Unix/Linux pueden correr Apache, pero no soportan mod_wsgi. En este caso, la solución más simple es correr Apache como proxy y hacer que Apache maneje los archivos estáticos solamente.
+
+
+Aquí se muestra una configuración minimalista de Apache:
+
 ``
 NameVirtualHost *:80
-#### deal with requests on port 80
+#### manejo de las solicitudes al puerto 80
 <VirtualHost *:80>
    Alias / /users/www-data/web2py/applications
-   ### serve static files directly
+   ### sirve los archivos estáticos directamente
    <LocationMatch "^/welcome/static/.*">
     Order Allow, Deny
     Allow from all
    </LocationMatch>
-   ### proxy all the other requests
+   ### usar proxy para el resto de las solicitudes
    <Location "/welcome">
      Order deny,allow
      Allow from all
@@ -375,40 +384,45 @@ NameVirtualHost *:80
 </VirtualHost>
 ``:code
 
-The above script exposes only the "welcome" application. To expose other applications, you need to add the corresponding <Location>...</Location> with the same syntax as done for the "welcome" app.
+El script anterior expone sólo la aplicación "welcome". Para exponer el resto de las aplicaciones, debes agregar los <location>...</location> correspondientes con la misma sintaxis que se usó para la app "welcome".
 
-The script assumes there is a web2py server running on port 8000. Before restarting Apache, make sure this is the case:
+
+El script asume que hay un servidor de web2py corriendo en el puerto 8000. Antes de reiniciar Apache, asegúrate de que ese servidor realmente esté funcionando:
+
 ``
 nohup python web2py.py -a '<recycle>' -i 127.0.0.1 -p 8000 &
 ``:code
 
-You can specify a password with the ``-a`` option or use the "<recycle>" parameter instead of a password. In the latter case, the previously stored password is reused and the password is not stored in the shell history.
+Puedes especificar una contraseña con la opción ``-a`` o usar el parámetro "<recycle>" en lugar de contraseña. Para este último caso, la contraseña almacenada previamente se reutilizará y no se almacenará la contraseña en el historial del shell.
 
-You can also use the parameter "<ask>", to be prompted for a password.
 
-The ``nohup`` commands makes sure the server does not die when you close the shell. ``nohup`` logs all output into ``nohup.out``.
+Además puedes usar el parámetro "<ask>", para que se te solicite una contraseña.
 
-To force admin and appadmin over HTTPS use the following Apache configuration file instead:
+
+Los comandos ``nohup`` se aseguran de que el servidor no muera cuando cierras la consola. ``nohup`` registra toda la salida en ``nohup.out``.
+
+Para hacer que el acceso a admin y appadmin por HTTPS sea obligatorio usa en cambio el siguiente archivo de configuración de Apache:
+
 ``
 NameVirtualHost *:80
 NameVirtualHost *:443
-#### deal with requests on port 80
+#### manejo de las solicitudes al puerto 80
 <VirtualHost *:80>
-   Alias / /usres/www-data/web2py/applications
-   ### admin requires SSL
+   Alias / /users/www-data/web2py/applications
+   ### amdin requiere SSL
    <LocationMatch "^/admin">
      SSLRequireSSL
    </LocationMatch>
-   ### appadmin requires SSL
+   ### appadmin requiere SSL
    <LocationMatch "^/welcome/appadmin/.*">
      SSLRequireSSL
    </LocationMatch>
-   ### serve static files directly
+   ### sirve los archivos estáticos directamente
    <LocationMatch "^/welcome/static/.*">
      Order Allow,Deny
      Allow from all
    </LocationMatch>
-   ### proxy all the other requests
+   ### usar proxy para las demás solicitudes
    <Location "/welcome">
      Order deny,allow
      Allow from all
@@ -434,56 +448,222 @@ NameVirtualHost *:443
 ``:code
 
 -------
-The administrative interface must be disabled when web2py runs on a shared host with mod_proxy, or it will be exposed to other users.
+La interfaz administrativa se debe deshabilitar cuando se corre web2py en un alojamiento compartido con mod_proxy, o estará expuesta a los demás usuarios.
 -------
 
-#### Start as Linux daemon
+#### Inicio como demonio de Linux
 
-Unless you are using mod_wsgi, you should setup the web2py server so that it can be started/stopped/restarted as any other Linux daemon, and so it can start automatically at the computer boot stage.
+A menos que estés usando mod_wsgi, deberías configurar el servidor web2py para que se pueda iniciar/parar/reiniciar como cualquier otro demonio de Linux, y para que se inicie automáticamente al iniciarse el sistema.
 
-The process to set this up is specific to various Linux/Unix distributions.
 
-In the web2py folder, there are two scripts which can be used for this purpose:
+El procedimiento para configurar esta característica es específico de las distintas distribuciones de Linux/Unix.
+
+
+En la carpeta de web2py, hay dos script que se pueden usar para este propósito:
+
 ``
 scripts/web2py.ubuntu.sh
 scripts/web2py.fedora.sh
 ``:code
 
-On Ubuntu, or other Debian-based Linux distribution, edit "web2py.ubuntu.sh" and replace the "/usr/lib/web2py" path with the path of your web2py installation, then type the following shell commands to move the file into the proper folder, register it as a startup service, and start it:
+En Ubuntu u otra distribución de Linux basada en Debian, modifica "web2py.ubuntu.sh" y reemplaza la ruta "/usr/lib/web2py" con la ruta a tu instalación de web2py, luego escribe los siguientes comandos de la consola para mover el archivo a la ubicación apropiada, registrarlo como servicio del inicio del sistema e iniciarlo:
+
 ``
 sudo cp scripts/web2py.ubuntu.sh /etc/init.d/web2py
 sudo update-rc.d web2py defaults
 sudo /etc/init.d/web2py start
 ``:code
 
-On Fedora, or any other distributions based on Fedora, edit "web2py.fedora.sh" and replace the "/usr/lib/web2py" path with the path of your web2py installation, then type the following shell commands to move the file into the proper folder, register it as a startup service and start it:
+En Fedora o cualquier otra distribución de Linux basada en Fedora, modifica "web2py.fedora.sh" y reemplaza la ruta "/usr/lib/web2py" por la ruta de tu instalación de web2py, luego escribe los siguientes comandos para mover el archivo en la carpeta adecuada, registrarlo como servicio del inicio del sistema e iniciarlo:
+
 ``
 sudo cp scripts/web2py.fedora.sh /etc/rc.d/init.d/web2pyd
 sudo chkconfig --add web2pyd
 sudo service web2py start
 ``:code
 
+#### Nginx
+
+Nginx es un servidor web libre, de código abierto que ha ganado popularidad rápidamente por su increíble rendimiento.
+
+
+A diferencia de los servidores tradicionales, Nginx no usa hilos. En lugar de ello usa una arquitectura para el manejo asíncrono, basado en eventos, de procesos simultáneos. Este tipo de arquitectura provee de un uso reducido y predecible de memoria, incluso bajo condiciones de alta exigencia.
+
+Nginx es más que un servidor HTTP y proxy reverso, además es un servidor proxy para IMAP/POP3.
+
+Nginx es fácil de configurar y sus archivos de configuración son más simples y compactos que los correspondientes archivos de Apache.
+
+Nginx no soporta WSGI pero provee de soporte nativo para el protocolo uWSGI ``uwsgi``:cite. ``uwsgi``:inxx
+
+
+En Ubuntu puedes instalar Nginx con:
+
+``
+apt-get -y install nginx-full
+``:code
+
+Luego necesitas crear un archivo de configuración como el que sigue:
+
+``
+# file /etc/nginx/sites-available/web2py
+server {
+        listen          80;
+        server_name     $hostname;
+        # para habilitar el uso correcto de response.static_version
+        #location ~* /(\w+)/static(?:/_[\d]+\.[\d]+\.[\d]+)?/(.*)$ {
+        #    alias /home/www-data/web2py/applications/$1/static/$2;
+        #    expires max;
+        #}
+        location ~* /(\w+)/static/ {
+            root /home/www-data/web2py/applications/;
+            # habilita la siguiente línea en producción
+            #expires max;
+        }
+        location / {
+            #uwsgi_pass      127.0.0.1:9001;
+            uwsgi_pass      unix:///tmp/web2py.socket;
+            include         uwsgi_params;
+            uwsgi_param     UWSGI_SCHEME $scheme;
+            uwsgi_param     SERVER_SOFTWARE    nginx/$nginx_version;
+        }
+}
+server {
+        listen 443 default_server ssl;
+        server_name     $hostname;
+        ssl_certificate         /etc/nginx/ssl/web2py.crt;
+        ssl_certificate_key     /etc/nginx/ssl/web2py.key;
+        ssl_prefer_server_ciphers on;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+        ssl_ciphers ECDHE-RSA-AES256-SHA:DHE-RSA-AES256-SHA:DHE-DSS-AES256-SHA:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA;
+        ssl_protocols SSLv3 TLSv1;
+        keepalive_timeout    70;
+        location / {
+            #uwsgi_pass      127.0.0.1:9001;
+            uwsgi_pass      unix:///tmp/web2py.socket;
+            include         uwsgi_params;
+            uwsgi_param     UWSGI_SCHEME $scheme;
+            uwsgi_param     SERVER_SOFTWARE    nginx/$nginx_version;
+        }
+ 
+}
+``:code		
+
+Necesitarás crear un symlink del archivo y eliminiar default
+
+``
+ln -s /etc/nginx/sites-available/web2py /etc/nginx/sites-enabled/web2py
+rm /etc/nginx/sites-enabled/default
+``:code
+
+Puedes necesitar además crear la carpeta ssl para los certificados y colocarlos allí:
+
+``
+mkdir /etc/nginx/ssl
+cp web2py.key /etc/nginx/ssl
+cp web2py.crt /etc/nginx/ssl
+``:code
+
+Luego debes instalar y configurar uWSGI 
+ 
+``
+sudo mkdir /etc/uwsgi
+sudo mkdir /var/log/uwsgi
+``:code
+
+Y crear el archivo de configuración "/etc/uwsgi/web2py.xml":
+ 
+``
+<uwsgi>
+    <socket>/tmp/web2py.socket</socket>
+    <pythonpath>/home/www-data/web2py/</pythonpath>
+    <mount>/=wsgihandler:application</mount>
+    <master/>
+    <processes>4</processes>
+    <harakiri>60</harakiri>
+    <reload-mercy>8</reload-mercy>
+    <cpu-affinity>1</cpu-affinity>
+    <stats>/tmp/stats.socket</stats>
+    <max-requests>2000</max-requests>
+    <limit-as>512</limit-as>
+    <reload-on-as>256</reload-on-as>
+    <reload-on-rss>192</reload-on-rss>
+    <uid>www-data</uid>
+    <gid>www-data</gid>
+    <no-orphans/>
+</uwsgi>
+``:code
+
+Este archivo supone que web2py está instalado dentro en la carpeta "/home/www-data/web2py", como en el caso de Apache.
+
+Además debes modificar un segundo archivo de configuración "/etc/init/uwsgi-emperor.conf":
+
+
+``
+# script uWSGI Emperor
+description "uWSGI Emperor"
+start on runlevel [2345]
+stop on runlevel [06]
+respawn
+exec uwsgi --master --die-on-term --emperor /etc/uwsgi --logto /var/log/uwsgi/uwsgi.log
+``:code
+
+Por último reinicia todo:
+
+``
+start uwsgi-emperor
+/etc/init.d/nginx restart 
+``:code
+
+Puedes volver a cargar uwsgi con
+``
+restart uwsgi-emperor
+``:code
+
+Lo puedes parar con
+
+``
+stop uwsgi-emperor
+``:code
+
+Puedes recargar web2py solamente (sin reiniciar uwsgi) con
+
+``
+touch /etc/uwsgi/web2py.xml
+``:code
+
+Todos estos pasos se realizan automaticamente en los script que vienen con web2py:
+
+``
+scripts/setup-web2py-nginx-uwsgi-on-centos.sh
+scripts/setup-web2py-nginx-uwsgi-ubuntu.sh
+``:code
+
 #### Lighttpd
 ``Lighttpd``:inxx ``FastCGI``:inxx ``fcgihandler``:inxx
 
-You can install Lighttpd on a Ubuntu or other Debian-based Linux distribution with the following shell command:
+Puedes instalar Lighttpd en una distribución de Linux como Ubuntu u otra basada en Debian con el siguiente comando de la consola:
+
 ``
 apt-get -y install lighttpd
 ``:code
 
-Once installed, edit ``/etc/rc.local`` and create a fcgi web2py background process
+Una vez instalado, edita ``/etc/rc.local`` y cra un proceso fcgi en segundo plano de web2py
+
 ``
 cd /var/www/web2py && sudo -u www-data nohup python fcgihandler.py &
 ``:code
 
-Then, you need to edit the Lighttpd configuration file
+Luego, debes modificar el archivo de configuración de Lighttpd
+
 ``
 /etc/lighttpd/lighttpd.conf
 ``:code
 
-so that it can find the socket created by the above process. In the config file, write something like:
+para que pueda encontrar el socket creado con el proceso de más arriba. En el archivo de configuración, escribe algo como:
+
 ``
-server.modules              = (
+server.modules = (
         "mod_access",
         "mod_alias",
         "mod_compress",
@@ -503,7 +683,7 @@ server.errorlog      = "/tmp/error.log"
 
 fastcgi.server = (
   "/handler_web2py.fcgi" => (
-      "handler_web2py" => ( #name for logs
+      "handler_web2py" => ( # nombre para los log
          "check-local" => "disable",
          "socket" => "/tmp/fcgi.sock"
       )
@@ -519,51 +699,54 @@ $HTTP["host"] = "(^|\.)example\.com$" {
 }
 ``:code
 
-Now check for syntax errors:
+Ahora comprobemos los errores de sintaxis:
 ``
 lighttpd -t -f /etc/lighttpd/lighttpd.conf
 ``:code
 
-and (re)start the web server with:
+y (re)iniciamos el servidor web con:
+
 ``
 /etc/init.d/lighttpd restart
 ``:code
 
-Notice that FastCGI binds the web2py server to a Unix socket,
-not to an IP socket:
+Observa que FastCGI asocia el servidor web de web2py a un socket de Unix, no a un socket de IP:
+
 ``
 /tmp/fcgi.sock
 ``:code
 
-This is where Lighttpd forwards the HTTP requests to and receives responses from. Unix sockets are lighter than Internet sockets, and this is one of the reasons Lighttpd+FastCGI+web2py is fast.
-As in the case of Apache, it is possible to setup Lighttpd to deal with static files directly, and to force some applications over HTTPS. Refer to the Lighttpd documentation for details.
+Es aquí donde Lighttpd reenvía las solicitudes HTTP y también desde donde recibe las respuestas. Los socket de Unix son más ligeros que los socket de Internet, y esa es una de las razones de la velocidad de Lighttpd+FastCGI+web2py.
+Como en el caso de Apache, es posible configurar Lighttpd para que maneje archivos estáticos directamente, y para que obligue el uso de algunas aplicaciones con HTTPS exclusivamente. Para más detalles, consulta la documentación de Lighttpd.
 
-Examples in this section were taken from John Heenan's post in web2pyslices.
+Los ejemplos de esta sección se tomaron de un artículo publicado por John Heenan en web2pyslices.
 
 -------
-The administrative interface must be disabled when web2py runs on a shared host with FastCGI, or it will be exposed to the other users.
+La interfaz administrativa se debe deshabilitar cuando se corre web2py en un alojamiento compartido con FastCGI, o se la expondrá al resto de los usuarios.
 -------
 
-#### Shared hosting with mod_python
+#### Alojamiento compartido con mod_python
 
-There are times, specifically on shared hosts, when one does not have the permission to configure the Apache config files directly. At the time of writing most of these hosts still run mod_python even if it is not maintained any more in favor of mod_wsgi.
 
-You can still run web2py. Here we show an example of how to set it up.
+En ocasiones, en especial en servicios de alojamiento compartido (''shared hosting''), uno no tiene acceso a los archivos de configuración del servidor web Apache directamente. Al tiempo de esta edición la mayoría de estos servicios todavía corren mod_python incluso cuando ya no tiene mantenimiento y ha sido reemplazado por mod_wsgi.
 
-Place contents of web2py into the "htdocs" folder.
+Puedes correr web2py de todas formas. Aquí se muestra un ejemplo para poder configurarlo.
 
-In the web2py folder, create a file "web2py_modpython.py" file with the following contents:
+Coloca los contenidos de web2py en la carpeta "htdocs".
+
+
+En la carpeta web2py, crea un archivo "web2py_modpython.py" que contenga lo siguiente:
 
 ``
 from mod_python import apache
 import modpythonhandler
 
-def handler(req):
-    req.subprocess_env['PATH_INFO'] = req.subprocess_env['SCRIPT_URL']
-    return modpythonhandler.handler(req)
+def handler(sol):
+    sol.subprocess_env['PATH_INFO'] = sol.subprocess_env['SCRIPT_URL']
+    return modpythonhandler.handler(sol)
 ``:code
 
-Create/update the file ".htaccess" with the following contents:
+Crea o actualiza el archivo ".htaccess" con el siguiente contenido:
 
 ``
 SetHandler python-program
@@ -571,18 +754,20 @@ PythonHandler web2py_modpython
 #PythonDebug On
 ``:code
 
-This example was provided by Niktar.
+Este ejemplo fue provisto por Niktar.
 
 
-#### Cherokee with FastCGI
+#### Cherokee con FastCGI
 ``Cherokee``:inxx ``FastCGI``:inxx
-Cherokee is a very fast web server and, like web2py, it provides an AJAX-enabled web-based interface for its configuration. Its web interface is written in Python. In addition, there is no restart required for most of the changes.
 
-Here are the steps required to setup web2py with Cherokee:
+Cherokee es un servidor web realmente rápido y, como web2py, provee de una interfaz web apta para AJAX para configurarlo. Su interfaz web está escrita en Python. Además de esto, no es necesario reiniciar el servidor para la mayoría de los cambios.
 
-Download Cherokee``cherokee``:cite
+Estos son los pasos requeridos para configurar web2py con cherokee:
 
-Untar, build, and install:
+Descarga Cherokee``cherokee``:cite
+
+Descomprime con untar, genera el build e instala:
+
 
 ``
 tar -xzf cherokee-0.9.4.tar.gz
@@ -591,9 +776,9 @@ cd cherokee-0.9.4
 make install
 ``:code
 
-Start web2py normally at least once to make sure it creates the "applications" folder.
+Inicia web2py normalmente al menos una vez para aseguarte de que cree la carpeta "applications".
 
-Write a shell script named "startweb2py.sh" with the following code:
+Escribe un script para el itérprete shell "startweb2py.sh" con el siguiente código:
 
 ``
 #!/bin/bash
@@ -601,29 +786,32 @@ cd /var/web2py
 python /var/web2py/fcgihandler.py &
 ``:code
 
-and give the script execute privileges and run it.  This will start web2py under FastCGI handler.
+asignale al script permisos para ejecución y córrelo. Esto iniciará web2py con el manejador FastCGI.
 
-Start Cherokee and cherokee-admin:
+Inicia Cherokee y el cherokee-admin:
 
 ``
 sudo nohup cherokee &
 sudo nohup cherokee-admin &
 ``:code
 
-By default, cherokee-admin only listens at local interface on port 9090. This is not a problem if you have full, physical access on that machine. If this is not the case, you can force it to bind to an IP address and port by using the following options:
+Por defecto, cherokee-admin solo espera solicitudes en la interfaz local en el puerto 9090. Este no es un problema si tienes acceso físico irrestricto en esa máquina. Si ese no es el caso, puedes forzarlo a que asocie un IP y un puerto utilizando las siguientes opciones:
+
 ``
 -b,  --bind[=IP]
 -p,  --port=NUM
 ``:code
 
-or do an SSH port-forward (more secure, recommended):
+o realizando una redirección de puerto SSH (más seguro y recomendable):
+
 ``
-ssh -L 9090:localhost:9090 remotehost
+ssh -L 9090:localhost:9090 hostremoto
 ``:code
 
-Open "http://localhost:9090" in your browser.  If everything is ok, you will get cherokee-admin.
+Abre "http://localhost:9090" en tu navegador. Si todo funciona correctamente, accederás al cherokee-admin.
 
-In cherokee-admin web interface, click "info sources".  Choose "Local Interpreter". Write in the following code, then click "Add New".
+En la interfaz web de cherokee-admin, haz clic en "info sources". Selecciona "Local interpreter". Escribe el siguiente código, y luego haz clic en "Add New".
+
 
 ``
 Nick: web2py
@@ -631,128 +819,183 @@ Connection: /tmp/fcgi.sock
 Interpreter: /var/web2py/startweb2py.sh
 ``:code
 
-Finally, perform the following remaining steps:
-- Click "Virtual Servers", then click "Default".
-- Click "Behavior", then, under that, click "default".
-- Choose "FastCGI" instead of "List and Send" from the list box.
-- At the bottom, select "web2py" as "Application Server"
-- Put a check in all the checkboxes (you can leave Allow-x-sendfile). If there is a warning displayed, disable and enable one of the checkboxes. (It will automatically re-submit the application server parameter. Sometimes it doesn't, which is a bug).
-- Point your browser to "http://yoursite", and "Welcome to web2py" will appear.
+Finalmente, realiza los siguientes pasos para cambio de nombres:
 
-#### Postgresql
+- Clic en "Virtual Servers", luego clic en "Default".
+- Clic en "Behavior", luego, debajo de eso, clic en "default".
+- Selecciona "FastCGI" en lugar de "List and Send" de caja con la lista.
+- Al final, selecciona "web2py" como "Application Server"
+- Habilita todos los ''checkbox'' (puedes dejar Allow-x-sendfile). Si se muestra una advertencia, deshabilita y luego habilita alguno de los ''checkbox''. (Esto reenviará automáticamente los parámetros del servidor de la aplicación, auque a veces no lo hace, por causa de un fallo en la aplicación).
+- Ingresa la dirección "http://tusitio", y aperecerá el mensaje "Welcome to web2py".
 
-PostgreSQL is a free and open source database which is used in demanding production environments, for example, to store the .org domain name database, and has been proven to scale well into hundreds of terabytes of data. It has very fast and solid transaction support, and provides an auto-vacuum feature that frees the administrator from most database maintenance tasks.
+#### PostgreSQL
 
-On an Ubuntu or other Debian-based Linux distribution, it is easy to install PostgreSQL and its Python API with:
+PostgreSQL es una base de datos libre de código abierto que es usada con entornos de producción de alta demanda, por ejemplo, para almacenar los dominios .org y ha probado tener una buena escalabilidad con cientos de terabyte de información. Tiene un soporte para transacciones realmente robusto y veloz y provee de una funcionalidad de auto limpieza y actualización o ''autovacuum'' que libera al administrador de gran parte de las tareas de mantenimiento.
+
+En Ubuntu u otra distribución de Linux basada en Debian, PostgreSQL y su API para Python se pueden instalar fácilmente con:
+
 ``
 sudo apt-get -y install postgresql
 sudo apt-get -y install python-psycopg2
 ``:code
 
-It is wise to run the web server(s) and the database server on different machines. In this case, the machines running the web servers should be connected with a secure internal (physical) network, or should establish SSL tunnels to securely connect with the database server.
+Es recomendable correr el/los servidor/es web y el servidor de la base de datao en distintos sistemas. En ese caso, las máquinas que corren los servidores web deberían estar conectadas en una red interna (cableada) segura, o deberían establecer túneles SSL para conectar en forma segura con el servidor de la base de datos.
 
-Edit the PostgreSQL configuration file
+Modifica el archivo de la configuración de PostgreSQL
+
 ``
-sudo nano /etc/postgresql/8.4/main/postgresql.conf
+sudo nano /etc/postgresql/9.1/main/postgresql.conf
 ``:code
 
-and make sure it contains these two lines
+y asegúrate de que contenga estas dos líneas
 ``
+...
+listen_addresses = 'localhost' 
 ...
 track_counts = on
 ...
-autovacuum = on   # Enable autovacuum subprocess?  'on'
+autovacuum = on   # ¿Habilitar el subproceso de mantenimiento?  'on'
 ...
 ``:code
 
-Start the database server with:
+Edita el archivo para la autenticación de clientes de PostgreSQL
+
+``
+sudo nano /etc/postgresql/9.1/main/pg_hba.conf
+``:code
+
+y cambia el método de estas líneas como ``trust``
+
+``
+...
+# "local" es para conexiones socket de dominios Unix únicamente
+local   all             all                                     trust
+# conexiones locales con IPv4:
+host    all             all             127.0.0.1/32            trust
+# conexiones locales con IPv6:
+host    all             all             ::1/128                 trust
+...
+``:code
+
+Inicia la base de datos con:
+
 ``
 sudo /etc/init.d/postgresql restart
 ``:code
 
-When restarting the PostgreSQL server, it should notify which port it is running on. Unless you have multiple database servers, it should be 5432.
+Cuando reinicias el servidor PostgreSQL, debería notificarte el puerto en el cual está corriendo. A menos que tengas múltiples servidores de bases de datos, debería ser el puerto 5432.
 
-The PostgreSQL logs are in:
+Los registros de PostgreSQL son:
+
 ``
 /var/log/postgresql/
 ``:code
 
-Once the database server is up and running, create a user and a database so that web2py applications can use it:
+Una vez que el servidor de la base de datos esté funcionando, crea un usuario y una base de datos para que las aplicaciones de web2py puedan usarlo:
 ``
-sudo -u postgres createuser -PE -s myuser
-postgresql> createdb -O myself -E UTF8 mydb
-postgresql> echo 'The following databases have been created:'
+sudo -u postgres createuser -PE -s miusuario
+postgresql> createdb -O miusuario -E UTF8 mibd
+postgresql> echo 'Se ha creado la siguiente base de datos:'
 postgresql> psql -l
-postgresql> psql mydb
+postgresql> psql mibd
 ``:code
 
-The first of the commands will grant superuser-access to the new user, called ``myuser``. It will prompt you for a password.
+El primero de los comandos dara permiso de acceso al nuevo usuario, llamado ``myuser``, como ''superuser''. El comando solicita una contraseña.
 
-Any web2py application can connect to this database with the command:
+Toda nueva aplicación de web2py se puede conectar a esta base de datos con el comando:
+
 ``
-db = DAL("postgres://myuser:mypassword@localhost:5432/mydb")
+db = DAL("postgres://miusuario:micontraseña@localhost:5432/mibd")
 ``:code
 
-where ``mypassword`` is the password you entered when prompted, and 5432 is the port where the database server is running.
+Donde ``micontraseña`` es la contraseña que ingresaste anteriormente, y 5432 es el puerto en el cual está corriendo el servidor de la base de datos.
 
-Normally you use one database for each application, and multiple instances of the same application connect to the same database. It is also possible for different applications to share the same database.
+Normalmente se utiliza una base de datos por aplicación, y las múltiples instancias de la misma aplicación conectan a la misma base de datos. También es posible para distintas aplicaciones compartir la misma base de datos.
 
-For database backup details, read the PostgreSQL documentation; specifically the commands ``pg_dump`` and ``pg_restore``.
+Para detalles sobre la base de datos, consulta la documentación de PostgreSQL; especialmente los comandos ``pg_dump`` y ``pg_restore``.
+
+
+#### Iniciar el planificador como servicio de Linux (con Upstart)
+Para instalar el planificador o ''scheduler'' como demonio permanente en Linux con Upstart, escribe lo siguiente en /etc/init/web2py-scheduler.conf, suponiendo que tu instancia de web2py está instalada en la carpeta raíz de <usuario>, corriendo como <usuario>, con la app <miapp> sobre la interfaz de red eth0.
+
+``
+description "web2py task scheduler"
+start on (local-filesystems and net-device-up IFACE=eth0)
+stop on shutdown
+respawn limit 8 60 # Give up if restart occurs 8 times in 60 seconds.
+exec sudo -u <usuario> python /home/<usuario>/web2py/web2py.py -K <miapp>
+respawn
+``:code
+
+Puedes iniciar/parar/reiniciar/comprobar el estado del demonio con:
+
+``
+sudo start web2py-scheduler
+sudo stop web2py-scheduler
+sudo restart web2py-scheduler
+sudo status web2py-scheduler
+``:code
 
 ### Windows
 
-#### Apache and mod_wsgi
+#### Apache y mod_wsgi
 
-Installing Apache, and mod_wsgi under Windows requires a different procedure.
-Here are assuming Python 2.5 is installed, you are running from source and web2py is located at ``c:/web2py``.
+Para instalar Apache y mod_wsgi bajo Windows es necesario otro procedimiento.
+Aquí vamos a suponer que se instaló Python 2.5, y que corres la versión de código fuente de web2py ubicada en ``c:/web2py``.
 
-First download the requires packages:
-- Apache ``apache_2.2.11-win32-x86-openssl-0.9.8i.msi`` from  ``apache1``:cite
-- mod_wsgi from ``modwsgi1``:cite
+Primero descarga los paquetes necesarios:
 
-Second, run ``apache...msi`` and follow the wizard screens. On the server information screen
+- Apache ``apache_2.2.11-win32-x86-openssl-0.9.8i.msi`` desde  ``apache1``:cite
+- mod_wsgi desde ``modwsgi1``:cite
+
+En segundo lugar, corre ``apache...msi`` y sigue las pantallas del ayudante. Al mostrarse la pantalla de información del servidor
 
 [[image @///image/en9200.png center 300px]]
 
-enter all requested values:
-- **Network Domain**: enter the DNS domain in which your server is or will be registered in.  For example, if your server's full DNS name is server.mydomain.net, you would type mydomain.net here
-- **ServerName**: Your server's full DNS name. From the example above, you would type server.mydomain.net here. Enter a fully qualified domain name or IP address from the web2py install, not a shortcut, for more information see ``apache2``:cite.
-- **Administrator's Email Address**. Enter the server administrator's or webmaster's email address here. This address will be displayed along with error messages to the client by default.
+ingresa todos los valores solicitados:
 
-Continue with a typical install to the end unless otherwise required
+- **Network Domain**: ingresa el dominio DNS en el cual estará registrado tu servidor. Por ejemplo, si el nombre completo DNS de tu servidor es servidor.midominio.new, aquí debes escribir midominio.new
+- **ServerName**: El nombre completo DNO de tu servidor. Para el ejemplo de arriba, deberías ingresar servidor.midominio.new en este campo. Ingresa un ''fully qualified domain name'' (FQDN) o una dirección IP desde la instalación de web2py, no un atajo, para más información ver ``apache2``:cite.
+**Administrator's Email Address**. Aquí debes ingresar el correo del administrador o webmaster. Esta dirección se mostrará junto con los mensajes de error enviados por defecto al cliente.
 
-The wizard, by default, installed Apache in the folder:
+Continúa con la instalación típica hasta finalizar si no requieres especificar otras opciones.
+
+El ayudante, por defecto, instalará Apache en la carpeta:
+
 ``
 C:/Program Files/Apache Software Foundation/Apache2.2/
 ``:code
 
-From now on we refer to this folder simply as ``Apache2.2``.
+De aquí en más vamos a referirnos a esta carpeta simplemente como ``Apache2.2``.
 
-Third, copy the downloaded mod_wsgi.so to
+En tercer lugar, copia el mod_wsgi.so descargado en
+
 ``Apache2.2/modules``
 
-written by Chris Travers, published by the Open Source Software Lab at Microsoft, December 2007.
+escrito por Chris Travers, publicado por el ''Open Source Software Lab'' en Microsoft, diciembre de 2007.
 
-Fourth, create ``server.crt`` and ``server.key`` certificates (as discussed in the previous section) and place them in the folder  ``Apache2.2/conf``. Notice the cnf file is in ``Apache2.2/conf/openssl.cnf``.
+Cuarto, crea los certificados ``server.crt`` y ``server.key`` (como se describe en la sección anterior) y ubícalos en la carpeta ``Apache2.2/conf``. Observa que el archivo cnf está en ``Apache2.2/conf/openssl.cnf``.
 
-Fifth, edit ``Apache2.2/conf/httpd.conf``,
-remove the comment mark (the # character) from the line
+Quinto, modifica ``Apache2.2/conf/httpd.conf``, elimina el signo de comentario (el caracter #) de la línea
+
 ``
 LoadModule ssl_module modules/mod_ssl.so
 ``:code
 
-add the following line after all the other LoadModule lines
+agrega la siguiente línea a continuación de todas líneas con LoadModule
+
 ``
 LoadModule wsgi_module modules/mod_wsgi.so
 ``:code
 
-look for "Listen 80" and add this line after it
+busca "Listen 80" en el documento y agrega esta línea a continuación
+
 ``
 Listen 443
 ``:code
 
-append the following lines at the end changing  drive letter, port number,
-ServerName according to your values
+agrega las siguientes líneas al final cambiando la letra de la unidad, el número de puerto y el nombre del servidor ServerName según tus parámetros
+
 ``
 NameVirtualHost *:443
 <VirtualHost *:443>
@@ -785,29 +1028,32 @@ NameVirtualHost *:443
 </VirtualHost>
 ``:code
 
-Save and check the config using: [Start > Program > Apache HTTP Server 2.2 > Configure Apache Server > Test Configuration]
+Guarda los cambios y comprueba la configuración usando [Inicio > Programas > Servidor Apache HTTP 2.2 > Configurar el Servidor Apache > Probar Configuración]
 
-If there are no problems you will see a command screen open and close.
-Now you can start Apache:
+Si no hay problemas verás una pantalla de la consola abrirse y luego cerrarse.
+Ahora puedes iniciar Apache:
 
-[Start > Program > Apache HTTP Server 2.2 > Control Apache Server > Start]
+[Inicio > Programas > Servidor Apache HTTP 2.2 > Control de Apache Server > Start]
 
-or better yet start the taskbar monitor
+o mejor aún, inicia el monitor de tareas
 
-``[Start > Program > Apache HTTP Server 2.2 > Control Apache Server]``
+``[Inicio > Programas > Servidor Apache HTTP 2.2 > Control del Servidor Apache]``
 
-Now you can right-click on the red feather-like taskbar icon to "Open Apache Monitor" and then start, stop and restart Apache as required.
+Ahora puedes hacer clic derecho en el icono con forma de pluma en la barra de tareas para "Abrir el Monitor de Apache" y luego iniciar, parar y reiniciar Apache según sea necesario.
 
-This section was created by Jonathan Lundell.
+Esta sección fue creada por Jonathan Lundell.
 
-#### Start as Windows service
+
+#### Iniciar como Servicio de Windows
 ``Windows service``:inxx
 
-What Linux calls a daemon, Windows calls a service.
-The web2py server can easily be installed/started/stopped as a Windows service.
+Aquello que en Linux se denomina demonio, en Windows se llama servicio.
 
-In order to use web2py as a Windows service, you must create a file "options.py"
-with startup parameters:
+El servidor de web2py puede fácilmente ser instalado/iniciado/parado como servicio de Windows.
+
+
+Para poder usar web2py como servicio de Windows, debes crear un archivo "options.py" con parámetros de inicio:
+
 ``
 import socket, os
 ip = socket.gethostname()
@@ -825,60 +1071,105 @@ shutdown_timeout = 5
 folder = os.getcwd()
 ``:code
 
-You don't need to create "options.py" from scratch since there is already an "options_std.py" in the web2py folder that you can use as a model.
+No es necesario que crees las opciones en "options.py" desde cero porque ya existe un archivo "options_std.py" en la carpeta de web2py que puedes usar como plantilla.
 
-After creating "options.py" in the web2py installation folder, you can install web2py as a service with:
+Luego de crear "options.py" en la carpeta de instalación de web2py, puedes instalar web2py como servicio con:
+
 ``
 python web2py.py -W install
 ``:code
 
-and start/stop the service with:
+opcionalmente puedes especificar el archivo opcions.py:
+
+``
+python web2py.py -W install -L options.py
+``:code
+
+Puedes iniciar/para el servicio con:
+
 ``
 python web2py.py -W start
 python web2py.py -W stop
 ``:code
 
-### Securing sessions and **admin**
+
+#### Iniciar el planificador como servicio de Windows
+``Windows scheduler service``:inxx
+
+Correr el planificador como un servicio de Windows puede ser muy útil. La forma más sencilla de hacer esto es descargar nssm (de http://www.nssm.cc). nssm es un ayudante para planificación de código abierto.
+
+nssm envuelve un comando ejecutable y lo convierte en servicio.
+El comando para iniciar el planificador es ''pythonw.exe -K <nombredeapp>''
+Utilizamos nssm para envolver este comando, convirtiéndolo en un servicio.
+Antes de hacer esto, debes elegir el nombre del servicio.
+Existen claras razones para crear un servicio específico para cada app que requiera un scheduler.
+Por lo tanto, la convención para el uso de nombres que utilices podría ser web2py_scheduler_app1 
+
+Luego de extraer el archivo zip, abre una consola del intérprete de comandos de Windows en la carpeta que contiene la versión para la arquitectura de tu sistema, y escribe
+
+``
+nssm install web2py_scheduler_app1``:code
+
+Esto muestra un diálogo para ingresar Application y Options.
+Application es el ejecutable poythonw.exe de tu instalación de Python.
+Opcions es
+
+``-K app1``:code
+
+donde app1 es el nombre de tu aplicación.
+
+Es posible invocar al planificador con múltiples aplicaciones. Sin embargo, con ese método, web2py asigna cada planificador de aplicación a un subproceso.
+Por lo tanto, el proceso iniciado por el servicio no morirá cuando una de las instancias tenga algún problema; en cambio morirá unicamente el proceso hijo.
+Luego, no podremos aprovechar la capacidad de reiniciar automáticamente un servicio en caso de falla. El uso de una app por servicio evita ese problema.
+
+
+### Protección de las sesiones y **admin**
 ``security``:inxx ``admin``:inxx
 
-It is very dangerous to publicly expose the **admin** application and the **appadmin** controllers unless they run over HTTPS. Moreover, your password and credentials should never be transmitted unencrypted. This is true for web2py and any other web application.
+Es muy peligrosa la exposición de la aplicación **admin** y los controladores **appadmin** a menos que corran sobre HTTPS.
+Es más, tus contraseñas y credenciales jamás se deberían transmitir sin cifrado. Esto vale tanto para web2py como para cualquier otra aplicación web.
 
-In your applications, if they require authentication, you should make the session cookies secure with:
+En tus aplicaciones, cuando requieren autenticación, deberías proteger las cookie de la sesión con:
+
 ``
 session.secure()
 ``:code
 
-An easy way to setup a secure production environment on a server is to first stop web2py and then remove all the ``parameters_*.py`` files from the web2py installation folder.  Then start web2py without a password. This will completely disable admin and appadmin.
+Una forma fácil de configurar un entorno seguro de producción en un servidor es primero parando web2py y luego eliminando todos los archivos en ``parameters_*.py`` de la carpeta de la instalación. Luego iniciar web2py sin contraseña. Esto hara que se deshabiliten admin y appadmin completamente.
+
 ``
 nohup python web2py --nogui -p 8001 -i 127.0.0.1 -a '' &
 ``:code
 
-Next, start a second web2py instance accessible only from localhost:
+Luego, inicia una segunda instancia de web2py accesible sólo para localhost:
+
 ``
 nohup python web2py --nogui -p 8002 -i 127.0.0.1 -a '<ask>' &
 ``:code
 
-and create an SSH tunnel from the local machine (the one from which you wish to access the administrative interface) to the server (the one where web2py is running, example.com), using:
+y crea un túnel de SSH desde la máquina local (la máquina desde la que quieres acceder a la interfaz administrativa) hacia el servidor (donde corre web2py, example.com), usando:
+
 ``
-ssh -L 8002:127.0.0.1:8002 username@example.com
+ssh -L 8002:127.0.0.1:8002 usuario@example.com
 ``:code
 
-Now you can access the administrative interface locally via the web browser at ``localhost:8002``.
+Ahora puedes acceder a la interfaz administrativa en forma local a través del servidor web en ``localhost:8002``.
 
-This configuration is secure because **admin** is not reachable when the tunnel is closed (the user is logged out).
+Esta configuración es segura porque **admin** no es accesible cuando el tunel está cerrado (es decir, el usuario cerró la sesión).
 
 -------
-This solution is secure on shared hosts if and only if other users do not have read access to the folder that contains web2py; otherwise users may be able to steal session cookies directly from the server.
+Esta solución es segura para servicios de alojamiento compartido si y solo si los otros usuarios no tienen acceso de lectura a la carpeta que contiene web2py; de lo contrario los usuarios podrían tener los derechos suficientes para robar las cookie de la sesión directamente del servidor.
 -------
 
-### Efficiency and scalability
+### Eficiencia y Escalabilidad
 ``scalability``:inxx
 
-web2py is designed to be easy to deploy and to setup. This does not mean that it compromises on efficiency or scalability, but it means you may need to tweak it to make it scalable.
+web2py está diseñado para que sea fácil de desplegar y configurar. Esto no implica una merma en la eficiecia o en la escalabilidad, pero sí puede implicar que tengas que realizar ajustes para que sea escalable.
 
-In this section we assume multiple web2py installations behind a NAT server that provides local load-balancing.
+En esta sección vamos a asumir que tenemos múltiples instalaciones de web2py detrás de un servidor NAT que funciona como balanceador de carga local.
 
-In this case, web2py works out-of-the-box if some conditions are met. In particular, all instances of each web2py application must access the same database servers and must see the same files. This latter condition can be implemented by making the following folders shared:
+Para esta situación, web2py funciona instantáneamente si se cumplen algunas condiciones. En especial, todas las instancias de cada aplicación web2py deben acceder a los mismos servidores de base de datos y deben acceder a los mismos archivos. Esta última condición se puede implementar compartiendo las siguientes carpetas:
+
 ``
 applications/myapp/sessions
 applications/myapp/errors
@@ -886,46 +1177,50 @@ applications/myapp/uploads
 applications/myapp/cache
 ``:code
 
-The shared folders must support file locking. Possible solutions are ZFS
-(ZFS was developed by Sun Microsystems and is the preferred choice.), NFS
-(With NFS you may need to run the``nlockmgr`` daemon to allow file locking.), or Samba (SMB).
+Las carpetas compartidas deben soportar el bloqueo de archivos o ''file locking''. Las alternativas posibles son ZFS (ZFS fue desarrollado por Sun Microsystems y es la opción más adecuada), NFS (con NFS puedes necesitar correr el demonio ``nlockmgr`` para mermitir el bloqueo de archivos.), o Samba (SMB).
 
-It is possible to share the entire web2py folder or the entire applications folder, but this is not a good idea because this would cause a needless increase of network bandwidth usage.
+Es posible compartir la carpeta entera de web2py o una carpeta completa de una aplicación, pero no es buena idea porque esto podría causar un innecesario incremento del uso del ancho de banda.
 
-We believe the configuration discussed above to be very scalable because it reduces the database load by moving to the shared filesystems those resources that need to be shared but do not need transactional safety (only one client at a time is supposed to access a session file, cache always needs a global lock, uploads and errors are write once/read many files).
+Creemos que la configuración tratada arriba es realmente escalable porque reduce la exigencia de la base de datos al mover a los sistemas de archivos compartidos aquellos recursos que necesitan ser compartidos pero que no requieren de seguridad en la transacción (se supone que solo un cliente por vez accederá a un archivo de sesión, el caché siempre requiere de un bloqueo global, las subidas de archivos y ticket de errores son de tipo ''write once/read many'').
 
-Ideally, both the database and the shared storage should have RAID capability. Do not make the mistake of storing the database on the same storage as the shared folders, or you will create a new bottleneck there.
+Idealmente, tanto la base de datos como el sistema de almacenamiento compartido deberían ser aptos para funcionar con RAID. No cometas el error de almacenar la base de datos en el mismo medio que las carpetas compartidas, u obtendrás allí un nuevo cuello de botella.
 
-On a case-by-case basis, you may need to perform additional optimizations and we will discuss them below. In particular, we will discuss how to get rid of these shared folders one-by-one, and how to store the associated data in the database instead. While this is possible, it is not necessarily a good solution. Nevertheless, there may be reasons to do so. One such reason is that sometimes we do not have the freedom to set up shared folders.
-
-#### Efficiency tricks
-
-web2py application code is executed on every request, so you want to minimize this amount of code. Here is what you can do:
-
-- Run once with ``migrate=True`` then set all your tables to ``migrate=False``.
-- Bytecode compile your app using **admin**.
-- Use ``cache.ram`` as much as you can but make sure to use a finite set of keys, or else the amount of cache used will grow arbitrarily.
-- Minimize the code in models: do not define functions there, define functions in the controllers that need them or - even better - define functions in modules, import them and use those functions as needed.
-- Do not put many functions in the same controller but use many controllers with few functions.
-- Call ``session.forget(response)`` in all controllers and/or functions that do not change the session.
-- Try to avoid web2py cron, and use a background process instead. web2py cron can start too many Python instances and cause excessive memory usage.
+En un análisis pormenorizado, puedes llegar a necesitar realizar optimizaciones adicionales y las trataremos más abajo. En particular, vamos a tratar sobre cómo deshacerse de aquellas carpetas compartidas una por una, y sobre cómo almacenar en cambio la información asociada en la base de datos. Si bien esto es posible, no es necesariamente una buena solución. De todas formas, en algunas ocasiones puede haber razones para hacerlo. Una de las razones puede ser que no tengas la posibilidad de configurar carpetas compartidas.
 
 
-#### Sessions in database
+#### Trucos de Eficiencia
 
-It is possible to instruct web2py to store sessions in a database instead of in the sessions folder. This has to be done for each individual web2py application, although they may all use the same database to store sessions.
+El código de las aplicaciones web2py se ejecuta para cada solicitud, por lo que queremos minimizar la cantidad de código. Esto es lo que se puedes hacer:
 
-Given a database connection
+
+- Correr por primera vez con ``migrate=True`` y luego configurar todas tus tablas como ``migrate=False``.
+- Crear compilaciones de Bytecode de la app con **admin**.
+- Usar ``cache.ram`` donde sea posible pero asegúrate de que utilizas un conjunto limitado de claves, o de lo contrario, la cantidad de caché utilizado crecerá en forma arbitraria.
+- Minimiza el código en los modelos: no definas funciones allí, define las funciones en los controladores que los necesitan o -aún mejor- define las funciones en los módulos, impórtalas y usa esas funciones cuando lo requieras.
+- No coloques muchas funciones en el mismo controlador pero sí usa muchos controladores con pocas funciones.
+- Llama a ``session.forget(response)`` en todos los controladores y/o funciones que no modifican la sesión.
+- Trata de evitar el cron de web2py, y utiliza en su lugar las tareas en segundo plano. El cron de web2py puede iniciar muchas instancias de Python y ocasionar un uso excesivo de memoria.
+
+
+#### Sesiones en la base de datos
+
+Es posible indicarle a web2py que almacene las sesiones en la base de datos en lugar de hacerlo en la carpeta sessions. Esto se debe hacer para cada aplicación individual de web2py, aunque todas las aplicaciones pueden usar la misma base de datos para almacenar las sesiones.
+
+
+Dada una conexión a la base de datos
+
 ``
 db = DAL(...)
 ``:code
 
-you can store the sessions in this database (db) by simply stating the following, in the same model file that establishes the connection:
+puedes almacenar las sesiones en esta base de datos (db) simplemente indicando lo siguiente, en el mismo archivo del modelo  que establece la conexión:
+
 ``
 session.connect(request, response, db)
 ``:code
 
-If it does not exist already, web2py creates, under the hood, a table in the database called ``web2py_session_``''appname'' containing the following fields:
+Si no existiera previamente, web2py crea, en forma transparente, una tabla de la base de datos llamada ``web2py_session_``''appname'' que contiene los siguientes campos:
+
 ``
 Field('locked', 'boolean', default=False),
 Field('client_ip'),
@@ -935,39 +1230,45 @@ Field('unique_key'),
 Field('session_data', 'text')
 ``:code
 
-"unique_key" is a uuid key used to identify the session in the cookie.
-"session_data" is the cPickled session data.
+"unique_key" es una clave uuid que se usa para identificar la sesión en el cookie.
+"session_data" es la información de la sesión procesada con cPickle (es decir, cPickleada).
 
-To minimize database access, you should avoid storing sessions when they are not needed with:
+Para minimizar el acceso a la base de datos, deberías evitar el almacenar sesiones cuando no las necesitas con:
+
 ``
 session.forget()
 ``:code
 
-With this tweak the "sessions" folder does not need to be a shared folder because it will no longer be accessed.
+Las sesiones son automáticamente omitidas si no se han modificado.
+
+Con sesiones en la base de datos, no es necesario compartir la carpeta "sessions" porque no se accederá en adelante.
+
 
 -------
-Notice that, if sessions are disabled, you must not pass the ``session`` to ``form.accepts`` and you cannot use ``session.flash`` nor CRUD.
+Observa que, si las sesiones están deshabilitadas, debes especificar ``session`` en ``formulario.accepts`` y no puedes utilizar ``session.flash`` ni CRUD.
 -------
 
-#### HAProxy a high availability load balancer
+#### El balanceador de carga de alta disponiblidad HAProxy
 ``HAProxy``:inxx
 
-If you need multiple web2py processes running on multiple machines, instead of storing sessions in the database or in cache, you have the option to use a load balancer with sticky sessions.
+Si necesitas múltiples procesos de web2py corriendo en mútiples máquinas, en lugar de almacenar sesiones en la bse de datos en el caché, tienes la opción de usar un balanceador de carga con sesiones pegajosas (''sticky sessions'').
 
-Pound``pound``:cite  and HAProxy``haproxy``:cite  are two HTTP load balancers and Reverse proxies that provides sticky sessions. Here we discuss the latter because it seems to be more common on commercial VPS hosting.
+Pound``pound``:cite  y HAProxy``haproxy``:cite son dos balanceadores de carga para HTTP y proxy reverso que proveen sesiones pegajosas. Aquí describimos el último porque aparentemente es más popular en los servicios de alojamiento VPS.
 
-By sticky sessions, we mean that once a session cookie has been issued, the load balancer will always route requests from the client associated to the session, to the same server. This allows you to store the session in the local filesystem without need for a shared filesystem.
+Con sesiones pegajosas, nos referimos a que una vez que se ha transmitido un cookie, el balanceador de carga siempre enrutará las solicitudes desde el cliente asociado a la sesión hacia el mismo servidor. Esto te permite almacenar la sesión en el sistema de archivos local sin necesidad de usar un sistema de archivos compartido.
 
-To use HAProxy:
+Para usar HAProxy:
 
-First, install it, on out Ubuntu test machine:
+Primero, debes instalarlo. Para una máquina de pruebas Ubuntu:
+
 ``
 sudo apt-get -y install haproxy
 ``:code
 
-Second edit the configuration file "/etc/haproxy.cfg" to something like this:
+Luego edita el archivo de configuración  "/etc/haproxy.cfg" con algo parecido a:
+
 ``
-## this config needs haproxy-1.1.28 or haproxy-1.2.1
+## esta configuración requiere haproxy-1.1.28 o haproxy-1.2.1
 
 global
       log 127.0.0.1   local0
@@ -995,120 +1296,137 @@ listen 0.0.0.0:80
       appsession WEB2PYSTICKY len 52 timeout 1h
 ``:code
 
-The ``listen`` directive tells HAProxy, which port to wait for connection from.
-The ``server`` directive tells HAProxy where to find the proxyed servers.
-The ``appsession`` directory makes a sticky session and uses the a cookie called ``WEB2PYSTICKY`` for this purpose.
+La instrucción ``listen`` le dice a HAProxy en qué puerto debe esperar las conexiones.
+La instrucción ``server`` le dice a  HAProxy dónde se encuentran los servidores que usan proxy.
+La carpeta ``appsession`` crea una sesión pegajosa y usa un cookie llamado ``WEB2PYSTICKY`` para ese propósito.
 
-Third, enable this config file and start HAProxy:
+Tercero, habilita el archivo de configuración e inicia HAProxy:
+
 ``
 /etc/init.d/haproxy restart
 ``:code
 
-You can find similar instructions to setup Pound at the URL
+Puedes encontrar instrucciones similares para configuar Pound en el URL
 
 ``
 http://web2pyslices.com/main/slices/take_slice/33
 ``:code
 
-#### Cleaning up sessions
+#### Limpieza de sesiones
 
-You should be aware that on a production environment, sessions pile up fast. web2py provides a script called:
+Deberías estar atento al hecho de que en un entorno de producción, las sesiones se acumulan velozmente. web2py provee de un script llamado:
+
 ``
 scripts/sessions2trash.py
 ``:code
 
-that when run in the background, periodically deletes all sessions that have not been accessed for a certain amount of time. Web2py provides a script to cleanup these sessions (it works for both file-based sessions and database sessions).
+que cuando se corre en segundo plano, elimina periódicamente todas las sesiones a las que no se ha accedido desde cierta cantidad de tiempo (funciona tanto para archivos de sesión como para las sesiones almacenadas en la base de datos).
 
-Here are some typical use cases:
+Estos son algunos casos típicos de uso:
 
-- Delete expired sessions every 5 minutes:
+- Borrar las sesiones vencidas cada 5 minutos:
+
 ``
 nohup python web2py.py -S app -M -R scripts/sessions2trash.py &
 ``:code
 
-- Delete sessions older than 60 minutes regardless of expiration, with verbose output, then exit:
+- Borrar las sesiones con una antigüedad mayor a 60 minutos hayan vencido o no, con salida detallada, luego salir:
+
 ``
 python web2py.py -S app -M -R scripts/sessions2trash.py -A -o -x 3600 -f -v
 ``:code
 
-- Delete all sessions regardless of expiry and exit:
+- Borrar todas las sesiones sin importar el vencimiento y salir:
+
 ``
 python web2py.py -S app -M -R scripts/sessions2trash.py -A -o -x 0
 ``:code
 
-Here ``app`` is the name of your application.
+Aquí ``app`` es el nombre de tu aplicación.
 
-#### Uploading files in database
 
-By default, all uploaded files handled by SQLFORMs are safely renamed and stored in the filesystem under the "uploads" folder. It is possible to instruct web2py to store uploaded files in the database instead.
+#### Subiendo archivos a la base de datos
 
-Now, consider the following table:
+Por defecto, todas las subidas de archivos manejadas por SQLFORM están renombradas en forma segura y almacenadas en el sistema de archivos dentro de la carpeta de la carpeta "uploads". Es posible como alternativa, indicarle a web2py que almacene los archivos subidos en la base de datos.
+
+
+Ahora, consideremos la siguiente tabla:
+
 
 ``
-db.define_table('dog',
-    Field('name')
-    Field('image', 'upload'))
+db.define_table('perro',
+    Field('nombre')
+    Field('imagen', 'upload'))
 ``:code
 
-where ``dog.image`` is of type upload. To make the uploaded image go in the same record as the name of the dog, you must modify the table definition by adding a blob field and link it to the upload field:
+donde ``perro.imagen`` es de tipo upload. Para hace que la imagen subida se agregue al mismo registro que el del nombre del perro, debes modificar la definición de la tabla agregando un campo blob y enlazarlo con el campo upload:
+
 ``
-db.define_table('dog',
-    Field('name')
-    Field('image', 'upload', uploadfield='image_data'),
-    Field('image_data', 'blob'))
+db.define_table('perro',
+    Field('nombre')
+    Field('imagen', 'upload', uploadfield='datos_imagen'),
+    Field('datos_imagen', 'blob'))
 ``:code
 
-Here "image_data" is just an arbitrary name for the new blob field.
+Aquí "datos_imagen" es solo un nombre arbitrario para el campo blob.
 
-Line 3 instructs web2py to safely rename uploaded images as usual, store the new name in the image field, and store the data in the uploadfield called "image_data" instead of storing the data on the filesystem. All of this is be done automatically by SQLFORMs and no other code needs to be changed.
+La línea 3 le indica a web2py que cambie el nombre de las imagenes subidas en forma segura como es usual, almacene el nombre en el campo imagen, y que almacene los datos en el campo tipo upload llamado "datos_imagen" en lugar de almacenar los datos en el sistema de archivos. Todo esto es hecho automáticamente en los SQLFORM y no hacen falta modificaciones o comandos adicionales.
 
-With this tweak, the "uploads" folder is no longer needed.
+Con este ajuste, el uso de la carpeta "uploads" no es más necesario.
 
-On Google App Engine, files are stored by default in the database without the need to define an uploadfield, since one is created by default.
+En Google App Engine, los archivos se almacenan por defecto en la base de datos sin necesidad de definir un campo upload, ya que se crean por defecto.
 
-#### Collecting tickets
 
-By default, web2py stores tickets (errors) on the local file system. It would not make sense to store tickets directly in the database, because the most common origin of error in a production environment is database failure.
+#### Organización de los ticket
 
-Storing tickets is never a bottleneck, because this is ordinarily a rare event. Hence, in a production environment with multiple concurrent servers, it is more than adequate to store them in a shared folder. Nevertheless, since only the administrator needs to retrieve tickets, it is also OK to store tickets in a non-shared local "errors" folder and periodically collect them and/or clear them.
+Por defecto, web2py almacena los ticket (errores) en el sistema de archivos local. No tendría sentido el almacenamiento de ticket directamente en la base de datos, porque el origen más común de los errores en producción son los errores de la base de datos.
 
-One possibility is to periodically move all local tickets to the database.
+Guardar los ticket nunca es un cuello de botella, porque suele ocurrir con poca frecuencia. Por eso, en un entorno de producción con servidores simultáneos, es más que adecuado su almacenamiento en carpetas compartidas. De todas formas, ya que solo el administrador necesita consultar los ticket, también es aceptable almacenar ticket en una carpeta local que no esté compartida llamada "errors" y realizar una recolección y/o limpieza periódica.
 
-For this purpose, web2py provides the following script:
+Una posibilidad es la de realizar una transferencia periódica de todo error local a la base de datos.
+
+
+Para esta tarea, web2py provee del siguiente script:
+
 ``
 scripts/tickets2db.py
 ``:code
 
-By default the script gets the db uri from a file saved into the private folder, **ticket_storage.txt**. This file should contain a string that is passed directly to a **DAL** instance, like:
+Por defecto, el script toma el uri de la bd desde un archivo guardado en la carpeta private, **ticket_storage.txt**. Este archivo debería contener una cadena que se pasa directamente a la instancia de **DAL**, como:
 
 ``
-mysql://username:password@localhost/test
-postgres://username:password@localhost/test
+mysql://usuario:contraseña@localhost/prueba
+postgres://usuario:contraseña@localhost/prueba
 ...
 ``:code
 
-This allows to leave the script as it is: if you have multiple applications, it will dynamically choose the right connection for every application. If you want to hardcode the uri in it, edit the second reference to db_string, right after the ''except'' line.
-You can run the script with the command:
+Esto permite dejar el script en su forma original: si tienes múltiples aplicaciones, eligirá automáticamente la conexión adecuada para cada aplicación. Si quieres especificar directamente  la uri en él, edita la segunda referencia a db_string, justo después de la línea ''except''.
+
+Puedes correr el script con el comando:
+
 ``
 nohup python web2py.py -S myapp -M -R scripts/tickets2db.py &
 ``:code
 
-where myapp is the name of your application.
+donde myapp es el nombre de tu aplicación.
 
-This script runs in the background and moves all tickets every 5 minutes to a table and removes the local tickets.
-You can later view the errors using the admin app, clicking on the "switch to: db" button at the top, with the same exact functionality as if they were stored on the file system.
+Este script corre en segundo plano y mueve todos los ticket cada 5 minutos a una tabla y elimina los ticket locales.
+Puedes más tarde ver los errores usando la app admin, haciendo clic en el botón "switch to: db" en la parte superior, con exactamente la misma funcionalidad que si estuviera almacenado en el sistema de archivos.
 
-With this tweak, the "errors" folder does not need to be a shared folder any more, since errors will be stored into the database.
+
+Con este ajuste, ya no se necesita que la carpeta "errors" esté compartida, ya que los errores se almacenarán en la base de datos.
 
 #### Memcache
 ``memcache``:inxx
 
-We have shown that web2py provides two types of cache: ``cache.ram`` and ``cache.disk``.
-They both work on a distributed environment with multiple concurrent servers, but they do not work as expected. In particular, ``cache.ram`` will only cache at the server level; thus it becomes useless. ``cache.disk`` will also cache at the server level unless the "cache" folder is a shared folder that supports locking; thus, instead of speeding things up, it becomes a major bottleneck.
+Hemos mostrado que web2py provee de dos tipos de caché:``cache.ram`` y ``cache.disk``. 
 
-The solution is not to use them, but to use memcache instead. web2py comes with a memcache API.
+Los dos tipos de caché funcionan en un ambiente distribuido con múltiples servidores simultáneos, pero no funcionan como se esperaría. En particular, ``cache.ram`` solo hará caché en el nivel del servidor; esto hace que pierda su utilidad. ``cache.disk`` también hará el caché en el nivel del servidor a menos que la carpeta "cache" sea una carpeta compartida son soporte para bloqueo o ''locking''; por lo tanto, en lugar de hacer el sistema más eficiente, se convierte en un importante cuello de botella.
 
-To use memcache, create a new model file, for example ``0_memcache.py``, and in this file write (or append) the following code:
+La solución es no utilizarlos, y utilizar en su lugar memcache. web2py incorpora una API para memcache.
+
+Para usar memcache, crea un archivo de modelo, por ejemplo ``0_memcache.py``, y en ese archivo escribe (o agrega) el siguiente código:
+
 ``
 from gluon.contrib.memcache import MemcacheClient
 memcache_servers = ['127.0.0.1:11211']
@@ -1116,142 +1434,339 @@ cache.memcache = MemcacheClient(request, memcache_servers)
 cache.ram = cache.disk = cache.memcache
 ``:code
 
-The first line imports memcache. The second line has to be a list of memcache sockets (server:port).  The third line defines ``cache.memcache``.  The fourth line redefines ``cache.ram`` and ``cache.disk`` in terms of memcache.
+La primera línea importa memcache. La segunda línea tiene que ser una lista de socket memcache (servidor:puerto). La tercer línea define ``cache.memcache``. La cuarta línea redefine ``cache.ram`` y ``cache.disk`` en función de memcache.
 
-You could choose to redefine only one of them to define a totally new cache object pointing to the Memcache object.
+Podrías optar por redefinir solo uno de ellos para definir un objeto cache totalmente nuevo asociado al objeto Memcache. 
 
-With this tweak the "cache" folder does not need to be a shared folder any more, since it will no longer be accessed.
+Con este ajuste ya no será necesario compartir la carpeta "cache", ya que no se volverá a utilizar.
 
-This code requires having memcache servers running on the local network. You should consult the memcache documentation for information on how to setup those servers.
+Este código requiere tener servidores de memcache corriendo en la red local. Para información sobre cómo configurar los servidores puedes consultar la documentación oficial de memcache.
 
-#### Sessions in memcache
 
-If you do need sessions and you do not want to use a load balancer with sticky sessions, you have the option to store sessions in memcache:
+#### Sesiones con memcache
+
+Si necesitas sesiones y no quieres usar un balanceador de carga con sesiones pegajosas, tienes como opción el almacenamiento de sesiones en memcache:
+
 ``
 from gluon.contrib.memdb import MEMDB
 session.connect(request,response,db=MEMDB(cache.memcache))
 ``:code
 
-#### Caching with Redis
+#### Caché con Redis
 ``redis``:cite
-An alternative to Memcache is use Redis. ``Redis``:inxx
 
-Assuming we have Redis installed and running on localhost at port 6379, we can connect to it using the following code (in a model):
+Redis``Redis``:inxx es una alternativa al uso de Memcache.
+
+Suponiendo que tenemos Redis instalado y corriendo en localhost en el puerto 6379, podemos conectar con él usando el siguiente código (en un modelo):
 
 ``
-from gluon.contrib.redis import RedisCache
+from gluon.contrib.redis_cache import RedisCache
 cache.redis = RedisCache('localhost:6379',db=None, debug=True)
 ``
 
-where 'localhost:6379' is the connection string and ``db`` is not a DAL object but a Redis database name.
+donde 'localhost:6379' es la cadena de conexión y ``db`` no es un objeto DAL sino el nombre de una base de datos Redis.
 
-We can now use ``cache.redis`` in place of (or along with) ``cache.ram`` and ``cache.disk``.
+Ahora podemos usar ``cache.redis`` en lugar de (o junto con) ``cache.ram`` y ``cache.disk``.
 
-We can also obtain Redis statistcs by calling:
+También podemos obtener estadísticas de Redis con la llamada:
+
 
 ``
 cache.redis.stats()
 ``:code
 
-#### Removing applications
+#### Sesiones y Redis
+
+Si tienes Redis en tu sistema, ¿por qué no usarlo para las sesiones?
+
+``
+from gluon.contrib.redis_session import RedisSession
+sessiondb = RedisSession('localhost:6379',db=0, session_expiry=False)
+session.connect(request, response, db = sessiondb)
+``
+
+El código fue probado con aproximadamente un millón de sesiones. Siempre que Redis tenga espacio en la memoria, el tiempo requerido para el manejo de sesiones de una o un millón de sesiones es el mismo. Si comparado con el uso de sesiones almacenadas en el sistema de archivos o en la base de datos la mejora de velocidad es despreciable para aproximadamente 40.000 sesiones, por arriba de esa barrera la mejora es notable. Obtendrás una clave por sesión, más dos claves, una que consiste de un entero (usado para asignar distintas claves de sesión) y otra conteniendo el conjunto de todas las sesiones generadas (de forma que para 1000 sesiones, serán 1002 claves).
+
+
+Si no se establece ``session_expiry``, las sesiones se manejarán normalmente, y deberías hacer una [[limpieza de sesiones @///chapter/13#Limpieza-de-sesiones]] con cierta frecuencia.
+
+Sin embargo, si ``session_expiry`` se ha establecido, eliminiará automáticamente las sesiones luego n segundos (por ejemplo, si se establece en 3600, la sesión vencerá exactamente una hora después de la última vez que se haya actualizado)
+
+Deberías de todas formas correr con cierta frecuencia sessions2trash.py para que se elimine la clave que contiene el conjunto de todas las sesiones enviadas previamente (para la limpieza de aproximadamente un millón de sesiones, el tiempo requerido es 3 segundos).
+
+
+#### Eliminando aplicaciones
 ``removing application``:inxx
 
-In a production setting, it may be better not to install the default applications: **admin**, **examples** and **welcome**. Although these applications are quite small, they are not necessary.
+En una configuración de producción, podría convenir no instalar las aplicaciones: **admin**, **examples** y **welcome**. Si bien estas aplicaciones son bastante pequeñas, no son necesarias.
 
-Removing these applications is as easy as deleting the corresponding folders under the applications folder.
+Para eliminar estas aplicaciones es suficiente con borrar las carpetas correspondientes de la carpeta applications.
 
-#### Using replicated databases
+#### Usando bases de datos replicadas
 
-In a high performance environment you may have a master-slave database
-architecture with many replicated slaves and perhaps a couple of
-replicated servers. The DAL can handle this situation and conditionally
-connect to different servers depending on the request parameters. The
-API to do this was described in Chapter 6. Here is an example:
+En entornos de alto rendimiento podrías usar una arquitectura de base de datos ''master-slave'' con varias bases de datos secundarias y quizás un un par de servidores replicados. La DAL puede manejar esta situación para conectar en forma condicional a los distintos servidores según los parámetros de la solicitud. La API necesaria para esto se ha descripto en el Capítulo 6. He aquí un ejemplo:
 
 ``
 from random import sample
 db = DAL(sample(['mysql://...1','mysql://...2','mysql://...3'], 3))
 ``:code
 
-In this case, different HTTP requests will be served by different
-databases at random, and each DB will be hit more or less with the
-same probability.
+En este caso, las distintas solicitudes HTTP serán servidas por distintas bases de datos en forma aleatoria, y cada base de datos recibirá consultas en una proporción aproximadamente equilibrada.
 
-We can also implement a simple Round-Robin
+También podemos implementar un sencillo algoritmo todos contra todos o ''Round-Robin''
 
 ``
-def fail_safe_round_robin(*uris):
-     i = cache.ram('round-robin', lambda: 0, None)
+def todos_contra_todos_seguro(*uris):
+     i = cache.ram('todos-contra-todos', lambda: 0, None)
      uris = uris[i:]+uris[:i] # rotate the list of uris
-     cache.ram('round-robin', lambda: (i+1)%len(uris), 0)
+     cache.ram('todos-contra-todos', lambda: (i+1)%len(uris), 0)
      return uris
-db = DAL(fail_safe_round_robin('mysql://...1','mysql://...2','mysql://...3'))
+db = DAL(todos_contra_todos_seguro('mysql://...1','mysql://...2','mysql://...3'))
 ``:code
 
-This is fail-safe in the sense that if the database server assigned to
-the request fails to connect, DAL will try the next one in the order.
+Esto es seguro (''fail-safe'') en el sentido de que si falla la conexión del servidor de base de datos asignado a la solicitud, DAL intentará con el siguiente servidor en el orden establecido.
 
-It is also possible to connect to different databases depending on the requested action or controller. In a master-slave database configuration, some action performs only a read and some person both read/write. The former can safely connect to a slave db server, while the latter should connect to a master. So you can do:
+También es posible conectar a distintas bases de datos según los parámetros de acción o controlador. En una configuración master-slave, algunas acciones realizan operaciones de sólo lectura, mientras que otras realizan operaciones tanto de lectura como de escritura. Las primeras pueden conectar en forma segura a un servidor esclavo, mientras que las de la segunda clase deberían conectar a un servidor maestro. Entonces, puedes hacer:
 
 ``
-if request.function in read_only_actions:
+if request.function in acciones_de_solo_lectura:
    db = DAL(sample(['mysql://...1','mysql://...2','mysql://...3'], 3))
-if request.action in read_only_actions:
+elif request.action in read_only_actions:
    db = DAL(shuffle(['mysql://...1','mysql://...2','mysql://...3']))
 else:
    db = DAL(sample(['mysql://...3','mysql://...4','mysql://...5'], 3))
 ``:code
 
-where 1,2,3 are slaves and 3,4,5 are masters.
+donde 1,2 y 3 son esclavos y 3, 4 y 5 maestros.
 
-### Deploying on Google App Engine
+
+#### Comprimir archivos estáticos
+
+Los navegadores pueden descomprimir contenido al vuelo, por lo que la compresión del contenido para esos navegadores permite ahorrar ancho de banda tanto al cliente como al servidor, optimizando los tiempos de respuesta. Actualmente la mayor parte de los servidores web pueden comprimir tu contenido al vuelo y enviarlo a los navegadores que soliciten contenido ''gzipeado''.
+Sin embargo, para el caso de los archivos estáticos, estarías desperdiciando recursos del microprocesador para que comprima el mismo contenido una y otra vez.
+
+Puedes usar el script en ''scripts/zip_static_files.py'' para crear versiones gzipeadas de tus archivos estáticos y servir esos archivos sin desperdiciar el uso del CPU. Corre el script con ``python web2py.py -S myapp -R scripts/zip_static_files.py`` en cron. El script se encarga de crear o actualizar las versiónes gzipeadas y las guarda junto con tus archivos, agregando la extensión .gz al nombre.
+
+Sólo necesitas informarle a tu servidor web cuándo enviar esos archivos ``apache-content-negotiation``:cite ``nginx-gzipstatic``:cite
+
+
+### Despliegue en PythonAnywhere
+
+``PythonAnywhere``:code ``PythonAnywhere``:inxx
+
+PythonAnywhere es la forma más simple de desplegar las aplicaciones web2py.
+
+PythonAnywhere es un entorno para desarrollo y alojamiento que se opera desde tu navegador y corre en servidores de la nube. Estos servidores ya están preconfigurados con todo lo necesario para correr Python y tienen soporte para web2py específico. En nuestra experiencia PythonAnywhere es fácil de usar, rápido y potente. También proveen bases de datos MySQL, consolas de Python e integración con Dropbox.
+También hay alojamiento profesional disponible en caso de que el servicio básico gratuito no te alcance.
+
+Para poder usar PythonAnywhere debes crear una cuenta, autenticarte y luego utilizar la consola administrativa o ''Dashboard'' para agregar una nueva App Web de tipo web2py.
+
+
+[[image @///image/pythonanywhere1.png center 300px]]
+[[image @///image/pythonanywhere2.png center 300px]]
+
+
+La interfaz te pedirá una contraseña administrativa.
+
+
+[[image @///image/pythonanywhere3.png center 300px]]
+
+La carpeta de web2py se creará en tu carpeta de usuario.
+
+
+Además, alternativamente, puedes usar la consola bash web para instalar web2py como lo se hace normalmente:
+
+
+``
+wget http://www.web2py.com/examples/static/web2py_src.zip
+unzip web2py_src.zip
+``:code
+
+Siempre desde la consola deberías crear una contraseña administrativa para su posterior uso:
+
+``
+python -c "from gluon.main import save_password; save_password(raw_input('admin  password: '),433)"
+``:code
+
+Luego visita el panel "Web" usando la interfaz web y modifica el archivo "/var/www/<usuario>_pythonanywhere_com_wsgi.py". Este es punto de acceso de tu programa (en nuestro caso web2py) que, evidentemente, se basa en el protocolo WSGI.
+
+Abre el archivo "/var/www/<usuario>_pythonanywhere_com_wsgi.py" y agrega lo siguiente:
+
+``
+import sys
+path = '/home/<usuario>/web2py'
+if path not in sys.path: sys.path.append(path)
+from wsgihandler import application # the web2py handler
+``:code
+
+Aquí "<usuario>" es tu nombre de usario de PythonAnywhere.
+
+Luego de instalar web2py, observa que no necesitas iniciar o configurar el servidor web. PythonAnywhere provee de uno y se carga nuevamente cuando editas el siguiente archivo de configuración o si presionas el botón "Reload web app" en la consola administrativa. La app estará desplegada de inmediato en la url:
+
+``
+http://tuusuario.pythonanywhere.com/
+``:code
+
+Además proveen de una versión segura del sitio, y puedes forzar su uso para ingresar a la interfaz administrativa de web2py en:
+
+``
+https://tuusuario.pythonanywhere.com/admin/default/index
+``:code
+
+Agradecemos al equipo de PythonAnywhere por su ayuda y apoyo.
+
+
+### Despliegue en Heroku
+``heroku``:cite ``Heroku``:inxx
+
+Heroku es una solución en alojamiento multiplataforma moderno y ágil. Permite aplicar cambios a tus aplicaciones en a una nube de servidores usando Git. Para poder usar Heroku debes tener Git instalado y además debes tener el SDK Heroku instalado. La interacción con Heroku es a través del SDK en forma local y los comandos se actualizan y ejecutan en el servidor. 
+
+Las aplicaciones que corren sobre Heroku no pueden depender de un sistema de archivos permanente ya que se actualiza en forma periódica. Por esta razón sólo se debe almacenar el código de la aplicación en el sistema de archivos. Todo dato debe ser almacenado en la base de datos. Heroku depende de PostgreSQL. Igualmente, PostgreSQL también se configura usando el SDK de Heroku y la URI para la base de datos se asigna en forma dinámica en tiempo de ejecución y se almacena en una variable de entorno.
+
+Esto implica que las aplicaciones web2py deben ser modificadas para funcionar con Heroku de forma que puedan usar la base de datos.
+
+Web2py provee de un script "heroku.py" para que puedas configurar tus aplicaciones con Heroku. Todo lo que debes hacer es reemplazar:
+
+``
+db = DAL(...)
+``:code
+
+en tu código con:
+
+``
+from gluon.contrib.heroku import get_db
+db = get_db(name=None, pool_size=10)
+``:code
+
+Aquí ``name`` es la variable de entorno que contiene la URI de PostgreSQL en Heroku (algo como ``HEROKU_POSTGRESQL_RED_URL``).
+Por defecto es ``None`` y si hay una única variable de entorno ``HEROKU_POSTGRESQL_*_URL`` entonces usará esa.
+``pool_size`` es el parámetro usual del constructor de DAL para especificar el tamaño del agrupamiento de conexiones.
+
+Si no se corre la plataforma Heroku, ``get_db`` usará una base de datos de desarrollo "sqlite://heroku.test.sqlite".
+
+En ambos casos las sesiones se almacenarán en la base de datos.
+
+Web2py provee de un script "scripts/setup-web2py-heroku.py" para desplegar tu instalación en Heroku. El script ejecuta los siguientes pasos: 
+
+
+Instala virtualenv y el controlador psycopg2:
+
+``
+sudo pip install virtualenv
+sudo pip install psycopg2
+``:code
+
+Crea y activa un virtualenv
+
+``
+virtualenv venv --distribute
+source venv/bin/activate
+``:code
+
+Entonces crea un archivo requirements:
+
+``
+pip freeze > requirements.txt
+``:code
+
+Y crea un "Procfile" que le dice a Heroku cómo iniciar web2py:
+
+
+``
+echo "web: python web2py.py -a 'tucontraseña' -i 0.0.0.0 -p \\$PORT" > Procfile
+``:code
+
+Puedes cambiar esta línea para usar un servidor diferente. Debes editarlo para especificar tu propia contraseña administrativa. ``\\$PORT`` es una variable que está correctamente escapada ya que su valor se establece en tiempo de ejecución. También deberías considerar el inicio de web2py con gunicorn utilizando ``anyserver.py`` ya que es uno de los servidores web recomendados para Python.
+
+
+Por último el script crea un repositorio Git:
+
+
+``
+git init
+git add .
+git add Procfile
+git commit -a -m "primer commit"
+``:code
+
+aplica todos los cambios en Heroku, y lo inicia:
+
+``
+heroku create
+git push heroku master
+heroku addons:add heroku-postgresql:dev
+heroku scale web=1
+heroku open
+``:code
+
+
+``heroku`` aquí es un comando de shell que pertenece al SDK de Heroku.
+
+Agradecemos a Craig Krestiens de Heroku por su ayuda con esta receta.
+
+
+### Despliegue en EC2
+``Amazon EC2``:inxx
+
+La Amazon Elastic Compute Cloud (Amazon EC2) es un servicio que provee de un alojamiento con capacidad de cómputo ampliable en la nube. Es una de las nubes más populares y extensas. Muchas otras plataformas de nube corren sobre EC2. Puedes correr cualquier aplicación en EC2 creando y desplegando una imagen de disco. Entonces Amazon provee de una API para replicar la imagen compartiendo al mismo tiempo una parte del sistema de archivos.
+
+Una descripción completa del proceso está fuera del alcance de este libro pero, asumiendo que tengas una cuenta de Amazon EC2, puedes usar el ''Turnkey Hub'' para buscar y desplegar una imagen preconfigurada de web2py:
+
+``https://hub.turnkeylinux.org/amazon/launch/web2py/``
+
+Una vez que la imagen se haya desplegado puedes autenticarte en ella como en cualquier VPS normal y puedes administrarla (por ejemplo realizar copias de seguridad, recuperar datos, hacer copias) a través de la interfaz web de Amazon EC2.
+
+
+### Despliegue en Google App Engine
 ``Google App Engine``:inxx
 
-It is possible to run web2py code on Google App Engine (GAE)``gae``:cite , including DAL code.
+Es posible correr el código para web2py sobre Google App Engine (GAE)``gae``:cite, incluyendo código de DAL.
 
-GAE supports two versions of Python: 2.5 (default) and 2.7 (beta). web2y supports both but uses 2.5 by default (this may change in the future). Look into the "app.yaml" file described below for configration details.
+GAE soporta dos versiones de Python: 2.5 (por defecto) y 2.7 (beta). web2py soporta ambas pero usa 2.5 por defecto (esto podría cambiar en el futuro). Examina el archivo "app.yaml" descripto más abajo para detalles sobre la configuración.
 
-GAE also supports a Google SQL database (compatible with MySQL) and a Google NoSQL (referred to as "Datastore").
+GAE además incluye las bases de datos Google SQL (compatible con MySQL) y Google NoSQL (llamada "Datastore").
 
-web2py supports both. If you wish to use Google SQL database follow the instructions on Chapter 6. This section assues you will be using the Google Datastore.
+web2py soporta ambas bases de datos. Si quieres usar la base de datos Google SQL sigue las instrucciones del capítulo 6. Esta sección asume que usarás Google Datastore.
 
-The GAE platform provides several advantages over normal hosting solutions:
-
-- Ease of deployment. Google completely abstracts the underlying architecture.
-- Scalability. Google will replicate your app as many times as it takes to serve all concurrent requests.
-- One can choose between a SQL and a NoSQL database (or both together).
-
-But also some disadvantages:
-- No read or write access to the file system.
-- No HTTPS unless you use the ``appspot.com`` domain with a Google certificate.
-
-and some Datastore specific disadvantages:
-
-- No typical transactions.
-- No complex datastore queries. In particular there are no ``JOIN``, ``LIKE``, and ``DATE/DATETIME`` operators.
-- No multiple ``OR`` sub-queries unless they involve one and the same field.
+La plataforma GAE provee de varias ventajas sobre una solución normal de alojamiento:
 
 
-Because of the readonly filesystem, web2py cannot store sessions, error tickets, cache files and uploaded files in the filesystem; they must be stored in the datastore and not in the filesystem.
+- Fácilidad para el despliegue. Google abstrae completamente la arquitectura subyacente.
+- Escalabilidad. Google replicará tu app tantas veces como sea necesario para servir las solicitudes simultáneas.
+- Uno puede elegir entre una base de datos SQL y NoSQL (o su uso combinado).
 
-Here we provide a quick overview of GAE and we focus on web2py specific issues, we refer you to the official GAE documentation online for details.
+Pero también algunas desventajas:
+- No hay acceso de lectura o escritura al sistema de archivos.
+- No provee de HTTPS a menos que uses el dominio ``appspot.com`` con un certificado de Google.
+
+y algunas desventajas específicas de Datastore:
+
+- Ausencia del sistema de transacciones típicas
+- Imposibilidad de realizar consultas complicadas a las bases de datos. En particular, no se pueden usar los operadores ``JOIN``, ``LIKE``, y ``DATE/DATETIME``
+- Imposibilidad de usar subconsultas ``OR`` a menos que estén restringidas a un campo.
+
+Por causa de su sistema de archivos de solo lectura, web2py no puede almacenar sesiones, ticket de error, archivos de caché y archivos subidos en él; deben ser almacenados en Datastore y no en el sistema de archivos.
+
+Aquí presentamos una pequeña introducción de GAE y nos concentramos en las cuestiones específicas de web2py, para información más detallada puedes consultar la documentación oficial de GAE en línea.
+
 
 -----
-Attention: At the time of writing, GAE supports only Python 2.5. Any other version will cause problems. You also must run the web2py source distribution, not a binary distribution.
+Atención: Al tiempo de esta edición, GAE soporta sólo Python 2.5. Cualquier otra causará problemas. Además debes correr la distribución de web2py de código fuente, no la distribución binaria.
 -----
 
-#### Configuration
+#### Configuración
 
-There are three configuration files to be aware of:
+Hay tres archivos de configuración que debemos tener en cuenta:
+
 ``
 web2py/app.yaml
 web2py/queue.yaml
 web2py/index.yaml
 ``:code
 
-``app.yaml`` and ``queue.yaml`` are most easily created by using the template files ``app.example.yaml`` and ``queue.example.yaml`` as starting points. ``index.yaml`` is created automatically by the Google deployment software.
+``app.yaml`` y ``queue.yaml`` se pueden crear fácilmente usando los archivos plantilla ``app.example.yaml`` y ``queue.example.yaml`` como punto de partida. ``index.yaml`` es creado automáticamente por el software para despliegue de Google.
 
-``app.yaml`` has the following structure (it has been shortened using ...):
+``app.yaml`` tiene la estructura siguiente (fue abreviada usando tres puntos):
 
 ``
 application: web2py
@@ -1273,58 +1788,60 @@ skip_files:
 ...
 ``:code
 
-``app.example.yaml`` (when copied to ``app.yaml``) is configured to deploy the web2py ``welcome`` application, but not the ``admin`` or ``example`` applications. You must replace ``web2py`` with the application id that you used when registering with Google App Engine.
+``app.example.yaml`` (cuando se copia a ``app.yaml``) se configura para desplegar la aplicación ``welcome`` de web2py, pero no las aplicaciones ``admin`` o ``example`` applications. Debes reemplazar ``web2py`` con el id de la aplicación que has usado cuando la registraste en Google App Engine.
 
-``url: /(.+?)/static/(.+)`` instructs GAE to serve your app static files directly, without calling web2py logic, for speed.
+``url: /(.+?)/static/(.+)`` le indica a GAE que debe servir los archivos estáticos de la app en forma directa, sin utilizar el código de web2py, para mayor velocidad.
 
 
-``url:.*`` instructs web2py to use the ``gaehandler.py`` for every other request.
+``url:.*`` le indica a web2py que debe usar el script ``gaehandler.py`` para las demás solicitudes.
 
-The ``skip_files:`` session is list of regular expressions for files that do not need to deployed on GAE. In particular the lines:
+La sección ``skip_files:`` es una lista de expresiones regulares para archivos que no requieren ser desplegados en GAE. En particular las líneas:
 
 ``
  (applications/(admin|examples)/.*)|
  ((admin|examples|welcome)\.(w2p|tar))|
 ``:code
 
-tell GAE not to deploy the default applications, except for the unpacked welcome scaffolding application. You can add more applications to be ignored here.
+le dicen a GAE que no debe desplegar las aplicaciones por defecto, excepto la aplicación de andamiaje welcome descomprimida. Puedes agregar más aplicaciones a ignorar en esa sección.
 
-Except for the application id and version, you probably do not need to edit ``app.yaml``, though you may wish to exclude the ``welcome`` application.
+Excepto el id de la aplicación y la versión, probablemente no necesitas editar ``app.yaml``, aunque quizás te interese excluir la aplicación ``welcome``.
 
-The file ``queue.yaml`` is used to configure GAE task queues.
+El archivo ``queue.yaml`` es usado para configurar la cola de tareas de GAE.
 
-The file ``index.yaml`` is automatically generated when you run your application locally using the GAE appserver (the web server that comes with the Google SDK). It contains something like this:
+El archivo ``index.yaml`` es automáticamente generado cuando corres tu aplicación en forma local usando el appserver de GAE (el servidor que viene con el SDK de Google). Contiene algo similar a esto:
 
 ``
 indexes:
-- kind: person
+- kind: persona
   properties:
-  - name: name
+  - name: nombre
     direction: desc
 ``:code
 
-In this example it tells GAE to create an index for table "person" that will be used to sort by "name" in reversed alphabetical order. You will not be able to search and sort records in your app without corresponding indexes.
+En este ejemplo le dice a GAE que debe crear un índice para la tabla "persona" que será usado para ordenar por "nombre" en orden alfabético inverso. No podrás hacer búsquedas u ordenar registros en tu app sin los índices correspondientes.
 
-It is important to always run your apps locally with the appserver and try every functionality of your app, before deployment. This will be important for testing purposes, but also to automatically generate the "index.yaml" file.
-Occasionally you may want to edit this file and perform cleanup, such as removing duplicate entries.
+Es importante que siempre corras tus app en forma local con el appserver y probar cada funcionalidad de tu app antes de desplegarla. Esto será importante por cuestiones de control de calidad, pero también para generar automáticamente los archivos "index.yaml". En ciertas ocasiones puede ser conveniente modificar este archivo y realizar una limpieza, por ejemplo eliminando las entradas duplicadas.
 
-#### Running and deployment
+
+#### Ejecución y despliegue
 
 ##### Linux
 
-Here we assume you have installed the GAE SDK.  At the time of writing, GAE runs on Python 2.5.2.  You can run your app from inside the "web2py" folder by using the appserver command:
+Aquí asumiremos que tienes instalado el SDK de GAE. Al tiempo de esta edición, GAE corre con Python 2.5.2. Puedes correr tu app 
+desde la carpeta "web2py" usando el siguiente comando de appserver:
 
 ``
 python2.5 dev_appserver.py ../web2py
 ``:code
 
-This will start the appserver and you can run your application at the URL:
+Esto iniciará appserver y puedes correr tu aplicación en el URL:
+
 
 ``
 http://127.0.0.1:8080/
 ``:code
 
-In order to upload your app on GAE, make sure you have edited the "app.yaml" file as explained before and set the proper application id, then run:
+Para poder cargar tu app en GAE, asegúrate de modificar el archivo "app.yaml" como se explicó previamente y establece el id de aplicación adecuado, luego corre:
 
 ``
 python2.5 appcfg.py update ../web2py
@@ -1332,21 +1849,22 @@ python2.5 appcfg.py update ../web2py
 
 ##### Mac, Windows
 
-On Mac and Windows, you can also use the Google App Engine Launcher.
-You can download the software from ref.``gae``:cite .
+En Mac y Windows, puedes además usar la herramienta para ejecución de Google App Engine ''Launcher''.
+Puedes descargar el software desde ref.``gae``:cite.
 
-Choose [File][Add Existing Application], set the path to the path of the top-level web2py folder, and press the [Run] button in the toolbar. After you have tested that it works locally, you can deploy it on GAE by simply clicking on the [Deploy] button on the toolbar (assuming you have an account).
+Selecciona [File][Add Existing Application], establece la ruta como la ruta de la carpeta raíz de web2py, y presiona el botón [Run] en la barra de tareas. Luego de probar tu aplicación en forma local, puedes desplegarla en la nube de GAE con solo hacer clic en el botón [Deploy] en la barra de tareas (suponiendo que ya tienes una cuenta).
+
 
 [[image @///image/en9300.png center 300px]]
 
-On GAE, the web2py tickets/errors are also logged into the GAE administration console where logs can be accessed and searched online.
+En GAE, los ticket de errores también se registran en la consola administrativa o ''Dashboard'' y por lo tanto puedes usar esa herramienta para realizar búsquedas y consultas de los errores de tu aplicación.
 
 [[image @///image/en9400.png center 300px]]
 
 
-#### Configuring the handler
+#### Configuración del manejador o ''handler''
 
-The file ``gaehandler.py`` is responsible for serving files on GAE and it has a few options. Here are their default values:
+El archivo ``gaehandler.py`` se encarga de servir los archivos en GAE y tiene algunas opciones. Aquí se listan sus valores por defecto:
 
 ``
 LOG_STATS = False
@@ -1354,23 +1872,25 @@ APPSTATS = True
 DEBUG = False
 ``:code
 
-``LOG_STATS`` will log the time to serve pages in the GAE logs.
+``LOG_STATS`` registrará mediciones cronometradas las respuestas a solicitudes en el ''log'' de GAE.
 
-``APPSTATS`` will enable GAE appstats which provides profiling statistics. They will be made available at the URL:
+``APPSTATS`` habilitará las estadísticas ''appstats'' de GAE con análisis de rendimiento. Las mediciones estarán disponibles en el URL:
 
 ``
 http://localhost:8080/_ah/stats
 ``:code
 
-``DEBUG`` sets debug mode. It make no difference in practice unless checked explicitly in your code via ``gluon.settings.web2py_runtime``.
+``DEBUG`` establece el nivel de depuración. En la práctica no hay diferencia notable a menos que se establezca explícitamente en el código por medio de ``gluon.settings.web2py_runtime``.
 
-#### Avoid the filesystem
+#### Evitando el uso del sistema de archivos
 
-On GAE you have no access to the filesystem. You cannot open any file for writing.
+En GAE tienes acceso al sistema de archivos. No puedes abrir un archivo para escritura.
 
-For this purpose, on GAE, web2py automatically stores all uploaded files in the datastore, whether or not "upload" Field(s) have a ``uploadfield`` attribute.
+Por este motivo, en GAE, web2py automáticamente almacena todos los archivos subidos en Datastore, incluso cuando los campos tipo "upload" no tienen establecido el atributo ``uploadfield``.
 
-You also should store sessions and tickets in the database and you have to be explicit:
+
+Además, deberías almacenar los ticket y las sesiones en la base de datos, especificando en forma explícita:
+
 
 ``
 if request.env.web2py_runtime_gae
@@ -1380,11 +1900,12 @@ else:
     db = DAL('sqlite://storage.sqlite')
 ``:code
 
-The above code checks whether you are running on GAE, connects to BigTable, and instructs web2py to store sessions and tickets in there. It connects to a sqlite database otherwise. This code is already in the scaffolding app in the file "db.py".
+El código presentado arriba comprueba que estés corriendo sobre GAE, conecta a ''BigTable'' y le indica a web2py que almacene los ticket y sesiones allí. De lo contrario, conectará a una base de datos SQLite. Este comportamiento ya viene implementado por defecto en la app de andamiaje, en el archivo de modelo "db.py".
+
 
 #### Memcache
 
-If you prefer, you can store sessions in memcache:
+Si así lo prefieres, puedes almacenar las sesiones en el memcache:
 
 ``
 from gluon.contrib.gae_memcache import MemcacheClient
@@ -1396,75 +1917,57 @@ db = DAL('gae')
 session.connect(request,response,MEMDB(cache.memcache))
 ``:code
 
-Notice that on GAE cache.ram and cache.disk should not be used, so we make them point to cache.memcache.
+Observa que en GAE cache.ram y cache.disk no se deberían usar, y que por lo tanto debemos enlazar sus nombres a cache.memcache.
 
-#### Datastore issues
 
-The absence of multi-entity transactions and typical functionalities of relational databases are what sets GAE apart from other hosting environment. This is the price to pay for high scalability. GAE is an excellent platform if these limitations are tolerable; if not, then a regular hosting platform with a relational database should be considered instead.
+#### Cuestiones referidas a Datastore
 
-If a web2py application does not run on GAE, it is because of one of the limitations discussed above. Most issues can be resolved by removing JOINs from web2py queries and de-normalizing the database.
+La ausencia de transacciones para entidades múltiples (''multi-entity transactions'') y las características típicas de las bases de datos relacionales son elementos que separan a GAE de otros entornos. Este es el precio a pagar si buscamos alta escalabilidad. GAE es una plataforma excelente si estas limitaciones son aceptables; en caso contrario, se debería considerar el uso de una plataforma de alojamiento con soporte para bases de datos relacionales.
 
-Google App Engine supports some special field types, such as ``ListProperty`` and ``StringListProperty``. You can use these types with web2py using the following old syntax:
+Si una aplicación de web2py no funciona con GAE, se deberá probablemente a una de las limitaciones descriptas anteriormente. En general, estos problemas se pueden resolver eliminando los JOIN de las consultas a la base de datos y denormalizando la base de datos.
+
+
+Google App Engine tiene soporte para algunos tipos especiales de campos, como ``ListProperty`` y ``StringListProperty``. Puedes usar estos tipos de campos con web2py con la siguiente sintaxis:
+
 
 ``
 from gluon.dal import gae
-db.define_table('product',
-    Field('name'),
-    Field('tags', type=gae.StringListProperty())
+db.define_table('producto',
+    Field('nombre'),
+    Field('etiquetas', type=gae.StringListProperty())
 ``:code
 
-or the equivalent new syntax:
+o la nueva sintaxis equivalente a la anterior:
 
 ``
-db.define_table('product',
-    Field('name'),
-    Field('tags', 'list:string')
+db.define_table('producto',
+    Field('nombre'),
+    Field('etiquetas', 'list:string')
 ``:code
 
-In both cases the "tags" field is a ``StringListProperty`` therefore its values must be lists of strings, compatibly with the GAE documentation. The second notation is to be preferred because web2py will treat the field in a smarter way in the context of forms and because it will work with relational databases too.
+En ambos casos el campo "etiquetas" es un ``StringListProperty`` y por lo tanto su valores deben ser listas de cadenas, de acuerdo con la documentación de GAE. Es aconsejable el uso de la segunda notación porque web2py tratará el campo de forma más inteligente cuando se utilicen formularios y porque también será compatible con bases de datos relacionales.
 
-Similarly, web2py supports ``list:integer`` and ``list:reference`` which map into a ``ListProperty(int)``.
+En forma similar, web2py soporta ``list:integer`` y ``list:reference`` que se traducen en ``ListProperty(int)``.
 
-``list`` types are discussed in more detail in Chapter 6.
+Los tipos ``list`` se describen con más detalle en el Capítulo 6.
 
-#### GAE and https
 
-If you application has id "myapp" your GAE domain is
+#### GAE y https
+
+Si tu aplicación tiene un id "miapp" tu dominio en GAE es
 
 ``
-http://myapp.appspot.com/
+http://miapp.appspot.com/
 ``:code
 
-and it can also be accessed via HTTPS
+y se puede acceder a él a través de HTTPS
 
 ``
-https://myapp.appspot.com/
+https://miapp.appspot.com/
 ``:code
 
-In this case it will use an "appspot.com" certificate provided by Google.
+En ese caso se usará un certificado "appspot.com" provisto por Google.
 
-You can register a DNS entry and use any other domain name you own for your app but you will not be able to use HTTPS on it. At the time of writing, this is a GAE limitation.
-
-### Jython
-``Jython``:inxx
-
-web2py normally runs on CPython (the Python interpreter coded in C), but it can also run on Jython (the Python interpreter coded in Java). This allows web2py to run in a Java infrastructure.
-
-Even though web2py runs with Jython out of the box, there is some trickery involved in setting up Jython and in setting up zxJDBC (the Jython database adaptor). Here are the instructions:
-- Download the file "jython_installer-2.5.0.jar" (or 2.5.x) from ``Jython.org``
-- Install it:
-``
-java -jar jython_installer-2.5.0.jar
-``:code
-- Download and install "zxJDBC.jar" from ``jdbcsource``:cite
-- Download and install the file "sqlitejdbc-v056.jar" from ``jdbcjar``:cite
-- Add zxJDBC and sqlitejdbc to the java CLASSPATH
-- Start web2py with Jython
-
-``
-/path/to/jython web2py.py
-``:code
-
-At the time of writing we only support ``sqlite`` and ``postgres`` on Jython.
+Puedes registrar una entrada DNS y usar cualquier otro nombre de dominio para tu app pero no te será posible usar HTTPS con él. Al tiempo de esta edición, esto es una limitación en GAE.
 
 
