@@ -21,16 +21,159 @@ Aquí explicamos como hacer esto para Windows:
 - Crea tu aplicación como usalmente lo haces.
 - Usando **admin**, compila tu aplicación(one click)
 - Usando **admin**, empaqueta la aplicación compilada(another click)
-- Descomprime esto en la carpeta "myapp" y comienza ahí (two clicks)
+- Descomprime esto en la carpeta "miapp" y comienza ahí (two clicks)
 - Carga usando **admin** el anterior paquete de la app compilada con el nombre "init" (one click)
-- Crea un archivo "myapp/start.bat" que contenga "cd web2py; web2py.exe"
-- comprime la carpeta miaplicacion en un archivo "myapp.zip"
-- distribuye y/o vende "myapp.zip"
+- Crea un archivo "miapp/start.bat" que contenga "cd web2py; web2py.exe"
+- comprime la carpeta miaplicacion en un archivo "miapp.zip"
+- distribuye y/o vende "miapp.zip"
 
-Cuando los usuarios descompriman "myapp.zip" y hagan click "run" ellos verán tu aplicación en lugar de la aplicación "welcome".
+Cuando los usuarios descompriman "miapp.zip" y hagan click "run" ellos verán tu aplicación en lugar de la aplicación "welcome".
 No tiene requerimientos del lado del usuario, ni incluso tener python pre-instalado.
 
 Para binarios en Mac el proceso es el mismo pero no hay necesidad de crear el archivo "bat".
+
+
+### WingIDE, Rad2Py, y Eclipse
+
+``WingIDE``:inxx ``Eclipse``:inxx ``Rad2Py``:inxx
+
+Puedes usar web2py con entornos de desarrollo de terceros como WingIDE, Rad2Py, y Eclipse.
+
+He aquí una captura de pantalla que ilustra el uso de web2py con WingIDE:
+
+[[image @///image/wingide.png center 480px]]
+
+En general, el problema con estos IDE (salvo el caso de Rad2Py que fue diseñado específicamente para que funciones con web2py) es que no entienden el contexto en que los modelos y controladores se ejecutan y por lo tanto la autocompleción no funciona en forma instantánea.
+
+Para que la autocompleción funcione el truco normalmente consiste en editar tus modelos y controladores agregando el siguiente código:
+
+``
+if False:
+    from gluon import *
+    request = current.request
+    response = current.response
+    session = current.session
+    cache = current.cache
+    T = current.T
+``:code
+
+Esto no modifica el funcionamiento ya que nunca se ejecutará pero hace que el IDE lo analice y entienda de dónde vienen los objetos del espacio de nombres global (el módulo ``gluon``), lo que a su vez hace que funcione la autocompleción.
+
+
+### SQLDesigner
+
+Hay un software llamado SQLDesigner que permite la creación de modelos de web2py en forma visual y con esa información se genera el código automáticamente. Aquí se muestra una captura de pantalla:
+
+
+[[image @///image/designer.png center 480px]]
+
+
+La versión de SQLDesigner que funciona con web2py se puede encontrar en:
+
+``https://github.com/elcio/visualdal``
+
+
+### Publicación de una carpeta
+
+Consideremos el problema de compartir carpetas y subcarpetas en la web. web2py lo hace realmente fácil. Sólo debes usar un controlador como el siguiente:
+
+``
+from gluon.tools import Expose
+def micarpeta():
+    return dict(archivos=Expose('/ruta/a/micarpeta'))
+``:code
+
+
+que puedes procesar en una vista con ``{{=archivos}}``. Esto creará una interfaz para visualizar archivos y carpetas, y navegar a través de la estructura de árbol de los archivos. Se crearán vistas previas de las imágenes.
+
+El prefijo con la ruta "/ruta/a/micarpeta" se ocultará a los visitantes. Por ejemplo un archivo llamado "/ruta/a/micarpeta/a/b.txt" se reemplazará por "base/a/b.txt". El prefijo "base" se puede especificar usando el argumento ``basename`` de la función Expose. Puedes especificar una lista de extensiones a listar con el parámetro ``extensions``, el resto de los archivos se ocultará. Por ejemplo:
+
+``
+def micarpeta():
+    return dict(archivos=Expose('/ruta/a/micarpeta', basename='.',
+                extensions=['.py', '.jpg']))
+``:code
+
+
+Los archivos y carpetas que contengan la palabra "private" en la ruta o tengan un nombre de archivo que comience con "." o que termine con "~" siempre se ocultan.
+
+### Pruebas funcionales
+
+web2py viene con un módulo ``gluon.contrib.webclient`` que permite realizar pruebas funcionales (''functional testing'') de aplicaciones locales y remotas de web2py. En realidad, este módulo no es específico de web2py y se puede usar para realizar pruebas e interacción en forma programática con cualquier aplicación web, si bien está preparado para trabajar con sesiones y repuestas de aplicaciones de web2py.
+
+
+He aquí un ejemplo de uso. El programa a continuación crea un cliente, conecta con la acción "index" para establecer una sesión, registra un nuevo usuario, luego cierra la sesión y vuelve a autenticarse usando las nuevas credenciales:
+
+``
+from gluon.contrib.webclient import WebClient
+
+cliente = WebClient('http://127.0.0.1:8000/welcome/default/',
+                    postbacks=True)
+
+cliente.get('index')
+# registro
+datos = dict(first_name = 'Homero',
+             last_name = 'Simpson',
+             email = 'homero@web2py.com',
+             password = 'prueba',
+             password_two = 'prueba',
+             _formname = 'register')
+cliente.post('user/register', data=datos)
+
+# cerrar sesión
+cliente.get('user/logout')
+
+# autenticarse nuevamente
+datos = dict(email='homero@web2py.com',
+             password='prueba',
+             _formname = 'login')
+cliente.post('user/login',data=datos)
+
+# comprobar registro y si el acceso fue exitoso
+cliente.get('index')
+assert('Bienvenido Homero' in cliente.text)
+``:code
+
+El constructor de WebClient toma un prefijo URL como argumento. En el ejemplo ese parámetro es "http://127.0.0.1:8000/welcome/default/". No realiza ningún intercambio de datos en la red. El argumento ``postbacks`` es por defecto ``True`` y le indica al cliente cómo debe manejar las respuestas de web2py.
+
+
+El objeto WebClient ``client`` tiene dos métodos:
+``get`` y ``post``. El primer argumento siempre es un postfijo URL.
+El URL completo para una solicitud POST o GET se compone simplemente concatenando el prefijo y el postfijo. El propósito de esto es simplemente hacer que la sintaxis sea más breve para las comunicaciones intensivas entre el cliente y el servidor.
+
+
+``data`` es un parámetro específico de las solicitudes POST que contiene un diccionario de los datos a enviarse. Los formularios de web2py tienen un campo oculto ``_formname`` y su valor se debe especificar cuando existe más de un formulario en la página. Los formularios de web2py también contienen un campo oculto ``_formkey`` que está diseñado para prevenir los ataques CSRF. Este campo es manejado en forma automática por el WebClient.
+
+
+Tanto ``cliente.get`` como ``cliente.post`` aceptan los siguientes argumentos adicionales:
+- ``headers``: un diccionario de encabezados HTTP opcionales.
+- ``cookies``: un diccionario de cookies opcionales HTTP.
+- ``auth``: un diccionario de parámetros que se deben pasar a ``urllib2.HTTPBasicAuthHandler().add_password(**auth)`` para el acceso por el sistema de autenticación básico (''basic authentication''). Para más información acerca de este tema se puede consultar la documentación de Python para el módulo urllib2.
+
+
+El objeto ``client`` en el ejemplo mantiene una conversación con el servidor especificado en el constructor por medio de solicitudes GET y POST. Este maneja automáticamente las cookie y las envía de regreso para actualizar las sesiones. Si detecta que se ha generado una nueva cookie de sesión aunque se esté usando actualmente otra, interpretará que se produjo una falla en la sesión y genera una excepción. Si el servidor devuelve un error HTTP, también generará una excepción. Si, en cambio, el servidor devuelve un error HTTP, pero además la respuesta contiene un ticket de web2py, devolverá una excepción conteniendo el código del ticket.
+
+
+El objeto client mantiene un registro o ''log'' de las solicitudes en ``cliente.history`` y el estado asociado con la última solicitud exitosa.
+El estado se compone de:
+- ``cliente.status``: el código de estado devuelto
+- ``cliente.text``: el contenido de la página
+- ``cliente.headers``: un diccionario de encabezados recuperados
+- ``cliente.cookies``: un diccionario de los cookie recuperados
+- ``cliente.sessions``: un diccionario de sesiones con la forma ``{nombredeapp: id_sesión}``.
+- ``cliente.forms``: un diccionario de formularios web2py detectados en el ``cliente.text``. El diccionario tiene la forma ``{_formname, _formkey}``.
+
+El objeto WebClient no realiza ningún análisis o conversión del contenido del ``cliente.txt`` devuelto por el servidor pero esto se puede hacer fácilmente con alguno de los módulos de terceros como BeautifulSoup. Por ejemplo, aquí se muestra un programa que demuestra cómo se pueden buscar todos los link en una página descargada por el cliente y comprobarlos:
+
+``
+from BeautifulSoup import BeautifulSoup
+dom = BeautifulSoup(cliente.text)
+for link in dom.findAll('a'):
+    nuevo_cliente = WebClient()
+    nuevo_cliente.get(link.href)
+    print nuevo_cliente.status
+``:code
+
 
 ### Construyendo un web2py minimalista
 
@@ -68,7 +211,7 @@ page = urllib.urlopen('http://www.web2py.com').read()
 
 Esto es usualmente correcto, pero el modulo ``urllib``  no funciona sobre "Google App Engine". Google provee una diferente API para descargar URLs que solamente funciona en GAE. en orden de hacer tu código portable, web2py incluye una función ``fetch`` que funcióna en GAE así mismo en otras instalaciones de Python
 ``
-from google.tools import fetch
+from gluon.tools import fetch
 page = fetch('http://www.web2py.com')
 ``:code
 
@@ -134,7 +277,7 @@ def listar_elementos():
 
 Nota que este código selecciona uno o más item de los que necesita, 20+1. el elemento extra dice a la vista si existe la siguiente página.
 
-Aquí es la vista "default/list_items.html":
+Aquí es la vista "default/listar_elementos.html":
 ``
 {{extend 'layout.html'}}
 
@@ -152,7 +295,7 @@ Aquí es la vista "default/list_items.html":
 {{pass}}
 ``:code
 
-En esta manera podemos obtener la paginación con un sólo "select"  por acción,y que un "select" sólo obtenga una fila más de lo que necesita.
+De esta manera podemos obtener la paginación con un sólo "select"  por acción, y que ese "select" sólo obtenga una fila más de lo que se necesita.
 
 ### httpserver.log y el Formato del archivo de bitácora.
 ``httpserver.log``:inxx
@@ -298,7 +441,7 @@ Una vez que tienes tu llave de la API, puedes aceptar tarjetas de crédito, con 
 from gluon.contrib.stripe import Stripe
 stripe = Stripe(api_key)
 d = stripe.charge(amount=100,
-	      currency='usd',
+    	      currency='usd',
               card_number='4242424242424242',
               card_exp_month='5',
               card_exp_year='2012',
@@ -312,7 +455,7 @@ elif:
 
 La respuesta, ``d``, es un diccionario que puedes explorar tu mismo. El número de tarjeta usado en el ejemplo es un sandbox y siempre será exitoso. Cada transacción está asociada a un identificador almacenado en ``d['id']``.
 
-Stripe también permite verificar una transaccion tiempo después:
+Stripe también permite verificar una transaccion en otro momento:
 
 ``
 d = Stripe(key).check(d['id'])
@@ -325,7 +468,7 @@ r = Stripe(key).refund(d['id'])
 if r.get('refunded',False):
     # el reembolso se realizó con éxito
 elif:
-    # error is in d.get('error','unkown')
+    # error is in d.get('error','unknown')
 ``
 
 Stripe hace sencillo mantener la contabilidad dentro de tu aplicación.
