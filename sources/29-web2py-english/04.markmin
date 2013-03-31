@@ -1214,6 +1214,9 @@ def cache_controller_and_view():
     return response.render(d)
 ``:code
 ``response.render(d)`` returns the rendered view as a string, which is now cached for 5 seconds. This is the best and fastest way of caching.
+------
+We recommend to use @cache.client starting from web2py 2.4.4 
+------
 
 Note, ``time_expire`` is used to compare the current time with the time the requested object was last saved in the cache. It does not affect future requests. This enables ``time_expire`` to be set dynamically when an object is requested rather than being fixed when the object is saved. For example:
 ``
@@ -1249,6 +1252,68 @@ It is also possible to define other caching mechanisms such as memcache. Memcach
 Be careful when caching to remeber that caching is usually at the app-level not at the user level. If you need, for example, to cache user specific content, choose a key that includes the user id.
 ------
 
+#### ``cache.client``
+Web2py by default assumes that the returned content is not going to be cached, as this reduces the shortcomings of an improper caching of the page client-side.
+
+For example, when you show a form to the user, or a list of records, the web page should not be cached, as other users may have inserted new records on the table you are showing.
+
+Instead, if you are showing to the user a wiki page whose content will never change (or it changes once a week), it is useful to store that page, but it is even more useful 
+to tell the client that that page is not going to change.
+
+This is accomplished sending out some specific headers along with the page: when the client's browser receives the content, it is stored in the browser's cache and it will not be requested again
+to your site. Of course this is a **major** speedup for public-facing sites.
+
+Web2py 2.4.4 introduced a new ``cache.client`` decorator to allow a smarter handling of this situation.
+``cache.client`` can be used:
+- for setting smart cache headers
+- to cache the results accordingly
+------
+NB: it will do one or another or **both**.
+------
+The main problem with caching a view with ``@cache(request.env.path_info, time_expire=300, cache_model=cache.ram)`` is that request.env.path_info as a key leads to several problems, e.g.
++ URL vars are not considered
+  -- you cached the result of ''/app/default/index?**search=foo**'' : for the next 300 seconds ''/app/default/index?**search=bar**'' will return the exact same thing of ''/app/default/index?**search=foo**''
++ User is not considered
+  -- you user accesses often a page and you choose to cache it. 
+     However, you cached the result of ''/app/default/index'' using request.env.path_info as the key, so another user
+     will see a page that was not meant for him
+  -- you cached a page for "Bill", but "Bill" accessed the page from the desktop. Now he tries to access it from its phone: if you prepared a template 
+     for mobile users that is different from the standard one, "Joe" will not see it
++ Language is not considered
+  -- when you cache the page, if you use T() for some elements, the page will be stored with a fixed translation
++ Method is not considered
+  -- When you cache a page, you should only cache it if it's a result of a GET operation
++ Status code is not considered
+  -- When you cached the page for the first time, something went wrong and you returned a nice 404 page.
+     You don't want to cache errors ^_^
+
+Instead of letting users write a lot of boilerplate code to take care of all those problems, ``cache.client`` was created.
+It will by default use smart cache headers to let the browser cache the result: if you pass a cache model to it, it will also figure out the best key automatically, 
+so different versions of the same page can be stored and retrieved accordingly (e.g. one for English users and one for Spanish ones)
+
+It takes several parameters, with smart defaults:
+
+- time_expire : the usual, defaults to 300 seconds
+- cache_model : by default is None. This means that @cache.client will **only** alter the default headers to let the client's browser cache the content
+    -- if you pass, e.g., ``cache.ram``, the result will be stored in the cache as well
+- prefix : if you want to prefix the auto-generated key (useful for clearing it later with, e.g. ``cache.ram.clear(prefix*)``)
+- session : if you want to consider the session, defaults to False
+- vars : if you want to consider URL vars, defaults to True
+- lang : if you want to consider the language, defaults to True
+- user_agent : if you want to consider the user agent, defaults to False
+- public : if you want the same page for all the users that will ever access it, defaults to True
+- valid_statuses : defaults to None. cache.client will cache only pages requested with a GET method, whose status codes begin with 1,2 or 3. 
+  You can pass a list of status codes (when you want pages to be cached with those statuses, e.g. status_codes=[200] will cache only pages
+  that resulted in a 200 status code) 
+- quick : defaults to None, but you can pass a list of initials to set a particular feature:
+  -- **S**ession, **V**ars, **L**ang, **U**ser_agent, **P**ublic
+     e.g. ``@cache.client(time_expire=300, cache_model=cache.ram, quick='SVP')`` is the same as
+     ``@cache.client(time_expire=300, cache_model=cache.ram, session=True, vars=True, public=True)``
+
+"Consider" means for e.g. **vars**, that you want to cache different pages if **vars** are different, 
+so  ''/app/default/index?**search=foo**'' will not be the same one for ''/app/default/index?**search=bar**''
+Some settings override others, so, e.g., if you set ``session=True, public=True`` the latter will be discarded.
+Use them wisely!
 
 ### ``URL``
 ``URL``:inxx
