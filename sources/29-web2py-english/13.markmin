@@ -1623,11 +1623,11 @@ Once your image is deployed you can login into it as a normal VPS and you can ma
 
 It is possible to run web2py code on Google App Engine (GAE)``gae``:cite , including DAL code.
 
-GAE supports two versions of Python: 2.5 (default) and 2.7 (beta). web2y supports both but uses 2.5 by default (this may change in the future). Look into the "app.yaml" file described below for configuration details.
+GAE supports two versions of Python: 2.5 and 2.7. web2y supports both but uses 2.5 by default (this may change in the future). Look into the "app.yaml" file described below for configuration details.
 
 GAE also supports a Google SQL database (compatible with MySQL) and a Google NoSQL (referred to as "Datastore").
 
-web2py supports both. If you wish to use Google SQL database follow the instructions on Chapter 6. This section assumes you will be using the Google Datastore.
+web2py supports both, and indeed, can connect to both at the same time, using the connection strings detailed in Chapter 6.
 
 The GAE platform provides several advantages over normal hosting solutions:
 
@@ -1638,20 +1638,18 @@ The GAE platform provides several advantages over normal hosting solutions:
 But also some disadvantages:
 - No read or write access to the file system.
 - No HTTPS unless you use the ``appspot.com`` domain with a Google certificate.
+- Not all Python libraries are supported (scipy is a notable non-supported library at the time of writing).
 
-and some Datastore specific disadvantages:
+While Google Cloud SQL is a regular mysql database, Google Datastore has some specific disadvantages:
 
-- No typical transactions.
+- No typical transactions; ''eventual consistency'' rather than strong consistency for queries.
 - No complex datastore queries. In particular there are no ``JOIN``, ``LIKE``, and ``DATE/DATETIME`` operators.
 - No multiple ``OR`` sub-queries unless they involve one and the same field.
-
-
-Because of the read-only filesystem, web2py cannot store sessions, error tickets, cache files and uploaded files in the filesystem; they must be stored in the datastore and not in the filesystem.
 
 Here we provide a quick overview of GAE and we focus on web2py specific issues, we refer you to the official GAE documentation online for details.
 
 -----
-Attention: At the time of writing, GAE supports only Python 2.5. Any other version will cause problems. You also must run the web2py source distribution, not a binary distribution.
+Attention: You must run the web2py source distribution, not a binary distribution.
 -----
 
 #### Configuration
@@ -1814,9 +1812,50 @@ Notice that on GAE cache.ram and cache.disk should not be used, so we make them 
 
 #### Datastore issues
 
-The absence of multi-entity transactions and typical functionalities of relational databases are what sets GAE apart from other hosting environment. This is the price to pay for high scalability. GAE is an excellent platform if these limitations are tolerable; if not, then a regular hosting platform with a relational database should be considered instead.
+While the Google Clould SQL functions as a regular SQL database, and is indeed based at the time of writing on mysql, Google Datastore presents significant differences. 
 
-If a web2py application does not run on GAE, it is because of one of the limitations discussed above. Most issues can be resolved by removing JOINs from web2py queries and de-normalizing the database.
+##### Eventual consistency
+
+The ''eventual consistency'' offered by Google Datastore deserves special attention. 
+In the Datastore, transactions that rely on primary Datastore keys, or a shared entity group, offer a strong consistency: every subsequent transaction or query will see the result of any prior transaction for the same key or entity group.
+On the other hand, queries that do not rely on primary keys or shared entity groups offer only ''eventual consistency'': new or modified data will be eventually made available to queries, after an unspecified delay that is typically up to a few seconds. 
+
+web2py does not rely on primary Datastore keys, nor shared entity groups.  The statement:
+
+``
+id = db.table.insert(field1=value1, field2=value2)
+``:code
+
+has the following effect:
+- A new row is inserted in the table ``db.table``; the row has a field ``id`` whose value is assigned by web2py.  The row also has a primary Datastore key, but this primary key is ''not'' ``id``, and is not exposed.
+- The indices on ``db.table`` are updated.  In particular, the index over ``id`` is updated, so the new row is ''eventually'' available to queries over ``db.table.id``. 
+Only after these two steps terminate, is the new data available for queries by ``id``. 
+In particular, the following common web2py paradigm will ''fail'':
+
+``
+def insert():
+    form = SQLFORM(db.table)
+    if form.process().accepted:
+        session.flash = T('The data has been inserted.')
+        redirect(URL('view', args=[form.vars.id]))
+    return dict(form=form)
+
+def view():
+    row = db.table(request.args(0))
+    if row is None:
+        session.flash = T('Data not found')
+        redirect(URL(index))
+    form = SQLFORM(db.table, record=row, readonly=True)
+    return dict(form=form)
+``:code
+
+Once a user visits the ``insert`` page and inserts data, the user is redirected to the ``view`` page. When using the Google Datastore, often the data just inserted is not found in the ``view`` controller.  Why?
+
+What happens is this.  In the ``insert`` controller, the data is inserted in the database, and the transaction is completed.  Then, asynchronously and after the transaction completes, Google Datastore rebuilds the indices, including the index on the ``id`` field of ``db.table``.  When the user accesses the ``view`` controller, there is no guarantee that the index on ``db.table.id`` already includes the new data item, and thus, the user is often presented with the "Data not found" message.
+
+##### Lack of JOINs
+
+The lack of JOIN operations and typical relational functionality of the Datastore requires removing JOINs from web2py queries and de-normalizing the database.
 
 Google App Engine supports some special field types, such as ``ListProperty`` and ``StringListProperty``. You can use these types with web2py using the following old syntax:
 
@@ -1840,6 +1879,28 @@ In both cases the "tags" field is a ``StringListProperty`` therefore its values 
 Similarly, web2py supports ``list:integer`` and ``list:reference`` which map into a ``ListProperty(int)``.
 
 ``list`` types are discussed in more detail in Chapter 6.
+
+#### Database migrations
+
+A good practice for migrations using Google AppEngine is the following.  
+AppEngine supports multiple code versions. 
+Use one code version (e.g., version 1) for the user-visible site, and another code version (e.g., version 2) for the admin code.  In ``app.yaml`` for version 2, declare the handler as follows (assuming Python 2.7 is used):
+
+``
+- url: .*
+  script: gaehandler.wsgiapp    # WSGI (Python 2.7 only)
+  secure: optional
+  login: admin
+``:code
+
+The ``login: admin`` clause ensures that only admins can use version 2.
+In the database connection string, specify ``migrate_enabled=False``. 
+To perform a migration, it is best to disable database access concurrent to the migration.
+Proceed as follows:
+- Add a file named ``DISABLED`` to the top directory of your version 1 application (the parent directory of the ``/controllers``, ``/views``, etc. directories), and upload the new version to GAE. This will disable version 1, and display a message ''"The site is temporarily down for maintenance"''. 
+- Upload to version 2 code with ``migrate_enabled=True`` in the db connection string, and visit it from an admin account, triggering the migration.
+- Upload to version 2 code with ``migrate_enabled=False``, to disable further migrations.
+- Remove the file named ``DISABLED`` from version 1, and upload the code to version 1.  This makes the site again visible to all.
 
 #### GAE and https
 
