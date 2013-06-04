@@ -40,6 +40,15 @@
 'First name': 'Primeiro nome',
 'Forms and Validators': 'Formulários e Validadores',
 'Free Applications': 'Applicações Livres',
+=======
+'Edit This App': 'Editar Esta Aplicação',
+'Edit current record': 'Editar o registro atual',
+'Errors': 'Errors',
+'FAQ': 'FAQ',
+'First name': 'First name',
+'Forms and Validators': 'Formulários e Validadores',
+'Free Applications': 'Free Applications',
+>>>>>>> 7f24c01f622f05d3c0e0161cd1a90f384a3bada1
 'Group ID': 'Group ID',
 'Groups': 'Grupos',
 'Hello World': 'Olá Mundo',
