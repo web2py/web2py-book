@@ -1330,7 +1330,7 @@ for item in html.components: print item
 
 #### ``flatten``
 
-Metoda flatten recurzivně serializuje obsah prvku na obyčejný text (bez tagů):
+Metoda flatten rekurzivně serializuje obsah prvku na obyčejný text (bez tagů):
 ``
 >>> a = DIV(SPAN('this', DIV('is', B('a'))), SPAN('test'))
 >>> print a.flatten()
@@ -1360,17 +1360,17 @@ TAG objekt může sloužit současně jako XML/HTML parser. Může číst text a
 <h1>Title</h1><p>tohle je <span>TEST</span></p>
 ``:code
 
-### Page layout
+### Vzhled stránky
 ``page layout``:inxx ``layout.html``:inxx ``extent``:inxx ``include``:inxx
 
-Views can extend and include other views in a tree-like structure.
+Pohledy mohou doplňovat/rozšiřovat (extend) jiné pohledy (být vkládány do nich) a podobně mohou jiné pohledy obsahovat (include), celkově tedy může být vytvářena stromová hierarchie pohledů.
 
-For example, we can think of a view "index.html" that extends "layout.html" and includes "body.html".
-At the same time,  "layout.html" may include "header.html" and "footer.html".
+Například můžeme mít pohled "index.html", který rozšiřuje (vkládá se do) "layout.html" a sám obsahuje (vkládá) "body.html".
+Současně "layout.html" může vkládat "header.html" a "footer.html".
 
-The root of the tree is what we call a layout view.  Just like any other HTML template file, you can edit it using the web2py administrative interface. The file name "layout.html" is just a convention.
+Kořenem stromu je to, co označujeme "layout view". Stejně jako všechny HTML šablony (pohledy) ho můžete (kromě jiných editorů) editovat ve webovém administračním rozhraní frameworku. Jméno souboru "layout.html" je jen konvence.
 
-Here is a minimalist page that extends the "layout.html" view and includes the "page.html" view:
+Tady je minimalistická stránka, která rozšiřuje "layout.html" view a sama vkládá view "page.html":
 
 ``
 {{extend 'layout.html'}}
@@ -1378,11 +1378,11 @@ Here is a minimalist page that extends the "layout.html" view and includes the "
 {{include 'page.html'}}
 ``:code
 
-The extended layout file must contain an ``{{include}}`` directive, something like:
+Soubor, na nějž odkazujeme pomocí ``extend``, musí někde obsahovat ``{{include}}`` direktivu, například:
 ``
 <html>
   <head>
-    <title>Page Title</title>
+    <title>Titulek stránky</title>
   </head>
   <body>
     {{include}}
@@ -1390,21 +1390,22 @@ The extended layout file must contain an ``{{include}}`` directive, something li
 </html>
 ``:code
 
-When the view is called, the extended (layout) view is loaded, and the calling view replaces the ``{{include}}`` directive inside the layout. Processing continues recursively until all ``extend`` and ``include`` directives have been processed. The resulting template is then translated into Python code. Note, when an application is bytecode compiled, it is this Python code that is compiled, not the original view files themselves. So, the bytecode compiled version of a given view is a single .pyc file that includes the Python code not just for the original view file, but for its entire tree of extended and included views.
+Po zavolání pohledu se načte extended (layout) view (rámcové view, do nějž má být první view vlloženo) a první view v něm nahradí ``{{include}}`` direktivu (rozvine se na jejím místě). Zpracování bude probíhat rekurzivně, dokud nebudou všechny ``extend`` a ``include`` direktivy nahrazeny. Poté bude výsledná šablona přeložena do Pythonu.
+Poznamenejme, že jestliže aplikaci bytecode kompilujete, je kompilován výsledný kód Pythonu, nikoli originální soubory pohledů. Proto bytecode kompilovanou verzí konkrétního view je jednoduchý .pyc soubor, který obsahuje Python kód nejen pro původní view, ale pro celou hierarchii (strom) odkazovaných extended a included pohledů.
 
 -------
-``extend``, ``include``, ``block`` and ``super`` are special template directives,
-not Python commands.
+``extend``, ``include``, ``block`` a ``super`` jsou speciální direktivy šablon,
+nikoli příkazy Pythonu.
 -------
 
-Any content or code that precedes the ``{{extend ...}}`` directive will be inserted (and therefore executed) before the beginning of the extended view's content/code. Although this is not typically used to insert actual HTML content before the extended view's content, it can be useful as a means to define variables or functions that you want to make available to the extended view. For example, consider a view "index.html":
+Veškerý obsah, který předchází ``{{extend ...}}`` direktivu, se vloží (a proto i vykoná) před vložením obsahu rozšiřujícího (extended) pohledu. Ačkoli toho typicky nevyužijete pro vkládání HTML obsahu, můžete to využít k nadefinování proměnných, které budou k dispozici a budou řídit rozšiřující šablonu. Například view "index.html" může vypadat takto:
 ``
 {{sidebar_enabled=True}}
 {{extend 'layout.html'}}
 <h1>Home Page</h1>
 ``:code
 
-and an excerpt from "layout.html":
+a "layout.html":
 ``
 {{if sidebar_enabled:}}
     <div id="sidebar">
@@ -1413,13 +1414,13 @@ and an excerpt from "layout.html":
 {{pass}}
 ``:code
 
-Because the ``sidebar_enabled`` assignment in "index.html" comes before the ``extend``, that line gets inserted before the beginning of "layout.html", making ``sidebar_enabled`` available anywhere within the "layout.html" code (a somewhat more sophisticated version of this is used in the **welcome** app).
+Protože přiřazení do ``sidebar_enabled`` proměnné v "index.html" předchází ``extend``, vloží se tento řádek před začátek "layout.html" a ``sidebar_enabled`` proměnná bude dostupná všude v "layout.html" kódu (o něco sofistikovanější verze tohoto mechanismu je použita ve **welcome** aplikaci).
 
-It is also worth pointing out that the variables returned by the controller function are available not only in the function's main view, but in all of its extended and included views as well.
+Poznamenejme také, že proměnné, které vrátila funkce kontroléru, jsou k dispozici nejen v pohledu, příslušném k oné akci, ale i ve všech pohlededch, které rozšiřuje nebo vkládá (extends/includes).
 
-The argument of an ``extend`` or ``include`` (i.e., the extended or included view name) can be a python variable (though not a python expression). However, this imposes a limitation -- views that use variables in ``extend`` or ``include`` statements cannot be bytecode compiled. As noted above, bytecode-compiled views include the entire tree of extended and included views, so the specific extended and included views must be known at compile time, which is not possible if the view names are variables (whose values are not determined until run time). Because bytecode compiling views can provide a significant speed boost, using variables in ``extend`` and ``include`` should generally be avoided if possible.
+Parametrem ``extend`` a ``include`` (tj. jménem view, na které se odkazujeme)může být i proměnná (ne však výraz). Má to ale negativní důsledek. Je-li proměnná na místě odkazovaného pohledu použita, nemůže být takový pohled byte-kompilován. To proto, že, jak jsme již zmínili, byte-kompilované pohledy obsahují kompletní strom (hierarchii) odkazovaných view - a ta není známa, jestliže jméno view teprve předáme pomocí proměnné během runtime. Protože kompilované pohledy znamenají obvykle značný nárůst rychlosti odezvy, měli bychom si použití proměnných v ``extend`` a ``include`` příkazech spíše odpoustit.
 
-In some cases, an alternative to using a variable in an ``include`` is simply to place regular ``{{include ...}}`` directives inside an ``if...else`` block.
+V mnoha případech je alternativou k použití proměnné v příkazu ``include`` umístění obyčejného ``{{include ...}}`` do ``if...else`` bloku.
 
 ``
 {{if some_condition:}}
@@ -1429,13 +1430,13 @@ In some cases, an alternative to using a variable in an ``include`` is simply to
 {{pass}}
 ``:code
 
-The above code does not present any problem for bytecode compilation because no variables are involved. Note, however, that the bytecode compiled view will actually include the Python code for both "this_view.html" and "that_view.html", though only the code for one of those views will be executed, depending on the value of ``some_condition``.
+Takový kód není pro bytecode kompilaci žádnou překážkou, protože proměnné v direktivách neobsahuje. Nicméně kompilace zahrne obě view, přestože při běhu programu bude použito jen jedno z nich - podle hodnoty``some_condition``.
 
-Keep in mind, this only works for ``include`` -- you cannot place ``{{extend ...}}`` directives inside ``if...else`` blocks.
+Pamatujte, že toto pracuje právě jen pro ``include`` -- nemůžete umísťovat ``{{extend ...}}`` direktivy do ``if...else`` bloků.
 
 ``response.menu``:inxx ``menu``:inxx ``response.meta``:inxx ``meta``:inxx
 
-Layouts are used to encapsulate page commonality (headers, footers, menus), and though they are not mandatory, they will make your application easier to write and maintain.  In particular, we suggest writing layouts that take advantage of the following variables that can be set in the controller. Using these well known variables will help make your layouts interchangeable:
+Rámcové pohledy (layouts) se používají pro společnou funkcionalitu všech stránek webu (hlavičky, zápatí, menu) a proto jsou důležité - umožňují vaši aplikaci snáze napsat a udržovat. Konkrétně doporučujeme psát rámcové pohledy (layouts) pro následující proměnné, které můžete v kontroléru nastavit. Výběr právě této sady proměnných vám pomůže, aby více vámi připravených rámcových pohledů bylo vzájemně zaměnitelných:
 ``
 response.title
 response.subtitle
@@ -1447,31 +1448,35 @@ response.menu
 response.files
 ``:code
 
-Except for ``menu`` and ``files``, these are all strings and their meaning should be obvious.
+S výjimkou ``menu`` a ``files`` jsou to všechno řetězce a jejich význam je jasný.
 
-``response.menu`` menu is a list of 3-tuples or 4-tuples. The three elements are: the link name, a boolean representing whether the link is active (is the current link), and the URL of the linked page. For example:
+``response.menu`` je seznam vektorů (tuples), a sice trojic nebo čtveřic. Jednotivé prvky vektoru jsou:
++ Popis položky menu,
++ True/False podle toho, zda odkaz je právě aktivní (zda je to aktuální odkaz),
++ URL odkazované stránky.
+Například:
 ``
 response.menu = [('Google', False, 'http://www.google.com',[]),
                  ('Index',  True,  URL('index'), [])]
 ``:code
 
 ``sub-menu``:inxx
-The fourth tuple element is an optional sub-menu.
+Čtvrtý prvek vektoru je případné sub-menu (podřízené menu).
 
-``response.files`` is a list of CSS and JS files that are needed by your page.
+``response.files`` je seznam CSS a JS souborů, které vaše stránka potřebuje.
 
-We also recommend that you use:
+Dále doporučujeme, abyste v HTML hlavičce použili:
 
 ``
 {{include 'web2py_ajax.html'}}
 ``:code
 
-in the HTML head, since this will include the jQuery libraries and define some backward-compatible JavaScript functions for special effects and Ajax. "web2py_ajax.html" includes the ``response.meta`` tags in the view, jQuery base, the calendar datepicker, and all required CSS and JS ``response.files``.
+protože tím připojíte jQuery knihovny a definujete některé javascriptové funkce pro speciální efekty a Ajax. "web2py_ajax.html" sestaví ``response.meta`` tagy hlavičky, připojí jQuery, kalendář pro výběr data, a všechny potřebné CSS a JS ``response.files`` soubory.
 
-#### Default page layout
+#### Defaultní rámcový vzhled (page layout)
 ``superfish``:inxx ``ez.css``:inxx
 
-Below is the "views/layout.html" that ships with the web2py scaffolding application **welcome** (stripped down of some optional parts). Any new application will have a similar default layout:
+Tady je defaultní "views/layout.html", které dodáváme se vzorovou aplikací **welcome** (přičemž podle verze web2py se soubor může poněkud lišit). Každá nově založená aplikace bude mít takovýto rámcový vzhled (který se uplatní, pokud jej ponecháte a pokud vaše pohledy na něj budou odkazovat pomocí ``extend``):
 
 ``
 <!DOCTYPE html>
@@ -1499,7 +1504,7 @@ Below is the "views/layout.html" that ships with the web2py scaffolding applicat
   </script>
 
   {{
-  # using sidebars need to know what sidebar you want to use
+  # pro použití sidebarů ve vašem pohledu nejprve zadejte, který chcete použít
   left_sidebar_enabled = globals().get('left_sidebar_enabled',False)
   right_sidebar_enabled = globals().get('right_sidebar_enabled',False)
   middle_columns = {0:'sixteen',1:'twelve',2:'eight'}[
@@ -1601,44 +1606,43 @@ Below is the "views/layout.html" that ships with the web2py scaffolding applicat
 
 ``:code
 
-There are a few features of this default layout that make it very easy to use and customize:
+Tento Layout má některé vlastnosti, díky kterým je velmi snadno použitelný a přizpůsobitelný:
 
-- It is written in HTML5 and uses the "modernizr" ``modernizr``:cite library for backward compatibility. The actual layout include some extra conditional statements required by IE and they are omitted for brevity.
-- It displays both ``response.title`` and ``response.subtitle`` which can be set in a model. If they are not set, it adopts the application name as title
-- It includes the ``web2py_ajax.html`` file in the header which generated all the link and script import statements.
-- It uses a modified version of "skeleton" ``skeleton``:cite a library for flexible layouts which works on mobile devices and re-arranges columns to fit small screened.
-- It uses "superfish.js" for dynamic cascading menus. There is an explicit script to activate the superfish cascading menu and it can be removed if not necessary.
-- The ``{{=auth.navbar(...)}}`` displays a welcome to the current user and links to auth functions like login, logout, register, change password, etc. depending on context. It is a helper factory and its output can be manipulated as any other helper. It is placed in a ``{{try:}}...{{except:pass}}`` in case auth is undefined.
-- The ``{{=MENU(response.menu)`` displays the menu structure as ``<ul>...</ul>``.
-- ``{{include}}`` is replaced by the content of the extending view when the page is rendered.
-- By default it uses a conditional three column (the left and right sidebars can be turned off by the extending views)
-- It uses the following classes: header, main, footer
-- It contains the following blocks: statusbar, left_sidebar, center, right_sidebar, footer.
+- Je napsán v HTML5 a používá "modernizr" ``modernizr``:cite knihovnu pro zpětnou kompatibilitu. Obsahuje několik podmíněných příkazů (které jsme zde pro zjednodušení vynechali) pro přijatelnou činnost Microsoft IE.
+- Zobrazuje ``response.title`` a ``response.subtitle``, které můžete nastavit v modelu (např. v menu.py). Není-li ``response.title`` nastaveno, zobrazuje jméno aplikace.
+- Vkládá ``web2py_ajax.html``, které připojí všechny výše zmíněné odkazy a skripty.
+- Obsahuje upravenou verzi "skeleton" knihovny ``skeleton``:cite Je to knihovna pro flexibilní vzhled, která pracuje na mobilních zařízeních a aranžuje sloupce tak, aby byly dobře čitelné na malém displayi.
+- Používá "superfish.js" pro dynamická kaskádová menu. Explicitní skript pro aktivaci superfish kaskádových menu může být odstraněn, pokud není potřeba.
+- ``{{=auth.navbar(...)}}`` zobrazuje přivítání aktuálního uživatele a odkazy na funkce objektu auth, jako jsou login, logout, register, change password, apod., zobrazené odkazy se mění podle kontextu. Jedná se o helper a proto můžete s jeho prvky manipulovat stejně, jak bylo popsáno u helperů. Je umístěn do ``{{try:}}...{{except:pass}}`` struktury pro případ, že byste objekt auth nedefinovali.
+- ``{{=MENU(response.menu)`` zobrazuje strom menu pomocí ``<ul>...</ul>``.
+- ``{{include}}`` se nahradí obsahem pohledu (view), které odpovídá právě prováděné akci a kontroléru (pokud obsahuje ``extend 'layout.html'``).
+- Připravuje 3-sloupcový design s tím, že zobrazení levého a pravého sidebaru můžete řídit nastavením odpovídajících proměnných ve vašem pohledu před zavoláním direktivy ``extend``
+- Používá následující třídy: header, main, footer
+- Obsahuje následující bloky: statusbar, left_sidebar, center, right_sidebar, footer.
 
-Views can turn on and fill sidebars as follows:
+Pohled tedy může zapínat a plnit sidebary takto:
 
 ``
 {{left_sidebar_enable=True}}
 {{extend 'layout.html'}}
 
-This text goes in center
+Tohle přijde doprostřed.
 
 {{block left_sidebar}}
-This text goes in sidebar
+A tohle přijde do sidebaru.
 {{end}}
 ``:code
 
-#### Customizing the default layout
+#### Přizpůsobení (customizace) defaultního layoutu
 
 ``CSS``:inxx
 
-Customizing the default layout without editing is very easy because the CSS files are documented:
+Přizpůsobení defaultního layoutu bez editace je snadné, protože CSS soubory jsou dokumentované:
 
-- "bootstrap.min.css" contains the Twitter Boostrap CSS style ``Bootstrap``:inxx
-- "web2py.css" contains web2py specific styles
+- "bootstrap.min.css" obsahuje Twitter Boostrap CSS styl ``Bootstrap``:inxx
+- "web2py.css" obsahuje styly specificky definované pro web2py
 
-To change colors and background images, 
-try append the following code to layout.html header:
+Např. pro změnu barev a obrázku pozadí zkuste vložit následující kód do layout.html hlavičky:
 
 ``
 <style>
@@ -1652,13 +1656,13 @@ a { color: #349C01; }
 </style>
 ``:code
 
-Of course you can also completely replace the "layout.html" and "web2py.css" files with your own.
+Samozřejmě můžete "layout.html" a "web2py.css" soubory úplně zaměnit jakýmikoli svými.
 
-#### Mobile development
+#### Vývoj pro mobilní zařízení
 
-The default layout.html is designed to be friendly to mobile devices but that is not enough. One may need to use different views when a page is visited by a mobile device.
+Defaultní layout.html je vytvořen, aby dobře spolupracoval s mobilními zařízeními. Ale to není dostatečné. Může být potřebné nebo vhodné použít jinou variantu pohledů, pokud je stránka navštívena z mobilního zařízení.
 
-To make developing for desktop and mobile devices easier, web2py includes the ``@mobilize`` decorator. This decorator is applied to actions that should have a normal view and a mobile view. This is demonstrated here:
+Pro usnadnění vývoje pro desktop a pro mobilní zařízení obsahuje web2py dekorátor ``@mobilize``. Tento dekorátor slouží pro akce (funkce kontroléru), které mají mít normální a navíc mobilní pohled. Tady je příklad:
 
 ``
 from gluon.contrib.user_agent_parser import mobilize 
@@ -1667,21 +1671,21 @@ def index():
    return dict()
 ``
 
-Notice that the decorator must be important once before using it in a controller.
-When the "index" function is called from a regular browser (desktop computer), web2py will render the returned dictionary using the view "[controller]/index.html". However, when it is called by a mobile device, the dictionary will be rendered by "[controller]/index.mobile.html". Notice that mobile views have the "mobile.html" extension.
+Všimněte si, že tento dekorátor je potřeba na začátku souboru kontroléru explicitně importovat.
+Je-li akce "index" zavolána z normálního prohlížeče (z desktop počítače), web2py bude renderovat výsledný slovník (dictionary) pomocí pohledu "[controller]/index.html". Ale pokud akci zavolá mobilní zařízení, slovník bude renderován pomocí "[controller]/index.mobile.html". Mobile pohledy tedy mají příponu "mobile.html".
 
-Alternatively you can apply the following logic to make all views mobile friendly:
+Alternativně můžete pro všechny pohledy aktivovat jejich mobilní varianty (např. v modelu):
 
 ``
 if request.user_agent().is_mobile:
     response.view.replace('.html','.mobile.html')
 ``
 
-The task of creating the "*.mobile.html" views is left to the developer but we strongly suggest using the "jQuery Mobile" plugin which makes the task very easy.
+Jak vytvoříte "*.mobile.html" pohledy ponecháváme na vás jako vývojáři. Ale velmi doporučujeme použít "jQuery Mobile" plugin, který vám velmi pomůže.
 
-### Functions in views
+### Funkce v pohledech
 
-Consider this "layout.html":
+Předpokládejme takovýto "layout.html":
 
 ``
 <html>
@@ -1689,46 +1693,46 @@ Consider this "layout.html":
     {{include}}
     <div class="sidebar">
       {{if 'mysidebar' in globals():}}{{mysidebar()}}{{else:}}
-        my default sidebar
+        můj defaultní sidebar
       {{pass}}
     </div>
   </body>
 </html>
 ``:code
 
-and this extending view
+a tento pohled
 
 ``
 {{def mysidebar():}}
-my new sidebar!!!
+můj nový sidebar !!!
 {{return}}
 {{extend 'layout.html'}}
 Hello World!!!
 ``:code
 
-Notice the function is defined before the ``{{extend...}}`` statement -- this results in the function being created before the "layout.html" code is executed, so the function can be called anywhere within "layout.html", even before the ``{{include}}``. Also notice the function is included in the extended view without the ``=`` prefix.
+Všimněte si, že funkce je definována před voláním ``{{extend...}}`` direktivy -- to způsobí, že funkce je vytvořena před vykonáním kódu z "layout.html", takže může kdekoli v něm být zavolána, a to i před ``{{include}}``. Také si všimněte, že volání funkce je vloženo bez použití ``=`` prefixu.
 
-The code generates the following output:
+Kód bude generovat následující výstup:
 
 ``
 <html>
   <body>
     Hello World!!!
     <div class="sidebar">
-        my new sidebar!!!
+        můj nový sidebar !!!
     </div>
   </body>
 </html>
 ``:code
 
-Notice that the function is defined in HTML (although it could also contain Python code) so that ``response.write`` is used to write its content (the function does not return the content). This is why the layout calls the view function using ``{{mysidebar()}}`` rather than ``{{=mysidebar()}}``. Functions defined in this way can take arguments.
+Všimněte si, že funkce je definována pomocí HTML (ačkoli Python kód by mohla obsahovat), takže do výstupu se její obsah přepíše pomocí ``response.write`` (samotná funkce nevrací žádný obsah). Právě proto Layout volá tuto funkci pomocí  ``{{mysidebar()}}`` místo pomocí ``{{=mysidebar()}}``. Tímto způsobem definované funkce také mohou mít parametry.
 
-### Blocks in views
+### Bloky v pohledech
 ``block``:inxx
 
-Another way to make a view more modular is by using ``{{block...}}s`` and this mechanism is an alternative to the mechanism discussed in the previous section.
+Jiný způsob, jak udělat pohled více modulární, je použitím ``{{block...}}`` a tento mechanismus je jinou alternativou k dosud popsaným postupům.
 
-Consider this "layout.html":
+Předpokládejme takovýto "layout.html":
 
 ``
 <html>
@@ -1736,62 +1740,63 @@ Consider this "layout.html":
     {{include}}
     <div class="sidebar">
       {{block mysidebar}}
-        my default sidebar
+        můj defaultní sidebar
       {{end}}
     </div>
   </body>
 </html>
 ``:code
 
-and this extending view
+a pohled:
 
 ``
 {{extend 'layout.html'}}
 Hello World!!!
 {{block mysidebar}}
-my new sidebar!!!
+  můj nový sidebar !!!
 {{end}}
 ``:code
 
-It generates the following output:
+To bude generovat následující výstup:
 
 ``
 <html>
   <body>
     Hello World!!!
     <div class="sidebar">
-        my new sidebar!!!
+        můj nový sidebar !!!
     </div>
   </body>
 </html>
 ``:code
 
-You can have many blocks, and if a block is present in the extended view but not in the extending view, the content of the extended view is used. Also, notice that unlike with functions, it is not necessary to define blocks before the ``{{extend ...}}`` -- even if defined after the ``extend``, they can be used to make substitutions anywhere in the extended view.
+Počet bloků není omezen.
+Jestliže blok zapíšete jen do jednoho z pohledů, ale ve druhém stejnojmenný blok chybí, vypíše se i tak obsah bloku.
+Poznamenejme také, že na rozdíl od funkcí není nutné bloky definovat před ``{{extend ...}}`` -- bez ohledu na pořadí použití exclude/include a block direktiv mohou bloky provádět záměnu obsahu kdekoli.
 
 ``super``:inxx
 
-Inside a block, you can use the expression ``{{super}}`` to include the content of the parent. For example, if we replace the above extending view with:
+Uvnitř bloku můžete ještě uvést ``{{super}}`` pro zdědění - zařazení obsahu obecné varianty bloku (rodiče). Například když pohled změníme takto:
 
 ``
 {{extend 'layout.html'}}
 Hello World!!!
 {{block mysidebar}}
 {{super}}
-my new sidebar!!!
+  můj nový sidebar !!!
 {{end}}
 ``:code
 
-we get:
+tak dostaneme výstup:
 
 ``
 <html>
   <body>
     Hello World!!!
     <div class="sidebar">
-        my default sidebar
-        my new sidebar!!!
+        můj defaultní sidebar
+        můj nový sidebar !!!
     </div>
   </body>
 </html>
 ``:code
-
