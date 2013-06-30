@@ -1,0 +1,665 @@
+## Otras Recetas
+
+### Upgrade
+``upgrades``:inxx
+
+En la página de la interfaz administrativa "site" existe un botón "upgrade now" (actualice la versión ahora). En caso de que no esté disponible o no funcione (por ejemplo por un problema de bloqueo de un archivo), actualizar web2py manualmente es muy fácil.
+
+-------
+Simplemente descomprime la última versión de web2py sobre la vieja instalación.
+-------
+
+Esto actualizará todas las librerías así como también las aplicaciones **admin**, **examples**, **welcome**.  Además creará un nuevo archivo vacío "NEWINSTALL". Al reiniciar, web2py eliminará los archivos vacíos y empaquetará la aplicación "welcome" en "welcome.w2p". Esta última aplicación se usará como punto de partida para nuevas aplicaciones.
+web2py no actualiza ningún otro archivo existente en otra aplicación.
+
+### Cómo distribuir tus aplicaciones como archivos binarios
+
+Es posible empaquetar tus aplicaciones con la distribución binaria de web2py y distribuirlas juntas. La licencia lo permite, siempre y cuando dejes claro en la licencia de tu aplicación que estás agregando web2py y añadas un enlace a ``web2py.com``.
+
+Aquí explicamos los pasos necesarios para la distribución de Windows:
+
+- Crea tu aplicación como usualmente lo haces.
+- Con la app **admin**, crea una compilación en bytecode de tu aplicación (un clic)
+- También en **admin**, empaqueta la aplicación compilada, (otro clic)
+- Crea una carpeta "miapp"
+- Descarga una distribución binaria para Windows de web2py
+- Descomprime la distribución en la carpeta "miapp" y ejecútala (dos clic)
+- Usando **admin** sube la app compilada empaquetada previamente asignándole el nombre "init" (un clic)
+- Crea un archivo "miapp/start.bat" que contenga "cd web2py; web2py.exe"
+- Crea un archivo "miapp/license" que contenga la licencia de tu app y asegúrate de que la licencia contenga la aclaración "se distribuye en conjunto con una copia sin modificaciones de web2py, obtenida en web2py.com"
+- Comprime la carpeta miapp en un archivo "miapp.zip"
+- Distribuye y/o vende "miapp.zip"
+
+Cuando los usuarios descompriman "miapp.zip" y hagan clic en "run", verán tu aplicación en lugar de la aplicación "welcome".
+No hay requerimientos del lado del usuario, tampoco es necesario Python preinstalado.
+
+Para la distribución binaria en Mac el proceso es el mismo pero no hay necesidad de crear el archivo "bat".
+
+
+### WingIDE, Rad2Py, y Eclipse
+
+``WingIDE``:inxx ``Eclipse``:inxx ``Rad2Py``:inxx
+
+Puedes usar web2py con entornos de desarrollo de terceros como WingIDE, Rad2Py, y Eclipse.
+
+He aquí una captura de pantalla que ilustra el uso de web2py con WingIDE:
+
+[[imagen @///image/wingide.png center 480px]]
+
+En general, el problema con estos IDE (salvo el caso de Rad2Py que fue diseñado específicamente para que funciones con web2py) es que no entienden el contexto en que los modelos y controladores se ejecutan y por lo tanto la autocompleción no funciona en forma instantánea.
+
+Para que la autocompleción funcione el truco normalmente consiste en editar tus modelos y controladores agregando el siguiente código:
+
+``
+if False:
+    from gluon import *
+    request = current.request
+    response = current.response
+    session = current.session
+    cache = current.cache
+    T = current.T
+``:code
+
+Esto no modifica el funcionamiento ya que nunca se ejecutará pero hace que el IDE lo analice y entienda de dónde vienen los objetos del espacio de nombres global (el módulo ``gluon``), lo que a su vez hace que funcione la autocompleción.
+
+
+### SQLDesigner
+
+Hay un software llamado SQLDesigner que permite la creación de modelos de web2py en forma visual y luego con esa información generar el código automáticamente. Aquí se muestra una captura de pantalla:
+
+
+[[imagen @///image/designer.png center 480px]]
+
+
+La versión de SQLDesigner que funciona con web2py se puede encontrar en:
+
+``https://github.com/elcio/visualdal``
+
+
+### Publicación de una carpeta
+
+Consideremos el problema de compartir carpetas y subcarpetas en la web. web2py lo hace realmente fácil. Sólo debes usar un controlador como el siguiente:
+
+``
+from gluon.tools import Expose
+def micarpeta():
+    return dict(archivos=Expose('/ruta/a/micarpeta'))
+``:code
+
+
+que puedes procesar en una vista con ``{{=archivos}}``. Esto creará una interfaz para visualizar archivos y carpetas, y navegar a través de la estructura de árbol de los archivos. Se crearán vistas previas de las imágenes.
+
+El prefijo con la ruta "/ruta/a/micarpeta" se ocultará a los visitantes. Por ejemplo un archivo llamado "/ruta/a/micarpeta/a/b.txt" se reemplazará por "base/a/b.txt". El prefijo "base" se puede especificar usando el argumento ``basename`` de la función Expose. Puedes especificar una lista de extensiones a listar con el parámetro ``extensions``, el resto de los archivos se ocultará. Por ejemplo:
+
+``
+def micarpeta():
+    return dict(archivos=Expose('/ruta/a/micarpeta', basename='.',
+                extensions=['.py', '.jpg']))
+``:code
+
+
+Los archivos y carpetas que contengan la palabra "private" en la ruta o tengan un nombre de archivo que comience con "." o que termine con "~" siempre se ocultan.
+
+### Pruebas funcionales
+
+web2py viene con un módulo ``gluon.contrib.webclient`` que permite realizar pruebas funcionales (''functional testing'') de aplicaciones locales y remotas de web2py. En realidad, este módulo no es específico de web2py y se puede usar para realizar pruebas e interacción en forma programática con cualquier aplicación web, si bien está preparado para trabajar con sesiones y repuestas de aplicaciones de web2py.
+
+
+He aquí un ejemplo de uso. El programa que se muestra a continuación crea un cliente, conecta con la acción "index" para establecer una sesión, registra un nuevo usuario, luego cierra la sesión y vuelve a autenticarse usando las nuevas credenciales:
+
+``
+from gluon.contrib.webclient import WebClient
+
+cliente = WebClient('http://127.0.0.1:8000/welcome/default/',
+                    postbacks=True)
+
+cliente.get('index')
+# registro
+datos = dict(first_name = 'Homero',
+             last_name = 'Simpson',
+             email = 'homero@web2py.com',
+             password = 'prueba',
+             password_two = 'prueba',
+             _formname = 'register')
+cliente.post('user/register', data=datos)
+
+# cerrar sesión
+cliente.get('user/logout')
+
+# autenticarse nuevamente
+datos = dict(email='homero@web2py.com',
+             password='prueba',
+             _formname = 'login')
+cliente.post('user/login',data=datos)
+
+# comprobar registro y si el acceso fue exitoso
+cliente.get('index')
+assert('Bienvenido Homero' in cliente.text)
+``:code
+
+El constructor de WebClient toma un prefijo URL como argumento. En el ejemplo ese parámetro es "http://127.0.0.1:8000/welcome/default/". No realiza ningún intercambio de datos en la red. El argumento ``postbacks`` es por defecto ``True`` y le indica al cliente cómo debe manejar las respuestas de web2py.
+
+
+El objeto WebClient ``client`` tiene dos métodos:
+``get`` y ``post``. El primer argumento siempre es un postfijo URL.
+El URL completo para una solicitud POST o GET se compone simplemente concatenando el prefijo y el postfijo. El propósito de esto es simplemente hacer que la sintaxis sea más breve para las comunicaciones intensivas entre el cliente y el servidor.
+
+
+``data`` es un parámetro específico de las solicitudes POST que contiene un diccionario de los datos a enviarse. Los formularios de web2py tienen un campo oculto ``_formname`` y su valor se debe especificar cuando existe más de un formulario en la página. Los formularios de web2py también contienen un campo oculto ``_formkey`` que está diseñado para prevenir los ataques CSRF. Este campo es manejado en forma automática por el WebClient.
+
+
+Tanto ``cliente.get`` como ``cliente.post`` aceptan los siguientes argumentos adicionales:
+- ``headers``: un diccionario de encabezados HTTP opcionales.
+- ``cookies``: un diccionario de cookies opcionales HTTP.
+- ``auth``: un diccionario de parámetros que se deben pasar a ``urllib2.HTTPBasicAuthHandler().add_password(**auth)`` para el acceso por el sistema de autenticación básico (''basic authentication''). Para más información acerca de este tema se puede consultar la documentación de Python para el módulo urllib2.
+
+
+El objeto ``client`` en el ejemplo mantiene una conversación con el servidor especificado en el constructor por medio de solicitudes GET y POST. Este maneja automáticamente las cookie y las envía de regreso para actualizar las sesiones. Si detecta que se ha generado una nueva cookie de sesión aunque se esté usando actualmente otra, interpretará que se produjo una falla en la sesión y genera una excepción. Si el servidor devuelve un error HTTP, también generará una excepción. Si, en cambio, el servidor devuelve un error HTTP, pero además la respuesta contiene un ticket de web2py, devolverá una excepción conteniendo el código del ticket.
+
+
+El objeto client mantiene un registro o ''log'' de las solicitudes en ``cliente.history`` y el estado asociado con la última solicitud exitosa.
+El estado se compone de:
+- ``cliente.status``: el código de estado devuelto
+- ``cliente.text``: el contenido de la página
+- ``cliente.headers``: un diccionario de encabezados recuperados
+- ``cliente.cookies``: un diccionario de los cookie recuperados
+- ``cliente.sessions``: un diccionario de sesiones con la forma ``{nombredeapp: id_sesión}``.
+- ``cliente.forms``: un diccionario de formularios web2py detectados en el ``cliente.text``. El diccionario tiene la forma ``{_formname, _formkey}``.
+
+El objeto WebClient no realiza ningún análisis o conversión del contenido del ``cliente.txt`` devuelto por el servidor pero esto se puede hacer fácilmente con alguno de los módulos de terceros como BeautifulSoup. Por ejemplo, aquí se puede ver un programa que demuestra cómo se pueden buscar todos los link en una página descargada por el cliente y comprobarlos:
+
+``
+from BeautifulSoup import BeautifulSoup
+dom = BeautifulSoup(cliente.text)
+for link in dom.findAll('a'):
+    nuevo_cliente = WebClient()
+    nuevo_cliente.get(link.href)
+    print nuevo_cliente.status
+``:code
+
+
+### Construyendo un web2py minimalista
+
+A veces necesitamos desplegar web2py en un servidor con muy poca memoria RAM. En este caso necesitamos disminuir web2py a su mínima expresión.
+
+Una sencilla manera de hacer esto es la siguiente:
+- En una máquina en producción, instala la distribución de código fuente web2py.
+- Desde la carpeta principal de web2py ejecuta
+``
+python scripts/make_min_web2py.py /path/to/minweb2py
+``
+- Ahora copia la aplicación que quieres desplegar en "/path/to/minweb2py/applications"
+- Despliega "/path/to/minweb2py" en el pequeño servidor.
+
+El script "make_min_web2py.py" creará una distribución mínima de web2py que no incluye:
+- admin
+- examples
+- welcome
+- scripts
+- modulos contrib poco utilizados
+
+Esta distribución contiene una aplicación "welcome", que consiste en un único archivo para pruebas de implementación.
+Examina el script. Al principio contiene una lista detallada que indica qué está incluido y qué se omite. Puedes modificarlo fácilmente y ajustarlo a tus necesidades.
+
+
+### Obteniendo una URL externa
+``fetch``:inxx
+
+Python incluye la librería ``urllib`` para descargar recursos desde un url:
+``
+import urllib
+page = urllib.urlopen('http://www.web2py.com').read()
+``:code
+
+``API``:inxx
+
+Esto es usualmente correcto, pero el modulo ``urllib``  no funciona sobre "Google App Engine". Google provee una API diferente para descargar URLs que solamente funciona en GAE. Para hacer que tu código sea portátil, web2py incluye una función ``fetch`` que se puede usar en GAE así como también en otras instalaciones de Python
+
+``
+from gluon.tools import fetch
+page = fetch('http://www.web2py.com')
+``:code
+
+### Prettydate
+``prettydate``:inxx
+
+A veces es preferible representar un objeto datetime como "hace un año" en lugar de "2009-07-25 14:34:56" . web2py provee de una función para esto:
+
+``
+import datetime
+d = datetime.datetime(2009,7,25,14,34,56)
+from gluon.tools import prettydate
+pretty_d = prettydate(d,T)
+``:code
+
+El segundo argumento (T) se debe usar si se quiere habilitar la internacionalización de la salida.
+
+
+### Coordenadas geográficas o ''Geocoding''
+``geocode``:inxx
+
+Si necesitas convertir una dirección (por ejemplo: "243 S Wabash Ave, Chicago, IL, USA") en coordenadas geográficas (latitud y longitud), web2py provee de una función para realizar eso, entonces.
+``
+from gluon.tools import geocode
+address = '243 S Wabash Ave, Chicago, IL, USA'
+(latitude, longitude) = geocode(address)
+``:code
+
+La función ``geocode`` requiere una conexión a internet y se conecta al servicio de Google de geocodificación. La función devuelve ``(0,0)`` en caso de fallar. Ten en cuenta que el servicio de Google de geocodificación  tiene un número máximo de solicitudes, por lo que deberías verificar sus términos y condiciones. La función ``geocode`` está implementada utilizando la función ``fetch`` y por lo tanto funciona también en GAE.
+
+
+### Paginación
+``pagination``:inxx
+
+Esta receta es un truco útil para minimizar el acceso a la base de datos cuando se requiere paginación, es decir, cuando necesitas mostrar una lista de registros de una base de datos pero quieres distribuir los registros a través de múltiples páginas.
+
+Comienza creando una aplicación **primos** que almacene los primeros 1000 números primos en una base de datos.
+
+Acá está el modelo ``db.py``:
+``
+db = DAL('sqlite://primos.db')
+db.define_table('primo',Field('valor','integer'))
+def esprimo(p):
+    for i in range(2,p):
+        if p%i==0: return False
+    return True
+if len(db().select(db.primo.id))==0:
+   p=2
+   for i in range(1000):
+       while not esprimo(p): p+=1
+       db.primo.insert(value=p)
+       p+=1
+``:code
+
+Ahora crea una acción ``listar_elementos`` en el controlador "default.py" que contenga lo siguiente:
+``
+def listar_elementos():
+    if len(request.args): pagina=int(request.args[0])
+    else: pagina=0
+    elementos_por_pagina=20
+    limitby=(pagina*elementos_por_pagina, (pagina+1)*elementos_por_pagina+1)
+    registros=db().select(db.primo.ALL, limitby=limitby)
+    return dict(registros=registros,pagina=pagina,
+                elementos_por_pagina=elementos_por_pagina)
+``:code
+
+Ten en cuenta que este código selecciona uno o más ítems de los que necesita, 20+1. el elemento extra le indica a la vista si existe la siguiente página.
+
+Esta es la vista "default/listar_elementos.html":
+``
+{{extend 'layout.html'}}
+
+{{for i, registro in enumerate(registros):}}
+{{if i==elementos_por_pagina: break}}
+{{=registro.valor}}<br />
+{{pass}}
+
+{{if pagina:}}
+<a href="{{=URL(args=[pagina-1])}}">previa</a>
+{{pass}}
+
+{{if len(registros)>items_per_page:}}
+<a href="{{=URL(args=[pagina+1])}}">próxima</a>
+{{pass}}
+``:code
+
+De esta manera podemos obtener la paginación con un sólo "select"  por acción, y que ese "select" sólo obtenga una fila más de las que necesita.
+
+
+### httpserver.log y el formato del archivo de historial.
+``httpserver.log``:inxx
+
+El servidor de web2py registra todas las solicitudes en un archivo llamado:
+``
+httpserver.log
+``:code
+
+en el directorio raíz de web2py. Se pueden especificar un nombre alternativo y la ubicación a través de las opciones de la línea de comandos de web2py.
+
+Se añaden nuevas entradas al final del archivo cada vez que se realiza una solicitud. Cada línea tiene una forma similar a la siguiente:
+``
+127.0.0.1, 2008-01-12 10:41:20, GET, /admin/default/site, HTTP/1.1, 200, 0.270000
+``:code
+
+El formato es:
+``
+ip, timestamp, method, path, protocol, status, time_taken
+``:code
+
+Donde
+- ip es la dirección IP del cliente que hizo la solicitud
+- timestamp es la fecha y la hora de la solicitud en el formato ISO 8601, YYYY-MM-DDT HH:MM:SS
+- method es o bien GET o POST
+- path es la ruta solicitada por el cliente
+- protocol es la versión del protocolo HTTP usado para enviar al cliente, normalmente HTTP/1.1
+- status es el código de estado del protocolo HTTP ``status``:cite
+- time_taken  es la cantidad de tiempo que el servidor tarda en procesar la solicitud, en segundos, no incluye tiempos de subida/descarga.
+
+En el repositorio de aplicaciones ``appliances``:cite, se encuentra disponible para descarga una aplicación para el análisis de ''log'' (registros del sistema).
+
+
+El registro en el historial se deshabilita por defecto con el uso de mod_wsgi porque duplicaría (es decir, registraría lo mismo que) el sistema de historial de Apache.
+
+
+### Completando la base de datos con datos ficticios
+
+Para efectuar pruebas y control de calidad o ''testing'', podríamos necesitar insertar registros en la base de datos con información aleatoria. web2py incluye un clasificador bayesiano que es capaz de generar textos legibles para este propósito.
+
+Esta es la forma más simple de usarlo:
+``
+from gluon.contrib.populate import populate
+populate(db.mitabla, 100)
+``:code
+
+Esto insertará 100 registros aleatorios en db.mitabla, e intentará generar inteligentemente textos cortos para campos que sean cadenas y enteros, double, date, datetime, time, booleanos, etc. según el tipo de campo completado. Además, intentará respetar los requerimientos impuestos por los validadores. Para campos que contengan la palabra "name", intentará generar nombres ficticios. Para campos reference se generarán referencias válidas.
+
+Si tienes dos tablas (A y B) donde B hace referencia a A, asegúrate de rellenar primero A y luego B.
+
+Como las inserciones son hechas en el ámbito de una única transacción, no intentes insertar demasiados registros al mismo tiempo, particularmente si estás trabajando con campos tipo reference. En cambio, haz un ciclo, insertando 100 cada vez, y luego un ``commit()``.
+
+``
+for i in range(10):
+    populate(db.mitabla, 100)
+    db.commit()
+``:code
+
+También puedes usar el clasificador bayesiano para aprender características de algunos textos y generar textos aleatorios que sean similares, pero ten en cuenta que el resultado podría no tener sentido:
+
+``
+from gluon.contrib.populate import Learner, IUP
+ell=Learner()
+ell.learn('una entrada de texto realmente larga ...')
+print ell.generate(1000, prefix=None)
+``:code
+
+### Aceptando pagos con tarjetas de crédito
+
+``Google Wallet``:inxx ``Paypal``:inxx ``Stripe.com``:inxx
+``Authorize.net``:inxx ``DowCommerce``:inxx
+
+Existen múltiples maneras de aceptar pagos con tarjetas de crédito por internet. web2py provee de una API especifica para algunos de los métodos más populares y prácticos:
+
+- Google Wallet ``googlewallet``:cite
+- PayPal ``paypal``cite
+- Stripe.com ``stripe``:cite
+- Authorize.net ``authorizenet``:cite
+- DowCommerece ``dowcommerce``:cite
+
+
+Los primeros dos mecanismos delegan el proceso de autenticación del pago en un servicio de terceros. Mientras esta es la mejor solución de seguridad (tu aplicación no tiene que manejar ninguna información de tarjetas de crédito) esto hace que el proceso sea incómodo (el usuario debe autenticarse dos veces; por ejemplo, una vez para tu aplicación, y otra con Google) y no permite que tu aplicación maneje pagos sucesivos en una forma automatizada.
+
+Hay veces que necesitas más control y quieres generar el formulario de entrada para la información de las tarjetas de crédito y que programáticamente pregunte a quien lo procesa cómo transferir el dinero desde la tarjeta de crédito a tu cuenta.
+
+Por esta razón web2py provee de integración instantánea con Stripe, Authorize.net (el modulo fue desarrollado por John Conde y ligeramente modificado) y DowCommerce. Stripe es la aplicación más simple de usar y  también la más económica para un bajo volumen de transacciones (no cobran un cargo fijo aunque el costo por transacción está por arriba del 3%). Authorize.net es mejor para altos volúmenes (tiene una tarifa fija anual y un costo bajo por transacción).
+
+Ten en cuenta que en el caso de Stripe y Authorize.net tu programa estará aceptando la información de las tarjetas de crédito. No es necesario que almacenes esta información y nosotros te aconsejamos no hacerlo, por los requerimientos legales que involucra (verificar con Visa o Mastercard), pero hay ocasiones en las que tú puedes querer almacenar la información para pagos sucesivos o reproducir el botón de pago en un sólo clic de Amazon.
+
+
+#### Google Wallet
+
+La manera más sencilla de usar Google Wallet (Level 1) consiste en integrar un botón a tu página y cuando hagan clic, redirigir a tus visitantes a la página de pagos provista por Google.
+
+El primer paso es registrar una cuenta de Google Merchant en la siguiente url:
+
+``
+https://checkout.google.com/sell
+``
+
+Necesitarás indicarle a Google tu información bancaria. Google te asignará un identificador ``merchant_id`` y una clave ``merchant_key`` (no los confundas, mantenlos en secreto).
+
+Entonces simplemente necesitas crear el siguiente código en tu vista:
+
+``
+{{from gluon.contrib.google_wallet import button}}
+{{=button(merchant_id="123456789012345",
+          products=[dict(name="calzado",
+                         quantity=1,
+                         price=23.5,
+                         currency='USD',
+                         description="zapatillas para correr negras")])}}
+``
+
+Cuando un visitante hace clic en el botón, será redirigido a la página de google donde ella o él pueden pagar por los artículos. Aquí ''products'' es una lista de productos  y cada producto es un diccionario de parámetros que quieres pasar describiendo tus artículos (nombre, cantidad, precio, moneda, descripción, y otros datos opcionales que puedes encontrar descriptos en la documentación de Google Wallet).
+
+Si optas por este mecanismo, puedes necesitar generar los valores pasados al botón en forma programática según tu inventario y los datos del carrito de compras del visitante.
+
+Todas la información de tasas y tarifas será manejada del lado de Google. Lo mismo ocurre para el caso de la información de la cuenta. Por defecto tu aplicación no recibirá un mensaje de confirmación cuando la transacción se concreta, por lo tanto, podrías tener que visitar tu cuenta de Google Merchant para ver cuáles productos han sido vendidos y pagado por los clientes, y cuáles productos necesitan ser enviados a sus compradores. Por otra parte, Google te enviará un email con la información.
+
+Si quieres una integración más estricta tienes que usar el nivel 2 de notificaciones de la API. En ese caso puedes pasar más información a Google y Google llamará a tu API para notificar las ventas. Esto permite mantener la información de la cuenta dentro de tu aplicación pero requiere que tengas servicios web capaces de comunicarse con Google Wallet.
+
+Esto último podría llegar a resultar complicado de programar para una app determinada, pero ya disponemos de un plugin que implementa una API para este propósito.
+
+``
+http://web2py.com/plugins/static/web2py.plugin.google_checkout.w2p
+``
+
+Puedes encontrar información sobre la documentación del plugin dentro del programa.
+
+
+#### Paypal
+
+La integración con Paypal no se describe aquí, pero puedes encontrar más información en este ''slice'':
+
+``
+http://www.web2pyslices.com/main/slices/take_slice/9
+``
+
+#### Stripe.com
+
+Esta es probablemente una de las formas más fáciles y flexibles para aceptar pagos con tarjetas de crédito.
+
+Debes registrar una cuenta en Stripe.com, que es una tarea muy simple, y Stripe te asignará una clave de la API para pruebas antes de que generes cualquier credencial.
+
+Una vez que obtengas tu clave de la API, podrás aceptar pagos de tarjetas de crédito, con el siguiente código:
+
+``
+from gluon.contrib.stripe import Stripe
+stripe = Stripe(api_key)
+d = stripe.charge(amount=100,
+    	      currency='usd',
+              card_number='4242424242424242',
+              card_exp_month='5',
+              card_exp_year='2012',
+              card_cvc_check='123',
+              description='zapatos negros comunes')
+if d.get('paid',False):
+    # payment accepted
+elif:
+    # error is in d.get('error', 'unknown')
+``
+
+La respuesta, ``d``, es un diccionario que te permite explorar sus valores. El número de tarjeta usado en el ejemplo es un ''sandbox'' (espacio de pruebas) y las transacciones siempre son exitosas. Cada transacción está asociada a un identificador almacenado en ``d['id']``.
+
+Stripe también permite verificar una transacción en otro momento:
+
+``
+d = Stripe(key).check(d['id'])
+``
+
+y una transacción de reembolso:
+
+``
+r = Stripe(key).refund(d['id'])
+if r.get('refunded', False):
+    # el reembolso se realizó con éxito
+elif:
+    # error is in d.get('error','unknown')
+``
+
+Stripe hace sencillo mantener la contabilidad dentro de tu aplicación.
+
+todas las comunicaciones entre tu aplicación y Stripe se realizan sobre servicios web RESTful. Stripe en realidad expone aún más servicios y proporciona un conjunto más amplio de funcionalidades en su API para Python. Puedes leer más sobre esto en su sitio web.
+
+
+#### Authorize.Net
+
+Otra manera simple de aceptar tarjetas de crédito es usando Authorize.Net. Como siempre, necesitas registrarte y obtener un ``login`` y una clave para las transacciones (``transkey``). Una vez que tengas esto, el funcionamiento es muy similar al de Stripe:
+
+``
+from gluon.contrib.AuthorizeNet import process
+if process(creditcard='4427802641004797',
+           expiration="122012,
+           total=100.0, cvv='123',tax=None, invoice=None,
+           login='cnpdev4289', transkey='SR2P8g4jdEn7vFLQ', testmode=True):
+   # el pago se ha procesado
+else:
+   # el pago ha sido rechazado
+``:code
+
+Si tienes una cuenta válida de Authorize.Net deberías reemplazar los parámetros ``login`` y ``transkey`` del espacio de pruebas con los de tu cuenta, configurar ``testmode=False`` para ejecutar en la plataforma real en lugar del ''sandbox'', y usar la información de la tarjeta de crédito dada por el visitante.
+
+Si ``process`` devuelve ``True``, el dinero ha sido transferido desde la tarjeta de crédito del visitante a tu cuenta en Authorize.Net. ``invoice`` es sólo una cadena que se puede personalizar y será almacenada por Authorize.Net con el resto de los valores de la transacción para que puedas conciliar los datos con la información en tu aplicación.
+
+Aquí se muestra un ejemplo más complejo del flujo de trabajo donde se exponen más variables:
+``
+from gluon.contrib.AuthorizeNet import AIM
+payment = AIM(login='cnpdev4289',
+              transkey='SR2P8g4jdEn7vFLQ',
+              testmod=True)
+payment.setTransaction(creditcard, expiration, total, cvv, tax, invoice)
+payment.setParameter('x_duplicate_window', 180) # duplicate_window de tres minutos
+payment.setParameter('x_cust_id', '1324')       # ID del cliente
+payment.setParameter('x_first_name', 'Agent') # nombre
+payment.setParameter('x_last_name', 'Smith') # apellido
+payment.setParameter('x_company', 'Test Company') # empresa
+payment.setParameter('x_address', '1234 Main Street') # dirección
+payment.setParameter('x_city', 'Townsville') # ciudad
+payment.setParameter('x_state', 'NJ') # estado
+payment.setParameter('x_zip', '12345') # código postal
+payment.setParameter('x_country', 'US') # país
+payment.setParameter('x_phone', '800-555-1234') # teléfono
+payment.setParameter('x_description', 'Test Transaction') # descripción
+payment.setParameter('x_customer_ip', socket.gethostbyname(socket.gethostname())) # IP del cliente
+payment.setParameter('x_email', 'tu@example.com') # correo electrónico
+payment.setParameter('x_email_customer', False) # correo del cliente
+
+payment.process()
+if payment.isApproved():
+    print 'Response Code: ', payment.response.ResponseCode
+    print 'Response Text: ', payment.response.ResponseText
+    print 'Response: ', payment.getResultResponseFull()
+    print 'Transaction ID: ', payment.response.TransactionID
+    print 'CVV Result: ', payment.response.CVVResponse
+    print 'Approval Code: ', payment.response.AuthCode
+    print 'AVS Result: ', payment.response.AVSResponse
+elif payment.isDeclined():
+    print 'Su tarjeta de crédito fue rechazada por el banco'
+elif payment.isError():
+    print 'Se produjo un error'
+print 'aprovada', payment.isApproved()
+print 'rechazada', payment.isDeclined()
+print 'error', payment.isError()
+``:code
+
+Ten en cuenta que el código del ejemplo anterior usa una cuenta para pruebas. Necesitas registrarte con Authorize.Net (no es un servicio gratuito) y especificar tu propio ''login'', ''transkey'' y ''testmode'' (True or False) para el constructor de ``AIM``.
+
+### Dropbox API
+
+``Dropbox.com``:inxx
+Dropbox es un servicio de almacenamiento muy popular. No solo almacena tus archivos en línea sino que también mantiene el almacenamiento en la nube sincronizado con todos tus equipos. Te permite crear grupos y dar permisos de lectura o escritura para cada carpeta a usuarios individuales o grupos. También mantiene un historial de versiones de todos tus archivos. Además incluye una carpeta llamada "Public" y cada archivo que coloques allí tendrá su propia URL pública. Dropbox es una excelente herramienta de colaboración.
+
+Puedes accedes a dropbox fácilmente registrándote en
+
+``
+https://www.dropbox.com/developers
+``
+
+Y obtendrás una ``APP_KEY`` y un ``APP_SECRET``. Una vez que tu tengas esto podrás usar Dropbox para autenticar a tus usuarios.
+
+Crea un archivo llamado "tuapp/private/dropbox.key" y en él escribe
+``
+<APP_KEY>:<APP_SECERT>:app_folder
+``
+donde ``<APP_KEY>`` y ``APP_SECRET`` son tu clave de aplicación (app_key) y la clave secreta (app_secret).
+
+Luego en "models/db.py" agrega el siguiente código:
+
+``
+from gluon.contrib.login_methods.dropbox_account import use_dropbox
+use_janrain(auth,filename='private/dropbox.key')
+midropbox = auth.settings.login_form
+``
+
+Esto permite a los usuarios autenticarse en tu aplicación usando sus credenciales de dropbox, y tu programa será capaz de subir archivos en sus cuentas dropbox:
+
+``
+stream = open('archivolocal.txt','rb')
+midropbox.put('archivodestino.txt', stream)
+``
+
+para descargar archivos:
+
+``
+stream = midropbox.get('archivodestino.txt')
+open('archivolocal.txt','wb').write(read)
+``
+
+y para obtener el listado del directorio:
+
+``
+contenidos = mydropbox.dir(path = '/')['contents']
+``
+
+
+### Twitter API
+
+Aquí mostramos algunos ejemplos rápidos de cómo enviar y obtener mensajes ''tweet''. No se requieren librerías de terceros, ya que Twitter ha creado una APIs RESTful.
+
+Aquí se puede ver un ejemplo de cómo enviar un ''tweet'' (mensaje):
+``
+def publicar_tweet(usuario, clave, mensaje):
+    import urllib, urllib2, base64
+    import gluon.contrib.simplejson as sj
+    argumentos = urllib.urlencode([('status', mensaje)])
+    encabezados={}
+    encabezados['Authorization'] = 'Basic '+base64.b64encode(
+        usuario + ':' + clave)
+    solicitud = urllib2.Request(
+        'http://twitter.com/statuses/update.json',
+        argumentos, encabezados)
+    return  sj.loads(urllib2.urlopen(solicitud).read())
+``:code
+
+Y este es un ejemplo para recibir mensajes de Twitter (es decir, varios tweet):
+``
+def recuperar_tweet():
+    """ Recupera conjunto de mensajes de Twitter """
+    usuario = 'web2py'
+    import urllib
+    import gluon.contrib.simplejson as sj
+    pagina = urllib.urlopen('http://twitter.com/%s?format=json' % usuario).read()
+    mensajes = XML(sj.loads(pagina)['#timeline'])
+    return dict(mensajes=mensajes)
+``:code
+
+Para operaciones más complejas, consulta la documentación de la API de Twitter.
+
+
+### Stream de archivos virtuales
+``streaming``:inxx
+
+Es común en programadores maliciosos el ''escaneado'' (scan) de sitios web buscando vulnerabilidades. Estos programadores usan escáneres de seguridad como Nessus para explorar el sitio web de interés, en búsqueda de script conocidos por sus vulnerabilidades. Un análisis del historial del servidor web examinado o directamente en la base de datos Nessus revela que la mayoría de las vulnerabilidades conocidas están en script de PHP y ASP. Si utilizamos web2py para nuestro servicio, no tendremos estas vulnerabilidades, pero igualmente somos escaneados por ellos. Esto es molesto, y por lo tanto, deberíamos responder a estos escáneres de vulnerabilidades y hacer al atacante entender que está desperdiciando su tiempo.
+
+Una posibilidad es redirigir todas las solicitudes para .php, .asp, y toda solicitud sospechosa a una acción ficticia o ''dummy'' que responderá al atacante manteniéndolo ocupado por una gran cantidad de tiempo. Eventualmente el atacante se rendirá y no nos escaneará de nuevo.
+
+Esta receta requiere de dos partes.
+
+Una aplicación dedicada llamada **atascador** con un controlador "default.py" como sigue:
+``
+class Atascador():
+   def read(self,n): return 'x'*n
+def atascar(): return response.stream(Atascador(), 40000)
+``:code
+
+Cuando esta acción sea invocada, responderá con un infinito flujo de datos de "x"-es. 40000 caracteres al mismo tiempo.
+
+El segundo ingrediente es un archivo  "route.py" que redirija cualquier solicitud terminada en .php, .asp, etc. (ambos en minúsculas y mayúsculas) al controlador.
+``
+routes_in=(
+ ('.*\.(php|PHP|asp|ASP|jsp|JSP)','atascador/default/atascar'),
+)
+``:code
+
+La primera vez que realicen un ataque puede ocurrir una pequeña sobreutilización de recursos, pero nuestra experiencia indica que el mismo atacante no lo intentará dos veces.
+
+
