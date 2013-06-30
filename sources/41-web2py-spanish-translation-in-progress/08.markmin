@@ -1,0 +1,466 @@
+## Correo electrónico y SMS
+
+``Mail``:inxx
+
+### Configuración de email
+
+Web2py incluye la clase ``gluon.tools.Mail`` que hace más fácil el envío de correo electrónico usando web2py. Uno puede definir un servicio de envío de correo con
+
+``
+from gluon.tools import Mail
+mail = Mail()
+mail.settings.server = 'smtp.example.com:25'
+mail.settings.sender = 'tu@example.com'
+mail.settings.login = 'usuario:contraseña'
+``:code
+
+Ten en cuenta que si tu aplicación usa ``Auth`` (tratado en el próximo capítulo), el objeto ``auth`` incluirá su propio servicio de correo en ``auth.settings.mailer``, por lo que puedes utilizar este último de la siguiente forma:
+
+``
+mail = auth.settings.mailer
+mail.settings.server = 'smtp.example.com:25'
+mail.settings.sender = 'tu@example.com'
+mail.settings.login = 'usuario:contraseña'
+``:code
+
+Debes reemplazar mail.settings con los parámetros correctos para tu servidor de SMTP. Establece ``mail.settings.login = None`` si le servidor SMTP no requiere autenticación.
+
+Si no deseas utilizar TLS, configura ``mail.settings.tls = False``
+
+``email logging``:inxx
+
+--------
+Para tareas de depuración puedes establecer
+``
+mail.settings.server = 'logging'
+``:code
+y los correos no se enviaran sino que se agregarán al historial (''log'') de la consola.
+-------
+
+
+#### Configurando el correo electrónico para Google App Engine
+
+``email from GAE``:inxx
+Para enviar correo con una cuenta de Google App Engine:
+
+``
+mail.settings.server = 'gae'
+``:code
+
+Hasta la edición actual web2py no soporta adjuntos o cifrado en correos con Google App Engine. Observa que cron y el scheduler no funcionan con GAE.
+
+#### x509 y ecriptación PGP
+``PGP``:inxx ``x509``:inxx
+
+Es posible el envío de correos ''encriptados'' (o cifrados) con x509 (SMIME) utilizando la siguiente configuración:
+
+``
+mail.settings.cipher_type = 'x509'
+mail.settings.sign = True
+mail.settings.sign_passphrase = 'tu frase de contraseña'
+mail.settings.encrypt = True
+mail.settings.x509_sign_keyfile = 'nombredelarchivo.key'
+mail.settings.x509_sign_certfile = 'nombredelarchivo.cert'
+mail.settings.x509_crypt_certfiles = 'nombredelarchivo.cert'
+``:code
+
+Se pueden enviar correos encriptados con PGP. En primer lugar debes instalar el paquete python-pyme. Luego puedes usar GnuPG (GPG) para crear los archivos/clave para el remitente (usa el valor de la dirección de email en mail.settings.sender) y pon los archivos pubring.gpg y secring.pgp en un directorio (por ejemplo, en "/home/www-data/.gnupg").
+
+Usa la siguiente configuración:
+
+``
+mail.settings.gpg_home = '/home/www-data/.gnupg/'
+mail.settings.cipher_type = 'gpg'
+mail.settings.sign = True
+mail.settings.sign_passphrase = 'tu frase de contraseña'
+mail.settings.encrypt = True
+``:code
+
+### Envío de correo electrónico
+``mail.send``:inxx ``email html``:inxx ``email attachments``:inxx
+
+Una vez que ``mail`` se ha definido, se puede usar para enviar correos con:
+
+``
+mail.send(to=['alguien@example.com'],
+          subject='hola',
+          # Si se omite reply_to, entonces se usará mail.settings.sender
+          reply_to='nosotros@example.com',
+          message='que tal')
+``:code
+
+Mail devuelve ``True`` si el envío del correo tiene éxito o ``False`` de lo contrario. La lista completa de argumentos para ``mail.send()`` es:
+
+``
+send(self, to, subject='None', message='None', attachments=1,
+     cc=1, bcc=1, reply_to=1, encoding='utf-8',headers={},
+     sender=None)
+``:code
+
+Ten en cuenta que ``to``, ``cc`` y ``bcc`` toman cada uno una lista con direcciones de correo.
+
+``headers`` es un diccionario de encabezados para refinar los encabezados antes de enviar el correo. Por ejemplo:
+
+``
+headers = {'Return-Path' : 'rebotados@example.org'}
+``:code
+
+``sender`` toma por defecto el valor ``None`` y en ese caso el remitente se establecerá como ``mail.settings.sender``.
+
+A continuación se detallan algunos ejemplos adicionales que demuestran el uso de ``mail.send()``.
+
+#### Envío de correo simple
+
+``
+mail.send('tu@example.com',
+  'Asunto del mensaje',
+  'Cuerpo del mensaje en texto plano')
+``:code
+
+#### Correos con HTML
+
+``
+mail.send('tu@example.com',
+  'Asunto del mensaje',
+  '<html>cuerpo del documento</html>')
+``:code
+
+Si el cuerpo del mensaje comienza con ``<html>`` y termina con ``</html>``, se enviará como correo con HTML.
+
+#### Combinando texto y HTML en correos
+
+El mensaje de correo puede ser una tupla (texto, html):
+
+``
+mail.send('tu@example.com',
+  'Asunto del mensaje',
+  ('Cuerpo del mensaje en texto plano', '<html>cuerpo del documento</html>'))
+``:code
+
+#### Correos con ``cc`` Y ``bcc``
+
+``
+mail.send('tu@example.com',
+  'Asunto del mensaje',
+  'Cuerpo del mensaje en texto plano',
+  cc=['otro1@example.com', 'otro2@example.com'],
+  bcc=['otro3@example.com', 'otro4@example.com'])
+``:code
+
+#### Archivos adjuntos
+
+``
+mail.send('tu@example.com',
+  'Asunto del mensaje',
+  '<html><img src="cid:foto" /></html>',
+  attachments = mail.Attachment('/path/to/foto.jpg', content_id='foto'))
+``:code
+
+#### Múltiples adjuntos
+
+``
+mail.send('tu@example.com',
+  'Asunto del mensaje',
+  'Cuerpo del mensaje',
+  attachments = [mail.Attachment('/ruta/al/primer.archivo'),
+                 mail.Attachment('/ruta/al/segundo.archivo')])
+``:code
+
+### Envío de mensajes SMS
+
+``SMS``:inxx
+
+El envío de mensajes SMS desde aplicaciones web2py requiere un servicio de terceros que pueda remitir el mensaje al destinatario.
+Normalmente no es un servicio gratuito, pero varía de país en país. Hemos probado algunos de estos servicios con poco éxito. Las compañías telefónicas bloquean los correos originados desde estos servicios porque pueden utilizarse para envío de spam.
+
+Es preferible utilizar a las mismas compañías telefónicas para remitir los mensajes de SMS. Cada compañía tiene una dirección de correo asociada con cada número de teléfono celular, de manera que los mensajes SMS se pueden enviar como correo electrónico a ese número telefónico.
+
+web2py viene con un módulo especial para ese proceso:
+
+``
+from gluon.contrib.sms_utils import SMSCODES, sms_email
+email = sms_email('1 (111) 111-1111','T-Mobile USA (tmail)')
+mail.sent(to=email, subject='prueba', message='prueba')
+``:code
+
+SMSCODES es un diccionario que asocia los nombres de las compañías más importantes al postfijo de la dirección de correo. La función ``sms_email`` toma un número de teléfono (como cadena) y el nombre de la compañía y devuelve la dirección de correo del teléfono.
+
+### Usando el sistema de plantillas para generar mensajes
+``emails``:inxx
+
+Se puede usar el sistema de plantillas para generar mensajes de correo. Por ejemplo, tomemos como ejemplo la tabla de la base de datos:
+
+``
+db.define_table('persona', Field('nombre'))
+``:code
+
+supongamos que queremos enviar a cada persona el la base de datos el siguiente mensaje, almacenado en un archivo de vista "mensaje.html":
+
+``
+Estimado {{=person.name}},
+Ha ganado el segundo premio, un set de cuchillos para asado.
+``:code
+
+Puedes hacer lo mismo de la forma siguiente
+``
+for persona in db(db.persona).select():
+    context = dict(persona=persona)
+    mensaje = response.render('mensaje.html', context)
+    mail.send(to=['quien@example.com'],
+              subject='None',
+              message=mensaje)
+``:code
+
+La mayor parte del trabajo se hace en la instrucción
+``
+response.render('mensaje.html', context)
+``:code
+
+Convierte la vista "mensaje.html" con las variables definidas en el diccionario "context", y devuelve una cadena con el texto del correo convertido. context es un diccionario que contiene variables que serán visibles para la plantilla.
+
+Si el mensaje comienza con ``<html>`` y termina con ``</html>``, el correo será un mensaje en formato HTML.
+
+Ten en cuenta que si quisieras incluir un link que regrese a tu sitio en el correo HTML, puedes usar la función ``URL``. Sin embargo, por defecto, la función ``URL`` genera un URL relativo, que no funcionará desde el mensaje de correo. Para generar URL absolutos, debes especificar los argumentos ``scheme`` y ``host`` en la función URL. Por ejemplo:
+
+``
+<a href="{{=URL(..., scheme=True, host=True)}}">Clic aquí</a>
+``:code
+
+o
+
+``
+<a href="{{=URL(..., scheme='http', host='www.site.com')}}">Clic aquí</a>
+``:code
+
+El mismo mecanismo que se usa para generar el texto del correo se puede usar también para generar los mensajes SMS o cualquier otro tipo de mensaje basado en plantillas.
+
+### Enviando mensajes con una tarea en segundo plano
+
+El envío de un mensaje puede llegar a tomar varios segundos debido a la necesidad de autenticación y comunicación con un servidor posible servidor SMTP remoto. Para evitar que el usuario tenga que esperar que la operación se complete, es deseable en algunas ocasiones agregar el correo a enviar en una cola de tareas en segundo plano para que sea enviado posteriormente. Como se detalla en el capítulo 4, esto se puede hacer configurando una simple cola de tareas o utilizando el planificador (''scheduler''). Aquí se muestra un ejemplo usando una cola de tareas común.
+
+Primero, en un archivo del modelo en nuestra aplicación, configuramos el modelo de la base de datos para que almacene nuestra cola de correos:
+``
+db.define_table('cola',
+    Field('estado'),
+    Field('direccion'),
+    Field('asunto'),
+    Field('mensaje'))
+``:code
+
+Desde un controlador, podemos agregar mensajes a enviar en la cola con:
+``
+db.queue.insert(estado='pendiente',
+                direccion='tu@example.com',
+                asunto='prueba',
+                mensaje='prueba')
+``:code
+
+Ahora, necesitamos un script de procesamiento que lea la cola y envíe los correos:
+``
+## in file /app/private/cola_mails.py
+import time
+while True:
+    registros = db(db.cola.estado=='pendiente').select()
+    for registro in registros:
+        if mail.send(to=registro.direccion,
+            subject=registro.asunto,
+            message=registro.mensaje):
+            registro.update_record(estado='enviado')
+        else:
+            registro.update_record(estado='falla')
+        db.commit()
+    time.sleep(60) # comprobar cada minuto
+``:code
+
+Finalmente, como se describe en el capítulo 4, necesitamos correr el script cola_mails.py como si estuviera dentro de un controlador en nuestra app:
+``
+python web2py.py -S app -M -N -R applications/app/private/cola_mails.py
+``:code
+
+Donde ``-S app`` le dice a web2py que corra "cola_mails.py" como "app", ``-M`` le indica que ejecute los modelos, y ``-N`` indica que no se debe ejecutar cron.
+
+Aquí asumimos que el objeto ``mail`` utilizado en "cola_mails.py" se definió en un archivo del modelo en nuestra app y por lo tanto es accesible en el script "cola_mails.py" debido a la opción ``-M``. Además observa que es importante hacer un commit de cada cambio tan pronto como sea posible para evitar el bloqueo de la base de datos para otros procesos simultáneos.
+
+Como se menciona en el capítulo 4, este tipo de procesos en segundo plano no se deberían ejecutar a través de cron (con la excepción quizás de cron @reboot) porque necesitas asegurarte de que no se esté ejecutando más de una instancia al mismo tiempo.
+
+Ten en cuenta que un problema con el envío de correo electrónico a través de un proceso en segundo plano es que hace difícil la tarea de informar al usuario si el envío ha fallado. Si el correo se envía directamente desde la acción del controlador, puedes atrapar cualquier error e inmediatamente devolver un mensaje de error al usuario. Con una tarea en segundo plano, sin embargo, el correo se envía en forma asíncrona, después de que la acción del controlador haya devuelto la respuesta, por lo que se torna más complicado informar la falla al usuario.
+
+
+### Lectura y manejo de bandejas de correo (Experimental)
+
+El adaptador ``IMAP`` está pensado como interfaz con los servidores IMAP para realizar consultas simples con la sintaxis de consultas a la base de datos de ``DAL``, de manera que servicios como la lectura, búsqueda y otros servicios relacionados a IMAP implementados por marcas como Google(mr) y Yahoo(mr) se puedan administrar desde aplicaciones de web2py.
+
+El adaptador crea sus tablas y campos en forma "estática", es decir, que el desarrollador debería relegar la definición de las tablas y campos a la instancia de DAL llamando al método ``.define_tables()``. Las tablas se definen con la lista de bandejas o carpetas informada por el servidor de correo.
+
+
+#### Conexión
+
+Para una sola cuenta de correo, este es el código recomendado para iniciar el soporte de IMAP en el modelo de la app.
+
+``
+# Reemplaza el usuario, contraseña, servidor y puerto en la
+# cadena de conexión
+# Establece el puerto como 993 para soporte de SSL
+imapdb = DAL("imap://usuario:contraseña@servidor:puerto", pool_size=1)
+imapdb.define_tables()
+``:code
+
+Ten en cuenta que ``<imapdb>.define_tables()`` devuelve un diccionario de cadenas que asocian nombres de tablas de DAL a los nombres de las bandejas del servidor según la estructura ``{<tablename>: <server mailbox name>, ...}``, para que sea posible acceder al nombre real de la bandeja en el servidor IMAP.
+
+Si deseas establecer tu propia configuración de nombres de tablas y bandejas y omitir la configuración de nombres automática, puedes pasar como parámetro del adaptador un diccionario personalizado como sigue:
+
+``
+imapdb.define_tables({"inbox": "BANDEJA", "basura", "SPAM"})
+``:code
+
+Para manejar los distintos nombres de bandeja originales en la interfaz de usuario, los siguientes atributos dan acceso a los nombres asociados automáticamente por el adaptador (qué nombre de bandeja tiene cuál nombre de tabla y vice versa):
+
+-------------------------------------
+**Atributo** | **Tipo** | **Formato**
+imapdb.mailboxes | dict | ``{<nombredetabla>: <nombre original de la bandeja>, ...}``
+imapdb.<table>.mailbox | string | ``"nombre original de la bandeja"``
+-------------------------------------
+
+El primer comando puede ser de utilidad para recuperar instancias de Set usando el nombre original de la bandeja en el servidor
+
+``
+# mailbox es una cadena que contiene el nombre real de la bandeja o carpeta
+nombresdetabla = dict([(v,k) for k,v in imapdb.mailboxes.items()])
+miset = imapdb(imapdb[nombresdetabla[mailbox]])
+``:code
+
+#### Recuperando mensajes y actualización de los flag
+
+Aquí se muestra una lista de comandos IMAP que puedes usar en un controlador. Por ejemplo, se supone que tu servicio tiene una bandeja llamada ``INBOX``, que es lo normal en las cuentas de Gmail(mr).
+
+Para hacer un conteo de los mensajes no revisados de tamaño menor a 6000 octetos en la bandeja de entrada puedes hacer
+
+``
+q = imapdb.INBOX.seen == False
+q &= imapdb.INBOX.created == datetime.date.today()
+q &= imapdb.INBOX.size < 6000
+nuevos = imapdb(q).count()
+``:code
+
+
+Puedes recuperar los mensajes de la consulta anterior con
+``
+mensajes = imapdb(q).select()
+``:code
+
+
+El adaptador implementa los operadores comunes para consultas a la base de datos, incluso ''belongs''
+
+``
+mensajes = imapdb(imapdb.INBOX.uid.belongs(<secuencia de uid>)).select()
+``:code
+
+**Nota**: Se recomienda especialmente mantener la cantidad de resultados de las consultas debajo de cierto umbral de tamaño para evitar la saturación del servidor con comandos select demasiado extensos.
+
+Para realizar consultas de mensajes más eficientes, es recomendable especificar un conjunto filtrado de campos:
+
+``
+fields = ["INBOX.uid", "INBOX.sender", "INBOX.subject", "INBOX.created"]
+mensajes = imapdb(q).select(*fields)
+``:code
+
+El adaptador sabe cómo recuperar secciones parciales de los mensajes (algunos campos como por ejemplo ``content``, ``size`` y ``attachments`` requieren la descarga completa de los datos del mensaje)
+
+Es posible filtrar los resultados del comando select con el parámetro limitby y secuencias de campos de la bandeja de correo
+``
+# Reemplaza los argumentos con valores personalizados
+miset.select(<secuencia de campos>, limitby=(<int>, <int>))
+``:code
+
+Supongamos, como ejemplo, que quieres hacer que una acción de una app muestre un mensaje de una bandeja de correo electrónico. Primero recuperamos el mensaje (si está soportado por tu servicio IMAP, recupera los mensajes especificando el campo ``uid`` para evitar el uso de referencias a números secuenciales erróneos).
+
+``
+mimensaje = imapdb(imapdb.INBOX.uid == <uid>).select().first()
+``:code
+
+Si no, puedes usar el campo ``id`` del mensaje.
+
+``
+mimensaje = imapdb.INBOX[<id>]
+``:code
+
+Ten en cuenta que el uso del id del mensaje no está recomendado, porque los números de secuencia pueden cambiar cuando se realizan operaciones de mantenimiento como por ejemplo eliminar mensajes. Si de todos modos deseas registrar valores de referencia a mensajes (por ejemplo en un campo del registro de otra base de datos), la solución es usar el campo uid como referencia siempre y cuando esté soportado y recuperar cada mensaje con el valor registrado.
+
+Por último, agrega algo parecido a lo siguiente para mostrar el contenido del mensaje en una vista
+
+``
+{{=P(T("Mensaje de"), " ", mimensaje.sender)}}
+{{=P(T("Received on"), " ", mimensaje.created)}}
+{{=H5(mimensaje.subject)}}
+{{for texto in mimensaje.content:}}
+  {{=DIV(texto)}}
+  {{=HR()}}
+{{pass}}
+``:code
+
+Naturalmente, podemos aprovechar el ayudante ``SQLTABLE`` para generar listas de mensajes en las vistas
+
+``
+{{=SQLTABLE(miset.select(), linkto=URL(...))}}
+``:code
+
+Y por supuesto, es posible usar el valor id de secuencia correspondiente como parámetro de un ayudante de formulario
+
+``
+{{=SQLFORM(imapdb.INBOX, <id del mensaje>, fields=[...])}}
+``:code
+
+Los campos soportados actualmente por el adaptador son los siguientes:
+
+---------------------------------------
+**Campo** | **Tipo** | **Descripción**
+uid | string | ````
+answered | boolean | Flag (utilizados para marcar los mensajes)
+created | date | Fecha
+content | list:string | Una lista con partes del mensaje de texto plano o html
+to | string | destinatario
+cc | string | copia de carbón
+bcc | string | copia de carbón oculta
+size | integer | la cantidad de octetos del mensaje*
+deleted | boolean | Flag
+draft | boolean | Flag
+flagged | boolean | Flag
+sender | string | remitente
+recent | boolean | Flag
+seen | boolean  | Flag
+subject | string| asunto del mensaje
+mime | string | La declaración mime del encabezado
+email | string | El mensaje completo según RFC822**
+attachments | list | Cada parte del mensaje sin texto plano como un diccionario
+encoding | string | La codificación de caracteres principal detectada
+---------------------------------------------------
+
+*Del lado de la aplicación se mide como la longitud de la cadena que contiene el mensaje RFC822
+
+**ADVERTENCIA**: Como los id de registro están asociados a números secuenciales, debes asegurarte de que tu app cliente de IMAP de web2py no elimine mensajes durante el procesamiento de acciones que contengan consultas como select o update, para prevenir la actualización o eliminación errónea de mensajes.
+
+Las operaciones típicas de ``CRUD`` no están soportadas. No hay manera de definir campos personalizados o tablas y realizar inserciones con distintos tipos de datos porque la actualización de bandejas de correo con servicios IMAP está usualmente limitada a la modificación de los flag en el servidor. De todos modos, es posible el acceso a esos comandos para actualizar los flag a través de la interfaz de DAL para IMAP
+
+Para marcar los mensajes de la consulta anterior como revisados
+
+``
+revisados = imapdb(q).update(seen=True)
+``:code
+
+
+Aquí eliminamos los correos en la base de datos IMAP que hayan sido enviados por el señor Gumby
+
+``
+eliminados = 0
+for nombredetabla in imapdb.tables():
+    eliminados += imapdb(imapdb[nombredetabla].sender.contains("gumby")).delete()
+``:code
+
+Además es posible marcar mensajes a eliminar en vez de eliminarlos directamente con
+
+``
+miset.update(deleted=True)
+``:code
+
+``IMAP``:inxx
+
