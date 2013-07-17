@@ -27,7 +27,7 @@ On some Unix/Linux systems, if the password is
 web2py uses the PAM password of the Operating System account of ``some_user`` to authenticate the administrator, unless blocked by the PAM configuration.
 
 -------
-web2py normally runs with CPython (the C implementation of the Python interpreter created by Guido van Rossum), but it can also run with PyPy and Jython. The latter possibility allows the use of web2py in the context of a J2EE infrastructure. To use Jython, simply replace "python web2py.py ..." with "jython web2py.py". Details about installing Jython, zxJDBC modules required to access the databases can be found in Chapter 14.
+web2py normally runs with CPython (the C implementation of the Python interpreter created by Guido van Rossum), but it can also run with PyPy and Jython. The latter possibility allows the use of web2py in the context of a Java EE infrastructure. To use Jython, simply replace "python web2py.py ..." with "jython web2py.py". Details about installing Jython, zxJDBC modules required to access the databases can be found in Chapter 14.
 -------
 
 The "web2py.py" script can take many command-line arguments specifying the maximum number of threads, enabling of SSL, etc. For a complete list type:
@@ -79,7 +79,7 @@ Options:
   --socket-timeout=SOCKET_TIMEOUT
                         timeout for socket (5 second)
   -f FOLDER, --folder=FOLDER
-                        folder from which to run web2py
+                        location of the applications folder (also known as directory) 
   -v, --verbose         increase --test verbosity
   -Q, --quiet           disable all output
   -D DEBUGLEVEL, --debug=DEBUGLEVEL
@@ -191,6 +191,7 @@ The web2py workflow is the following:
 There are some caveats to keep in mind:
 - Models in the same folder/subfolder are executed in alphabetical order.
 - Any variable defined in a model will be visible to other models following alphabetically, to the controllers, and to the views.
+``models_to_run``:inxx
 - Models in subfolders are executed conditionally. For example, if the user has requested "/a/c/f" where "a" is the application, "c" is the controller, and "f" is the function (action), then the following models are executed:
 
 ``
@@ -198,6 +199,7 @@ applications/a/models/*.py
 applications/a/models/c/*.py
 applications/a/models/c/f/*.py
 ``
+  This behaviour is enforced by default. Altering the ``response.models_to_run`` regex list, you can force the behaviour you want. Look at [[response #response_models_to_run]] for additional details
 
 - The requested controller is executed and the requested function is called. This means all top-level code in the controller is also executed at every request for that controller.
 - The view is only called if the action returns a dictionary.
@@ -910,7 +912,7 @@ results in the following ``request`` object:
 **variable** | **value**
 ``request.application`` | ``examples``
 ``request.controller`` | ``default``
-``request.function`` | ``index``
+``request.function`` | ``status``
 ``request.extension`` | ``html``
 ``request.view`` | ``status``
 ``request.folder`` | ``applications/examples/``
@@ -982,12 +984,13 @@ Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi 
 ``response.optimize_css``:inxx
 ``response.optimize_js``:inxx
 ``response._caller``:inxx
+``response.models_to_run``:inxx
 
 ``response`` is another instance of the ``Storage`` class. It contains the following:
 
 - ``response.body``: a ``StringIO`` object into which web2py writes the output page body. NEVER CHANGE THIS VARIABLE.
 - ``response.cookies``: similar to ``request.cookies``, but while the latter contains the cookies sent from the client to the server, the former contains cookies sent by the server to the client. The session cookie is handled automatically.
-- ``response.download(request, db)``: a method used to implement the controller function that allows downloading of uploaded files. ``request.download`` expects the last ``arg`` in ``request.args`` to be the encoded filename (i.e., the filename generated at upload time and stored in the upload field). It extracts the upload field name and table name as well as the original filename from the encoded filename. ``response.download`` takes two optional arguments: ``chunk_size`` sets the size in bytes for chunked streaming (defaults to 64K), and ``attachments`` determines whether the downloaded file should be treated as an attachment or not (default to ``True``). Note, ``response.download`` is specifically for downloading files associated with ``db`` upload fields. Use ``response.stream`` (see below) for other types of file downloads and streaming. Also, note that it is not necessary to use ``response.download`` to access files uploaded to the /static folder -- static files can (and generally should) be accessed directly via URL (e.g., /app/static/files/myfile.pdf).
+- ``response.download(request, db)``: a method used to implement the controller function that allows downloading of uploaded files. ``response.download`` expects the last ``arg`` in ``request.args`` to be the encoded filename (i.e., the filename generated at upload time and stored in the upload field). It extracts the upload field name and table name as well as the original filename from the encoded filename. ``response.download`` takes two optional arguments: ``chunk_size`` sets the size in bytes for chunked streaming (defaults to 64K), and ``attachments`` determines whether the downloaded file should be treated as an attachment or not (default to ``True``). Note, ``response.download`` is specifically for downloading files associated with ``db`` upload fields. Use ``response.stream`` (see below) for other types of file downloads and streaming. Also, note that it is not necessary to use ``response.download`` to access files uploaded to the /static folder -- static files can (and generally should) be accessed directly via URL (e.g., /app/static/files/myfile.pdf).
 - ``response.files``: a list of ``.css``, ``.js``, ``.coffee``, and ``.less`` files required by the page. They will automatically be linked in the head of the standard "layout.html" via the included "web2py_ajax.html". To include a new CSS, JS, COFFEE, or LESS file, just append it to this list. It will handle duplicates. The order is important.
 - ``response.include_files()`` generates html head tags to include all ``response.files`` (used in "views/web2py_ajax.html").
 - ``response.flash``: optional parameter that may be included in the views. Normally used to notify the user about something that happened.
@@ -1028,6 +1031,9 @@ Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi 
 - ``response.xmlrpc(request, methods)``: when a controller returns it, this function exposes the methods via XML-RPC``xmlrpc``:cite . This function is deprecated since a better mechanism is available and described in Chapter 10.
 - ``response.write(text)``: a method to write text into the output page body.
 - ``response.js`` can contain Javascript code. This code will be executed if and only if the response is received by a web2py component as discussed in Chapter 12.
+- ``response.models_to_run`` [[response_models_to_run]] contains a list of regexes that chooses what models to run.
+-- By default, this is set automatically to load /a/models/*.py, /a/models/c/*.py, and /a/models/c/f/*.py files when ``/a/c/f`` is requested. You can set, e.g., ``response.models_to_run = ['myfolder/']`` to force the execution only of the models inside your application's ``models/myfolder`` subfolder.
+-- NB: ``response.models_to_run`` is a list of regex, not a list of filepaths. The regex are relative to the models/ folder, so any model file with a relative file path that matches one of the regexes will be executed.
 
 Since ``response`` is a ``gluon.storage.Storage`` object, it can be used to store other attributes that you may want to pass to the view. While there is no technical restriction, our recommendation is to store only variables that are to be rendered by all pages in the overall layout ("layout.html").
 
@@ -1216,7 +1222,7 @@ def cache_controller_and_view():
 ``:code
 ``response.render(d)`` returns the rendered view as a string, which is now cached for 5 seconds. This is the best and fastest way of caching.
 ------
-We recommend to use @cache.client starting from web2py 2.4.4 
+We recommend to use @cache.action starting from web2py > 2.4.6 
 ------
 
 Note, ``time_expire`` is used to compare the current time with the time the requested object was last saved in the cache. It does not affect future requests. This enables ``time_expire`` to be set dynamically when an object is requested rather than being fixed when the object is saved. For example:
@@ -1253,7 +1259,7 @@ It is also possible to define other caching mechanisms such as memcache. Memcach
 Be careful when caching to remeber that caching is usually at the app-level not at the user level. If you need, for example, to cache user specific content, choose a key that includes the user id.
 ------
 
-#### ``cache.client``
+#### ``cache.action``
 Web2py by default assumes that the returned content is not going to be cached, as this reduces the shortcomings of an improper caching of the page client-side.
 
 For example, when you show a form to the user, or a list of records, the web page should not be cached, as other users may have inserted new records on the table you are showing.
@@ -1264,8 +1270,8 @@ to tell the client that that page is not going to change.
 This is accomplished sending out some specific headers along with the page: when the client's browser receives the content, it is stored in the browser's cache and it will not be requested again
 to your site. Of course this is a **major** speedup for public-facing sites.
 
-Web2py 2.4.4 introduced a new ``cache.client`` decorator to allow a smarter handling of this situation.
-``cache.client`` can be used:
+Web2py > 2.4.6 introduced a new ``cache.action`` decorator to allow a smarter handling of this situation.
+``cache.action`` can be used:
 - for setting smart cache headers
 - to cache the results accordingly
 ------
@@ -1288,14 +1294,14 @@ The main problem with caching a view with ``@cache(request.env.path_info, time_e
   -- When you cached the page for the first time, something went wrong and you returned a nice 404 page.
      You don't want to cache errors ^_^
 
-Instead of letting users write a lot of boilerplate code to take care of all those problems, ``cache.client`` was created.
+Instead of letting users write a lot of boilerplate code to take care of all those problems, ``cache.action`` was created.
 It will by default use smart cache headers to let the browser cache the result: if you pass a cache model to it, it will also figure out the best key automatically, 
 so different versions of the same page can be stored and retrieved accordingly (e.g. one for English users and one for Spanish ones)
 
 It takes several parameters, with smart defaults:
 
 - time_expire : the usual, defaults to 300 seconds
-- cache_model : by default is None. This means that @cache.client will **only** alter the default headers to let the client's browser cache the content
+- cache_model : by default is None. This means that @cache.action will **only** alter the default headers to let the client's browser cache the content
     -- if you pass, e.g., ``cache.ram``, the result will be stored in the cache as well
 - prefix : if you want to prefix the auto-generated key (useful for clearing it later with, e.g. ``cache.ram.clear(prefix*)``)
 - session : if you want to consider the session, defaults to False
@@ -1308,8 +1314,8 @@ It takes several parameters, with smart defaults:
   that resulted in a 200 status code) 
 - quick : defaults to None, but you can pass a list of initials to set a particular feature:
   -- **S**ession, **V**ars, **L**ang, **U**ser_agent, **P**ublic
-     e.g. ``@cache.client(time_expire=300, cache_model=cache.ram, quick='SVP')`` is the same as
-     ``@cache.client(time_expire=300, cache_model=cache.ram, session=True, vars=True, public=True)``
+     e.g. ``@cache.action(time_expire=300, cache_model=cache.ram, quick='SVP')`` is the same as
+     ``@cache.action(time_expire=300, cache_model=cache.ram, session=True, vars=True, public=True)``
 
 "Consider" means for e.g. **vars**, that you want to cache different pages if **vars** are different, 
 so  ''/app/default/index?**search=foo**'' will not be the same one for ''/app/default/index?**search=bar**''
@@ -1562,7 +1568,7 @@ redirect(URL('index', args=(1,2,3), vars=dict(a='b')))
 In chapter 12 we discuss web2py components. They make Ajax requests to web2py actions. If the called action performs a redirect, you may want the Ajax request to follow the redirect or you may want the entire page performing the Ajax request redirecting. In this latter case you can set:
 
 ``
-redirect(...,type='auto')
+redirect(...,client_side=True)
 ``:code
 
 
@@ -2276,7 +2282,7 @@ AliasMatch ^/([^/]+)/static/(.*) \
 ``
 into this:
 ``
-AliasMatch ^/([^/]+)/static/(?:/_[\d]+\.[\d]+\.[\d]+)?(.*) \
+AliasMatch ^/([^/]+)/static/(?:_[\d]+.[\d]+.[\d]+/)?(.*) \
    /home/www-data/web2py/applications/$1/static/$2
 ``
 

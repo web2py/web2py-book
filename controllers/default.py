@@ -94,7 +94,7 @@ def calc_date(now=request.utcnow.date()):
     return now.strftime(format)
 
 def chapter():
-    book_id, chapter_id = request.args(0), request.args(1,cast=int,default='0')
+    book_id, chapter_id = request.args(0), request.args(1, cast=int, default=0)
     subfolder = get_subfolder(book_id)
     info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
     chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=TIME_EXPIRE)
