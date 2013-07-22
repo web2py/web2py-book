@@ -1,0 +1,1535 @@
+## Control de acceso
+``Auth``:inxx ``Access Control``:inxx ``RBAC``:inxx ``DAC``:inxx ``MAC``:inxx
+
+web2py incluye un mecanismo de Control de Acceso Basado en Roles (RBAC) potente y personalizable.
+
+He aquí una definición en Wikipedia:
+
+
+"... el Control de Acceso Basado en Roles (RBAC) es una técnica para restringir el acceso al sistema a usuarios autorizados. Es una nueva alternativa del Control de Acceso Obligatorio (MAC) y el Control de Acceso Discrecional (DAC). A veces se refiere a RBAC como seguridad basada en roles (''role-based security'')
+
+RBAC es una tecnología para el control de acceso independiente de las reglas implementadas y flexible lo suficientemente potente para emular DAC y MAC. Asimismo, MAC puede emular RBAC si la configuración de roles (''role graph'') se restringe a un árbol en lugar de un conjunto parcialmente ordenado.
+
+Previamente al desarrollo de RBAC, MAC y DAC eran considerados el único modelo conocido para control de acceso: si un modelo no era MAC, se lo consideraba modelo DAC, y viceversa. La investigación de los finales de la década de 1990 demostró que RBAC no cuadra en ninguna de esas categorías.
+
+En el ámbito de una organización, los roles se crean para varias funciones de trabajo. La permisología para realizar ciertas operaciones es asignada a roles específicos. Se asignan a los miembros del personal (u otros usuarios del sistema) roles particulares, y por medio de esas asignaciones de roles adquieren los permisos para acceder a funciones particulares del sistema. A diferencia de los controles de acceso basados en el contexto (''context-based'' CBAC), RBAC no revisa el contexto del mensaje (como por ejemplo la dirección de origen de la conexión).
+
+Como no se asigna a los usuarios permisos directamente, sino que solo los obtienen a través de su rol (o roles), el manejo de derechos individuales consta simplemente de asociar los roles apropiados a un usuario determinado; esto simplifica las operaciones más comunes, como por ejemplo agregar un usuario o cambiar a un usuario de departamento.
+
+RBAC difiere de las listas de control de acceso (ACLs) usadas normalmente en los sistemas de control automático de acceso tradicionales en que asigna permisos para operaciones específicas que tienen un significado para la organización, no solo para objetos de datos de bajo nivel. Por ejemplo, se podría usar una lista de control de acceso para otorgar o denegar el acceso a escritura a un archivo determinado del sistema, pero eso no informaría sobre la forma en que se puede modificar ese archivo ..."
+
+
+La clase de web2py que implementa RBAC se llama **Auth**.
+
+**Auth** necesita (y define) las siguientes tablas:
+
+- ``auth_user`` almacena el nombre del usuario, dirección de correo electrónico, contraseña y estado (pendiente de registro, aceptado, bloqueado)
+- ``auth_group`` almacena los grupos o roles para usuarios en una estructura muchos-a-muchos. Por defecto, cada usuario pertenece a su propio grupo, pero un usuario puede estar incluido en múltiples grupos, y cada grupo contener múltiples usuarios. Un grupo es identificado por su rol y descripción.
+- ``auth_membership`` enlaza usuarios con grupos en una estructura muchos-a-muchos. 
+- ``auth_permission`` enlaza grupos con permisos. Un permiso se identifica por un nombre y opcionalmente, una tabla y un registro. Por ejemplo, los miembros de cierto grupo pueden tener permisos "update" (de actualización) para un registro específico de una tabla determinada.
+- ``auth_event`` registra los cambios en las otras tablas y el acceso otorgado a través de CRUD a objetos controlados con RBAC.
+- ``auth_cas`` se usa para el Servicio Central de Autenticación (CAS). Cada aplicación web2py es un proveedor de CAS y puede opcionalmente consumir el servicio CAS.
+
+El esquema de acceso se ha reproducido gráficamente en la imagen de abajo:
+
+[[imagen @///image/schema_auth.png center 300px]]
+
+
+En un principio, no hay una restricción de los nombres de roles o permisos; el desarrollador puede crearlos de acuerdo a los requerimientos de nombres de la organización. Una vez que estos se han creado, web2py provee de una API para comprobar si un usuario está autenticado, si un usuario es miembro de un grupo determinado, y/o si el usuario es miembro de cualquier grupo que tenga asignado un permiso determinado.
+
+web2py provee además de decoradores para la restricción de acceso a cualquier función en base al sistema de autenticación o ''login'', membresía o ''membership'' y permisos.
+
+Además, web2py es capaz de interpretar automáticamente algunos permisos especiales, como por ejemplo, aquellos asociados a los métodos CRUD (''create'', ''read'', ''update'', ''delete'') y puede llevar un control automático sin necesidad del uso de decoradores.
+
+En este capítulo, vamos a tratar sobre distintas partes de RBAC caso por caso.
+
+
+### Autenticación
+
+Para poder usar RBAC, debemos identificar a los usuarios. Esto significa que deben registrarse (o ser registrados) e ingresar al sistema (''log in'').
+
+**Auth** provee de múltiples métodos de autenticación. El método por defecto consiste en identificar a los usuarios según la tabla local ``auth_user``. Como alternativa, se puede registrar a los usuarios por medio de sistemas de autenticación de terceros y proveedores de ''single sign on'' como Google, PAM, LDAP, Facebook, LinkedIn, Dropbox, OpenID, OAuth, etc...
+
+Para comenzar a usar ``Auth``, debes por lo menos colocar este código en un archivo del modelo, que también viene por defecto en la aplicación "welcome" de web2py y supone el uso de un objeto de conexión llamado ``db``:
+
+``
+from gluon.tools import Auth
+auth = Auth(db)
+auth.define_tables()
+``:code
+
+Auth tiene un argumento opcional ``secure=True``, que forzará la autenticación a través de HTTPS. ``https``:inxx
+
+-------
+El campo ``password`` de la tabla ``db.auth_user`` tiene un validador ``CRYPT`` por defecto que requiere una ``hmac_key``. En aplicaciones heredadas de web2py deberías ver un argumento extra pasado al constructor de Auth: ``hmac_key = Auth.get_or_create_key()``. Esta última es una función que lee una clave HMAC desde "private/auth.key" en la carpeta de la aplicación. Si el archivo no existe, crea una ``hmac_key`` aleatoria. Si la misma base de datos auth es compartida por múltiples aplicaciones, asegúrate de que también usen la misma ``hmac_key``. Esto ya no es necesario para aplicaciones nuevas porque las contraseñas son ''saladas'' según un ''salt'' aleatorio e individual.
+-------
+
+Por defecto, web2py usa la dirección de correo electrónico como nombre de usuario para el ''login''. Si quieres autenticar a los usuarios con ''username'' debes establecer ``auth.define_tables(username=True)``.
+
+Cuando la base de datos de auth es compartida por varias aplicaciones deberías deshabilitar las migraciones: ``auth.define_tables(migrate=False=)``.
+
+Para exponer **Auth**, necesitas además la siguiente función en un controlador (por ejemplo en "default.py"):
+
+``
+def user(): return dict(form=auth())
+``:code
+
+-------
+El objeto ``auth`` y la acción ``user`` están definidos por defecto en la aplicación de andamiaje.
+-------
+
+web2py incluye además una vista de ejemplo "welcome/views/default/user.html" para convertir la función correctamente, similar a:
+
+``
+{{extend 'layout.html'}}
+<h2>{{=T( request.args(0).replace('_',' ').capitalize() )}}</h2>
+<div id="web2py_user_form">
+  {{=form}}
+  {{if request.args(0)=='login':}}
+    {{if not 'register' in auth.settings.actions_disabled:}}
+      <br/><a href="{{=URL(args='register')}}">regístrese</a>
+    {{pass}}
+    {{if not 'request_reset_password' in auth.settings.actions_disabled:}}
+      <br/>
+      <a href="{{=URL(args='request_reset_password')}}">olvidé mi contraseña</a>
+    {{pass}}
+  {{pass}}
+</div>
+``:code
+
+Observa que esta función simplemente muestra un ``form`` y por lo tanto se puede personalizar usando la notación común para formularios. El único problema es que el formulario producido por medio de ``form=auth()`` depende de ``request.args(0)``; por lo tanto, si reemplazas el formulario de login ``auth()`` con uno personalizado, puedes necesitar un condicional ``if`` en la vista como el siguiente:
+
+``
+{{if request.args(0)=='login':}}...formulario de autenticación personalizado...{{pass}}
+``:code
+
+``auth.impersonate``:inxx ``auth.is_impersonating``:inxx
+
+El controlador anterior expone múltiples acciones:
+``
+http://.../[app]/default/user/register
+http://.../[app]/default/user/login
+http://.../[app]/default/user/logout
+http://.../[app]/default/user/profile
+http://.../[app]/default/user/change_password
+http://.../[app]/default/user/verify_email
+http://.../[app]/default/user/retrieve_username
+http://.../[app]/default/user/request_reset_password
+http://.../[app]/default/user/reset_password
+http://.../[app]/default/user/impersonate
+http://.../[app]/default/user/groups
+http://.../[app]/default/user/not_authorized
+``:code
+
+- **register** permite a un usuario registrarse. Se integra con CAPTCHA, aunque la opción no está habilitada por defecto. También está integrado con una calculadora de entropía definida en "web2py.js". La calculadora indica la fortaleza de la nueva contraseña. Puedes usar el validador ``IS_STRONG`` para prevenir que web2py acepte contraseñas débiles.
+- **login** permite a un usuario registrado el acceso al sistema o ''login'' (si el registro del usuario se ha verificado o no se requiere verificación, si se aprovó o no requiere aprobación, y si no está bloqueado).
+- **logout** hace lo que esperarías que haga pero además, como los demás métodos, registra la acción y se puede usar además para activar otra acción o ''event''.
+- **profile** permite a los usuarios editar sus datos de registro, es decir, el contenido de la tabla ``auth_user``. Observa que esta tabla no tiene una estructura fija y se puede personalizar.
+- **change_password** permite a los usuarios cambiar su contraseña en forma segura.
+- **verify_email**. Si la verificación de correo electrónico está habilitada, los usuarios, al registrarse, reciben un correo con un link para verificar su información de correo. El link refiere a esta  misma acción.
+- **retrieve_username**. Por defecto, **Auth** usa email y contraseña para el login, pero puede, opcionalmente, utilizar ''username'' en su lugar. Para este último caso, si un usuario olvida su nombre de usuario, el método ``retrieve_username`` permite al usuario ingresar la dirección de correo electrónico para que se le envíe su nombre de usuario.
+- **request_reset_password**. Permite a los usuarios que olvidaron su contraseña que soliciten una nueva. Recibirán una confirmación por correo electrónico enlazada a la acción **reset_password**.
+- **impersonate** permite a un usuario adoptar las credenciales de otro o ''suplirlo'' en forma temporal. Esto es importante para propósitos de depuración. ``request.args[0]`` es el id del usuario que se va a suplir. Esto se permite únicamente si el usuario verifica ``has_permission('impersonate', db.auth_user, user_id)``. Puedes usar ``auth.is_impersonating()`` para comprobar si el usuario actual está supliendo a otro usuario.
+- **groups** lista los grupos en los que está incluido el usuario como miembro.
+- **not_authorized** muestra un mensaje de error cuando el usuario ha intentado hacer sin permisos que lo habiliten.
+- **navbar** es un ayudante que genera una barra con links login/registrarse/etc.
+
+
+Logout, profile, change_password, impersonate, y groups requieren un usuario autenticado.
+
+Por defecto todos estos recursos se exponen, pero es posible restringir el acceso a un subconjunto de las acciones.
+
+Todos los métodos descriptos arriba se pueden extender o reemplazar creando una subclase de **Auth**.
+
+Todos los métodos de arriba se puede usar en acciones separadas. Por ejemplo:
+
+``
+def milogin(): return dict(formulario=auth.login())
+def miregistro(): return dict(formulario=auth.register())
+def miperfil(): return dict(formulario=auth.profile())
+...
+``
+
+Para restringir el acceso a funciones a aquellos usuarios que se hayan autenticado únicamente, decora la función como en el siguiente ejemplo
+``
+@auth.requires_login()
+def hola():
+    return dict(message='hola %(first_name)s' % auth.user)
+``:code
+
+Toda función se puede decorar, no sólo las acciones expuestas. Por supuesto que esto es todavía un ejemplo realmente simple de control de acceso. Más adelante trataremos sobre ejemplos más complicados.
+
+``auth.user``:inxx ``auth.user_id``:inxx ``auth.user_groups``.
+
+-----
+``auth.user`` contiene una copia de los registros en ``db.auth_user`` para el usuario actualmente autenticado o ``None`` en su defecto. También está ``auth.user_id`` que es lo mismo que ``auth.user.id`` (es decir, el id del usuario actualmente autenticado) o ``None``. En forma similar, ``auth.user_groups`` contiene un diccionario donde cada clave es el id del grupo del cual el actual usuario autenticado es miembro, el valor asociado a la clave, es el rol correspondiente.
+-----
+
+``otherwise``:inxx
+
+El decorador ``auth.requires_login()`` así como también los demás decoradores ``auth.requires_*`` toman un argumento opcional ``otherwise``. Se puede especificar como una cadena que indica a dónde redirigir al usuario si falla la autenticación o como un objeto ''callable''. Este objeto se llama en caso de que fracase la acción.
+
+
+#### Restricciones al registro de usuarios
+
+
+Si quieres permitir a los visitantes que se registren pero que no tengan acceso hasta que su registro se haya aprobado por el administrador:
+
+``
+auth.settings.registration_requires_approval = True
+``:code
+
+Puedes aprobar un registro de usuario a través de la interfaz appadmin. Examina la tabla ``auth_user``. Los registros de usuarios pendientes tienen un campo ``registration_key`` cuyo valor es "pending". Un registro de usuario está aprobado cuando se establece el campo de este valor como vacío.
+
+Con la interfaz appadmin, puedes también bloquear a un usuario para que no pueda acceder. Busca al usuario en la tabla ``auth_user`` y establece el ``registration_key`` a "bloqueado". Los usuarios "bloqueados" no tienen permitido el acceso. Observa que esto evitará que un visitante se autentique pero no forzará al visitante que ya está autenticado para que cierre su sesión. Se puede usar la palabra "disabled" en lugar de "blocked" si se prefiere, con el mismo resultado.
+
+Además puedes bloquear completamente el acceso a la página para registro de usuarios con esta instrucción:
+
+``
+auth.settings.actions_disabled.append('register')
+``:code
+
+Si quieres permitir que todos se registren y automáticamente ser autenticados luego de registrarse pero de todas formas quieres enviar un correo de verificación para que no puedan autenticarse nuevamente luego de cerrar la sesión, a menos que hayan completado las instrucciones en el correo, puedes hacerlo de la siguiente manera:
+
+``
+auth.settings.registration_requires_approval = True
+auth.settings.login_after_registration = True
+``:code
+
+
+Otros métodos de **Auth** se pueden restringir de la misma forma.
+
+
+#### Integración con OpenID, Facebook, etc.
+``Janrain``:inxx ``OpenID``:inxx ``Facebook``:inxx ``LinkedIn``:inxx ``Google``:inxx ``MySpace``:inxx ``Flickr``:inxx
+
+Puedes usar el sistema de Control de Acceso Basado en Roles de web2py y autenticar con otros servicios como OpenID, Facebook, LinkedIn, Google, Dropbox, MySpace, Flickr, etc.
+
+La forma más fácil es usar Janrain Engage (antiguamente RPX) (Janrain.com).
+
+Dropbox se tratará como caso especial en el capítulo 14, porque implica más que simplemente autenticación, también tiene servicios de almacenamiento para usuarios autenticados.
+
+Janrain Engage es un servicio que provee autenticación con ''middleware''. Puedes registrarte en Janrain.com, registrar un dominio (el nombre de tu app) y el conjunto de los URL que vas a usar, y el sistema te proveerá de una clave de acceso a la API.
+
+Ahora edita el modelo de tu aplicación de web2py y coloca las siguientes líneas en alguna parte después de la definición del objeto ``auth``:
+
+``
+from gluon.contrib.login_methods.rpx_account import RPXAccount
+auth.settings.actions_disabled=['register','change_password','request_reset_password']
+auth.settings.login_form = RPXAccount(request,
+    api_key='...',
+    domain='...',
+    url = "http://tu-direccion-externa/%s/default/user/login" % request.application)
+``:code
+
+La primer línea importa el nuevo método de autenticación, la segunda línea deshabilita el registro de usuarios local, y la tercera línea le indica a web2py que debe usar el método RPX de autenticación. Debes ingresar tu propia ``api_key`` provista por Janrain.com, el dominio que hayas seleccionado al registrar la app y la ``url`` externa de tu página de login. Para obtener los datos ingresa a janrain.com, luego ve a [Deployment][Application Settings]. En la parte derecha está la "Application Info" (información de la aplicación), la api_key se llama "API Key (Secret)".
+
+El dominio es "Application Domain" sin el "https://" inicial y sin el ".rpxnow.com/" final.
+Por ejemplo: si has registrado un sitio web como "seguro.misitioweb.org", Janrain lo devuelve como el dominio "https://seguro.misitioweb.rpxnow.com".
+
+
+[[imagen @///image/en6900.png center 300px]]
+
+Cuando un nuevo usuario se autentica por primera vez, web2py crea un nuevo registro en ``db.auth_user`` asociado al usuario. Utilizará el campo ``registration_id`` para almacenar la clave id única de autenticación para el usuario. Practicamente todo método de autenticación provee también de nombre de usuario, correo, primer nombre y apellido pero eso no está garantizado. Los campos que se devuelven dependen del método de autenticación elegido por el usuario. Si el mismo usuario se autentica dos veces consecutivas utilizando distintos mecanismos de autenticación (por ejemplo una vez con OpenID y luego con Facebook), Janrain podría no notarlo ya que el mismo usuario puede tener asignado otro ``registration_id``
+
+Puedes personalizar el mapeo de datos entre los datos provistos por Janrain y la información almacenada en ``db.auth_user``. Aquí mostramos un ejemplo para Facebook:
+
+``
+auth.settings.login_form.mappings.Facebook = lambda profile:\\
+            dict(registration_id = profile["identifier"],
+                 username = profile["preferredUsername"],
+                 email = profile["email"],
+                 first_name = profile["name"]["givenName"],
+                 last_name = profile["name"]["familyName"])
+``:code
+
+Las claves en el diccionario son campos en ``db.auth_user`` y los valores son entradas de datos en el objeto del perfil provisto por Janrain. Consulta la documentación en línea de Janrain para más detalles sobre el objeto del perfil.
+
+Janrain además mantendrá estadísticas sobre los ingresos del usuario.
+
+Este formulario de autenticación está completamente integrado con el sistema de Control de Acceso Basado en Roles y por lo tanto puedes crear grupos, asignar membresías, permisos, bloquear usuarios, etc.
+
+-----
+El servicio básico gratuito de Janrain permite hasta 2500 usuarios únicos registrados por año). Para una mayor cantidad de usuarios hace falta un upgrade a alguno de sus distintos niveles de servicios pagos.
+
+Si prefieres no usar Janrain y quieres usar un método distinto de autenticación (LDAP, PAM, Google, OpenID, OAuth/Facebook, LinkedIn, etc.) puedes hacerlo. La API para este propósito se describe más adelante en este capítulo.
+-----
+
+#### CAPTCHA y reCAPTCHA
+
+``CAPTCHA``:inxx ``reCAPTCHA``:inxx ``PIL``:inxx
+
+Para impedir que los spammer y bot se registren en tu sitio, deberías solicitar el registro a través de CAPTCHA. web2py soporta reCAPTCHA``recaptcha``:cite por defecto. Esto se debe a que reCAPTCHA tiene un excelente diseño, es libre, accesible (puede leer las a los visitantes), fácil de configurar, y no requiere la instalación de ninguna librería de terceros.
+
+Esto es lo que necesitas hacer para usar reCAPTCHA:
+
+- Registrarte en reCAPTCHA``recaptcha``:cite y obtener el par (PUBLIC_KEY, PRIVATE_KEY) para tu cuenta. Estas son simplemente dos cadenas de texto.
+- Agrega el siguiente código a tu modelo luego de la definición del objeto ``auth``:
+
+``
+from gluon.tools import Recaptcha
+auth.settings.captcha = Recaptcha(request,
+    'PUBLIC_KEY', 'PRIVATE_KEY')
+``:code
+
+reCAPTCHA podría no funcionar si accedes al sitio desde 'localhost' o '127.0.0.1', porque está limitado para funcionar solamente con sitios públicamente accesibles.
+
+El constructor de ``Recaptcha`` toma algunos argumentos opcionales:
+
+``
+Recaptcha(..., use_ssl=True, error_message='inválido', label='Verificar:', options='')
+``:code
+
+Observa el ``use_ssl=False`` por defecto.
+
+``options`` puede ser una cadena de configuración, por ejemplo ``options="theme:'white', lang:'es'"``
+
+Más detalles: [[reCAPTCHA http://www.google.com/recaptcha]]``recaptchagoogle``:cite y [[customizing http://code.google.com/apis/recaptcha/docs/customization.html]].
+
+Si no quieres usar reCAPTCHA, puedes examinar la definición de la clase ``Recaptcha`` en "gluon/tools.py", ya que puedes fácilmente integrar la autenticación con otros sistemas CAPTCHA.
+
+Observa que ``Recaptcha`` es sólo un ayudante que extiende ``DIV``. Genera un campo ficticio que realiza la validación usando el servicio ``reCaptcha`` y, por lo tanto, se puede usar en cualquier formulario, incluso los formularios FORM definidos por el usuario.
+
+``
+formulario = FORM(INPUT(...), Recaptcha(...), INPUT(_type='submit'))
+``:code
+
+Puedes inyectarlo en cualquier clase de SQLFORM de esta forma:
+
+``
+formulario = SQLFORM(...) or SQLFORM.factory(...)
+formulario.element('table').insert(-1,TR('',Recaptcha(...),''))
+``:code
+
+#### Personalización de ``Auth``
+
+La llamada a
+``
+auth.define_tables()
+``:code
+
+define todas las tablas **Auth** que no se hayan definido previamente. Esto significa que si así lo quisieras, podrías definir tu propia tabla ``auth_user``.
+
+Hay algunas formas distintas de personalizar auth. La forma más simple es agregando campos extra:
+
+``
+## después de auth = Auth(db)
+auth.settings.extra_fields['auth_user']= [
+  Field('direccion'),
+  Field('ciudad'),
+  Field('codigo_postal'),
+  Field('telefono')]
+## antes de auth.define_tables(username=True)
+``
+
+Puedes declarar campos extra no solo para la tabla "auth_user" sino también para las otras tablas "auth_".
+Es recomendable el uso de ``extra_fields`` porque no creará ningún conflicto en el mecanismo interno.
+
+Otra forma de hacer lo mismo, aunque no es recomendable, consiste en definir nuestras propias tablas auth. Si una tabla se declara antes de ``auth.define_tables()`` es usada en lugar de la tabla por defecto. Esto se hace de la siguiente forma:
+
+``
+## después de auth = Auth(db)
+db.define_table(
+    auth.settings.table_user_name,
+    Field('first_name', length=128, default=''),
+    Field('last_name', length=128, default=''),
+    Field('email', length=128, default='', unique=True), # requerido
+    Field('password', 'password', length=512,            # requerido
+          readable=False, label='Password'),
+    Field('address'),
+    Field('city'),
+    Field('zip'),
+    Field('phone'),
+    Field('registration_key', length=512,                # requerido
+          writable=False, readable=False, default=''),
+    Field('reset_password_key', length=512,              # requerido
+          writable=False, readable=False, default=''),
+    Field('registration_id', length=512,                 # requerido
+          writable=False, readable=False, default=''))
+
+## no te olvides de los validadores
+auth_table_especial = db[auth.settings.table_user_name] # obtiene auth_table_especial
+auth_table_especial.first_name.requires = \\
+  IS_NOT_EMPTY(error_message=auth.messages.is_empty)
+auth_table_especial.last_name.requires = \\
+  IS_NOT_EMPTY(error_message=auth.messages.is_empty)
+auth_table_especial.password.requires = [IS_STRONG(), CRYPT()]
+auth_table_especial.email.requires = [
+  IS_EMAIL(error_message=auth.messages.invalid_email),
+  IS_NOT_IN_DB(db, auth_table_especial.email)]
+
+auth.settings.table_user = auth_table_especial # le dice a auth que use la tabla especial
+
+## antes de  auth.define_tables()
+``:code
+
+Puedes definir cualquier campo que quieras, y puedes cambiar los validadores pero no puedes eliminar los campos marcados como "requerido" en el ejemplo.
+
+Es importante que los campos "password", "registration_key", "reset_password_key" y "registration_id" tengan los valores ``readable=False`` y ``writable=False``, porque no debe permitirse que los usuarios los puedan manipular libremente.
+
+Si agregas un campo llamado "username", se utilizará en lugar de "email" para el acceso. Si lo haces, también deberás agregar un validador:
+
+``
+auth_table.username.requires = IS_NOT_IN_DB(db, auth_table.username)
+``:code
+
+#### Personalización de los nombres de tablas ``Auth``
+
+Los nombres utilizados de las tablas ``Auth`` se almacenan en
+``
+auth.settings.table_user_name = 'auth_user'
+auth.settings.table_group_name = 'auth_group'
+auth.settings.table_membership_name = 'auth_membership'
+auth.settings.table_permission_name = 'auth_permission'
+auth.settings.table_event_name = 'auth_event'
+``:code
+
+Se pueden cambiar los nombres de las tablas cambiando los valores de las variables de arriba después de la definición del objeto ``auth`` y antes de la definición de sus tablas. Por ejemplo:
+
+``
+auth = Auth(db)
+auth.settings.table_user_name = 'persona'
+#...
+auth.define_tables()
+``:code
+
+También se pueden recuperarlas tablas, independientemente de sus nombres actuales, con
+``
+auth.settings.table_user
+auth.settings.table_group
+auth.settings.table_membership
+auth.settings.table_permission
+auth.settings.table_event
+``:code
+
+#### Otros métodos de acceso y formularios de autenticación
+``LDAP``:inxx ``PAM``:inxx
+
+Auth provee de múltiples métodos y técnicas para crear nuevos métodos de autenticación. Cada método de acceso soportado tiene su correspondiente archivo en la carpeta
+``
+gluon/contrib/login_methods/
+``:code
+
+Puedes consultar la documentación en los mismos archivos para cada método de acceso, pero aquí mostramos algunos ejemplos.
+
+En primer lugar, necesitamos hacer una distinción entre dos tipos de métodos alternativos de acceso:
+
+- métodos de acceso que usan el formulario de autenticación de web2py (aunque verifican las credenciales fuera de web2py). Un ejemplo es LDAP.
+- métodos de acceso que requieren un formulario ''single-sign-on'' (como por ejemplo Google o Facebook).
+
+Para el último caso, web2py nunca obtiene las credenciales de acceso, solo un parámetro de acceso enviado por el proveedor del servicio. El parámetro o ''token'' se almacena en ``db.auth_user.registration_id``.
+
+Veamos ejemplos del primer caso:
+
+##### Básico
+
+Digamos que tienes un servicio de autenticación, por ejemplo en el url
+
+``
+https://basico.example.com
+``:code
+
+que acepta la autenticación de acceso básica. Eso significa que el servidor acepta solicitudes con un encabezado del tipo:
+
+``
+GET /index.html HTTP/1.0
+Host: basico.example.com
+Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
+``:code
+
+donde la última cadena es la codificación en base64 de la cadena usuario:contraseña. El servicio responde con 200 OK si el usuario está autorizado y 400, 401, 402, 403 o 404 en su defecto.
+
+Quieres ingresar el usuario y contraseña usando el formulario estándar de ``Auth```y verificar que las credenciales sean correctas para el servicio. Todo lo que debes hacer es agregar el siguiente código en tu aplicación:
+
+``
+from gluon.contrib.login_methods.basic_auth import basic_auth
+auth.settings.login_methods.append(
+    basic_auth('https://basico.example.com'))
+``:code
+
+Observa que ``auth.settings.login_methods`` es una lista de métodos de autenticación que se ejecutan en forma secuencial.
+Por defecto se establece como
+
+``
+auth.settings.login_methods = [auth]
+``:code
+
+Cuando se agrega un método alternativo, por ejemplo ``basic_auth``, **Auth** primero intenta dar acceso al visitante según el contenido de ``auth_user``, y si eso falla, trata el próximo método de autenticación en la lista. Si un método tiene éxito en la autenticación del usuario, y si se verifica ``auth.settings.login_methods[0]==auth``, ``Auth`` actúa de la siguiente manera:
+
+- si el usuario no existe en la tabla ``auth_user``, se crea un nuevo usuario y se almacenan los campos username/email y password.
+- si el usuario existe en ``auth_user`` pero la contraseña aceptada no coincide con la almacenada anteriormente, la contraseña antigua es reemplazada con la nueva (observa que las contraseñas son siempre almacenadas como ''hash'' a menos que se especifique lo contrario).
+
+Si no desea almacenar las la nueva contraseña en ``auth_user``, entonces basta con cambiar el orden de los métodos de autenticación, o eliminar ``auth`` de la lista. Por ejemplo:
+
+``
+from gluon.contrib.login_methods.basic_auth import basic_auth
+auth.settings.login_methods = \\
+    [basic_auth('https://basico.example.com')]
+``:code
+
+Esto es válido para cualquier otro de los métodos de acceso tratados.
+
+
+##### SMTP y Gmail
+``SMTP``:inxx ``Gmail``:inxx
+
+Puedes verificar las credenciales de acceso usando un servidor remoto SMTP, por ejemplo Gmail; por ejemplo, autenticas al usuario si el correo y la contraseña que proveen son credenciales válidas para acceder al servicio SMTP de Gmail (``smtp.gmail.com:567``). Todo lo que se requiere es el siguiente código:
+
+``
+from gluon.contrib.login_methods.email_auth import email_auth
+auth.settings.login_methods.append(
+    email_auth("smtp.gmail.com:587", "@gmail.com"))
+``:code
+
+El primer argumento de ``email_auth`` es la dirección:puerto del servidor SMTP. El segundo argumento es el dominio del correo.
+
+Esto funciona con cualquier servicio de correo que requiera autenticación con TLS. ``TLS``:inxx
+
+
+##### PAM
+``PAM``:inxx
+
+La autenticación usando los ''Pluggable Authentication Modules'' (PAM) funciona en forma parecida los casos anteriores. Permite a web2py que autentique a los usuarios usando una cuenta del sistema operativo:
+
+``
+from gluon.contrib.login_methods.pam_auth import pam_auth
+auth.settings.login_methods.append(pam_auth())
+``:code
+
+##### LDAP
+``LDAP``:inxx
+
+La autenticación utilizando LDAP funciona del mismo modo que en los casos anteriores.
+
+Para usar el login de LDAP con MS Active Directory:``Active Directory``:inxx
+``
+from gluon.contrib.login_methods.ldap_auth import ldap_auth
+auth.settings.login_methods.append(ldap_auth(mode='ad',
+   server='mi.dominio.controlador',
+   base_dn='ou=Users,dc=domain,dc=com'))
+``:code
+
+Para usar el login de LDAP con Lotus Notes y Domino:``Lotus Notes``:inxx ``Domino``:inxx
+``
+auth.settings.login_methods.append(ldap_auth(mode='domino',
+   server='mi.servidor.domino'))
+``:code
+
+Para usar el login de LDAP con OpenLDAP (con UID):``OpenLDAP``:inxx
+``
+auth.settings.login_methods.append(ldap_auth(server='mi.servidor.ldap',
+   base_dn='ou=Users,dc=domain,dc=com'))
+``:code
+
+Para usar el login de LDAP con OpenLDAP (con CN):
+``
+auth.settings.login_methods.append(ldap_auth(mode='cn',
+   server='mi.servidor.ldap', base_dn='ou=Users,dc=domain,dc=com'))
+``:code
+
+##### Google App Engine
+``GAE login``:inxx
+
+La autenticación usando Google cuando se corre en Google App Engine requiere omitir el formulario de acceso de web2py, redirigir a la página de acceso de Google y regresar en caso de éxito. Como el funcionamiento es distinto que en los ejemplos previos, la API es un tanto diferente.
+
+``
+from gluon.contrib.login_methods.gae_google_login import GaeGoogleAccount
+auth.settings.login_form = GaeGoogleAccount()
+``:code
+
+##### OpenID
+``OpenID``:inxx
+
+Ya hemos tratado sobre la integración con Janrain (que tiene soporte para OpenID) y habíamos notado que era la forma más fácil de usar OpenID. Sin embargo, a veces no deseas depender de un servicio de terceros y quieres acceder al proveedor de OpenID en forma directa a través de la app que consume el servicio, es decir, tu aplicación.
+
+Aquí se puede ver un ejemplo:
+
+``
+from gluon.contrib.login_methods.openid_auth import OpenIDAuth
+auth.settings.login_form = OpenIDAuth(auth)
+``:code
+
+``OpenIDAuth`` requiere la instalación del módulo adicional ''python-openid''. El método define automágicamente la siguiente tabla:
+
+``
+db.define_table('alt_logins',
+    Field('username', length=512, default=''),
+    Field('type', length =128, default='openid', readable=False),
+    Field('user', self.table_user, readable=False))
+``:code
+
+que almacena los nombres openid de cada usuario. Si quieres mostrar los openid de un usuario autenticado:
+
+``
+{{=auth.settings.login_form.list_user_openids()}}
+``:code
+
+##### OAuth2.0 y Facebook
+``OAuth``:inxx ``Facebook``:inxx
+
+Hemos tratado previamente la integración con Janrain (que tiene soporte para Facebook), pero a veces no quieres depender de un servicio de terceros y deseas acceder al proveedor de OAuth2.0 en forma directa; por ejemplo, Facebook. Esto se hace de la siguiente forma:
+
+``
+from gluon.contrib.login_methods.oauth20_account import OAuthAccount
+auth.settings.login_form=OAuthAccount(TU_ID_DE_CLIENTE,TU_CLAVE_DE_CLIENTE)
+``:code
+
+Las cosas se tornan un tanto complicadas cuando quieres usar Facebook OAuth2.0 para autenticar en una app específica de Facebook para acceder a su API, en lugar de acceder a tu propia app. Aquí mostramos un ejemplo para acceder a la Graph API de Facebook.
+
+Antes que nada, debes instalar el [[Facebook Python SDK https://github.com/pythonforfacebook/facebook-sdk/]].
+
+En segundo lugar, necesitas el siguiente código en tu modelo:
+
+``
+# importar los módulos requeridos
+from facebook import GraphAPI
+from gluon.contrib.login_methods.oauth20_account import OAuthAccount
+# extensión de la clase OAUthAccount
+class FaceBookAccount(OAuthAccount):
+    """OAuth impl for Facebook"""
+    AUTH_URL="https://graph.facebook.com/oauth/authorize"
+    TOKEN_URL="https://graph.facebook.com/oauth/access_token"
+    def __init__(self, g):
+        OAuthAccount.__init__(self, g,
+                              TU_ID_DE_CLIENTE,
+                              TU_CLAVE_DE_CLIENTE,
+                              self.URL_DE_AUTH,
+                              self.PARAMETRO_URL) # token url
+        self.graph = None
+    # reemplazamos la función que recupera la información del usuario
+    def get_user(self):
+        "Devuelve el usuario de la Graph API"
+        if not self.accessToken():
+            return None
+        if not self.graph:
+            self.graph = GraphAPI((self.accessToken()))
+        try:
+            user = self.graph.get_object("me")
+            return dict(first_name = user['first_name'],
+                        last_name = user['last_name'],
+                        username = user['id'])
+        except GraphAPIError:
+            self.session.token = None
+            self.graph = None
+            return None
+# puedes usar la clase definida arriba para crear
+# un nuevo formulario de autenticación
+auth.settings.login_form=FaceBookAccount()
+``:code
+
+##### LinkedIn
+``LinkedIn``:inxx
+
+Hemos tratado anteriormente sobre la integración con Janrain (que tiene soporte para LinkedIn) y esa es la forma más sencilla para usar OAuth. Sin embargo, a veces no quieres depender de un servicio de terceros o quieres acceder directamente a LinkedIn para recuperar más información de la que te provee Janrain.
+
+He aquí un ejemplo:
+
+``
+from gluon.contrib.login_methods.linkedin_account import LinkedInAccount
+auth.settings.login_form=LinkedInAccount(request,CLAVE,CLAVE_SECRET,URL_DE_RETORNO)
+``:code
+
+``LinkedInAccount`` requiere que se instale el módulo adicional "python-linkedin".
+
+##### X509
+
+Además puedes autenticar enviando a la página un certificado x509 y tu credencial se extraerá del certificado. Esto necesita instalado ``M2Crypto`` de esta dirección:
+
+``
+http://chandlerproject.org/bin/view/Projects/MeTooCrypto
+``
+
+Una vez que tienes M2Crypto instalado puedes hacer:
+
+``
+from gluon.contrib.login_methods.x509_auth import X509Account
+auth.settings.actions_disabled=['register','change_password','request_reset_password']
+auth.settings.login_form = X509Account()
+``:code
+
+Ahora puedes autenticar en web2py pasando tu certificado x509. La forma de hacerlo depende del navegador, pero probablemente necesites usar certificados para webservices. En ese caso puedes usar por ejemplo ``cURL`` para hacer pruebas a tu autenticación:
+
+``
+curl -d "firstName=John&lastName=Smith" -G -v --key private.key \\
+     --cert  server.crt https://example/app/default/user/profile
+``
+
+Esto funciona instantáneamente con Rocket (el servidor web incorporado) pero puedes necesitar algunas configuraciones extra para que funcione del lado del servidor si vas a usar un servidor diferente. En especial debes informar a tu servidor web dónde se ubican los certificados en la máquina que aloja el sistema y que se requiere la verificación de los certificados que son enviados en forma remota. La forma de hacer esto depende del servidor web y por lo tanto no lo trataremos aquí.
+
+
+##### Múltiples formularios de acceso
+
+Algunos métodos de acceso hacen modificaciones al formulario de autenticación, otros no. Cuando lo hacen, es probable que no puedan coexistir. Esto a veces se puede resolver especificando múltiples formularios de acceso en la misma página. web2py provee un método para esta tarea. Aquí se muestra un ejemplo mezclando el login normal (auth) y el login RPX (janrain.com):
+
+``
+from gluon.contrib.login_methods.extended_login_form import ExtendedLoginForm
+otro_formulario = RPXAccount(request, api_key='...', domain='...', url='...')
+auth.settings.login_form = ExtendedLoginForm(auth, otro_formulario, signals=['token'])
+``:code
+
+Si se establecen las señales y uno de los parámetros en la solicitud coincide con alguna de las señales, entonces realizará la llamada a ``otro_formulario.formulario_acceso`` como alternativa. ``otro_formulario`` puede manejar algunas situaciones particulares, por ejemplo, múltiples pasos del lado del acceso con OpenID dentro de ``otro_formulario.formulario_acceso``.
+
+En su defecto mostrará el formulario de acceso ''login'' normal junto con ``otro_formulario``.
+
+
+#### Versiones de registros
+
+Puedes usar Auth para habilitar el control de versiones de registros (''record versioning''):
+
+``
+db.enable_record_versioning(db,
+    archive_db=None,
+    archive_names='%(tablename)s_archive',
+    current_record='current_record'):
+``:code
+
+Esto le indica a web2py que cree una tabla de control de registros para cada tabla en ``db`` y que almacene una copia de cada registro cuando se modifica. Lo que se almacena es la copia antigua, no la nueva versión.
+
+Los últimos tres parámetros son opcionales:
+
+- ``archive_db`` permite especificar otra base de datos donde se almacenarán las tablas de control. Si se configura como ``None`` equivale a especificar ``db``.
+- ``archive_names`` provee de un patrón para la nomenclatura utilizada para cada tabla.
+- ``current_record`` especifica el nombre del campo tipo reference a usarse en la tabla de control para referir al registro original sin modificar. Observa que en caso de verificarse ``archive_db!=db`` entonces el campo de referencia es meramente un campo tipo integer ya que no se contemplan las referencias entre bases de datos.
+
+Solo se realiza el control de versiones para las tablas con campos ``modified_by`` y ``modified_on`` (como las creadas por ejemplo por auth.signature)
+
+Cuando habilitas ``enable_record_versioning``, si los registros tienen un campo ``is_active`` (también creado por auth.signature), los registros nunca se eliminarán sino que se marcarán con ``is_active=False``. De hecho, ``enable_record_versioning`` agrega un ``common_filter`` a cada tabla con control de versión que excluye los registros con ``is_active=False`` de manera que no sean visibles.
+
+Si habilitas ``enable_record_versioning`` no deberías usar ``auth.archive`` o ``crud.archive`` o de lo contrario se producirán duplicados de registros. Esas funciones realizan la misma tarea que ``enable_record_versioning`` pero en forma explícita y serán deprecadas, mientras que ``enable_record_versioning`` lo hace automáticamente.
+
+
+#### ``Mail`` y ``Auth``
+
+Uno puede definir un motor de envío de correo con
+
+``
+from gluon.tools import Mail
+mail = Mail()
+mail.settings.server = 'smtp.example.com:25'
+mail.settings.sender = 'tu@example.com'
+mail.settings.login = 'usuario:contraseña'
+
+``
+
+o simplemente usar el ''mailer'' provisto con ``auth``:
+
+``
+mail = auth.settings.mailer
+mail.settings.server = 'smtp.example.com:25'
+mail.settings.sender = 'tu@example.com'
+mail.settings.login = 'usuario:contraseña'
+``
+
+Debes reemplazar los valores de mail.settings con los parámetros apropiados para tu servidor SMTP. Establece ``mail.settings.login = None`` si el servidor de SMTP no requiere autenticación. Si no quieres utilizar TLS, establece ``mail.settings.tls = False``
+
+Puedes leer más acerca de la API para email y su configuración en el Capítulo 8. Aquí nos limitamos a tratar sobre la interacción entre ``Mail`` y ``Auth``.
+
+En ``Auth``, por defecto, la verificación de correo electrónico está deshabilitada.
+Para habilitarla, agrega las siguientes líneas en el modelo donde se define ``auth``:
+
+``
+auth.settings.registration_requires_verification = True
+auth.settings.registration_requires_approval = False
+auth.settings.reset_password_requires_verification = True
+auth.messages.verify_email = 'Haz clic en el link http://' + \\
+    request.env.http_host + \\
+    URL(r=request,c='default',f='user',args=['verify_email']) + \\
+    '/%(key)s para verificar tu dirección de correo electrónico'
+auth.messages.reset_password = 'Haz clic en el link http://' + \\
+    request.env.http_host + \\
+    URL(r=request,c='default',f='user',args=['reset_password']) + \\
+    '/%(key)s para restablecer tu contraseña'
+``:code
+
+En los dos mensajes de ``auth.messages`` de arriba, podrías necesitar reemplazar la parte del URL en la cadena con la dirección absoluta y/o apropiada de la acción. Esto se debe a que web2py podría estar instalado detrás de un proxy, y no puede determinar su propia URL con absoluta certeza. Los ejemplos anteriores (que son los valores por defecto) deberían, sin embargo, funcionar en la mayoría de los casos.
+
+
+### Autorización
+
+
+Una vez que se ha registrado un nuevo usuario, se crea un nuevo grupo que lo contiene. El rol del nuevo usuario es por convención "user_[id]" donde [id] es el id del nuevo usuario creado. Se puede deshabilitar la creación del grupo con
+
+``
+auth.settings.create_user_groups = None
+``:code
+
+aunque no es recomendable. Observa que ``create_user_groups`` no es un valor booleano (aunque se puede establecer como ``False``) sino que es por defecto:
+
+``
+auth.settings.create_user_groups="user_%(id)s"
+``:code
+
+Este almacena una plantilla para el nombre del grupo a crear para un determinado ``id`` de usuario.
+
+Los usuarios tienen membresía en los grupos. Cada grupo se identifica por un nombre/rol o ''role''. Los grupos tienen permisos. Los usuarios tienen permisos según a qué grupos pertenezcan. Por defecto cada usuario es nombrado miembro de su propio grupo.
+
+Además puedes hacer
+
+``
+auth.settings.everybody_group_id = 5
+``:code
+
+para que un usuario sea miembro automáticamente del grupo número 5. Aquí 5 es utilizado como ejemplo y asumimos que el grupo ya se ha creado de antemano.
+
+Puedes crear grupos, asignar membresías y permisos a través de **appadmin** o en forma programática usando los siguientes métodos:
+``
+auth.add_group('rol', 'descripción')
+``:code
+
+el método devuelve el id del nuevo grupo creado.
+
+``
+auth.del_group(id_grupo)
+``:code
+
+borra el grupo que tenga id ``id_grupo``.
+
+``
+auth.del_group(auth.id_group('user_7'))
+``:code
+
+borra el grupo cuyo rol es "user_7", es decir, el grupo exclusivo del usuario número 7
+
+``
+auth.user_group(id_usuario)
+``:code
+
+devuelve el id del grupo exclusivo del usuario identificado con el id ``id_usuario``.
+
+``
+auth.add_membership(id_grupo, id_usuario)
+``:code
+
+le otorga membresía en el grupo ``id_grupo`` al usuario ``id_usuario``.
+Si el usuario no se especifica, web2py asume que se trata del usuario autenticado.
+
+``
+auth.del_membership(id_grupo, id_usuario)
+``:code
+
+expulsa al usuario ``id_usuario`` del grupo ``id_grupo``.
+Si no se especifica el usuario, entonces web2py asume que se trata del usuario autenticado.
+
+``
+auth.has_membership(id_grupo, id_usuario, rol)
+``:code
+
+verifica que el usuario ``id_usuario`` es miembro del grupo ``id_grupo`` o el grupo con el rol especificado. Solo se debería pasar ``id_grupo`` o ``rol`` a la función, no ambos. Si no se especifica ``id_usuario``, entonces web2py asume que se trata del usuario autenticado.
+
+``
+auth.add_permission(id_grupo, 'nombre', 'objeto', id_registro)
+``:code
+
+otorga permiso para "nombre" (definido por el usuario) sobre "objeto" (también definido por el usuario) a miembros del grupo ``id_grupo``. Si "objeto" es un nombre de tabla entonces el permiso puede hacer referencia a toda la tabla estableciendo el valor de ``id_registro`` como cero o bien el permiso puede hacer referencia a un registro específico estableciendo ``id_registro`` con un valor numérico mayor a cero. Cuando se otorgan permisos sobre tablas, es una práctica común la utilización de nombres comprendidos en el conjunto ('create', 'read', 'update', 'delete', 'select'). Estos parámetros son tratados especialmente y controlados en forma instantánea por las API para CRUD.
+
+Si el valor ``id_grupo`` es cero, web2py usa el grupo exclusivo para el usuario actualmente autenticado.
+
+También puedes usar ``auth.id_group(role="...")`` para recuperar el id del grupo por su nombre. ``id_group``:inxx
+
+``
+auth.del_permission(group_id, 'nombre', 'objeto', id_registro)
+``:code
+
+anula el permiso.
+
+``
+auth.has_permission('nombre', 'objeto', id_registro, id_usuario)
+``:code
+
+comprueba que el usuario identificado por ``id_usuario`` tiene membresía en un grupo con el permiso consultado.
+
+``
+registro = db(auth.accessible_query('read', db.mitabla, id_usuario))\\
+    .select(db.mitabla.ALL)
+``:code
+
+devuelve todo registro de la tabla "mitabla" para el cual el usuario ``id_usuario`` tiene permiso de lectura.
+Si el usuario no se especifica, entonces web2py asume que se trata del usuario autenticado.
+El comando ``accessible_query(...)`` se puede combinar con otras consultas para obtener consultas más complicadas.
+``accessible_query(...)`` es el único método de **Auth** que requiere el uso de JOIN, por lo que no es utilizable en Google App Engine.
+
+Suponiendo que se han establecido las siguientes definiciones:
+``
+>>> from gluon.tools import Auth
+>>> auth = Auth(db)
+>>> auth.define_tables()
+>>> secretos = db.define_table('documento', Field('cuerpo'))
+>>> james_bond = db.auth_user.insert(first_name='James',
+                                     last_name='Bond')
+``:code
+
+He aquí un ejemplo:
+``
+>>> doc_id = db.documento.insert(cuerpo = 'confidencial')
+>>> agentes = auth.add_group(role = 'Agente secreto')
+>>> auth.add_membership(agentes, james_bond)
+>>> auth.add_permission(agentes, 'read', secretos)
+>>> print auth.has_permission('read', secretos, doc_id, james_bond)
+True
+>>> print auth.has_permission('update', secretos, doc_id, james_bond)
+False
+``:code
+
+#### Decoradores
+
+La forma más corriente de comprobar credenciales no es usar llamadas explícitas a los métodos descriptos más arriba, sino decorando las funciones para que se compruebe la permisología en función del usuario autenticado. Aquí se muestran algunos ejemplos:
+
+``
+def funcion_uno():
+    return 'esta es una función pública'
+
+@auth.requires_login()
+def funcion_dos():
+    return 'esta requiere de acceso'
+
+@auth.requires_membership('agentes')
+def funcion_tres():
+    return 'eres un agente secreto'
+
+@auth.requires_permission('read', secretos)
+def funcion_cuatro():
+    return 'tienes permiso para leer los documentos secretos'
+
+@auth.requires_permission('delete', 'archivos todos')
+def funcion_cinco():
+    import os
+    for file in os.listdir('./'):
+        os.unlink(file)
+    return 'se borraron todos los archivos'
+
+@auth.requires(auth.user_id==1 or request.client=='127.0.0.1', requires_login=True)
+def funcion_seis():
+    return 'puedes leer documentos secretos'
+
+@auth.requires_permission('sumar', 'número')
+def sumar(a, b):
+    return a + b
+
+def funcion_siete():
+    return sumar(3, 4)
+``:code
+
+El argumento que especifica los requisitos de ``auth.requires(condición)`` puede ser un objeto ''callable'' y a menos que la condición sea simple, es preferible pasar un callable que una condición porque será más rápido, ya que la condición sólo se evaluará en caso de ser necesario. Por ejemplo
+
+``
+@auth.requires(lambda: comprobar_condicion())
+def accion():
+    ....
+``:code
+
+``@auth.requires`` también toma un argumento opcional ``requires_login`` que es por defecto ``True``. Si se establece como False, no requiere login antes de evaluar la condición de verdadero/falso. La condición puede ser un valor booleano o una función que evalúe a un booleano.
+
+Observa que el acceso a todas las funciones excepto la de la primera y la última está restringido según la permisología asociada al usuario que realizó la solicitud.
+
+Si no hay un usuario autenticado, entonces los permisos no se pueden comprobar; el visitante es redirigido a la página de login y luego de regreso a la página que requiere los permisos.
+
+
+#### Combinando requisitos
+
+Ocasionalmente, hace falta combinar requisitos. Esto puede hacerse a través de un decorador con ``requires`` genérico que tome un único argumento que consista en una condición verdadera o falsa. Por ejemplo, para dar acceso a los agentes, pero solo los días martes:
+
+``
+@auth.requires(auth.has_membership(group_id='agentes' \\
+               and request.now.weekday()==1)
+def funcion_siete():
+    return 'Hola agente, ¡debe ser martes!'
+``:code
+
+o el equivalente:
+
+``
+@auth.requires(auth.has_membership(role='Agente secreto') \\
+               and request.now.weekday()==1)
+def funcion_siete():
+    return 'Hola agente, ¡debe ser martes!'
+``:code
+
+#### CRUD y Autorización
+
+El uso de decoradores o comprobaciones explícitas proveen de una forma de implementación para el control de acceso.
+
+Otra forma de implementación del control de acceso es siempre usar CRUD (en lugar de ``SQLFORM``) para acceder a la base de datos e indicarle a CRUD que debe controlar el acceso a las tablas y registros de la base de datos. Esto puede hacerse enlazando ``Auth`` y ``CRUD`` con la siguiente instrucción:
+
+``
+crud.settings.auth = auth
+``:code
+
+Esto evitará que el visitante acceda a cualquier operación CRUD a menos que esté autenticado y tenga la permisología adecuada.
+Por ejemplo, para permitir a un visitante que publique comentarios, pero que sólo pueda actualizar sus comentarios (suponiendo que se han definido crud, auth y db.comentario):
+
+``
+def otorgar_permiso_crear(formulario):
+    id_grupo = auth.id_group('user_%s' % auth.user.id)
+    auth.add_permission(id_grupo, 'read', db.comentario)
+    auth.add_permission(id_grupo, 'create', db.comentario)
+    auth.add_permission(id_grupo, 'select', db.comentario)
+
+def otorgar_permiso_actualizar(formulario):
+    id_comentario = formulario.vars.id
+    id_grupo = auth.id_group('user_%s' % auth.user.id)
+    auth.add_permission(group_id, 'update', db.comentario, id_comentario)
+    auth.add_permission(group_id, 'delete', db.comentario, id_comentario)
+
+auth.settings.register_onaccept = otorgar_permiso_crear
+crud.settings.auth = auth
+
+def publicar_comentario():
+   formulario = crud.create(db.comentario, onaccept=otorgar_permiso_actualizar)
+   comentarios = db(db.comentario).select()
+   return dict(formulario=formulario, comentarios=comentarios)
+
+def actualizar_comentario():
+   formulario = crud.update(db.comentario, request.args(0))
+   return dict(formulario=formulario)
+``:code
+
+Además puedes recuperar registros específicos (aquellos para los que está habilitada la lectura 'read'):
+``
+def publicar_comentario():
+   formulario = crud.create(db.comentario, onaccept=otorgar_permiso_actualizar)
+   consulta = auth.accessible_query('read', db.comentario, auth.user.id)
+   comentarios = db(consulta).select(db.comentario.ALL)
+   return dict(formulario=formulario, comentarios=comentarios)
+``:code
+
+Los nombres empleados para la permisología manejados por:
+
+``
+crud.settings.auth = auth
+``:code
+
+son "read", "create", "update", "delete", "select", "impersonate".
+
+#### Autorización y descargas
+
+El uso de decoradores y de ``crud.settings.auth`` no establece un control de acceso a archivos descargados con la función de descarga corriente.
+
+``
+def download(): return response.download(request, db)
+``:code
+
+En caso de ser necesario, uno debe declarar explícitamente cuáles campos tipo "upload" contienen archivos que requieren control de acceso al descargarse. Por ejemplo:
+
+``
+db.define_table('perro',
+   Field('miniatura', 'upload'),
+   Field('imagen', 'upload'))
+
+db.perro.imagen.authorization = lambda registro: \\
+   auth.is_logged_in() and \\
+   auth.has_permission('read', db.perro, registro.id, auth.user.id)
+``:code
+
+El atributo ``authorization`` del campo upload puede ser None (por defecto) o una función personalizada que compruebe credenciales y/o la permisología para los datos consultados. En el caso del ejemplo, la función comprueba que usuario esté autenticado y tenga permiso de lectura para el registro actual. Además, también para este caso particular, no existe una restricción sobre la descarga de imágenes asociadas el campo "miniatura", pero requiere control de acceso para las imágenes asociadas al campo "imagen".
+
+
+#### Control de Acceso y Autenticación Básica
+
+En algunas ocasiones, puede ser necesario exponer acciones con decoradores que implementan control de acceso como servicios; por ejemplo, cuando se los llama desde un script o programa pero con la posibilidad de utilizar el servicio de autenticación para comprobar las credenciales de acceso.
+
+**Auth** contempla el acceso por el método de autenticación básico:
+
+``
+auth.settings.allow_basic_login = True
+``:code
+
+Con esa opción, una acción como por ejemplo
+
+``
+@auth.requires_login()
+def la_hora():
+    import time
+    return time.ctime()
+``:code
+
+puede invocarse, por ejemplo, desde un comando de la consola:
+
+``
+wget --user=[usuario] --password=[contraseña]
+    http://.../[app]/[controlador]/la_hora
+``:code
+
+También es posible dar acceso llamando a ``auth.basic()`` en lugar de usar un decorador ``@auth``:
+
+``
+def la_hora():
+    import time
+    auth.basic()
+    if auth.user:
+        return time.ctime()
+    else:
+        return 'No tiene autorización'
+``:code
+
+El método de acceso básico es a menudo la única opción para servicios (tratados en el próximo capítulo), pero no está habilitado por defecto.
+
+#### Autenticación manual
+
+A veces necesitas implementar tus propios algoritmos y hacer un sistema de acceso "manual".
+Esto también está contemplado llamando a la siguiente función:
+
+``
+user = auth.login_bare(usuario, contraseña)
+``:code
+
+``login_bare`` devuelve el objeto user en caso de que exista y su contraseña es válida, de lo contrario devuelve False. ``username`` es la dirección de correo electrónico si la tabla ``auth_user`` no tiene un campo ``username``.
+
+
+#### Configuraciones y mensajes
+
+Esta es la lista de todos los parámetros que se pueden personalizar para **Auth**
+
+Para que ``auth`` pueda enviar correos se debe enlazar lo siguiente a un objeto ``gluon.toools.Mail``:
+
+
+``
+auth.settings.mailer = None
+``:code
+
+El siguiente debe ser el nombre del controlador que define la acción ``user``:
+
+``
+auth.settings.controller = 'default'
+``:code
+
+El que sigue es un parámetro muy importante:
+
+
+``
+auth.settings.hmac_key = None
+``:code
+
+Debe tomar un valor similar a "sha512:una-frase-de-acceso" y se pasará como parámetro al validador CRYPT para el campo "password" de la tabla ``auth_user``. Serán el algoritmo y la frase de acceso usados para hacer un hash de las contraseñas.
+
+Por defecto, auth también requiere una extensión mínima para las contraseñas de 4 caracteres. Esto se puede modificar:
+
+``
+auth.settings.password_min_length = 4
+``:code
+
+Para deshabilitar una acción agrega su nombre a la siguiente lista:
+
+``
+auth.settings.actions_disabled = []
+``:code
+
+Por ejemplo:
+
+``
+auth.settings.actions_disabled.append('register')
+``:code
+
+deshabilitará el registro de usuarios.
+
+Si deseas recibir un correo para verificar el registro de usuario debes configurar este parámetro como ``True``:
+
+``
+auth.settings.registration_requires_verification = False
+``:code
+
+Para autenticar automáticamente a los usuarios una vez que se hayan registrado, incluso si no han completado el proceso de verificación del correo electrónico, establece el siguiente parámetro como ``True``:
+
+``
+auth.settings.login_after_registration = False
+``:code
+
+Si los nuevos usuarios registrados deben esperar por la aprobación antes de poder acceder configura esto como ``True``:
+
+
+``
+auth.settings.registration_requires_approval = False
+``:code
+
+La aprobación consiste en establecer el valor ``registration_key==''`` a través de appadmin o programáticamente.
+
+Si no deseas que se genere un nuevo grupo para cada usuario establece el siguiente parámetro como ``False``:
+
+``
+auth.settings.create_user_groups = True
+``:code
+
+Las siguientes configuraciones establecen métodos alternativos para el acceso o ''login'', tratados más arriba:
+
+``
+auth.settings.login_methods = [auth]
+auth.settings.login_form = auth
+``:code
+
+¿Necesitas habilitar el acceso básico?
+
+
+``
+auth.settings.allows_basic_login = False
+``:code
+
+
+El siguiente URL corresponde a la acción de autenticación ''login'':
+
+``
+auth.settings.login_url = URL('user', args='login')
+``:code
+
+Si el usuario intenta acceder a la página de registro pero ya se ha autenticado, se lo redirigirá a esta URL:
+
+``
+auth.settings.logged_url = URL('user', args='profile')
+``:code
+
+Esto debe referir al URL de la acción download, en caso de que el perfil contenga imágenes:
+
+``
+auth.settings.download_url = URL('download')
+``:code
+
+Estos parámetros deben enlazar al URL al que quieras usar para redirigir a tus usuarios luego de cada acción de tipo ``auth`` (en caso de que no se haya establecido un parámetro de redirección especial o ''referrer''):
+
+``
+auth.settings.login_next = URL('index')
+auth.settings.logout_next = URL('index')
+auth.settings.profile_next = URL('index')
+auth.settings.register_next = URL('user', args='login')
+auth.settings.retrieve_username_next = URL('index')
+auth.settings.retrieve_password_next = URL('index')
+auth.settings.change_password_next = URL('index')
+auth.settings.request_reset_password_next = URL('user', args='login')
+auth.settings.reset_password_next = URL('user', args='login')
+auth.settings.verify_email_next = URL('user', args='login')
+``:code
+
+Si el usuario no se ha autenticado, y ejecuta una función que requere autenticación, entonces será redirigido a ``auth.settings.login_url`` que por defecto es ``URL('default', 'user/login')``.
+Podemos cambiar ese comportamiento si redefinimos:
+``on_failed_authentication``:inxx
+
+``
+auth.settings.on_failed_authentication = lambda url: redirect(url)
+``:code
+
+Que es la función a la que se llama para las redirecciones. El argumento ``url`` pasado a esta función es el url para la página de acceso (''login page'').
+
+Si el visitante no tiene permiso de acceso a una función determinada, es redirigido al URL definido por
+``on_failed_authorization``:inxx
+
+``
+auth.settings.on_failed_authorization = \\
+    URL('user',args='on_failed_authorization')
+``:code
+
+Puedes cambiar esa variable y redirigir al usuario a otra parte.
+
+
+A menudo querrás usar ``on_failed_authorization`` como URL pero puede tomar como parámetro una función que devuelva el URL y que será llamada en caso de fallar la autorización.
+
+
+Hay listas de llamadas de retorno que deberían ejecutarse luego de la validación de formularios para cada una de las acciones correspondientes y antes de toda E/S de la base de datos:
+
+``
+auth.settings.login_onvalidation = []
+auth.settings.register_onvalidation = []
+auth.settings.profile_onvalidation = []
+auth.settings.retrieve_password_onvalidation = []
+auth.settings.reset_password_onvalidation = []
+``:code
+
+Cada llamada de retorno puede ser una función que toma un objeto ``form`` y puede modificar los atributos de ese formulario antes de aplicarse los cambios en la base de datos.
+
+Hay listas de llamadas de retorno o ''callback'' que se deberían ejecutar luego de la E/S de la base de datos y antes de la redirección:
+
+``
+auth.settings.login_onaccept = []
+auth.settings.register_onaccept = []
+auth.settings.profile_onaccept = []
+auth.settings.verify_email_onaccept = []
+``:code
+
+He aquí un ejemplo:
+
+``
+auth.settings.register_onaccept.append(lambda formulario:\\
+   mail.send(to='tu@example.com',subject='nuevo usuario',
+             message='el email del nuevo usuario es %s'%formulario.vars.email))
+``:code
+
+Puedes habilitar captcha para cualquiera de las acciones de ``auth``:
+
+``
+auth.settings.captcha = None
+auth.settings.login_captcha = None
+auth.settings.register_captcha = None
+auth.settings.retrieve_username_captcha = None
+auth.settings.retrieve_password_captcha = None
+``:code
+
+Si los parámetros de ``.captcha`` hacen referencia a ``gluon.tools.Recaptcha``, todos los formularios para los cuales la opción correspondiente (como ``.login_captcha``) se haya establecido como ``None`` tendrán captcha, mientras que aquellos para los que la opción correspondiente se ha establecido como ``False`` no lo tendrán. Si, en cambio, se establece ``.captcha`` como ``None``, solo aquellos formularios que tengan la opción correspondiente con un objeto ``gluon.tools.Recaptcha`` como parámetro, tendrán captcha, los otros, no.
+
+
+Este es el tiempo de vencimiento de la sesión:
+
+``
+auth.settings.expiration = 3600  # segundos
+``:code
+
+Puedes cambiar el nombre del campo para la contraseña (en Firebird, por ejemplo, "password" es una palabra especial y no se puede usar para nombrar un campo):
+
+``
+auth.settings.password_field = 'password'
+``:code
+
+
+Normalmente el formulario de acceso intenta verificar el formato de los correos. Esto se puede deshabilitar modificando la configuración:
+
+``
+auth.settings.login_email_validate = True
+``:code
+
+¿Quieres mostrar el id de registro  en la página de edición del perfil?
+
+``
+auth.settings.showid = False
+``:code
+
+Para formularios personalizados puedes necesitar que las notificaciones automáticas de errores en formularios estén deshabilitadas:
+
+``
+auth.settings.hideerror = False
+``:code
+
+Además para formularios personalizados puedes cambiar el estilo:
+
+
+``
+auth.settings.formstyle = 'table3cols'
+``:code
+
+(puede ser "table2cols", "divs" y "ul")
+
+Y puedes especificar un separador para los formularios generados por auth:
+
+``
+auth.settings.label_separator = ':'
+``:code
+
+Por defecto, el formulario de autenticación da la opción de extender el acceso con una opción "remember me". El plazo de vencimiento se puede cambiar o deshabilitar la opción con estos parámetros:
+
+``
+auth.settings.long_expiration = 3600*24*30 # un mes
+auth.settings.remember_me_form = True
+``:code
+
+También puedes personalizar los siguientes mensajes cuyo uso y contexto deberían ser obvios:
+
+``
+auth.messages.submit_button = 'Enviar'
+auth.messages.verify_password = 'Verificar contraseña'
+auth.messages.delete_label = 'Marque para eliminar:'
+auth.messages.function_disabled = 'Función deshabilitada'
+auth.messages.access_denied = 'Privilegios insuficientes'
+auth.messages.registration_verifying = 'El registro de usuario requiere verificación'
+auth.messages.registration_pending = 'El registro de usuario está pendiente de aprobación'
+auth.messages.login_disabled = 'El acceso fue deshabilitado por el administrador'
+auth.messages.logged_in = 'Autenticado'
+auth.messages.email_sent = 'Correo enviado'
+auth.messages.unable_to_send_email = 'Falló el envío del correo'
+auth.messages.email_verified = 'Dirección de correo verificada'
+auth.messages.logged_out = 'Se ha cerrado la sesión'
+auth.messages.registration_successful = 'Registro de usuario completado'
+auth.messages.invalid_email = 'Dirección de correo inválida'
+auth.messages.unable_send_email = 'Falló el envío del correo'
+auth.messages.invalid_login = 'Falló la autenticación'
+auth.messages.invalid_user = 'El usuario especificado no es válido'
+auth.messages.is_empty = "No puede ser vacío"
+auth.messages.mismatched_password = "Los campos de contraseña no coinciden"
+auth.messages.verify_email = ...
+auth.messages.verify_email_subject = 'Verificación de contraseña'
+auth.messages.username_sent = 'Su nombre de usuario ha sido enviado por correo'
+auth.messages.new_password_sent = 'Se ha enviado una nueva contraseña a su correo'
+auth.messages.password_changed = 'Contraseña modificada'
+auth.messages.retrieve_username = 'Su nombre de usuario es: %(username)s'
+auth.messages.retrieve_username_subject = 'Recuperar usuario'
+auth.messages.retrieve_password = 'Su contraseña de usuario es: %(password)s'
+auth.messages.retrieve_password_subject = 'Recuperar contraseña'
+auth.messages.reset_password = ...
+auth.messages.reset_password_subject = 'Restablecer contraseña'
+auth.messages.invalid_reset_password = 'Nueva contraseña inválida'
+auth.messages.profile_updated = 'Perfil actualizado'
+auth.messages.new_password = 'Nueva contraseña'
+auth.messages.old_password = 'Vieja contraseña'
+auth.messages.group_description = \\
+    'Grupo exclusivo del usuario %(id)s'
+auth.messages.register_log = 'Usuario %(id)s registrado'
+auth.messages.login_log = 'Usuario %(id)s autenticado'
+auth.messages.logout_log = 'Usuario %(id)s cerró la sesión'
+auth.messages.profile_log = 'Usuario %(id)s perfil actualizado'
+auth.messages.verify_email_log = 'Usuario %(id)s correo de verificación enviado'
+auth.messages.retrieve_username_log = 'Usuario %(id)s nombre de usuario recuperado'
+auth.messages.retrieve_password_log = 'Usuario %(id)s contraseña recuperada'
+auth.messages.reset_password_log = 'Usuario %(id)s contraseña restablecida'
+auth.messages.change_password_log = 'Usuario %(id)s se cambió la contraseña'
+auth.messages.add_group_log = 'Grupo %(group_id)s creado'
+auth.messages.del_group_log = 'Grupo %(group_id)s eliminado'
+auth.messages.add_membership_log = None
+auth.messages.del_membership_log = None
+auth.messages.has_membership_log = None
+auth.messages.add_permission_log = None
+auth.messages.del_permission_log = None
+auth.messages.has_permission_log = None
+auth.messages.label_first_name = 'Nombre'
+auth.messages.label_last_name = 'Apellido'
+auth.messages.label_username = 'Nombre de Usuario'
+auth.messages.label_email = 'Correo Electrónico'
+auth.messages.label_password = 'Contraseña'
+auth.messages.label_registration_key = 'Clave de registro de usuario'
+auth.messages.label_reset_password_key = 'Clave para restablecer contraseña'
+auth.messages.label_registration_id = 'Identificador del registro de usuario'
+auth.messages.label_role = 'Rol'
+auth.messages.label_description = 'Descripción'
+auth.messages.label_user_id = 'ID del Usuario'
+auth.messages.label_group_id = 'ID del Grupo'
+auth.messages.label_name = 'Nombre'
+auth.messages.label_table_name = 'Nombre de Tabla'
+auth.messages.label_record_id = 'ID del Registro'
+auth.messages.label_time_stamp = 'Fecha y Hora'
+auth.messages.label_client_ip = 'IP del Cliente'
+auth.messages.label_origin = 'Origen'
+auth.messages.label_remember_me = "Recordarme (por 30 días)"
+``:code
+
+Los registros de membresía ``add|del|has`` permiten le uso de "%(user_id)s" y "%(group_id)s".
+Los registros de permisos``add|del|has`` permiten el uso de "%(user_id)s", "%(name)s", "%(table_name)s", y "%(record_id)s".
+
+### Servicio Central de Autenticación
+``CAS``:inxx ``authentication``:inxx
+
+web2py provee de soporte para la autenticación con servicios de terceros y ''single sign on''.
+Aquí describimos el Servicio Central de Autenticación (CAS, ''Central Authentication Service'') que es un estándar industrial y tanto el cliente como el servidor están incorporados en web2py.
+
+CAS es un protocolo abierto para la autenticación distribuida y funciona de la siguiente forma: Cuando un visitante arriba a nuestro sitio web, nuestra aplicación comprueba en la sesión si el usuario ya está autenticado (por ejemplo a través de un objeto ``session.token``). Si el usuario no se ha autenticado, el controlador redirige al visitante desde la aplicación de CAS, donde puede autenticarse, registrarse y manejar sus credenciales (nombre, correo electrónico, contraseña). Si el usuario se registra, recibirá un correo; el registro de usuario no estará completo hasta que el usuario conteste el correo. Una vez que el usuario está exitosamente registrado y autenticado, la aplicación CAS redirige al usuario a nuestra aplicación junto con una clave. Nuestra aplicación utiliza la clave para obtener las credenciales del usuario a través de una solicitud HTTP en segundo plano al servidor CAS.
+
+Usando este mecanismo, múltiples aplicaciones pueden utilizar un sistema ''single sing-on'' a través del servicio CAS. El servidor que provee la autenticación es denominado ''proveedor del servicio''. Aquellas aplicaciones que requieren la autenticación de los visitantes se llaman ''consumidores del servicio''.
+
+CAS es similar a OpenID, con una diferencia esencial. En el caso de OpnenID, el visitante elige el proveedor del servicio. En el caso de CAS, nuestra aplicación hace esa elección. Haciendo que CAS sea más segura.
+
+Corriendo un proveedor CAS con web2py es tan fácil como copiar la app de andamiaje. De hecho cualquier app que exponga la acción
+
+``
+## proveedor de acceso
+def user(): return dict(form=auth())
+``:code
+
+es un proveedor de CAS 2.0 y se puede acceder a sus servicios con los URL
+
+``
+http://.../proveedor/default/user/cas/login
+http://.../proveedor/default/user/cas/validate
+http://.../proveedor/default/user/cas/logout
+``:code
+(suponemos que la app se llama "proveedor").
+
+Puedes acceder a este servicio desde cualquier otra aplicación web (el consumidor) simplemente relegando la autenticación al proveedor:
+
+``
+## en la app consumidor
+auth = Auth(db,cas_provider = 'http://127.0.0.1:8000/proveedor/default/user/cas')
+``:code
+
+Cuando visitas el url de acceso de la app consumidor, te redirigirá a la app proveedor, que realizará la autenticación y luego redirigirá nuevamente a la app consumidor. Todos los procesos de registro de usuarios, cerrar sesión, cambio de contraseña o recuperar contraseña, se deben completar en la app proveedor. Se creará un registro sobre el acceso del usuario del lado del consumidor para que se puedan agregar campos extra y un perfil local. Gracias a CAS 2.0 todos los campos accesibles para lectura en el proveedor que tienen su correspondiente campo en la tabla ``auth_user`` del consumidor se copiarán automáticamente.
+
+``Auth(..., cas_provider='...')`` funcional con proveedores de terceros y soporta CAS 1.0 y 2.0. La versión se detecta automáticamente. Por defecto genera los URL del proveedor a partir de una base (el url de ``cas_provider`` de arriba) agregando
+
+``
+/login
+/validate
+/logout
+``:code
+
+Estos valores se pueden cambiar tanto en el consumidor como en el proveedor
+
+``
+## en la app del consumidor y del proveedor (deben coincidir)
+auth.settings.cas_actions['login']='login'
+auth.settings.cas_actions['validate']='validate'
+auth.settings.cas_actions['logout']='logout'
+``:code
+
+Si deseas conectar a un proveedor CAS de web2py desde un dominio diferente, debes habilitarlos agregándolos a la lista de dominios autorizados:
+
+
+``
+## en la app proveedor
+auth.settings.cas_domains.append('example.com')
+``:code
+
+
+#### Uso de web2py para autenticar otras aplicaciones
+
+Esto es posible pero depende del servidor web.
+aquí vamos a suponer que las aplicaciones corren en el mismo servidor web: Apache con ``mod_wsgi``.
+Una de las aplicaciones es web2py con una app que provee control de acceso por medio de Auth.
+La otra aplicación puede ser un script CGI, un programa en PHP o cualquier otra cosa.
+Queremos que el servidor web solicite permisos a la primera aplicación cuando una solicitud de un cliente accede a la segunda.
+
+En primer lugar es necesario modificar la aplicación de web2py y agregar el siguiente controlador:
+
+``
+def verificar_acceso():
+    return 'true' if auth.is_logged_in() else 'false'
+``:code
+
+que devuelve ``true`` si el usuario se autenticó y ``false`` en su defecto. Ahora ejecutemos un proceso en segundo plano:
+
+
+``
+nohup python web2py.py -a '' -p 8002
+``
+
+El puerto 8002 es indispensable y no hay necesidad de habilitar admin, por lo que no se especifica una contraseña.
+
+Luego debemos editar el archivo de configuración de Apache (por ejemplo "/etc/apache2/sites-available/default") para que cuando una app que no sea de web2py reciba una solicitud, llame a la función para ``verificar_acceso`` definida más arriba en su lugar y, si esta devuelve ``true``, que continúe con la respuesta a la solicitud, o de lo contrario que prohíba el acceso.
+
+
+Como web2py y la otra aplicación corren en el mismo dominio, si el usuario está autenticado en la app de web2py, la cookie de la sesión será enviada al servidor web Apache incluso si la solicitud es para la otra aplicación y admitirá la verificación de las credenciales.
+
+Para que esto sea posible necesitamos un script, "web2py/scripts/access.wsgi" que sabe como lidiar con ese asunto.
+El script viene incluido con web2py. Todo lo que tenemos que hacer es decirle a apache que llame al script, e informar el URL de la aplicación que requiere control de acceso y la ubicación del script:
+
+``
+<VirtualHost *:80>
+   WSGIDaemonProcess web2py user=www-data group=www-data
+   WSGIProcessGroup web2py
+   WSGIScriptAlias / /home/www-data/web2py/wsgihandler.py
+
+   AliasMatch ^ruta/a/miapp/que/requiere/autenticacion/miarchivo /ruta/al/archivo
+   <Directory /ruta/a/>
+     WSGIAccessScript /ruta/a/web2py/scripts/access.wsgi
+   </Directory>
+</VirtualHost>
+``
+
+Aquí "^ruta/a/miapp/que/requiere/autenticacion/miarchivo" es la expresión regular que debería coincidir con la solicitud entrante y "/ruta/a" es la ubicación absoluta de la carpeta de web2py.
+
+El script "access.wsgi" contiene la siguiente línea:
+
+``
+URL_CHECK_ACCESS = 'http://127.0.0.1:8002/%(app)s/default/check_access'
+``
+
+que refiere a la aplicación de web2py que hemos solicitado pero puedes editarlo para que refiera a una aplicación específica, que corra en otro puerto que no sea 8002.
+
+Además puedes cambiar la acción ``check_access()`` y hacer que su algoritmo sea más complejo. Esta acción puede recuperar el URL que fue originalmente solicitado usando la variable de entorno
+
+
+``
+request.env.request_uri
+``
+
+y puedes implementar reglas más complejas:
+
+``
+def verificar_acceso():
+    if not auth.is_logged_in():
+       return 'false'
+    elif not usuario_tiene_acceso(request.env.request_uri):
+       return 'false'
+    else:
+       return 'true'
+``:code
+
