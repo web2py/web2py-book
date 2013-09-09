@@ -35,6 +35,140 @@ web2pyのバイナリ形式の配布と一緒に独自のアプリケーショ�
 
 Mac用のバイナリを生成する過程も同じですが、"bat"ファイルは要りません。
 
+### WingIDE, Rad2Py, Eclipse
+### WingIDE, Rad2Py, and Eclipse
+
+``WingIDE``:inxx ``Eclipse``:inxx ``Rad2Py``:inxx
+
+WingIDE、Rad2PyやEclipseといったサードパーティのIDEでweb2pyを使用できます。
+
+WingIDEでweb2pyを使った時にスクリーンショットです。
+
+[[image @///image/wingide.png center 480px]]
+
+これらのIDE（web2pyを向けにデザインされたRad2Pyは除きます）を使った時の一般的な問題として、モデルとコントローラーが実行される状況を理解しないため、そのままでは自動補完が利きません。
+
+自動補完を利かせるための一般的なトリックとして、モデルとコントローラーに次のコードを追加します。
+
+``
+if False:
+    from gluon import *
+    request = current.request
+    response = current.response
+    session = current.session
+    cache = current.cache
+    T = current.T
+``:code
+
+このコードは全く実行さませんが、IDEに強制的に構文解析させてグローバル名前空間(``gluon``モジュール)にオブジェクトがどこにあるかを理解させることで、ロジックを変更せずに自動補完を機能させることができます。
+
+### SQLDesigner
+
+SQLDesignerという視覚的にweb2pyのモデルの構築や対応するコードの生成をするためのソフトウェアが在ります。これがそのスクリーンショットです。
+
+[[image @///image/designer.png center 480px]]
+
+web2pyで動作するSQLDesignerのバージョンは、ここで見れます:
+
+``https://github.com/elcio/visualdal``
+
+### フォルダ公開
+
+web上でフォルダ（サブフォルダも含む）を共有する問題を考えます。web2pyはとても簡単にできます。下記のコードをコントローラに追加するだけです:
+
+``
+from gluon.tools import Expose
+def myfolder():
+    return dict(files=Expose('/path/to/myfolder'))
+``:code
+
+``{{=files}}``でビューに表示できます。ファイルとフォルダを見るためのインターフェースを生成し、ツリー構造でナビゲートします。画像はプレビュー付きです。
+
+"/path/to/myfolder"パスプレフィックスは、訪問者側には隠されます。例えば、"/path/to/myfolder/a/b.txt"というファイルは"base/a/b.txt"に置き換えられます。"base"プレフィックスは、Expose関数の``basename``引数の使って指定できます。``extensions``引数の使用は、ファイル拡張子のリストで指定でき、該当しないファイルは隠されます。例:
+
+``
+def myfolder():
+    return dict(files=Expose('/path/to/myfolder',basename='.',
+                             extensions=['.py', '.jpg']))
+``:code
+
+パスに"private"が含まれるファイルやフォルダ、"."で始まるファイルや"~"で終わるファイルは、常に隠されます。
+
+### 機能テスト(Functional testing)
+
+web2pyは、ローカルとリモートのweb2pyアプリケーションを機能テストするための``gluon.contrib.webclient``モジュールを備えています。実は、このモジュールはweb2py向けではなくテストや他のwebアプリケーションと対話するように使えて、さらに、web2pyセッションとweb2pyポストバックを理解するように設計されています。
+
+
+下記は、使い方です。次のプログラムは、クライアントを生成、
+セッションを確立するために"index"アクションへ接続、
+新規ユーザの登録、直後にログアウト、再度新たに作ったユーザでログイン:
+
+``
+from gluon.contrib.webclient import WebClient
+
+client = WebClient('http://127.0.0.1:8000/welcome/default/',
+                   postbacks=True)
+
+client.get('index')
+# register
+data = dict(first_name='Homer',
+            last_name='Simpson',
+            email='homer@web2py.com',
+            password='test',
+            password_two='test',
+            _formname='register')
+client.post('user/register', data=data)
+
+# logout
+client.get('user/logout')
+
+# login again
+data = dict(email='homer@web2py.com',
+            password='test',
+            _formname='login')
+client.post('user/login', data=data)
+
+# check registration and login were successful
+client.get('index')
+assert('Welcome Homer' in client.text)
+``:code
+
+WebClientコンストラクタはURLプレフィックスを引数に取ります。例では、"http://127.0.0.1:8000/welcome/default/"となります。他のネットワークIOに対して働きません。``postbacks``引数はデフォルトで``True``であり、クライアントにweb2pyのポストバックのハンドル方法を通知します。
+
+WenClientオブジェクト``client``は、2個だけメソッドがあります:
+``get``、``post``。第1引数は、常にURLポストフィックスを取ります。
+POSTリクエストのGET用のフルURLは、プレフィックスとポストフィックスを連消することで簡単に構成しています。
+この目的は、クライアントとサーバ間の長いやり取りのためにシンタックスを短くさせることを意味づけています。
+
+``data``は、POSTリクエストの明示的なパラメータであり、ポストされるデータのディクショナリを含んでいます。web2pyのフォームは、``_formname``フィールドを隠し持っており、ページにたった1つのフォームが存在しない限り提供される値です。web2pyフォームは、CSRF攻撃を弾くために設計された``_formkey``フィールドも隠し持っています。WebClientが自動的にフィールドを処理してくれます。
+
+``client.get``と``client.post``は他に次の引数をとることができます:
+- ``headers``: 任意のHTTPヘッダーのディクショナリ。
+- ``cookies``: 任意のHTTPクッキーのディクショナリ。
+- ``auth``: BASIC認証を通すために``urllib2.HTTPBasicAuthHandler().add_password(**auth)``へ渡されるパラメータのディクショナリです。これに関する詳細は、urllib2モジュールに関するPythonドキュメントを参照してください。
+
+例である``client``オブジェクトは、GETとPOSTリクエストを生成によるコンストラクタで指定したサーバーとの対話を持ち越します。すべてのクッキーを自動的に保持し、セッションを持続するためにクッキーを送り返します。新しいセッションクッキーが既に存在するセッションクッキーであると検知したら、新しいセッションを壊して例外を発生させます。もしサーバーがHTTPエラーを返してきたら、例外を発生させます。サーバーがweb2pyのチケットを含んだHTTPエラーを返したら、チケットコードを含んだRuntimeError例外を返します。
+
+``client``オブジェクトは、``client.history``にリクエストログを保持し、状態は最新の成功したリクエストで構成されます。状態には下記で構成されます:
+
+- ``client.status``: ステータスコードを返脚
+- ``client.text``: ページの内容
+- ``client.headers``: パースしたヘッダーのディクショナリ
+- ``client.cookies``: パースしたクッキーのディクショナリ
+- ``client.sessions``: ``{appname: session_id}``からのweb2pyセッションのディクショナリ
+- ``client.forms``: ``client.text``から検知したweb2pyフォームのディクショナリ。``{_formname,_formkey}``フォームのディクショナリを保持。
+
+サーバーから返された``client.text``をパースする機能はありませんが、BeautifulSoupなどのサードパーティ製モジュールで簡単に実現できます。次のコード例は、クライアントでダウンロードしたページ内のリンクをすべて見つけ、それらを確かめます:
+
+``
+from BeautifulSoup import BeautifulSoup
+dom = BeautifulSoup(client.text)
+for link in dom.findAll('a'):
+    new_client = WebClient()
+    new_client.get(a.href)
+    print new_client.status
+``
+
 ### web2pyの最小構成
 
 web2pyをとても小さなメモリ量でデプロイする場合があります。その場合は余分なものをそぎ落とし最小構成にしたいです。
@@ -48,7 +182,7 @@ python scripts/make_min_web2py.py /path/to/minweb2py
 - 次にデプロイしたいアプリケーションを"/path/to/minweb2py/applications"内にコピー
 - "/path/to/minweb2py"を小さなメモリ量のサーバとしてデプロイ
 
-この"make_min_web2py.py"スクリプトは、次の物を含まない最小構成のweb2pyディストリビューションを構築します: 
+この"make_min_web2py.py"スクリプトは、次の物を含まない最小構成のweb2pyディストリビューションを構築します:
 - admin
 - examples
 - welcome
@@ -71,7 +205,7 @@ page = urllib.urlopen('http://www.web2py.com').read()
 通常は問題ないですが、``urllib``モジュールは、Google App Engine上では動作しません。Googleは、GAE用に、URLをダウンロードするための異なるAPIを提供します。あなたのコードを移植しやすくするために、web2pyは、他のPython環境だけでなくGAEでも動く``fetch``関数を同梱しています:
 
 ``
-from google.tools import fetch
+from gluon.tools import fetch
 page = fetch('http://www.web2py.com')
 ``:code
 
@@ -79,7 +213,6 @@ page = fetch('http://www.web2py.com')
 ``prettydate``:inxx
 
 日付を"2009-07-25 14:34:56"と表記するのではなく、"one years ago"と表記したほうが良い場合があります。このために、web2pyは便利な関数を提供します:
-
 ``
 import datetime
 d = datetime.datetime(2009,7,25,14,34,56)
@@ -93,7 +226,6 @@ pretty_d = prettydate(d,T)
 ``geocode``:inxx
 
 住所(例: "243 S Wabash Ave, Chicago, IL, USA")を地理座標(緯度と経度)に変換する必要がある場合、web2pyはそのように動作する関数を提供します。
-
 ``
 from gluon.tools import geocode
 address = '243 S Wabash Ave, Chicago, IL, USA'
@@ -127,7 +259,6 @@ if len(db().select(db.prime.id))==0:
 ``:code
 
 そしてこのように、"default.py"コントローラにデータベースを読む``list_item``アクションを作ります:
-
 ``
 def list_items():
     if len(request.args): page=int(request.args[0])
@@ -141,6 +272,7 @@ def list_items():
 このコードは必要な個数より1つ多いアイテムを選択することに注意してください(20+1)。範囲外の要素は次のページがあるかどうかを示します。
 
 "default/list_items.html"　ビュー:
+Here is the "default/list_items.html" view:
 ``
 {{extend 'layout.html'}}
 
@@ -164,7 +296,6 @@ def list_items():
 ``httpserver.log``:inxx
 
 web2pyのwebサーバーはファイルへのリクエストをweb2pyのルートディレクトに置かれている:
-
 ``
 httpserver.log
 ``:code
@@ -181,7 +312,7 @@ httpserver.log
 ip, timestamp, method, path, protocol, status, time_taken
 ``:code
 
-各要素について
+フォーマットは:
 - ipはリクエストしてきたクライアントのIPアドレス
 - timestampはリクエストの日付と時間、ISO8601フォーマット(YYYY-MM-DDT HH:MM:SS)で記述
 - methodはPOSTかGETのどちらか
@@ -208,7 +339,7 @@ populate(db.mytable,100)
 
 もしBがAを参照する2つのテーブル(AとB)があるとき、Aから先に登録し、次にBを登録します。
 
-登録作業はトランザクションで実行されるので、とりわけリファレンスが含まれる場合は一度にたくさんのレコードを登録しようとしないでください。その代わりに、100個ずつの登録を、コミット、ループすることを推奨します。
+もしBがAを参照する2つのテーブル(AとB)があるとき、Aから先に登録し、次にBを登録します。
 ``
 for i in range(10):
     populate(db.mytable,100)
@@ -241,7 +372,7 @@ print ell.generate(1000,prefix=None)
 
 さらなるコントロールが必要な時や自作のクレジットカード情報の入力フォームを生成したい時、すなわち、プログラムがクレジットカードからあなたのアカウントへ送金するための処理を依頼する時があります。
 
-このためweb2pyはStrip、Authorize.Net(モジュールはJohn Condeによって開発され若干修正されています)、DownCommerceとの統合を既定で提供しています。Stripeは最も簡単に使え、低額の売買なら安くすみます(使用料は固定額ではなく取引価格の約3%)。Authorize.netは高額の取引向けです(1年間の定額の使用料が掛かり、加えて1回の取引に安い使用料が掛かります)。
+このためweb2pyはStripe、Authorize.Net(モジュールはJohn Condeによって開発され若干修正されています)、DownCommerceとの統合を既定で提供しています。Stripeは最も簡単に使え、低額の売買なら安くすみます(使用料は固定額ではなく取引価格の約3%)。Authorize.netは高額の取引向けです(1年間の定額の使用料が掛かり、加えて1回の取引に安い使用料が掛かります)。
 
 StripeとAuthorize.netの場合、あなたのプログラムがクレジットカード情報を承認することを覚えておいてください。クレジットカード情報を記録する必要はありませんし、我々は法的必要条件が関係するため(VisaやMastercardで取引する場合)あなたにそうすべきでないとアドバイスしますが、何回も会計をしたりAmazon one-clickボタンを再現するためにクレジットカード情報を記録したい場合もあります。
 
@@ -305,7 +436,7 @@ Stripe.comに登録する必要がありますが、とても簡単です。実�
 from gluon.contrib.stripe import Stripe
 stripe = Stripe(api_key)
 d = stripe.charge(amount=100,
-	      currency='usd',
+              currency='usd',
               card_number='4242424242424242',
               card_exp_month='5',
               card_exp_year='2012',
@@ -332,7 +463,7 @@ r = Stripe(key).refund(d['id'])
 if r.get('refunded',False):
     # refund was successful
 elif:
-    # error is in d.get('error','unkown')
+    # error is in d.get('error','unknown')
 ``
 
 Stripeでアプリケーション内に支払情報を簡単に保持できます。
@@ -342,8 +473,6 @@ Stripeでアプリケーション内に支払情報を簡単に保持できま�
 #### Authorize.Net
 
 もう1つの簡単にクレジットカード承認の方法としてAuthorize.netがあります。いつもどおりあなたは登録する必要があり、``login``とトランザクションキー(``transaction``)を取得します。一度、それらを取得すると、Stripeの様に動作します:
-Another simple way to accept credit cards is to use Authorize.Net. As usual you need to register and you will obtain a ``login`` and a transaction key (``transkey``. Once you have them it works very much like Stripe does:
-
 ``
 from gluon.contrib.AuthorizeNet import process
 if process(creditcard='4427802641004797',
@@ -429,6 +558,7 @@ from gluon.contrib.login_methods.dropbox_account import use_dropbox
 use_janrain(auth,filename='private/dropbox.key')
 mydropbox = auth.settings.login_form
 ``
+
 このコードは、ユーザにDropbox認証を扱うアプリへのログインを許可し、あなたのプログラムはユーザのDropboxアカウントにファイルをアップロードすることができます:
 
 ``
@@ -510,3 +640,4 @@ route_in=(
 
 ##### 第3版 - 翻訳: Yota Ichino　レビュー: Omi Chiba
 ##### 第4版 - 翻訳: Yota Ichino　レビュー: Omi Chiba
+##### 第5版 - 翻訳: Yota Ichino　レビュー: Omi Chiba

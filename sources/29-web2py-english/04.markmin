@@ -111,8 +111,10 @@ Options:
   -T TEST_PATH, --test=TEST_PATH
                         run doctests in web2py environment; TEST_PATH like
                         a/c/f (c,f optional)
-  -W WINSERVICE, --winservice=WINSERVICE
-                        -W install|start|stop as Windows service
+  -W WINSERVICE, --winservice=WINSERVICE 
+                        -W install|start|stop as Windows service. 
+                        However, this is deprecated. Please see 
+                        use of nssm in the Deployment Recipes chapter
   -C, --cron            trigger a cron run manually; usually invoked from a
                         system crontab
   --softcron            triggers the use of softcron
@@ -444,13 +446,14 @@ anyserver.py
 
 which is a script to interface with many different web servers, described in Chapter 13.
 
-There are three example files:
+There are three example files in the "examples" directory:
 ``
 options_std.py
 routes.example.py
 router.example.py
 ``:code
 
+They are all meant to be copied to the root dir (where web2py.py or web2py.exe is) and edited according to your own preferences.
 The former is an optional configuration file that can be passed to web2py.py with the ``-L`` option. The second is an example of a URL mapping file. It is loaded automatically when renamed "routes.py". The third is an alternative syntax for URL mapping, and can also be renamed (or copied to) "routes.py".
 
 The files
@@ -2015,7 +2018,7 @@ routers = dict(
 ``:code
 maps ``http://domain.com`` accesses to the controller named ``insecure``, while ``HTTPS`` accesses go to the ``secure`` controller. Alternatively, you can map different ports to different apps, in the obvious way.
 
-For further information, please consult the file [[``router.example.py`` http://code.google.com/p/web2py/source/browse/router.example.py]] provided in the base folder of the standard web2py distribution.
+For further information, please consult the file [["router.example.py" https://github.com/web2py/web2py/blob/master/examples/router.example.py]] provided in the "examples" folder of the standard web2py distribution.
 
 Note: The ''parameter-based'' system first appeared in web2py version 1.92.1.
 
@@ -2203,7 +2206,7 @@ For each tuple, the first string is matched against "[app name]/[error code]". I
 
 These variables will be accessible to the error handling action via ``request.vars`` and can be used in generating the error response. In particular, it is a good idea for the error action to return the original HTTP error code instead of the default 200 (OK) status code. This can be done by setting ``response.status = request.vars.code``. It is also possible to have the error action send (or queue) an email to an administrator, including a link to the ticket in ``admin``.
 
-Unmatched errors display a default error page. This default error page can also be customized here (see ``router.example.py`` and ``routes.example.py`` in the root web2py folder):
+Unmatched errors display a default error page. This default error page can also be customized here (see "router.example.py" and "routes.example.py" in the "examples" folder):
 ``
 error_message = '<html><body><h1>%s</h1></body></html>'
 error_message_ticket = '''<html><body><h1>Internal error</h1>
@@ -2365,7 +2368,7 @@ You can also call a controller function, in which case there is no need to speci
 
 If you specify ``@reboot`` in the first field in the crontab file, the given task will be executed only once, at web2py startup. You can use this feature if you want to pre-cache, check, or initialize data for an application on web2py startup. Note that cron tasks are executed in parallel with the application --- if the application is not ready to serve requests until the cron task is finished, you should implement checks to reflect this. Example:
 ``
-@reboot  *  *  *  *  root *mycontroller/myfunction
+@reboot  root *mycontroller/myfunction
 ``:code
 
 Depending on how you are invoking web2py, there are four modes of operation for web2py cron.
@@ -2432,7 +2435,9 @@ def task_add(a,b):
     return a+b
 ``:code
 
-Tasks will always be called in the same environment seen by controllers and therefore they see all the global variables defined in models, including database connections (``db``). Tasks differ from a controller action because they are not associated with an HTTP request and therefore there is no ``request.env``.
+Tasks will always be called in the same environment seen by controllers and therefore they see all the global variables defined in models, including database connections (``db``).
+Tasks differ from a controller action because they are not associated with an HTTP request and therefore there is no ``request.env``.
+Also, tasks can access another environmental variable that is not present in normal requests: ``W2P_TASK``. ``W2P_TASK.id`` holds the ``scheduler_task.id`` and ``W2P_TASK.uuid`` the ``scheduler_task.uuid`` field of the task that is running.
 
 ------
 Remember to call ``db.commit()`` at the end of every task if it involves inserts/updates to the database. web2py commits by default at the end of a successful action but the scheduler tasks are not actions.
@@ -2674,8 +2679,7 @@ In any case, the stdout is captured and also logged into the run record.
 
 Using appadmin, one can check all ``RUNNING`` tasks, the output of ``COMPLETED`` tasks, the error of ``FAILED`` tasks, etc.
 
-The scheduler also creates one more table called "scheduler_worker", which st\
-ores the workers' heartbeat and their status.
+The scheduler also creates one more table called "scheduler_worker", which stores the workers' heartbeat and their status.
 
 ##### Managing processes
 
@@ -2712,7 +2716,7 @@ each function take an optional parameter, that can be a string or a list, to man
 An example is better than a thousand words: ``scheduler.terminate('high_prio')`` will TERMINATE all the workers that are processing the ``high_prio`` tasks, while ``scheduler.terminate(['high_prio', 'low_prio'])`` will terminate all ``high_prio`` and ``low_prio`` workers.
 ------
 Watch out: if you have a worker processing ``high_prio`` and ``low_prio``, ``scheduler.terminate('high_prio')`` will terminate the worker alltogether, even if you didn't want to terminate ``low_prio`` too.
------- 
+------
 
 Everything that one can do via appadmin one can do programmatically by inserting and updating records in these tables.
 
@@ -2902,7 +2906,7 @@ http://docs.python.org/library/logging.html
 The string "web2py.app.myapp" defines an app-level logger.
 
 For this to work properly, you need a configuration file for the logger.
-One is provided by web2py in the root web2py folder "logging.example.conf". You need to rename the file "logging.conf" and customize it as necessary.
+One is provided by web2py in the "examples" folder "logging.example.conf". You need to copy the file to web2py's directory and rename the file to "logging.conf" and customize it as necessary.
 
 This file is self documenting, so you should open it and read it.
 
