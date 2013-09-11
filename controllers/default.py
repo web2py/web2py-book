@@ -12,7 +12,7 @@ if request.is_local:
     FORCE_RENDER = True
 
 response.title = 'web2py'
-response.subtitle = 'Full Stack Web Framework, 4th Ed.\nwritten by Massimo Di Pierro in English'
+response.subtitle = 'Full Stack Web Framework, 6th Ed (pre-release).\nwritten by Massimo Di Pierro in English'
 response.menu = []
 
 def splitter(x):
