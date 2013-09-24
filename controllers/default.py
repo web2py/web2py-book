@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os, datetime
+from gluon.validators import urlify
 session.forget()
 
 TIME_EXPIRE = 60*60*24
@@ -11,12 +12,17 @@ if request.is_local:
     FORCE_RENDER = True
 
 response.title = 'web2py'
-response.subtitle = 'Full Stack Web Framework, 4th Ed.\nwritten by Massimo Di Pierro in English'
+response.subtitle = 'Full Stack Web Framework, 6th Ed (pre-release).\nwritten by Massimo Di Pierro in English'
 response.menu = []
 
 def splitter(x):
     a,b = x.split(':',1)
     return a.strip(),b.strip()
+
+def splitter_urlify(x):
+    a,b = x.split(':',1)
+    return a.strip(),b.strip(), urlify(b)
+
 
 @cache('folders',None)
 def get_folders(dummy=None):
@@ -44,7 +50,7 @@ def get_info(subfolder):
 
 def get_chapters(subfolder):
     filename = os.path.join(FOLDER,subfolder,'chapters.txt')
-    chapters = [splitter(line)
+    chapters = [splitter_urlify(line)
                 for line in open(filename).readlines()
                 if ':' in line]
     return chapters
@@ -98,6 +104,8 @@ def chapter():
     subfolder = get_subfolder(book_id)
     info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
     chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=TIME_EXPIRE)
+    chapter_title = chapters[chapter_id][1]
+    response.title = '%s - %s' % (info['title'], chapter_title)
     filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
     dest = os.path.join(request.folder, 'static_chaps', subfolder, '%.2i.html' % chapter_id)
     if not FORCE_RENDER:
@@ -131,15 +139,15 @@ def search():
         k = data.find(search)
         if k>=0:
             snippet = data[data.rfind('\n\n',0,k)+1:data.find('\n\n',k)].strip()
-            results.append((chapter[0],chapter[1],convert2html(book_id,snippet)))
+            results.append((chapter[0],chapter[1],chapter[2],convert2html(book_id,snippet)))
             content = CAT(*[DIV(H2(A(chapter[1],
                                      _href=URL('chapter',
                                                vars=dict(search=search),
-                                               args=(book_id,chapter[0])))),
-                            chapter[2],BR(),
+                                               args=(book_id,chapter[0],chapter[2])))),
+                            chapter[3],BR(),
                             A('more',_href=URL('chapter',
                                                vars=dict(search=search),
-                                               args=(book_id,chapter[0])),_class="btn"))
+                                               args=(book_id,chapter[0],chapter[2])),_class="btn"))
                         for chapter in results])
     response.view = 'default/chapter.html'
     return locals()

@@ -534,7 +534,7 @@ server {
         }
  
 }
-``:code		
+``:code     
 
 You will need to symlink the file and remove the default
 
@@ -996,6 +996,7 @@ Now you can right-click on the red feather-like taskbar icon to "Open Apache Mon
 This section was created by Jonathan Lundell.
 
 #### Start as Windows service
+##### This method is deprecated. Consider using nssm (below)
 ``Windows service``:inxx
 
 What Linux calls a daemon, Windows calls a service.
@@ -1039,7 +1040,13 @@ python web2py.py -W start
 python web2py.py -W stop
 ``:code
 
-#### Start the scheduler as a Windows service
+#### Using nssm to run as a Windows service
+``Windows services with nssm``:inxx
+Rather than maintaining Windows service code in web2py.py, the developers plan to move to an external tool 'nssm'. 
+nssm is a well respected windows tool with technical advantages, such as automatic restart of services. It also means a consistent way of running web2py services, scheduler services and clean-up processes like session deletes. The use of the -W command-line option is deprecated. 
+The nssm method does not use the options.py file. Instead, options are passed on the command line (some exmaples are provided below)
+
+##### nssm example: running the scheduler as a Windows service with nssm
 ``Windows scheduler service``:inxx
 
 Running the scheduler as a Windows service makes a lot of sense.
@@ -1064,6 +1071,13 @@ where app1 is the name of your application.
 It is possible to invoke the scheduler with multiple applications. However, in this mode, web2py detaches each application's scheduler into a subprocess.
 Therefore, the process started by the service will not die if one of the scheduler instances runs into problems; rather, that child process would die.
 We then can't take advantage of automatic restarting of services in case of failure. Using one app per service avoids this weakness.
+
+##### nssm example: running web2py.py as a service 
+The example above shows how to use nssm.
+To run web2py in SSL mode on port 8041, and including some other options, you could give nssm a command line (in the options field of the nssm dialog) like this:
+
+``c:\web2py.py -p 8041 -i "0.0.0.0" --password="112233" --folder="d:\web2py_internet" --socket-timeout=10 --timeout=120 -c "d:\web2py_internet\applications\example.com.au.crt" -k "d:\web2py_internet\applications\web2py.key``:code
+(note that this is not best-practice for storing passwords, since a task manager which shows command lines reveals the password. Investigate the web2py command line option -a "<recycle>")
 
 ### Securing sessions and **admin**
 ``security``:inxx ``admin``:inxx
@@ -1384,6 +1398,10 @@ We can also obtain Redis statistics by calling:
 ``
 cache.redis.stats()
 ``:code
+Redis cache subsystem allows you to prevent the infamous "thundering herd problem": this is not active by default
+because usually you choose redis for speed, but at a negligible cost you can make sure that only one thread/process
+can set a value concurrently. To activate this behaviour, just pass the ``with_lock=True`` param to the ``RedisCache`` call.
+You can also enable the behaviour "on-demand" with ``value = cache.redis('mykey', lambda: time.time(), with_lock=True)``
 
 #### Sessions in Redis
 If you have Redis in your stack, why not use it for sessions ?
@@ -1395,16 +1413,21 @@ session.connect(request, response, db = sessiondb)
 The code has been tested with ~1M sessions. As long as Redis can fit in memory, the time taken to handle
 1 or 1M sessions is the same. While against file-based sessions or db-based sessions
 the speedup is unnoticeable for ~40K sessions, over that barrier the improvement is remarkable.
+A big improvement can be also noticed when you're running a "farm" of web2py instances, because sharing the sessions folder or having multiple processes connected to a database
+often hogs down the system.
 You'll end up with 1 key per session, plus 2 keys, one holding an integer (needed for assigning different session keys) and the other holding the set of all
 sessions generated (so for 1000 sessions, 1002 keys).
 
 If ``session_expiry`` is not set, sessions will be handled as usual, you'd need to [[cleanup sessions as usual @///chapter/13#Cleaning-up-sessions]] once a while.
 
 However, when ``session_expiry`` is set will delete automatically sessions after n seconds
-(e.g. if set to 3600, session will expire exactly one hour later having been updated the last time)
-You should however occasionally run sessions2trash.py just to clean the key holding the set of all
+(e.g. if set to 3600, session will expire exactly one hour later having been updated the last time), 
+you should occasionally run sessions2trash.py just to clean the key holding the set of all
 the sessions previously issued (for ~1M sessions, cleaning up requires 3 seconds)
-
+The redis backend for sessions is the only one that can prevent concurrent modifications to the same session: this is especially true
+for ajax-intensive applications that write to sessions often in a semi-concurrent way.
+To favour speed this is by default not enforced, however if you want to turn on the locking behaviour, just turn it on with ``with_lock=True`` parameter
+passed to the ``RedisSession`` object.
 
 #### Removing applications
 ``removing application``:inxx
@@ -1796,16 +1819,14 @@ The above code checks whether you are running on GAE, connects to BigTable, and 
 
 #### Memcache
 
-If you prefer, you can store sessions in memcache:
+If you prefer, you can store sessions in memcache too:
 
 ``
 from gluon.contrib.gae_memcache import MemcacheClient
 from gluon.contrib.memdb import MEMDB
 cache.memcache = MemcacheClient(request)
 cache.ram = cache.disk = cache.memcache
-
-db = DAL('gae')
-session.connect(request,response,MEMDB(cache.memcache))
+session.connect(request,response,db=MEMDB(cache.memcache.client))
 ``:code
 
 Notice that on GAE cache.ram and cache.disk should not be used, so we make them point to cache.memcache.

@@ -266,6 +266,14 @@ The redefinition may trigger a migration if field content is different.
 Because usually in web2py models are executed before controllers, it is possible that some table are defined even if not needed. It is therefore necessary to speed up the code by making table definitions lazy. This is done by setting the ``DAL(...,lazy_tables=True)``  parameter. Tables will be actually created only when accessed.
 ----------
 
+#### Adding attributes to fields and tables
+If you need to add custom attributes to fields, you can simply do this:
+``db.table.field.extra = {}``:code 
+
+"extra" is not a keyword ; it's a custom attributes now attached to the field object. You can do it with tables too but they must be preceded by an 
+underscore to avoid naming conflicts with fields: 
+
+``db.table._extra = {} ``:code
 
 ### Record representation
 
@@ -350,7 +358,7 @@ Notice that ``requires=...`` is enforced at the level of forms, ``required=True`
 - ``ondelete`` translates into the "ON DELETE" SQL statement. By default it is set to "CASCADE". This tells the database that when it deletes a record, it should also delete all records that refer to it. To disable this feature, set ``ondelete`` to "NO ACTION" or "SET NULL".
 - ``notnull=True`` translates into the "NOT NULL" SQL statement. It prevents the database from inserting null values for the field.
 - ``unique=True`` translates into the "UNIQUE" SQL statement and it makes sure that values of this field are unique within the table. It is enforced at the database level.
-- ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
+- ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set to True, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
 - ``uploadfolder`` defaults to the application's "uploads/" folder. If set to a different path, files will uploaded to a different folder. For example,
 ``
 Field(...,uploadfolder=os.path.join(request.folder,'static/temp'))
@@ -459,6 +467,8 @@ print db.person.name.validate('John')
 
 which returns a tuple ``(value, error)``. ``error`` is ``None`` if the input passes validation.
 
+
+
 ### Migrations
 ``migrations``:inxx
 
@@ -466,7 +476,7 @@ which returns a tuple ``(value, error)``. ``error`` is ``None`` if the input pas
 
 We refer to this behavior as a "migration". web2py logs all migrations and migration attempts in the file "databases/sql.log".
 
-The first argument of ``define_table`` is always the table name. The other unnamed arguments are the fields (Field). The function also takes an optional last argument called "migrate" which must be referred to explicitly by name as in:
+The first argument of ``define_table`` is always the table name. The other unnamed arguments are the fields (Field). The function also takes an optional keyword argument called "migrate":
 ``
 >>> db.define_table('person', Field('name'), migrate='person.table')
 ``:code
@@ -511,7 +521,7 @@ The other problem is more generic but typical with MySQL. MySQL does not allow m
 
 The solution consists of disabling migrations for all tables and enabling fake migrations:
 ``
-db.define_table(....,migrate=False,fake_migrate=True)
+db.define_table(....,migrate=True,fake_migrate=True)
 ``:code
 
 This will rebuild web2py metadata about the table according to the table definition. Try multiple table definitions to see which one works (the one before the failed migration and the one after the failed migration). Once successful remove the ``fake_migrate=True`` parameter.
@@ -526,6 +536,17 @@ db = DAL(...,fake_migrate_all=True)
 
 This also fails if the model describes tables that do not exist in the database,
 but it can help narrowing down the problem.
+
+### Migration control summary
+
+The logic of the various migration arguments are summarized in this pseudo-code:
+``
+if DAL.migrate_enabled and table.migrate:
+   if DAL.fake_migrate_all or table.fake_migrate:
+       perform fake migration
+   else:
+       perform migration
+``:code
 
 ### ``insert``
 
@@ -1640,6 +1661,8 @@ DAL fields may have a ``compute`` attribute. This must be a function (or lambda)
 Notice that the computed value is stored in the db and it is not computed on retrieval, as in the case of virtual fields, described later. Two typical applications of computed fields are:
 - in wiki applications, to store the processed input wiki text as HTML, to avoid re-processing on every request
 - for searching, to compute normalized values for a field, to be used for searching.
+
+Computed fields are evaluated in the order in which they are defined in the table definition. A computed field can refer to previously defined computed fields (new after v 2.5.1)
 
 ### Virtual fields
 

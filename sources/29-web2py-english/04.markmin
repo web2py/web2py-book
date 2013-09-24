@@ -79,7 +79,7 @@ Options:
   --socket-timeout=SOCKET_TIMEOUT
                         timeout for socket (5 second)
   -f FOLDER, --folder=FOLDER
-                        folder from which to run web2py
+                        location of the applications folder (also known as directory) 
   -v, --verbose         increase --test verbosity
   -Q, --quiet           disable all output
   -D DEBUGLEVEL, --debug=DEBUGLEVEL
@@ -111,8 +111,10 @@ Options:
   -T TEST_PATH, --test=TEST_PATH
                         run doctests in web2py environment; TEST_PATH like
                         a/c/f (c,f optional)
-  -W WINSERVICE, --winservice=WINSERVICE
-                        -W install|start|stop as Windows service
+  -W WINSERVICE, --winservice=WINSERVICE 
+                        -W install|start|stop as Windows service. 
+                        However, this is deprecated. Please see 
+                        use of nssm in the Deployment Recipes chapter
   -C, --cron            trigger a cron run manually; usually invoked from a
                         system crontab
   --softcron            triggers the use of softcron
@@ -141,7 +143,7 @@ Lower-case options are used to configure the web server. The ``-L`` option tells
 python web2py.py -vT welcome
 ``:code
 
-if you run web2py as Windows Service, ``-W``,  it is not convenient to pass the configuration using command line arguments. For this reason, in the web2py folder there is a sample "options_std.py" configuration file for the internal web server:
+if you run web2py as a Windows Service, ``-W``,  it is not convenient to pass the configuration using command line arguments. For this reason, in the web2py folder there is a sample "options_std.py" configuration file for the internal web server:
 
 ``
 import socket
@@ -336,7 +338,10 @@ request.cid
 Components are discussed in more detail in Chapter 12.
 
 ``request.get_vars``:inxx ``request.post_vars``:inxx ``request.vars``:inxx
-If the HTTP request is a GET, then ``request.env.request_method`` is set to "GET"; if it is a POST, ``request.env.request_method`` is set to "POST". URL query variables are stored in the ``request.vars`` Storage dictionary; they are also stored in ``request.get_vars`` (following a GET request) or ``request.post_vars`` (following a POST request).
+If the HTTP request is a GET, then ``request.env.request_method`` is set to "GET"; if it is a POST, ``request.env.request_method`` is set to "POST". 
+URL query variables are stored in ``request.get_vars``.
+``request.post_vars`` contains all parameters passed into the body of a request (usually a POST, PUT or a DELETE one).
+The ``request.vars`` Storage dictionary contains both of them (``get_vars`` and ``post_vars`` get merged)
 
 web2py stores WSGI and web2py environment variables in ``request.env``, for example:
 ``
@@ -441,13 +446,14 @@ anyserver.py
 
 which is a script to interface with many different web servers, described in Chapter 13.
 
-There are three example files:
+There are three example files in the "examples" directory:
 ``
 options_std.py
 routes.example.py
 router.example.py
 ``:code
 
+They are all meant to be copied to the root dir (where web2py.py or web2py.exe is) and edited according to your own preferences.
 The former is an optional configuration file that can be passed to web2py.py with the ``-L`` option. The second is an example of a URL mapping file. It is loaded automatically when renamed "routes.py". The third is an alternative syntax for URL mapping, and can also be renamed (or copied to) "routes.py".
 
 The files
@@ -873,9 +879,9 @@ my_other_storage = Storage(dict(a=1, b=2)) # convert dictionary to Storage
 - ``request.now``: a ``datetime.datetime`` object storing the datetime of the current request.
 - ``request.utcnow``: a ``datetime.datetime`` object storing the UTC datetime of the current request.
 - ``request.args``: A list of the URL path components following the controller function name; equivalent to ``request.env.path_info.split('/')[3:]``
-- ``request.vars``: a ``gluon.storage.Storage`` object containing both the HTTP GET and HTTP POST query variables.
-- ``request.get_vars``: a ``gluon.storage.Storage`` object containing only the HTTP GET query variables.
-- ``request.post_vars``: a ``gluon.storage.Storage`` object containing only the HTTP POST query variables.
+- ``request.vars``: a ``gluon.storage.Storage`` object containing all request parameters.
+- ``request.get_vars``: a ``gluon.storage.Storage`` object containing only parameters passed into the query string (a request to ``/a/c/f?var1=1&var2=2`` will end in ``{var1: "1", var2: "2"}``)
+- ``request.post_vars``: a ``gluon.storage.Storage`` object containing only the parameters passed into the body of the request (usually in POST, PUT, DELETE requests).
 - ``request.client``: The ip address of the client as determined by, if present, ``request.env.http_x_forwarded_for`` or by ``request.env.remote_addr`` otherwise. While this is useful it should not be trusted because the ``http_x_forwarded_for`` can be spoofed.
 - ``request.is_local``: ``True`` if the client is localhost, ``False`` otherwise. Should work behind a proxy if the proxy supports ``http_x_forwarded_for``.
 - ``request.is_https``: ``True`` if the request is using the HTTPS protocol, ``False`` otherwise.
@@ -912,7 +918,7 @@ results in the following ``request`` object:
 **variable** | **value**
 ``request.application`` | ``examples``
 ``request.controller`` | ``default``
-``request.function`` | ``index``
+``request.function`` | ``status``
 ``request.extension`` | ``html``
 ``request.view`` | ``status``
 ``request.folder`` | ``applications/examples/``
@@ -990,7 +996,7 @@ Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi 
 
 - ``response.body``: a ``StringIO`` object into which web2py writes the output page body. NEVER CHANGE THIS VARIABLE.
 - ``response.cookies``: similar to ``request.cookies``, but while the latter contains the cookies sent from the client to the server, the former contains cookies sent by the server to the client. The session cookie is handled automatically.
-- ``response.download(request, db)``: a method used to implement the controller function that allows downloading of uploaded files. ``request.download`` expects the last ``arg`` in ``request.args`` to be the encoded filename (i.e., the filename generated at upload time and stored in the upload field). It extracts the upload field name and table name as well as the original filename from the encoded filename. ``response.download`` takes two optional arguments: ``chunk_size`` sets the size in bytes for chunked streaming (defaults to 64K), and ``attachments`` determines whether the downloaded file should be treated as an attachment or not (default to ``True``). Note, ``response.download`` is specifically for downloading files associated with ``db`` upload fields. Use ``response.stream`` (see below) for other types of file downloads and streaming. Also, note that it is not necessary to use ``response.download`` to access files uploaded to the /static folder -- static files can (and generally should) be accessed directly via URL (e.g., /app/static/files/myfile.pdf).
+- ``response.download(request, db)``: a method used to implement the controller function that allows downloading of uploaded files. ``response.download`` expects the last ``arg`` in ``request.args`` to be the encoded filename (i.e., the filename generated at upload time and stored in the upload field). It extracts the upload field name and table name as well as the original filename from the encoded filename. ``response.download`` takes two optional arguments: ``chunk_size`` sets the size in bytes for chunked streaming (defaults to 64K), and ``attachments`` determines whether the downloaded file should be treated as an attachment or not (default to ``True``). Note, ``response.download`` is specifically for downloading files associated with ``db`` upload fields. Use ``response.stream`` (see below) for other types of file downloads and streaming. Also, note that it is not necessary to use ``response.download`` to access files uploaded to the /static folder -- static files can (and generally should) be accessed directly via URL (e.g., /app/static/files/myfile.pdf).
 - ``response.files``: a list of ``.css``, ``.js``, ``.coffee``, and ``.less`` files required by the page. They will automatically be linked in the head of the standard "layout.html" via the included "web2py_ajax.html". To include a new CSS, JS, COFFEE, or LESS file, just append it to this list. It will handle duplicates. The order is important.
 - ``response.include_files()`` generates html head tags to include all ``response.files`` (used in "views/web2py_ajax.html").
 - ``response.flash``: optional parameter that may be included in the views. Normally used to notify the user about something that happened.
@@ -2012,7 +2018,7 @@ routers = dict(
 ``:code
 maps ``http://domain.com`` accesses to the controller named ``insecure``, while ``HTTPS`` accesses go to the ``secure`` controller. Alternatively, you can map different ports to different apps, in the obvious way.
 
-For further information, please consult the file [[``router.example.py`` http://code.google.com/p/web2py/source/browse/router.example.py]] provided in the base folder of the standard web2py distribution.
+For further information, please consult the file [["router.example.py" https://github.com/web2py/web2py/blob/master/examples/router.example.py]] provided in the "examples" folder of the standard web2py distribution.
 
 Note: The ''parameter-based'' system first appeared in web2py version 1.92.1.
 
@@ -2200,7 +2206,7 @@ For each tuple, the first string is matched against "[app name]/[error code]". I
 
 These variables will be accessible to the error handling action via ``request.vars`` and can be used in generating the error response. In particular, it is a good idea for the error action to return the original HTTP error code instead of the default 200 (OK) status code. This can be done by setting ``response.status = request.vars.code``. It is also possible to have the error action send (or queue) an email to an administrator, including a link to the ticket in ``admin``.
 
-Unmatched errors display a default error page. This default error page can also be customized here (see ``router.example.py`` and ``routes.example.py`` in the root web2py folder):
+Unmatched errors display a default error page. This default error page can also be customized here (see "router.example.py" and "routes.example.py" in the "examples" folder):
 ``
 error_message = '<html><body><h1>%s</h1></body></html>'
 error_message_ticket = '''<html><body><h1>Internal error</h1>
@@ -2362,7 +2368,7 @@ You can also call a controller function, in which case there is no need to speci
 
 If you specify ``@reboot`` in the first field in the crontab file, the given task will be executed only once, at web2py startup. You can use this feature if you want to pre-cache, check, or initialize data for an application on web2py startup. Note that cron tasks are executed in parallel with the application --- if the application is not ready to serve requests until the cron task is finished, you should implement checks to reflect this. Example:
 ``
-@reboot  *  *  *  *  root *mycontroller/myfunction
+@reboot  root *mycontroller/myfunction
 ``:code
 
 Depending on how you are invoking web2py, there are four modes of operation for web2py cron.
@@ -2400,7 +2406,17 @@ This type of background process should not be executed via cron (except perhaps 
 In chapter 8, we will provide an example of how to use the above method to send emails.
 
 
-#### Scheduler (experimental)
+#### Scheduler 
+
+Prior to version 2.6.0 the scheduler was considered experimental. From v2.6.0 the documented API is stable.
+The stable API consists of these functions:
+- disable()
+- resume()
+- terminate()
+- kill()
+- queue_task(), 
+- task_status() 
+- stop_task()
 
 The web2py scheduler works very much like the task queue described in the previous sub-section with some differences:
 - It provides a standard mechanism for creating, scheduling, and monitoring tasks.
@@ -2419,7 +2435,9 @@ def task_add(a,b):
     return a+b
 ``:code
 
-Tasks will always be called in the same environment seen by controllers and therefore they see all the global variables defined in models, including database connections (``db``). Tasks differ from a controller action because they are not associated with an HTTP request and therefore there is no ``request.env``.
+Tasks will always be called in the same environment seen by controllers and therefore they see all the global variables defined in models, including database connections (``db``).
+Tasks differ from a controller action because they are not associated with an HTTP request and therefore there is no ``request.env``.
+Also, tasks can access another environmental variable that is not present in normal requests: ``W2P_TASK``. ``W2P_TASK.id`` holds the ``scheduler_task.id`` and ``W2P_TASK.uuid`` the ``scheduler_task.uuid`` field of the task that is running.
 
 ------
 Remember to call ``db.commit()`` at the end of every task if it involves inserts/updates to the database. web2py commits by default at the end of a successful action but the scheduler tasks are not actions.
@@ -2458,6 +2476,7 @@ python web2py.py -K myapp:group1:group2,myotherapp:group1
 
 If you have a model called ``scheduler.py`` you can start/stop the workers from web2py's default window (the one you use to set the ip address and the port).
 
+##### Scheduler Deployment
 One last nice addition: if you use the embedded webserver, you can start the webserver and the scheduler with just one line of code (this assumes you don't want the web2py window popping up, else you can use the "Schedulers" menu instead)
 
 ``
@@ -2465,6 +2484,10 @@ python web2py.py -a yourpass -K myapp -X
 ``
 You can pass the usual parameters (-i, -p, here -a prevents the window from showing up), pass whatever app in the -K parameter and append a -X. The scheduler will run alongside the webserver!
 
+Windows users looking to create a service should see the Deployment Recipes chapter.
+
+
+##### Complete Scheduler signature
 Scheduler's complete signature is:
 
 ``
@@ -2656,8 +2679,7 @@ In any case, the stdout is captured and also logged into the run record.
 
 Using appadmin, one can check all ``RUNNING`` tasks, the output of ``COMPLETED`` tasks, the error of ``FAILED`` tasks, etc.
 
-The scheduler also creates one more table called "scheduler_worker", which st\
-ores the workers' heartbeat and their status.
+The scheduler also creates one more table called "scheduler_worker", which stores the workers' heartbeat and their status.
 
 ##### Managing processes
 
@@ -2694,7 +2716,7 @@ each function take an optional parameter, that can be a string or a list, to man
 An example is better than a thousand words: ``scheduler.terminate('high_prio')`` will TERMINATE all the workers that are processing the ``high_prio`` tasks, while ``scheduler.terminate(['high_prio', 'low_prio'])`` will terminate all ``high_prio`` and ``low_prio`` workers.
 ------
 Watch out: if you have a worker processing ``high_prio`` and ``low_prio``, ``scheduler.terminate('high_prio')`` will terminate the worker alltogether, even if you didn't want to terminate ``low_prio`` too.
------- 
+------
 
 Everything that one can do via appadmin one can do programmatically by inserting and updating records in these tables.
 
@@ -2884,7 +2906,7 @@ http://docs.python.org/library/logging.html
 The string "web2py.app.myapp" defines an app-level logger.
 
 For this to work properly, you need a configuration file for the logger.
-One is provided by web2py in the root web2py folder "logging.example.conf". You need to rename the file "logging.conf" and customize it as necessary.
+One is provided by web2py in the "examples" folder "logging.example.conf". You need to copy the file to web2py's directory and rename the file to "logging.conf" and customize it as necessary.
 
 This file is self documenting, so you should open it and read it.
 

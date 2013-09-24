@@ -336,6 +336,7 @@ form.add_button('Back', URL('other_page'))
 ``:code
 
 You can add more than one button to form. The arguments of ``add_button`` are the value of the button (its text) and the url where to redirect to.
+(See also the buttons argument for SQLFORM, which provides a more powerful approach)
 
 #### More about manipulation of FORMs
 As discussed in the Views chapter, a FORM is an HTML helper. Helpers can be manipulated as Python lists and as dictionaries, which enables run-time creation and modification.
@@ -453,7 +454,12 @@ col3 = {'name':A('what is this?',
 - ``comments``. If set to False, does not display the col3 comments
 - ``ignore_rw``. Normally, for a create/update form, only fields marked as writable=True are shown, and for readonly forms, only fields marked as readable=True are shown. Setting ``ignore_rw=True`` causes those constraints to be ignored, and all fields are displayed. This is mostly used in the appadmin interface to display all fields for each table, overriding what the model indicates.
 - ``formstyle``:inxx ``formstyle`` determines the style to be used when serializing the form in html. It can be "table3cols" (default), "table2cols" (one row for label and comment, and one row for input), "ul" (makes an unordered list of input fields), "divs" (represents the form using css friendly divs, for arbitrary customization). ``formstyle`` can also be a function that takes (record_id, field_label, field_widget, field_comment) as attributes and returns a TR() object.
-- ``buttons``:inxx is a list of ``INPUT``s or ``TAG.BUTTON``s (though technically could be any combination of helpers) that will be added to a DIV where the submit button would go.
+- ``buttons``:inxx ``buttons`` is a list of ``INPUT``s or ``TAG.button``s (though technically could be any combination of helpers) that will be added to a DIV where the submit button would go. 
+For example, adding a URL-based back-button (for a multi-page form) and a renamed submit button:
+``
+buttons = [TAG.button('Back',_type="button",_onClick = "parent.location='%s' " % URL(...),
+             TAG.button('Next',_type="submit")]
+``:code
 - ``separator``:inxx ``separator`` sets the string that separates form labels from form input fields.
 - Optional ``attributes`` are arguments starting with underscore that you want to pass to the ``FORM`` tag that renders the ``SQLFORM`` object. Examples are:
 ``
@@ -611,7 +617,7 @@ When editing the record using an UPDATE form, it would be nice to display a link
 If you pass a URL to the ``SQLFORM`` constructor via the upload argument, web2py uses the action at that URL to download the file. Consider the following actions:
 ``
 def display_form():
-   record = db.person(request.args(0)) or redirect(URL('index'))
+   record = db.person(request.args(0))
    form = SQLFORM(db.person, record, deletable=True,
                   upload=URL('download'))
    if form.process().accepted:
@@ -764,6 +770,7 @@ contains the value "dog.owner=5" appropriately url-encoded
 You can easily implement a very general "list_records" action as follows:
 ``
 def list_records():
+    import re
     REGEX = re.compile('^(\w+)\.(\w+)\.(\w+)\=\=(\d+)$')
     match = REGEX.match(request.vars.query)
     if not match:
@@ -2408,7 +2415,24 @@ SQLFORM.grid(
 - ``links_in_grid`` if set to False, links will only be displayed in the "details" and "edit" page (so, not on the main grid)
 - ``upload`` same as SQLFORM's one. web2py uses the action at that URL to download the file
 - ``maxtextlength`` sets the maximum length of text to be displayed for each field value, in the grid view. This value can be overwritten for each field using ``maxtextlengths``, a dictionary of 'tablename.fieldname':length e.g. ``{'auth_user.email' : 50}``
-- ``onvalidation``, ``oncreate``, ``onupdate`` and ``ondelete`` are callback functions. All but ``ondelete`` take a form object as input.
+- ``onvalidation``, ``oncreate``, ``onupdate`` and ``ondelete`` are callback functions. All but ``ondelete`` take a form object as input, ondelete takes the table and the record id
+``
+def myonvalidation(form):
+    print 'validate!'
+    print form.vars
+
+def myoncreate(form):
+    print 'create!'
+    print form.vars
+
+def myonupdate(form):
+    print 'update!'
+    print form.vars
+
+def myondelete(table, id):
+    print 'delete!'
+    print table, id
+``:code
 - ``sorter_icons`` is a list of two strings (or helpers) that will be used to represent the up and down sorting options for each field.
 - ``ui`` can be set equal to 'web2py' and will generate web2py friendly class names, can be set equal to ``jquery-ui`` and will generate jquery UI friendly class names, but it can also be its own set of class names for the various grid components:
   ``
