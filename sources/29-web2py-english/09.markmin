@@ -538,54 +538,117 @@ which stores the openid usernames for each user. If you want to display the open
 {{=auth.settings.login_form.list_user_openids()}}
 ``:code
 
-##### OAuth2.0 and Facebook
-``OAuth``:inxx ``Facebook``:inxx
+##### OAuth2.0
+``OAuth``:inxx ``Facebook``:inxx ``Google``:inxx ``Twitter``:inxx
 
-We have previously discussed integration with Janrain (which has Facebook support), yet sometimes you do not want to rely on a third party service and you want to access a OAuth2.0 provider directly; for example, Facebook. Here is how:
+We have previously discussed integration with Janrain, yet sometimes you do not want to rely on a third party service and you want to access a OAuth2.0 provider directly;
+for example, Facebook, Linkedin, Twitter, Google all of them provide an OAuth2.0 authentication service.
+web2py handles the OAuth2.0 flow transparently so that a user can be verified against any configured OAuth2.0 
+provider during login.
+Other than authentication an OAuth2.0 provider can grant to any web2py application access to user resources
+with restricted access thought a proprietary API.  Google, Twitter, Facebook and so on, all have APIs that can be
+easily accessed by a web2py application.
 
-``
-from gluon.contrib.login_methods.oauth20_account import OAuthAccount
-auth.settings.login_form=OAuthAccount(YOUR_CLIENT_ID,YOUR_CLIENT_SECRET)
-``:code
+It must be underlined that OAuth2.0 is limited only to authentication and authorization
+(for instance CAS has more functionalities), this means that each OAuth2.0 provider
+has a different way to receive a unique id from their user database through one of their APIs.
+Specific methods are well explained on respective provider documentation, they usually consist in a very
+simple REST call.  This is why for each OAuth2.0 provider there is the need to write a few lines of code. 
 
-Things get a little more complex if you want to use Facebook OAuth2.0 to login into a specific Facebook app to access its API, instead of your own app. Here is an example for accessing the Facebook Graph API.
+Before writing any instructions in the application model a first step is needed for any provider: registering a new application;  this is usually done
+on provider's site and is explained in provider's documentation.
+
+There are a few things that needs to be known once there is the need to add a new OAuth2.0 provider to your
+application:
+ 1. the Authorization URI;
+ 2. the Token request URI;
+ 3. the application identification token and secret received upon registration of the new application;
+ 4. the permissions that the provider must grant to the web2py application, i.e. the "scope" (see the provider's documentation);
+ 5. the API call to receive a UID of the authenticating user, as explained on providers documentation.
+ 
+Point 1 to 4 are used to initialize the authorization endpoint used by web2py to communicate with the OAuth2.0 provider.
+The unique id is retrieved by web2py with a call to the get_user() method when needed during the login flow; this is where
+the API call of point 5 is needed.
+
+These are the essential modification that need to be done in your model:
+ a. import OAuthAccount class;
+ b. define a derived OAuthClass implementation;
+ c. override __init__() method of that class;
+ d. override get_user() method of that class.
+ e. instantiate the class with the data of points 1-4 of the above list;
+
+Once the class is instantiated, and the user is authenticated, the web2py application
+can access the API of the provider any time by using the OAuth2.0 access token by calling the accessToken() method
+of that class.
+
+What follows is an example of what can be used with Facebook.  This is a basic example using Facebook Graph API,
+remind that, by writing a proper get_user() method, many different things can be done.  The example shows how the
+OAuth2.0 access token can be used when calling the remote API of the provider.
 
 First of all you must install the [[Facebook Python SDK https://github.com/pythonforfacebook/facebook-sdk/]].
 
 Second, you need the following code in your model:
 
 ``
+## Define oauth application id and secret.
+FB_CLIENT_ID='xxx'
+FB_CLIENT_SECRET="yyyy"
+
 ## import required modules
-from facebook import GraphAPI
+try:
+    import json
+except ImportError:
+    from gluon.contrib import simplejson as json
+from facebook import GraphAPI, GraphAPIError
 from gluon.contrib.login_methods.oauth20_account import OAuthAccount
+
+
 ## extend the OAUthAccount class
 class FaceBookAccount(OAuthAccount):
-    """OAuth impl for Facebook"""
+    """OAuth impl for FaceBook"""
     AUTH_URL="https://graph.facebook.com/oauth/authorize"
     TOKEN_URL="https://graph.facebook.com/oauth/access_token"
-    def __init__(self, g):
-        OAuthAccount.__init__(self, g,
-                              YOUR_CLIENT_ID,
-                              YOUR_CLIENT_SECRET,
-                              self.AUTH_URL,
-                              self.TOKEN_URL)
+
+    def __init__(self):
+        OAuthAccount.__init__(self, None, FB_CLIENT_ID, FB_CLIENT_SECRET,
+                              self.AUTH_URL, self.TOKEN_URL,
+                              scope='email,user_about_me,user_activities, user_birthday, user_education_history, user_groups, user_hometown, user_interests, user_likes, user_location, user_relationships, user_relationship_details, user_religion_politics, user_subscriptions, user_work_history, user_photos, user_status, user_videos, publish_actions, friends_hometown, friends_location,friends_photos',
+                              state="auth_provider=facebook",
+                              display='popup')
         self.graph = None
-    # override function that fetches user info
+
     def get_user(self):
-        "Returns the user using the Graph API"
+        '''Returns the user using the Graph API.
+        '''
         if not self.accessToken():
             return None
+
         if not self.graph:
             self.graph = GraphAPI((self.accessToken()))
+
+        user = None
         try:
             user = self.graph.get_object("me")
+        except GraphAPIError, e:
+            session.token = None
+            self.graph = None
+
+        if user:
+            if not user.has_key('username'):
+                username = user['id']
+            else:
+                username = user['username']
+                
+            if not user.has_key('email'):
+                email = '%s.fakemail' %(user['id'])
+            else:
+                email = user['email']    
+
             return dict(first_name = user['first_name'],
                         last_name = user['last_name'],
-                        username = user['id'])
-        except GraphAPIError:
-            self.session.token = None
-            self.graph = None
-            return None
+                        username = username,
+                        email = '%s' %(email) )
+
 ## use the above class to build a new login form
 auth.settings.login_form=FaceBookAccount()
 ``:code
