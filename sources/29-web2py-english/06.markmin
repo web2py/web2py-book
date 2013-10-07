@@ -976,6 +976,29 @@ row[i].person.name
 ``
 Yes this is unusual and rarely needed.
 
+#### Rendering rows using represent
+You may wish to rewrite rows returned by select to take advantage of formatting information contained in the represents setting of the fields. 
+
+``rows = db(query).select()
+repr_row = rows.render(0)``:code
+
+If you don't specify an index, you get a generator to iterate over all the rows:
+
+``for row in rows.render():
+    print row.myfield``:code
+
+Can also be applied to slices:
+
+``for row in rows[0:10].render():
+    print row.myfield``:code
+
+If you only want to transform selected fields via their "represent" attribute, you can list them in the "fields" argument:
+
+``repr_row = row.render(0, fields=[db.mytable.myfield])``:code
+
+Note, it returns a transformed copy of the original Row, so there's no update_record (which you wouldn't want anyway) or delete_record.
+
+
 #### Shortcuts
 ``DAL shortcuts``:inxx
 
@@ -1164,10 +1187,11 @@ and the corresponding view:
 
 ``SQLFORM.grid`` and ``SQLFORM.smartgrid`` should be preferred to ``SQLTABLE`` because they are more powerful although higher level and therefore more constraining. They will be explained in more detail in chapter 7.
 
-#### ``orderby``, ``groupby``, ``limitby``, ``distinct``, ``having``
+#### ``orderby``, ``groupby``, ``limitby``, ``distinct``, ``having``,``orderby_on_limitby``,``left``,``cache``
 
-The ``select`` command takes five optional arguments: orderby, groupby, limitby, left and cache. Here we discuss the first three.
+The ``select`` command takes a number of optional arguments.
 
+##### orderby
 You can fetch the records sorted by name:
 
 ``orderby``:inxx ``groupby``:inxx ``having``:inxx
@@ -1218,6 +1242,7 @@ Bob
 Alex
 ``:code
 
+##### groupby, having
 Using ``groupby`` together with ``orderby``, you can group records with the same value for the specified field (this is back-end specific, and is not on the Google NoSQL):
 ``
 >>> for row in db().select(
@@ -1237,6 +1262,7 @@ You can use ``having`` in conjunction with ``groupby`` to group conditionally (o
 
 Notice that query1 filters records to be displayed, query2 filters records to be grouped.
 
+##### distinct
 ``distinct``:inxx
 
 With the argument ``distinct=True``, you can specify that you only want to select distinct records. This has the same effect as grouping using all specified fields except that it does not require sorting. When using distinct it is important not to select ALL fields, and in particular not to select the "id" field, else all records will always be distinct.
@@ -1258,7 +1284,7 @@ Alex
 Bob
 Carl
 ``:code
-
+##### limitby
 With limitby=(min, max), you can select a subset of the records from offset=min to but not including offset=max (in this case, the first two starting at zero):
 
 ``limitby``:inxx
@@ -1268,6 +1294,21 @@ With limitby=(min, max), you can select a subset of the records from offset=min 
 Alex
 Bob
 ``:code
+
+##### orderby_on_limitby
+``orderby_on_limitby``:inxx
+Note that the DAL defaults to implicitly adding an orderby when using a limitby.
+This ensures the same query returns the same results each time, important for pagination.
+But it can cause performance problems. 
+use ``orderby_on_limitby = False`` to change this (this defaults to True). 
+
+##### left
+Discussed below in the section on joins
+
+##### cache, cacheable
+An example use which gives much faster selects is:
+``rows = db(query).select(cache=(cache.ram,3600),cacheable=True)``:code
+See discussion on 'caching selects', below, to understand what the tradeoffs are. 
 
 
 #### Logical operators
