@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import os, datetime
 from gluon.validators import urlify
+from w2p_book_cidr import CIDRConv
+from gluon.serializers import loads_json
 session.forget()
 
 TIME_EXPIRE = 60*60*24
@@ -179,3 +181,29 @@ def reference():
         redirect(info['source_url'])
     else:
         return repr(info)
+
+
+def rebuild_sources():
+    github_cidrs = ['204.232.175.64/27', '192.30.252.0/22']
+    check_cidr = CIDRConv(cidrs=github_cidrs)
+    originator = request.env.remote_addr
+    is_valid = check_cidr.valid_ip(originator)
+    if not is_valid:
+        raise HTTP(404)
+    payload = request.post_vars.payload
+    if not payload:
+        raise HTTP(404)
+    payload = loads_json(payload)
+    commits = payload.get('commits', [])
+    rebuild = False
+    for commit in commits:
+        author = commit.get('author', {'name' : ''})
+        if author['name'] == 'mdipierro': #rebuild only on massimo's commits
+            rebuild = True
+            break
+    if not rebuild:
+        raise HTTP(200)
+    dest = os.path.join(request.folder, 'private', 'rebuild_me')
+    with open(dest, 'w') as g:
+        g.write('ok')
+    return 'ok'
