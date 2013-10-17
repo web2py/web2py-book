@@ -5,6 +5,8 @@
 
 web2py comes with a Database Abstraction Layer (DAL), an API that maps Python objects into database objects such as queries, tables, and records. The DAL dynamically generates the SQL in real time using the specified dialect for the database back end, so that you do not have to write SQL code or learn different SQL dialects (the term SQL is used generically), and the application will be portable among different types of databases. A partial list of supported databases is show in the table below. Please check on the web2py web site and mailing list for more recent adapters. Google NoSQL is treated as a particular case in Chapter 13.
 
+The Gotchas section at the end of this chapter has some more information about specific databases.
+
 The Windows binary distribution works out of the box with SQLite and MySQL. The Mac binary distribution works out of the box with SQLite.
 To use any other database back-end, run from the source distribution and install the appropriate driver for the required back end.
 ``database drivers``:inxx
@@ -3359,20 +3361,35 @@ db =DAL(..., driver_args={}, adapter_args={})
 ``
 
 
-#### Gotchas
+### Gotchas
 
-**SQLite** does not support dropping and altering columns. That means that web2py migrations will work up to a point. If you delete a field from a table, the column will remain in the database but will be invisible to web2py. If you decide to reinstate the column, web2py will try re-create it and fail. In this case you must set ``fake_migrate=True`` so that metadata is rebuilt without attempting to add the column again. Also, for the same reason, **SQLite** is not aware of any change of column type. If you insert a number in a string field, it will be stored as string. If you later change the model and replace the type "string" with type "integer", SQLite will continue to keep the number as a string and this may cause problem when you try to extract the data.
+#### SQLite
+SQLite does not support dropping and altering columns. That means that web2py migrations will work up to a point. If you delete a field from a table, the column will remain in the database but will be invisible to web2py. If you decide to reinstate the column, web2py will try re-create it and fail. In this case you must set ``fake_migrate=True`` so that metadata is rebuilt without attempting to add the column again. Also, for the same reason, **SQLite** is not aware of any change of column type. If you insert a number in a string field, it will be stored as string. If you later change the model and replace the type "string" with type "integer", SQLite will continue to keep the number as a string and this may cause problem when you try to extract the data.
 
-**MySQL** does not support multiple ALTER TABLE within a single transaction. This means that any migration process is broken into multiple commits. If something happens that causes a failure it is possible to break a migration (the web2py metadata are no longer in sync with the actual table structure in the database). This is unfortunate but it can be prevented (migrate one table at the time) or it can be fixed a posteriori (revert the web2py model to what corresponds to the table structure in database, set ``fake_migrate=True`` and after the metadata has been rebuilt, set ``fake_migrate=False`` and migrate the table again).
+SQLite doesn't have a boolean type. web2py internally maps booleans to a 1 character string, with 'T' and 'F' representing True and False. The DAL handles this completely; the abstraction of a true boolean value works well. 
+But if you are updating the SQLite table with SQL directly, be aware of the web2py implementation, and avoid using 0 and 1 values.
 
-**Google SQL** has the same problems as MySQL and more. In particular table metadata itself must be stored in the database in a table that is not migrated by web2py. This is because Google App Engine has a read-only file system. Web2py migrations in Google:SQL combined with the MySQL issue described above can result in metadata corruption. Again, this can be prevented (by migrating the table at once and then setting migrate=False so that the metadata table is not accessed any more) or it can fixed a posteriori (by accessing the database using the Google dashboard and deleting any corrupted entry from the table called ``web2py_filesystem``.
+#### MySQL
 
+MySQL does not support multiple ALTER TABLE within a single transaction. This means that any migration process is broken into multiple commits. If something happens that causes a failure it is possible to break a migration (the web2py metadata are no longer in sync with the actual table structure in the database). This is unfortunate but it can be prevented (migrate one table at the time) or it can be fixed a posteriori (revert the web2py model to what corresponds to the table structure in database, set ``fake_migrate=True`` and after the metadata has been rebuilt, set ``fake_migrate=False`` and migrate the table again).
+
+#### Googel SQL
+
+Google SQL has the same problems as MySQL and more. In particular table metadata itself must be stored in the database in a table that is not migrated by web2py. This is because Google App Engine has a read-only file system. Web2py migrations in Google:SQL combined with the MySQL issue described above can result in metadata corruption. Again, this can be prevented (by migrating the table at once and then setting migrate=False so that the metadata table is not accessed any more) or it can fixed a posteriori (by accessing the database using the Google dashboard and deleting any corrupted entry from the table called ``web2py_filesystem``.
+
+#### MSSQL (Microsoft SQL Server)
 ``limitby``:inxx
-**MSSQL** does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
+MSSQL does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
 
-**Oracle** also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). This works for simple select but may break for complex selects involving aliased fields and or joins.
+#### Oracle
 
-**MSSQL** has problems with circular references in tables that have ONDELETE CASCADE. This is an MSSQL bug and you work around it by setting the ondelete attribute for all reference fields to "NO ACTION". You can also do it once and for all before you define tables:
+Oracle also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). 
+This works for simple select but may break for complex selects involving aliased fields and or joins.
+
+#### MSSQL 
+
+MSSQL has problems with circular references in tables that have ONDELETE CASCADE. This is an MSSQL bug and you work around it by setting the ondelete attribute for all reference fields to "NO ACTION". 
+You can also do it once and for all before you define tables:
 
 ``
 db = DAL('mssql://....')
@@ -3381,7 +3398,7 @@ for key in ['reference','reference FK']:
         '%(on_delete_action)s','NO ACTION')
 ``:code
 
-**MSSQL** also has problems with arguments passed to the DISTINCT keyword and therefore
+MSSQL also has problems with arguments passed to the DISTINCT keyword and therefore
  while this works,
 
 ``
@@ -3394,4 +3411,10 @@ this does not
 db(query).select(distinct=db.mytable.myfield)
 ``
 
-**Google NoSQL (Datastore)** does not allow joins, left joins, aggregates, expression, OR involving more than one table, the ‘like’ operator searches in "text" fields. Transactions are limited and not provided automatically by web2py (you need to use the Google API ``run_in_transaction`` which you can look up in the Google App Engine documentation online). Google also limits the number of records you can retrieve in each one query (1000 at the time of writing). On the Google datastore record IDs are integer but they are not sequential. While on SQL the "list:string" type is mapped into a "text" type, on the Google Datastore it is mapped into a ``ListStringProperty``. Similarly "list:integer" and "list:reference" are mapped into "ListProperty". This makes searches for content inside these fields types are more efficient on Google NoSQL than on SQL databases.
+#### Googel NoSQL (Datastore)
+Google NoSQL (Datastore) does not allow joins, left joins, aggregates, expression, OR involving more than one table, the ‘like’ operator searches in "text" fields. 
+
+Transactions are limited and not provided automatically by web2py (you need to use the Google API ``run_in_transaction`` which you can look up in the Google App Engine documentation online). 
+
+Google also limits the number of records you can retrieve in each one query (1000 at the time of writing). On the Google datastore record IDs are integer but they are not sequential. 
+While on SQL the "list:string" type is mapped into a "text" type, on the Google Datastore it is mapped into a ``ListStringProperty``. Similarly "list:integer" and "list:reference" are mapped into "ListProperty". This makes searches for content inside these fields types are more efficient on Google NoSQL than on SQL databases.
