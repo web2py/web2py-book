@@ -13,6 +13,8 @@ if request.is_local:
     TIME_EXPIRE = -1
     FORCE_RENDER = True
 
+response.logo = A(B('web',SPAN(2),'py'),XML('&trade;&nbsp;'),
+                  _class="brand",_href="http://www.web2py.com/")
 response.title = 'web2py'
 response.subtitle = 'Full Stack Web Framework, 6th Ed (pre-release).\nwritten by Massimo Di Pierro in English'
 response.menu = []
@@ -65,7 +67,7 @@ def build_menu(dummy=None):
         info = get_info(subfolder)
         book_id = subfolder.split('-')[0]
         submenu.append((info['title']+' '+info['language'],None,URL('chapter',args=book_id)))
-    menu.append(('Books',None,None,submenu))
+    menu.append(('Books',None,'#',submenu))
     menu.append(('Contribute',None,'https://github.com/mdipierro/web2py-book'))
     return menu
 
