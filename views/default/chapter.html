@@ -4,74 +4,94 @@ response.files.append(URL('static','js/jquery.highlight.js'))
 response.files.append(URL('static','js/jquery.scrollTo-min.js'))
 response.files.append(URL('static','js/jquery.toc-0.1.js'))
 response.files.append(URL('static','js/jquery.qtip-1.0.0-rc3.min.js'))
-response.title = info['title']
 response.subtitle = SPAN(info['subtitle']," written by "+(info['authors'] and info['authors'] or 'unknown')+" in " + info['language'])
 }}
 {{extend 'layout.html'}}
-<style>
-.highlight {background-color: yellow}
-.article h1 { font-size: 32px; padding-top: 1em}
-.article h2 { font-size: 28px; padding-top: 1em}
-.article h3 { font-size: 24px; padding-top: 1em}
-.article h4 { font-size: 20px; padding-top: 1em}
-.article h5 { font-size: 16px; padding-top: 1em}
-.article h6 { font-size: 12px; padding-top: 1em}
-
-.article img {padding-left: 30px; }
-.article p, .article li {text-align: justify;margin-bottom:0.5em;}
-.article li {list-style:circle outside;}
-.article ul {margin-left: 2em;}
-.inxx { background-color: #999999; color: white; position: absolute; right: -100px; white-space: nowrap; font-size: 0.8em; padding: 5px; -moz-border-radius: 5px; -webkit-border-radius: 5px;}
-.article h1 code, .article h2 code, .article h3 code, .article h4 code, .article h5 code, .article h6 code {
-   display: in-line block;
-   color : inherit;
-   border: 0px;
-   font-size: inherit;
-   background: transparent;
-}
-</style>
 
 {{block header}}
+{{printed_book_link = info['url_print'] if info['url_print'] and IS_URL()(info['url_print'])[1] is None else "http://www.lulu.com/shop/massimo-di-pierro/web2py-5th-edition/paperback/product-20731496.html"}}
+<a class="btn btn btn-danger" href="{{=printed_book_link}}">buy printed</a>
+{{pass}}
+{{if info['url_pdf'] and IS_URL()(info['url_pdf'])[1] is None:}}
+<a class="btn" href="{{=info['url_pdf']}}">pdf</a>
+{{pass}}
 {{end}}
 
 {{block statusbar}}
 {{end}}
 
 {{block left_sidebar}}
-{{if info['url_print']:}}
-<a class="btn" href="{{=info['url_print']}}">buy printed</a>
-{{pass}}
-{{if info['url_pdf']:}}
-<a class="btn" href="{{=info['url_pdf']}}">pdf</a>
-{{pass}}
-
 <h4>Search</h4>
-<form action="{{=URL('search',args=book_id)}}"><input name="search" value="{{=request.vars.search or ''}}" onkeyup="jQuery('.article').unhighlight(); var v=jQuery(this).val(); if(v!='') jQuery('.article').highlight(v);"/><input type="submit" value="Search" style="padding: 0 5px"></form>
+<form class="form-search" action="{{=URL('search',args=book_id)}}">
+    <div class="input-append">
+        <input id="search-field" type="text" name="search" class="span2 search-query" value="{{=request.vars.search or ''}}"/><button type="submit" class="btn"><i class="icon-search"></i></button>
+    </div>
+</form>
+
 <h4>Table of Content</h4>
-<ul>
-{{for key,item in chapters:}}
-{{=LI(A(item,_href=URL(args=(book_id,key))))}}
+<ul id="toc-list">
+{{for key,item,slug in chapters:}}
+{{=LI(A(item,_href=URL(f="chapter", args=(book_id,key,slug))))}}
 {{pass}}
 </ul>
 {{end}}
 
 {{if request.function=='chapter':}}
-<h4><a href="#" onclick="jQuery('ul.jquery-toc-1').slideToggle();return false;">Chapter Table of Contents</a></h4>
+<h4><a id="chapter-toc-toggle" href="#">Chapter Table of Contents</a></h4>
+{{pass}}
 
+{{block page_javascript}}
 <script>
 jQuery(document).ready(function(){
-  jQuery.toc('.article h1, .article h2, .article h3, .article h4').prependTo('.article');
+  jQuery('#search-field').on( "keyup", function() {
+    jQuery('.article').unhighlight(); 
+    var v = jQuery(this).val();
+    if (v!='') jQuery('.article').highlight(v);
+  });
+  jQuery('#chapter-toc-toggle').on( "click", function(e) {
+    e.preventDefault();
+    jQuery('ul.jquery-toc-1').slideToggle();
+  });
+  // scroll to the target
+  var scrollToOffset = (jQuery('.navbar-fixed-top').css('position') == 'fixed') ? -43 : -3
+  //var bodyPaddingTop = jQuery('body').innerHeight() - jQuery('body').height();
+  //var scrollToOffset = (bodyPaddingTop > 0) ? -43  : -3
+  {{if request.function=='chapter':}}
+  var chapterTOC = jQuery.toc('.article h1, .article h2, .article h3, .article h4');
+  chapterTOC.prependTo('.article');
+  jQuery('.article ul[class^="jquery-toc-"] a').on('click', function() {
+    jQuery(document).scrollTo('a[name=' + this.hash.replace('#', '') + ']', 500, {axis:'y', offset: scrollToOffset});
+  });
+  if (!chapterTOC.find('a').length) {
+    jQuery('#chapter-toc-toggle').hide();
+  };
+  {{pass}}
   if (location.hash) setTimeout(function(){
-                jQuery(document).scrollTo('a[name=' + location.hash.replace('#', '') + ']',2000, {axis:'y'});
-                }, 1000);
+    jQuery(document).scrollTo('a[name=' + location.hash.replace('#', '') + ']', 2000, {axis:'y', offset: scrollToOffset});
+  }, 300);
   {{if request.vars.search:}}
     jQuery('.article').highlight('{{=request.vars.search}}');
-    jQuery(document).scrollTo('.highlight',2000, {axis:'y'});
+    jQuery(document).scrollTo('.highlight', 2000, {axis:'y', offset: scrollToOffset});
   {{pass}}
+  // scroll to top
+  var offset = 440;
+  var duration = 300;
+  jQuery(window).scroll(function() {
+    if (jQuery(this).scrollTop() > offset) {
+            jQuery('#gototop_btn').fadeIn(duration);
+        } else {
+            jQuery('#gototop_btn').fadeOut(duration);
+        }
+  });
+  jQuery("#gototop_btn").on('click', function(e) {
+    jQuery(document).scrollTo(0, 500);
+  });
 });
 </script>
-{{pass}}
+{{end}}
 
 <div class="article">
   {{=content}}
 </div>
+
+<a id="gototop_btn" href="#header"><i class="icon-arrow-up"></i><em>&nbsp;top</em></a>

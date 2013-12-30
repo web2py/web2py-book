@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 import os, datetime
+from gluon.validators import urlify
+from w2p_book_cidr import CIDRConv
+from gluon.serializers import loads_json
 session.forget()
 
 TIME_EXPIRE = 60*60*24
@@ -10,13 +13,20 @@ if request.is_local:
     TIME_EXPIRE = -1
     FORCE_RENDER = True
 
+response.logo = A(B('web',SPAN(2),'py'),XML('&trade;&nbsp;'),
+                  _class="brand",_href="http://www.web2py.com/")
 response.title = 'web2py'
-response.subtitle = 'Full Stack Web Framework, 4th Ed.\nwritten by Massimo Di Pierro in English'
+response.subtitle = 'Full Stack Web Framework, 6th Ed (pre-release).\nwritten by Massimo Di Pierro in English'
 response.menu = []
 
 def splitter(x):
     a,b = x.split(':',1)
     return a.strip(),b.strip()
+
+def splitter_urlify(x):
+    a,b = x.split(':',1)
+    return a.strip(),b.strip(), urlify(b)
+
 
 @cache('folders',None)
 def get_folders(dummy=None):
@@ -44,7 +54,7 @@ def get_info(subfolder):
 
 def get_chapters(subfolder):
     filename = os.path.join(FOLDER,subfolder,'chapters.txt')
-    chapters = [splitter(line)
+    chapters = [splitter_urlify(line)
                 for line in open(filename).readlines()
                 if ':' in line]
     return chapters
@@ -57,7 +67,7 @@ def build_menu(dummy=None):
         info = get_info(subfolder)
         book_id = subfolder.split('-')[0]
         submenu.append((info['title']+' '+info['language'],None,URL('chapter',args=book_id)))
-    menu.append(('Books',None,None,submenu))
+    menu.append(('Books',None,'#',submenu))
     menu.append(('Contribute',None,'https://github.com/mdipierro/web2py-book'))
     return menu
 
@@ -98,6 +108,8 @@ def chapter():
     subfolder = get_subfolder(book_id)
     info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
     chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=TIME_EXPIRE)
+    chapter_title = chapters[chapter_id][1]
+    response.title = '%s - %s' % (info['title'], chapter_title)
     filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
     dest = os.path.join(request.folder, 'static_chaps', subfolder, '%.2i.html' % chapter_id)
     if not FORCE_RENDER:
@@ -131,15 +143,15 @@ def search():
         k = data.find(search)
         if k>=0:
             snippet = data[data.rfind('\n\n',0,k)+1:data.find('\n\n',k)].strip()
-            results.append((chapter[0],chapter[1],convert2html(book_id,snippet)))
+            results.append((chapter[0],chapter[1],chapter[2],convert2html(book_id,snippet)))
             content = CAT(*[DIV(H2(A(chapter[1],
                                      _href=URL('chapter',
                                                vars=dict(search=search),
-                                               args=(book_id,chapter[0])))),
-                            chapter[2],BR(),
+                                               args=(book_id,chapter[0],chapter[2])))),
+                            chapter[3],BR(),
                             A('more',_href=URL('chapter',
                                                vars=dict(search=search),
-                                               args=(book_id,chapter[0])),_class="btn"))
+                                               args=(book_id,chapter[0],chapter[2])),_class="btn"))
                         for chapter in results])
     response.view = 'default/chapter.html'
     return locals()
@@ -171,3 +183,29 @@ def reference():
         redirect(info['source_url'])
     else:
         return repr(info)
+
+
+def rebuild_sources():
+    github_cidrs = ['204.232.175.64/27', '192.30.252.0/22']
+    check_cidr = CIDRConv(cidrs=github_cidrs)
+    originator = request.env.remote_addr
+    is_valid = check_cidr.valid_ip(originator)
+    if not is_valid:
+        raise HTTP(404)
+    payload = request.post_vars.payload
+    if not payload:
+        raise HTTP(404)
+    payload = loads_json(payload)
+    commits = payload.get('commits', [])
+    rebuild = False
+    for commit in commits:
+        author = commit.get('author', {'name' : ''})
+        if author['name'] == 'mdipierro': #rebuild only on massimo's commits
+            rebuild = True
+            break
+    if not rebuild:
+        raise HTTP(200)
+    dest = os.path.join(request.folder, 'private', 'rebuild_me')
+    with open(dest, 'w') as g:
+        g.write('ok')
+    return 'ok'

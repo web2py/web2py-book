@@ -1,9 +1,10 @@
 ## EmailとSMS
+
 ``Mail``:inxx
 
-### メールの設定
+### メールのセットアップ
 
-web2pyは、web2pyを使用して簡単にメール送信を行うために、 ``gluon.tools.Mail`` クラスを提供しています。メーラは次のように定義できます。
+web2pyは、web2pyを使用して簡単にメール送信を行うために、``gluon.tools.Mail`` クラスを提供しています。メーラは次のように定義できます。
 ``
 from gluon.tools import Mail
 mail = Mail()
@@ -12,7 +13,7 @@ mail.settings.sender = 'you@example.com'
 mail.settings.login = 'username:password'
 ``:code
 
-アプリケーションが ``Auth`` を使用している場合（Authについては次章で取り上げます）、 ``auth`` オブジェクトは専用メーラ ``auth.settings.mailer`` を持っています。このため代わりに、次のように定義することも可能です。
+アプリケーションが ``Auth`` を使用している場合(Authについては次章で取り上げます)、``auth`` オブジェクトは専用メーラ ``auth.settings.mailer`` を持っています。このため代わりに、次のように定義することも可能です:
 ``
 mail = auth.settings.mailer
 mail.settings.server = 'smtp.example.com:25'
@@ -20,12 +21,14 @@ mail.settings.sender = 'you@example.com'
 mail.settings.login = 'username:password'
 ``:code
 
-使用するSMTPサーバ用に、mail.settings で適切なパラメータ値を設定します。SMTPサーバが認証を必要としない場合は、 ``mail.settings.login=False`` と設定します。
+使用するSMTPサーバ用に、mail.settings で適切なパラメータ値を設定します。SMTPサーバが認証を必要としない場合は、``mail.settings.login = None`` とセットします。
+
+もしTLSを使用したくない場合は、``mail.settings.tls = False`` とセットします。
 
 ``email logging``:inxx
 
 --------
-デバッグ用には次のように設定します。
+デバッグ用には次のようにセットします。
 ``
 mail.settings.server = 'logging'
 ``:code
@@ -34,18 +37,18 @@ mail.settings.server = 'logging'
 
 #### Google App Engine でのメール設定
 ``email from GAE``:inxx
-Google App Engineでのメール送信設定は次のようになります。
+Google App Engineでのメール送信設定は、次のようになります:
 
 ``
 mail.settings.server = 'gae'
 ``:code
 
-現時点でのweb2pyは、Google App Engine上での添付ファイルと暗号化メールはサポートしていません。
+現時点でのweb2pyは、Google App Engine上での添付ファイルと暗号化メールはサポートしていません。cronとスケジューラは、GAE上では動作しないことに注意してください。
 
 #### x509 と PGP 暗号化
 ``PGP``:inxx ``x509``:inxx
 
-x509 (SMIME) 暗号化メールを送信するには、次のように設定します。
+x509 (SMIME) 暗号化メールを送信するには、次のようにセットします:
 ``
 mail.settings.cipher_type = 'x509'
 mail.settings.sign = True
@@ -56,21 +59,22 @@ mail.settings.x509_sign_certfile = 'filename.cert'
 mail.settings.x509_crypt_certfiles = 'filename.cert'
 ``:code
 
-PGP 暗号化メールを送信するには、次のように設定します。
+PGP 暗号化メールを送信することも可能です。全ての最初に、python-pymeパッケージをインストールすることが必要です。次に GnuPG (GPG) を使用し、送信者のキーファイルを作成します(mail.settings.senderからのe-mailで利用します)。そして、pubring.gpg と secring.gpgファイルをディレクトリ(例えば、"/home/www-data/.gnupg")に配置します
+
+次のように設定します:
+
 ``
-from gpgme import pgp
+mail.settings.gpg_home = '/home/www-data/.gnupg/'
 mail.settings.cipher_type = 'gpg'
 mail.settings.sign = True
 mail.settings.sign_passphrase = 'your passphrase'
 mail.settings.encrypt = True
 ``:code
 
-後者の設定（PGP 暗号化メール送信）では、python-pyme パッケージが必要です。
-
 ### メール送信
 ``mail.send``:inxx ``email html``:inxx ``email attachments``:inxx
 
-``mail`` の設定が完了している場合、次のようにメールの送信が可能です。
+``mail`` の設定が完了している場合、次のようにメールの送信が可能です:
 ``
 mail.send(to=['somebody@example.com'],
           subject='hello',
@@ -79,20 +83,23 @@ mail.send(to=['somebody@example.com'],
           message='hi there')
 ``:code
 
-メール送信が成功すると Mail は ``True`` を返します。そうでなければ、 ``False`` を返します。 ``mail.send()`` の全ての引数は次の通りです。
+メール送信が成功すると Mail は ``True`` を返します。そうでなければ、``False`` を返します。 ``mail.send()`` の全ての引数は次の通りです:
 
 ``
 send(self, to, subject='None', message='None', attachments=1,
-     cc=1, bcc=1, reply_to=1, encoding='utf-8',headers={})
+     cc=1, bcc=1, reply_to=1, encoding='utf-8',headers={},
+     sender=None)
 ``:code
 
 ``to`` ``cc`` そして ``bcc`` はメールアドレスのリスト値を指定します。
 
-``headers`` は送信するメールのヘッダー情報を、次のように辞書型で指定します。
+``headers`` は送信するメールのヘッダー情報を、次のように辞書型で指定します:
 
 ``
 headers = {'Return-Path' : 'bounces@example.org'}
 ``:code
+
+``sender`` はデフォルトでは ``None`` になり、このケースでは送信者は ``mail.settings.sender`` とセットされます。
 
 以下、 ``mail.send()`` の追加の使用例です。
 
@@ -116,7 +123,7 @@ mail.send('you@example.com',
 
 #### テキストとHTMLの混在メール
 
-メール本文をタプルで指定できます（テキスト, html）。
+メール本文をタプルで指定できます(テキスト, html):
 
 ``
 mail.send('you@example.com',
@@ -155,19 +162,18 @@ mail.send('you@example.com',
 
 ### SMS メッセージの送信
 ``SMS``:inxx
-
 web2pyアプリケーションからSMSメッセージを送るには、受信者にメッセージを中継することのできるサードパーティのサービスが必要です。通常はこのサービスは無料ではありません。しかしこれは国によって違います。幾つかのサービスを試してみましたが、ほとんど成功しませんでした。電話会社は結局スパムと判断し、これらのサービスからのオリジナルのメールをブロックしました。
 
 より良い方法は、SMSを中継する電話会社のサービスを使用することです。各電話会社が独自に携帯電話番号に関連付けられたメールアドレスを持っているので、SMSメッセージを電話番号へ、メールとして送信することができます。
 
-web2pyには、この処理を支援するモジュールが付属しています。
+web2pyには、この処理を支援するモジュールが付属しています:
 ``
 from gluon.contrib.sms_utils import SMSCODES, sms_email
 email = sms_email('1 (111) 111-1111','T-Mobile USA (tmail)')
 mail.sent(to=email, subject='test', message='test')
 ``:code
 
-SMSCODESは、主要な電話会社のメールアドレスの後に付加する名前のマッピング辞書です。 `` sms_email`` 関数は、電話番号（文字列）と電話会社の名前を受け取り、携帯電話のメールアドレスを返します。
+SMSCODESは、主要な電話会社のメールアドレスの後に付加する名前のマッピング辞書です。`` sms_email`` 関数は、電話番号（文字列）と電話会社の名前を受け取り、携帯電話のメールアドレスを返します。
 
 ### メッセージ作成で使用するテンプレートシステム
 ``emails``:inxx
@@ -177,7 +183,7 @@ SMSCODESは、主要な電話会社のメールアドレスの後に付加する
 db.define_table('person', Field('name'))
 ``:code
 
-データベースに登録されている人に、ビュー・ファイル "message.html" に保存した次のメッセージを送信します。
+データベースに登録されている人に、ビュー・ファイル "message.html" に保存した次のメッセージを送信します:
 ``
 Dear {{=person.name}},
 You have won the second prize, a set of steak knives.
@@ -198,11 +204,11 @@ for person in db(db.person).select():
 response.render('message.html', context)
 ``:code
 
-"context"辞書に定義されている変数を使用し、ビュー"message.html"をレンダリングします。そしてレンダリングしたメールテキストを文字列で返します。context は、テンプレートファイルで表示する変数を含んだ辞書オブジェクトです。
+"context" 辞書に定義されている変数を使用し、ビュー "message.html" をレンダリングします。そしてレンダリングしたメールテキストを文字列で返します。context は、テンプレートファイルで表示する変数を含んだ辞書オブジェクトです。
 
 メッセージが ``<html>`` で始まり ``</html>`` で終わる場合、HTMLメールになります。
 
-HTMLメールにウェブサイトのリンクを入れる時は、 ``URL`` 関数を利用できます。しかしデフォルトの ``URL`` 関数が生成する相対URLは、メールからは動作しません。絶対URLを生成するには、URL関数の引数 ``scheme`` と ``host`` を指定することが必要です。この設定例です。
+HTMLメールにウェブサイトのリンクを入れる時は、``URL`` 関数を利用できます。しかしデフォルトの ``URL`` 関数が生成する相対URLは、メールからは動作しません。絶対URLを生成するには、URL関数の引数 ``scheme`` と ``host`` を指定することが必要です。例えば:
 ``
 <a href="{{=URL(..., scheme=True, host=True)}}">Click here</a>
 ``:code
@@ -220,7 +226,7 @@ SMSメッセージや他のテンプレートベースのメッセージ生成�
 接続の可能性があるリモートSMTPサーバへのログインと通信処理のため、メールメッセージ送信の動作に数秒かかることがあります。
 この間、ユーザは処理が完了するまで待機状態になるため、バックグラウンドタスクによって、メールを後で送信するキューを使う方が望ましい場合があります。４章での説明にのように、手製のタスクキューの設定や、web2pyスケジューラを使用することが可能です。ここではタスクキューを使用した例を紹介します。
 
-最初に、メールキューを格納するデータベースモデルを、アプリケーションのモデルファイルに定義します。
+最初に、メールキューを格納するデータベースモデルを、アプリケーションのモデルファイルに定義します:
 ``
 db.define_table('queue',
     Field('status'),
@@ -229,7 +235,7 @@ db.define_table('queue',
     Field('message'))
 ``:code
 
-コントローラからメッセージを送信するため、次のようにキューに入れます。
+コントローラからメッセージを送信するため、次のようにキューに入れます:
 ``
 db.queue.insert(status='pending',
                 email='you@example.com',
@@ -237,7 +243,7 @@ db.queue.insert(status='pending',
                 message='test')
 ``:code
 
-次に、バックグラウンドプロセスのスクリプトで、キューを読むと共にメール送信を行うことが必要です。
+次に、バックグラウンドプロセスのスクリプトで、キューを読むと共にメール送信を行うことが必要です:
 ``
 ## in file /app/private/mail_queue.py
 import time
@@ -254,18 +260,192 @@ while True:
     time.sleep(60) # check every minute
 ``:code
 
-最後に、第4章で説明したように、アプリケーションの環境下で mail_queue.py スクリプトを実行する必要があります
+最後に、第4章で説明したように、アプリケーションの環境下で mail_queue.py スクリプトを実行する必要があります:
 ``
 python web2py.py -S app -M -N -R applications/app/private/mail_queue.py
 ``:code
 
-ここで、``-S app`` はweb2pyの"app"環境下で"mail_queue.py"を動かす、``-M`` はweb2pyのモデル定義を読み込む、``-N`` はweb2pyのクーロンを動かさない、という意味です。
+ここで、``-S app`` はweb2pyの "app" 環境下で "mail_queue.py" を動かす、``-M`` はweb2pyのモデル定義を読み込む、``-N`` はweb2pyのクーロンを動かさない、という意味です。
 
-mail_queue.py"で参照している ``mail`` オブジェクトは、モデルファイルて定義しています。これは ``-M`` オプションにより、"mail_queue.py"スクリプトで参照可能になる、ということが前提になっています。さらにまた、他のプロセスに対してデータベースロックの影響を及ぼさないよう、できるだけ早く変更をコミットすることも重要です。
+"mail_queue.py" で参照している ``mail`` オブジェクトは、モデルファイルて定義しています。これは ``-M`` オプションにより、"mail_queue.py" スクリプトで参照可能になる、ということが前提になっています。さらにまた、他のプロセスに対してデータベースロックの影響を及ぼさないよう、できるだけ早く変更をコミットすることも重要です。
 
 第4章でも説明しましたが、このタイプのバックグラウンドプロセスはクーロンでは動かすべきではありません（@rebootクーロンは除きます）。理由は、同時に複数のインスタンスが実行されていないことを確認する必要があるからです。
 
-バックグラウンドプロセスでメール送信することの欠点は、メール送信が失敗した場合にユーザへのフィードバックが困難なことです。メールをコントローラ機能から直接送信した場合は、各種エラーを受け取り、すぐにユーザに返すことが可能です。バックグラウンドプロセスを使用した場合は、コントローラ機能がレスポンスを返した後に、メールは非同期で送信されます。これによりエラーをユーザに知らせるのは、より複雑になります。
+バックグラウンドプロセスでメール送信することの欠点は、メール送信が失敗した場合にユーザへのフィードバックが困難なことです。メールをコントローラ機能から直接送信した場合は、各種エラーを受け取り、直ぐにユーザに返すことが可能です。バックグラウンドプロセスを使用した場合は、コントローラ機能がレスポンスを返した後に、メールは非同期で送信されます。これによりエラーをユーザに知らせるのは、より複雑になります。
+
+### メールボックスの読み込みと管理(実験的)
+
+``IMAP`` アダプタはIMAPサーバとのインターフェースとして意図されており、web2pyのクエリ構文で単純なクエリを実行することにより、メールの読み込み、検索、他のIMAPメールサービス(Google(r)やYahoo(r)のようなブランドとして実行される)との連携を、web2pyアプリケーションから管理することが可能になります。
+
+これは "statically" という名前のテーブルとフィールドを作成します。これは開発者が、``.define_tables()`` メソッドでアダプターを呼び出すことにより、DALインスタンスへのテーブルとフィールドの定義を行うのを、残しておく必要があることを意味しています。テーブルは、IMAPサーバのメールボックスの一覧情報により、定義されます。
+
+#### 接続
+
+単一のメールアカウントの場合、次のコードは、アプリのモデルでIMAPサポートを開始するお勧めのコードです。
+
+``
+# Replace user, password, server and port in the connection string
+# Set port as 993 for SSL support
+imapdb = DAL("imap://user:password@server:port", pool_size=1)
+imapdb.define_tables()
+``:code
+
+``<imapdb>.define_tables()`` は、``{<tablename>: <server mailbox name>, ...}`` 構造によるサーバメールボックス名に対する、DALテーブル名のマッピング文字列の辞書を返すことに、注意してください。これにより、IMAPサーバの実際のメールボックス名を取得することができます。
+
+もし自分自身のテーブル名/メールボックスの設定をセットし、自動での名前設定をスキップしたい場合、次のようにアダプタに対してカスタム辞書を渡すことが可能です:
+
+``
+imapdb.define_tables({"inbox": "MAILBOX", "trash", "SPAM"})
+``:code
+
+ユーザインターフェースに違うネイティブのメールボックス名を取り扱うには、自動でマッピングされたメールボック名(ネイティブのメールボックスのテーブル名と逆引きを持っています)のアダプタに、次の属性を与えてアクセスします:
+
+-------------------------------------
+**属性** | **タイプ** | **フォーマット**
+**Attribute** | **Type** | **Format**
+imapdb.mailboxes | dict | ``{<tablename>: <server native name>, ...}``
+imapdb.<table>.mailbox | string | ``"server native name"``
+-------------------------------------
+
+最初は、ネイティブのメールサービスのメールボックスでの、IMAPクエリセットを取得すると便利です。
+``
+# mailbox is a string containing the actual mailbox name
+tablenames = dict([(v,k) for k,v in imapdb.mailboxes.items()])
+myset = imapdb(imapdb[tablenames[mailbox]])
+``:code
+
+#### メールのフェッチとフラグの更新
+
+ここでは、コントローラで使用することができる、IMAPコマンドのリストを示します。例ではIMAPサービスは、Gmail(r)アカウントのケースを想定した、``INBOX`` という名前のメールボックスを持っています。
+
+メールボックスの受信トレイから、6000オクテット以下の本日の未読メッセージをカウントします。
+``
+q = imapdb.INBOX.seen == False
+q &= imapdb.INBOX.created == request.now.date()
+q &= imapdb.INBOX.size < 6000
+unread = imapdb(q).count()
+``:code
+
+
+前のクエリのメッセージをフェッチするには、次のようにします。
+``
+rows = imapdb(q).select()
+``:code
+
+
+通常のクエリ演算子は、belongsも含め実装されています。
+
+``
+messages = imapdb(imapdb.INBOX.uid.belongs(<uid sequence>)).select()
+``:code
+
+**注意**: 巨大なセレクトコマンドによるサーバ障害を避けるため、クエリの結果はしきい値以下のサイズにすることを、強く推奨します。
+
+メールクエリを速く実行するために、フィールドのフィルタセットを渡すことを、お勧めします。
+``
+fields = ["INBOX.uid", "INBOX.sender", "INBOX.subject", "INBOX.created"]
+rows = imapdb(q).select(*fields)
+``:code
+
+アダプタは、いつ部分的なメッセージペイロードの取得するのかを知っています(``content``、``size``、``attachments`` のようなフィールドは完全なメッセージデータの取得を要求します)。
+
+limitby とメールボックのフィールドのシーケンスで、クエリセレクトの結果をフィルターすることが可能です。
+``
+# Replace the arguments with actual values
+myset.select(<fields sequence>, limitby=(<int>, <int>))
+``:code
+
+アプリのアクションでメールボックスメッセージを表示したい場合、まずメッセージを取得します(IMAPサービスがサポートしている場合、古い参照シーケンスを使用しないで、``uid`` によってメッセージをフィッチします)。
+
+``
+mymessage = imapdb(imapdb.INBOX.uid == <uid>).select().first()
+``:code
+
+さもなければ、メッセージの ``id`` を使用することができます。
+
+``
+mymessage = imapdb.INBOX[<id>]
+``:code
+
+メッセージのidを使用した参照は推奨されていないことに、注意してください。なぜなら、メッセージの削除などによるメールボックのメンテナンス操作で、シーケンス番号が変更される可能性があるからです。もしそれでもメッセージへの参照を記録したい場合(すなわち、他のデータベースのレコードフィールド)、サポートする場合はいつでも、参照としてuidフィールドが、保存された値と共に各メッセージの取得に使用することがソリューションになります。
+
+最後に、ビューでメッセージ内容を表示するには、次のものを追加します。
+
+``
+{{=P(T("Message from"), " ", mymessage.sender)}}
+{{=P(T("Received on"), " ", mymessage.created)}}
+{{=H5(mymessage.subject)}}
+{{for text in mymessage.content:}}
+  {{=DIV(text)}}
+  {{=TR()}}
+{{pass}}
+``:code
+
+期待通り、ビューでメッセージリストを作成するために、``SQLTABLE`` ヘルパーを活用することができます。
+
+``
+{{=SQLTABLE(myset.select(), linkto=URL(...))}}
+``:code
+
+そしてもちろん、適切なシーケンスid値を持つフォームヘルパーを与えることも可能です。
+
+``
+{{=SQLFORM(imapdb.INBOX, <message id>, fields=[...])}}
+``:code
+
+現在のアダプタで利用可能な、サポートされるフィールドは次の通りです:
+
+---------------------------------------
+**フィールド** | **タイプ** | **説明**
+**Field** | **Type** | **Description**
+uid | string | ````
+answered | boolean | Flag
+created | date | ````
+content | list:string | A list of text or html parts
+to | string | ````
+cc | string | ````
+bcc | string | ````
+size | integer | the amount of octets of the message*
+deleted | boolean | Flag
+draft | boolean | Flag
+flagged | boolean | Flag
+sender | string | ````
+recent | boolean | Flag
+seen | boolean  | Flag
+subject | string| ````
+mime | string | The mime header declaration
+email | string | The complete RFC822 message**
+attachments | list | Each non text decoded part as dictionary
+encoding | string | The message's main detected charset
+---------------------------------------------------
+
+*アプリケーション・サイドでは、RFC822の長さのメッセージ文字列として測定されます。
+
+**警告**: 行番号はメールシーケンス番号としてマッピングされます。このためIMAPクライアントweb2pyアプリは、他の更新中もしくは削除中メッセージを保護するため、セレクトと更新アクションの間はメッセージの削除をしないことを確認してください。
+
+標準 ``CRUD`` データベース操作は、サポートされていません。カスタムフィールドやテーブルの定義と、違うタイプのデータの挿入する方法はありません。なぜなら、IMAPサービスで更新中のメールボックスは通常、サーバにフラグ更新をポストするのを少なくするためです。それでも、DAL IMAPインターフェースを介し、それらのフラグコマンドにアクセスすることが可能です。
+
+表示するメッセージクエリに、最後にマークするには、
+``
+seen = imapdb(q).update(seen=True)
+``:code
+
+
+IMAPデータベースで、Gumby氏から来たメッセージを削除するには、次のようにします。
+``
+deleted = 0
+for tablename in imapdb.tables():
+    deleted += imapdb(imapdb[tablename].sender.contains("gumby")).delete()
+``:code
+
+
+直接削除する代わりに、削除マークをすることも可能です。
+``
+myset.update(deleted=True)
+``:code
+
+``IMAP``:inxx
 
 ##### 第3版 - 翻訳: 中垣健志　レビュー: 細田謙二
 ##### 第4版 - 翻訳: Hitoshi Kato　レビュー: Mitsuhiro Tsuda
+##### 第5版 - 翻訳: Hitoshi Kato　レビュー: Omi Chiba

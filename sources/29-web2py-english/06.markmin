@@ -5,6 +5,8 @@
 
 web2py comes with a Database Abstraction Layer (DAL), an API that maps Python objects into database objects such as queries, tables, and records. The DAL dynamically generates the SQL in real time using the specified dialect for the database back end, so that you do not have to write SQL code or learn different SQL dialects (the term SQL is used generically), and the application will be portable among different types of databases. A partial list of supported databases is show in the table below. Please check on the web2py web site and mailing list for more recent adapters. Google NoSQL is treated as a particular case in Chapter 13.
 
+The Gotchas section at the end of this chapter has some more information about specific databases.
+
 The Windows binary distribution works out of the box with SQLite and MySQL. The Mac binary distribution works out of the box with SQLite.
 To use any other database back-end, run from the source distribution and install the appropriate driver for the required back end.
 ``database drivers``:inxx
@@ -263,9 +265,17 @@ db.define_table('person', Field('name'), redefine=True)
 The redefinition may trigger a migration if field content is different.
 
 ----------
-Because usually in web2py models are executed before controllers, it is possible that some table are defined even if not needed. It is therefore necessary to speed up the code by making table definitions lazy. This is done by setting the ``DAL(...,lazy_tables=True)`` attribute. Tables will be actually created only when accessed.
+Because usually in web2py models are executed before controllers, it is possible that some table are defined even if not needed. It is therefore necessary to speed up the code by making table definitions lazy. This is done by setting the ``DAL(...,lazy_tables=True)``  parameter. Tables will be actually created only when accessed.
 ----------
 
+#### Adding attributes to fields and tables
+If you need to add custom attributes to fields, you can simply do this:
+``db.table.field.extra = {}``:code 
+
+"extra" is not a keyword ; it's a custom attributes now attached to the field object. You can do it with tables too but they must be preceded by an 
+underscore to avoid naming conflicts with fields: 
+
+``db.table._extra = {} ``:code
 
 ### Record representation
 
@@ -350,7 +360,7 @@ Notice that ``requires=...`` is enforced at the level of forms, ``required=True`
 - ``ondelete`` translates into the "ON DELETE" SQL statement. By default it is set to "CASCADE". This tells the database that when it deletes a record, it should also delete all records that refer to it. To disable this feature, set ``ondelete`` to "NO ACTION" or "SET NULL".
 - ``notnull=True`` translates into the "NOT NULL" SQL statement. It prevents the database from inserting null values for the field.
 - ``unique=True`` translates into the "UNIQUE" SQL statement and it makes sure that values of this field are unique within the table. It is enforced at the database level.
-- ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
+- ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set to True, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
 - ``uploadfolder`` defaults to the application's "uploads/" folder. If set to a different path, files will uploaded to a different folder. For example,
 ``
 Field(...,uploadfolder=os.path.join(request.folder,'static/temp'))
@@ -459,6 +469,8 @@ print db.person.name.validate('John')
 
 which returns a tuple ``(value, error)``. ``error`` is ``None`` if the input passes validation.
 
+
+
 ### Migrations
 ``migrations``:inxx
 
@@ -466,7 +478,7 @@ which returns a tuple ``(value, error)``. ``error`` is ``None`` if the input pas
 
 We refer to this behavior as a "migration". web2py logs all migrations and migration attempts in the file "databases/sql.log".
 
-The first argument of ``define_table`` is always the table name. The other unnamed arguments are the fields (Field). The function also takes an optional last argument called "migrate" which must be referred to explicitly by name as in:
+The first argument of ``define_table`` is always the table name. The other unnamed arguments are the fields (Field). The function also takes an optional keyword argument called "migrate":
 ``
 >>> db.define_table('person', Field('name'), migrate='person.table')
 ``:code
@@ -511,10 +523,10 @@ The other problem is more generic but typical with MySQL. MySQL does not allow m
 
 The solution consists of disabling migrations for all tables and enabling fake migrations:
 ``
-db.define_table(....,migrate=False,fake_migrate=True)
+db.define_table(....,migrate=True,fake_migrate=True)
 ``:code
 
-This will rebuild web2py metadata about the table according to the table definition. Try multiple table definitions to see which one works (the one before the failed migration and the one after the failed migration). Once successful remove the ``fake_migrate=True`` attribute.
+This will rebuild web2py metadata about the table according to the table definition. Try multiple table definitions to see which one works (the one before the failed migration and the one after the failed migration). Once successful remove the ``fake_migrate=True`` parameter.
 
 Before attempting to fix migration problems it is prudent to make a copy of "applications/yourapp/databases/*.table" files.
 
@@ -526,6 +538,17 @@ db = DAL(...,fake_migrate_all=True)
 
 This also fails if the model describes tables that do not exist in the database,
 but it can help narrowing down the problem.
+
+### Migration control summary
+
+The logic of the various migration arguments are summarized in this pseudo-code:
+``
+if DAL.migrate_enabled and table.migrate:
+   if DAL.fake_migrate_all or table.fake_migrate:
+       perform fake migration
+   else:
+       perform migration
+``:code
 
 ### ``insert``
 
@@ -955,6 +978,29 @@ row[i].person.name
 ``
 Yes this is unusual and rarely needed.
 
+#### Rendering rows using represent
+You may wish to rewrite rows returned by select to take advantage of formatting information contained in the represents setting of the fields. 
+
+``rows = db(query).select()
+repr_row = rows.render(0)``:code
+
+If you don't specify an index, you get a generator to iterate over all the rows:
+
+``for row in rows.render():
+    print row.myfield``:code
+
+Can also be applied to slices:
+
+``for row in rows[0:10].render():
+    print row.myfield``:code
+
+If you only want to transform selected fields via their "represent" attribute, you can list them in the "fields" argument:
+
+``repr_row = row.render(0, fields=[db.mytable.myfield])``:code
+
+Note, it returns a transformed copy of the original Row, so there's no update_record (which you wouldn't want anyway) or delete_record.
+
+
 #### Shortcuts
 ``DAL shortcuts``:inxx
 
@@ -1143,10 +1189,11 @@ and the corresponding view:
 
 ``SQLFORM.grid`` and ``SQLFORM.smartgrid`` should be preferred to ``SQLTABLE`` because they are more powerful although higher level and therefore more constraining. They will be explained in more detail in chapter 7.
 
-#### ``orderby``, ``groupby``, ``limitby``, ``distinct``, ``having``
+#### ``orderby``, ``groupby``, ``limitby``, ``distinct``, ``having``,``orderby_on_limitby``,``left``,``cache``
 
-The ``select`` command takes five optional arguments: orderby, groupby, limitby, left and cache. Here we discuss the first three.
+The ``select`` command takes a number of optional arguments.
 
+##### orderby
 You can fetch the records sorted by name:
 
 ``orderby``:inxx ``groupby``:inxx ``having``:inxx
@@ -1197,6 +1244,7 @@ Bob
 Alex
 ``:code
 
+##### groupby, having
 Using ``groupby`` together with ``orderby``, you can group records with the same value for the specified field (this is back-end specific, and is not on the Google NoSQL):
 ``
 >>> for row in db().select(
@@ -1216,6 +1264,7 @@ You can use ``having`` in conjunction with ``groupby`` to group conditionally (o
 
 Notice that query1 filters records to be displayed, query2 filters records to be grouped.
 
+##### distinct
 ``distinct``:inxx
 
 With the argument ``distinct=True``, you can specify that you only want to select distinct records. This has the same effect as grouping using all specified fields except that it does not require sorting. When using distinct it is important not to select ALL fields, and in particular not to select the "id" field, else all records will always be distinct.
@@ -1237,7 +1286,7 @@ Alex
 Bob
 Carl
 ``:code
-
+##### limitby
 With limitby=(min, max), you can select a subset of the records from offset=min to but not including offset=max (in this case, the first two starting at zero):
 
 ``limitby``:inxx
@@ -1247,6 +1296,21 @@ With limitby=(min, max), you can select a subset of the records from offset=min 
 Alex
 Bob
 ``:code
+
+##### orderby_on_limitby
+``orderby_on_limitby``:inxx
+Note that the DAL defaults to implicitly adding an orderby when using a limitby.
+This ensures the same query returns the same results each time, important for pagination.
+But it can cause performance problems. 
+use ``orderby_on_limitby = False`` to change this (this defaults to True). 
+
+##### left
+Discussed below in the section on joins
+
+##### cache, cacheable
+An example use which gives much faster selects is:
+``rows = db(query).select(cache=(cache.ram,3600),cacheable=True)``:code
+See discussion on 'caching selects', below, to understand what the tradeoffs are. 
 
 
 #### Logical operators
@@ -3297,20 +3361,35 @@ db =DAL(..., driver_args={}, adapter_args={})
 ``
 
 
-#### Gotchas
+### Gotchas
 
-**SQLite** does not support dropping and altering columns. That means that web2py migrations will work up to a point. If you delete a field from a table, the column will remain in the database but will be invisible to web2py. If you decide to reinstate the column, web2py will try re-create it and fail. In this case you must set ``fake_migrate=True`` so that metadata is rebuilt without attempting to add the column again. Also, for the same reason, **SQLite** is not aware of any change of column type. If you insert a number in a string field, it will be stored as string. If you later change the model and replace the type "string" with type "integer", SQLite will continue to keep the number as a string and this may cause problem when you try to extract the data.
+#### SQLite
+SQLite does not support dropping and altering columns. That means that web2py migrations will work up to a point. If you delete a field from a table, the column will remain in the database but will be invisible to web2py. If you decide to reinstate the column, web2py will try re-create it and fail. In this case you must set ``fake_migrate=True`` so that metadata is rebuilt without attempting to add the column again. Also, for the same reason, **SQLite** is not aware of any change of column type. If you insert a number in a string field, it will be stored as string. If you later change the model and replace the type "string" with type "integer", SQLite will continue to keep the number as a string and this may cause problem when you try to extract the data.
 
-**MySQL** does not support multiple ALTER TABLE within a single transaction. This means that any migration process is broken into multiple commits. If something happens that causes a failure it is possible to break a migration (the web2py metadata are no longer in sync with the actual table structure in the database). This is unfortunate but it can be prevented (migrate one table at the time) or it can be fixed a posteriori (revert the web2py model to what corresponds to the table structure in database, set ``fake_migrate=True`` and after the metadata has been rebuilt, set ``fake_migrate=False`` and migrate the table again).
+SQLite doesn't have a boolean type. web2py internally maps booleans to a 1 character string, with 'T' and 'F' representing True and False. The DAL handles this completely; the abstraction of a true boolean value works well. 
+But if you are updating the SQLite table with SQL directly, be aware of the web2py implementation, and avoid using 0 and 1 values.
 
-**Google SQL** has the same problems as MySQL and more. In particular table metadata itself must be stored in the database in a table that is not migrated by web2py. This is because Google App Engine has a read-only file system. Web2py migrations in Google:SQL combined with the MySQL issue described above can result in metadata corruption. Again, this can be prevented (by migrating the table at once and then setting migrate=False so that the metadata table is not accessed any more) or it can fixed a posteriori (by accessing the database using the Google dashboard and deleting any corrupted entry from the table called ``web2py_filesystem``.
+#### MySQL
 
+MySQL does not support multiple ALTER TABLE within a single transaction. This means that any migration process is broken into multiple commits. If something happens that causes a failure it is possible to break a migration (the web2py metadata are no longer in sync with the actual table structure in the database). This is unfortunate but it can be prevented (migrate one table at the time) or it can be fixed a posteriori (revert the web2py model to what corresponds to the table structure in database, set ``fake_migrate=True`` and after the metadata has been rebuilt, set ``fake_migrate=False`` and migrate the table again).
+
+#### Googel SQL
+
+Google SQL has the same problems as MySQL and more. In particular table metadata itself must be stored in the database in a table that is not migrated by web2py. This is because Google App Engine has a read-only file system. Web2py migrations in Google:SQL combined with the MySQL issue described above can result in metadata corruption. Again, this can be prevented (by migrating the table at once and then setting migrate=False so that the metadata table is not accessed any more) or it can fixed a posteriori (by accessing the database using the Google dashboard and deleting any corrupted entry from the table called ``web2py_filesystem``.
+
+#### MSSQL (Microsoft SQL Server)
 ``limitby``:inxx
-**MSSQL** does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
+MSSQL does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
 
-**Oracle** also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). This works for simple select but may break for complex selects involving aliased fields and or joins.
+#### Oracle
 
-**MSSQL** has problems with circular references in tables that have ONDELETE CASCADE. This is an MSSQL bug and you work around it by setting the ondelete attribute for all reference fields to "NO ACTION". You can also do it once and for all before you define tables:
+Oracle also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). 
+This works for simple select but may break for complex selects involving aliased fields and or joins.
+
+#### MSSQL 
+
+MSSQL has problems with circular references in tables that have ONDELETE CASCADE. This is an MSSQL bug and you work around it by setting the ondelete attribute for all reference fields to "NO ACTION". 
+You can also do it once and for all before you define tables:
 
 ``
 db = DAL('mssql://....')
@@ -3319,7 +3398,7 @@ for key in ['reference','reference FK']:
         '%(on_delete_action)s','NO ACTION')
 ``:code
 
-**MSSQL** also has problems with arguments passed to the DISTINCT keyword and therefore
+MSSQL also has problems with arguments passed to the DISTINCT keyword and therefore
  while this works,
 
 ``
@@ -3332,4 +3411,10 @@ this does not
 db(query).select(distinct=db.mytable.myfield)
 ``
 
-**Google NoSQL (Datastore)** does not allow joins, left joins, aggregates, expression, OR involving more than one table, the ‘like’ operator searches in "text" fields. Transactions are limited and not provided automatically by web2py (you need to use the Google API ``run_in_transaction`` which you can look up in the Google App Engine documentation online). Google also limits the number of records you can retrieve in each one query (1000 at the time of writing). On the Google datastore record IDs are integer but they are not sequential. While on SQL the "list:string" type is mapped into a "text" type, on the Google Datastore it is mapped into a ``ListStringProperty``. Similarly "list:integer" and "list:reference" are mapped into "ListProperty". This makes searches for content inside these fields types are more efficient on Google NoSQL than on SQL databases.
+#### Googel NoSQL (Datastore)
+Google NoSQL (Datastore) does not allow joins, left joins, aggregates, expression, OR involving more than one table, the ‘like’ operator searches in "text" fields. 
+
+Transactions are limited and not provided automatically by web2py (you need to use the Google API ``run_in_transaction`` which you can look up in the Google App Engine documentation online). 
+
+Google also limits the number of records you can retrieve in each one query (1000 at the time of writing). On the Google datastore record IDs are integer but they are not sequential. 
+While on SQL the "list:string" type is mapped into a "text" type, on the Google Datastore it is mapped into a ``ListStringProperty``. Similarly "list:integer" and "list:reference" are mapped into "ListProperty". This makes searches for content inside these fields types are more efficient on Google NoSQL than on SQL databases.
