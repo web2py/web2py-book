@@ -2563,7 +2563,16 @@ vars = {'a':3, 'b':4}
 
 The ``scheduler_task`` table is the one where tasks are organized.
 
+To add tasks via the API, use
+``
+scheduler.queue_task('mytask',...)
+``
+which is documented [[below #queue_task_sig]] .
+
+
+##### Task Lifecycle
 All tasks follow a lifecycle
+
 
 [[scheduler tasks @///image/ce8edcc3.png center]]
 
@@ -2593,7 +2602,9 @@ Additionally, you can control how many times a task should be repeated (i.e. you
 parameter (default = 1 time only, 0 = unlimited). You can influence how many seconds should pass between executions with the ``period`` parameter (default = 60 seconds).
 
 ------
-The time period is not calculated between the END of the first round and the START of the next, but from the START time of the first round to the START time of the next cycle)
+Default behavior: The time period is not calculated between the END of the first round and the START of the next, but from the START time of the first round to the START time of the next cycle). 
+This can cause accumulating 'drift' in the start time of a job.
+After v 2.8.2, a new parameter ``prevent_drift`` was added, defaulting to False. If set to True when queing a task, the start_time parameter will take precedence over the period, preventing drift.
 ------
 
 You can also set how many times the function can raise an exception (i.e. requesting data from a slow web service) and be queued again instead of stopping in **FAILED**  status using the parameter ``retry_failed`` (default = 0, -1 = unlimited).
@@ -2606,18 +2617,30 @@ Summary: you have
 - ``retry_failed`` to control how many times the task can "fail"
 - ``start_time`` and ``stop_time`` to schedule a function in a restricted timeframe
 
-##### ``queue_task`` and ``task_status``
+##### ``queue_task`` and ``task_status`` [[queue_task_sig]]
 
 The method:
 ``
-scheduler.queue_task(function, pargs=[], pvars={}, **kwargs)
+scheduler.queue_task(
+    function,
+    pargs=[],
+    pvars={},
+    start_time=now, 		#datetime
+    stop_time = None,		#datetime
+    timeout = 60,               #seconds
+    prevent_drift=False,
+    period=60,                  #seconds
+    immediate=False,
+    repeats = 1
+)
 ``:code
-allows you to queue tasks to be executed by workers. It takes the following parameters:
+allows you to queue tasks to be executed by workers. 
+It returns a row (see [[here #queue_task_return]]), and it takes the following parameters:
 
 - ``function`` (required): It can be a task name or a reference to an actual function.
 - ``pargs``: are the arguments to be passed to the task, stored as a Python list.
 - ``pvars`` : are the named arguments to be passed to the task, stored as a Python dictionary.
-- ``kwargs`` : all other scheduler_task columns can be passed as keywords arguments (for example repeats, period, timeout).
+- all other scheduler_task columns can be passed as keyword arguments; the most important are shown.
 
 For example:
 
@@ -2656,7 +2679,7 @@ scheduler.queue_task('demo1', pvars=dict(a=1,b=2),
 
 Since version 2.4.1 if you pass an additional parameter ``immediate=True`` it will force the main worker to reassign tasks. Until 2.4.1, the worker checks for new tasks every 5 cycles (so, ``5*heartbeats`` seconds). If you had an app that needed to check frequently for new tasks, to get a ''snappy'' behaviour you were forced to lower the ``heartbeat`` parameter, putting the db under pressure for no reason. With ``immediate=True`` you can force the check for new tasks: it will happen at most as ``heartbeat`` seconds are passed   
 
-A call to ``scheduler.queue_task`` returns the task ``id`` and ``uuid`` of the task you queued (can be the one you passed or the auto-generated one), and possible ``errors``:
+A call to ``scheduler.queue_task`` returns the task ``id`` and ``uuid`` of the task you queued (can be the one you passed or the auto-generated one), and possible ``errors``: [[queue_task_return]]
 
 ``
 <Row {'errors': {}, 'id': 1, 'uuid': '08e6433a-cf07-4cea-a4cb-01f16ae5f414'}>
