@@ -6,10 +6,13 @@ from gluon.serializers import loads_json
 session.forget()
 
 TIME_EXPIRE = 60*60*24
+CACHE_EXPIRE = None
 FORCE_RENDER = False
 
 # this is for checking new content instantly in development
-if request.is_local:
+if request.global_settings.web2py_runtime_gae:
+    CACHE_EXPIRE = 999999999
+elif request.is_local:
     TIME_EXPIRE = -1
     FORCE_RENDER = True
 
@@ -28,7 +31,7 @@ def splitter_urlify(x):
     return a.strip(),b.strip(), urlify(b)
 
 
-@cache('folders',None)
+@cache('folders',CACHE_EXPIRE)
 def get_folders(dummy=None):
     folder = os.path.join(request.folder,'sources')
     return folder, [f for f in os.listdir(folder)
@@ -59,7 +62,7 @@ def get_chapters(subfolder):
                 if ':' in line]
     return chapters
 
-@cache('menu',None)
+@cache('menu',CACHE_EXPIRE)
 def build_menu(dummy=None):
     menu = []
     submenu = []
