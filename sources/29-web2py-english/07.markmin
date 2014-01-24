@@ -2063,6 +2063,8 @@ The resulting hash takes the form ``alg$salt$hash``, where ``alg`` is the hash a
 
 ##### ``IS_NOT_IN_DB``
 ``IS_NOT_IN_DB``:inxx
+Synopsis:
+``IS_NOT_IN_DB(db|set,'table.field')``
 
 Consider the following example:
 ``
@@ -2070,7 +2072,11 @@ db.define_table('person', Field('name'))
 db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
 ``:code
 
-It requires that when you insert a new person, his/her name is not already in the database, ``db``, in the field ``person.name``. As with all other validators this requirement is enforced at the form processing level, not at the database level. This means that there is a small probability that, if two visitors try to concurrently insert records with the same person.name, this results in a race condition and both records are accepted. It is therefore safer to also inform the database that this field should have a unique value:
+It requires that when you insert a new person, his/her name is not already in the database, ``db``, in the field ``person.name``. 
+
+A set can be used instead of db.
+
+As with all other validators this requirement is enforced at the form processing level, not at the database level. This means that there is a small probability that, if two visitors try to concurrently insert records with the same person.name, this results in a race condition and both records are accepted. It is therefore safer to also inform the database that this field should have a unique value:
 ``
 db.define_table('person', Field('name', unique=True))
 db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
@@ -2093,6 +2099,9 @@ db.person.name.requires = IS_NOT_IN_DB(recent, 'person.name')
 
 ##### ``IS_IN_DB``
 ``IS_IN_DB``:inxx
+Synopsis:
+``IS_IN_DB(db|set,'table.value_field','%(representing_field)s',zero='choose one')``
+where the third and fourth arguments are optional.
 
 Consider the following tables and requirement:
 
@@ -2101,6 +2110,8 @@ db.define_table('person', Field('name', unique=True))
 db.define_table('dog', Field('name'), Field('owner', db.person)
 db.dog.owner.requires = IS_IN_DB(db, 'person.id', '%(name)s',
                                  zero=T('choose one'))
+*or*
+db.person.name.requires = IS_IN_DB(db(db.person.id>10), 'person.id', '%(name)s')
 ``:code
 
 It is enforced at the level of dog INSERT/UPDATE/DELETE forms. It requires that a ``dog.owner`` be a valid id in the field ``person.id`` in the database ``db``. Because of this validator, the ``dog.owner`` field is represented as a drop-down list. The third argument of the validator is a string that describes the elements in the drop-down list. In the example you want to see the person ``%(name)s`` instead of the person ``%(id)s``. ``%(...)s`` is replaced by the value of the field in brackets for each record.
