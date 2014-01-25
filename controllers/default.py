@@ -6,12 +6,17 @@ from gluon.serializers import loads_json
 session.forget()
 
 TIME_EXPIRE = 60*60*24
+CACHE_EXPIRE = None
 FORCE_RENDER = False
 
 # this is for checking new content instantly in development
 if request.is_local:
     TIME_EXPIRE = -1
     FORCE_RENDER = True
+
+if request.global_settings.web2py_runtime_gae:
+    CACHE_EXPIRE = 999999999
+    FORCE_RENDER = False
 
 response.logo = A(B('web',SPAN(2),'py'),XML('&trade;&nbsp;'),
                   _class="brand",_href="http://www.web2py.com/")
@@ -28,7 +33,7 @@ def splitter_urlify(x):
     return a.strip(),b.strip(), urlify(b)
 
 
-@cache('folders',None)
+@cache('folders',CACHE_EXPIRE)
 def get_folders(dummy=None):
     folder = os.path.join(request.folder,'sources')
     return folder, [f for f in os.listdir(folder)
@@ -59,7 +64,7 @@ def get_chapters(subfolder):
                 if ':' in line]
     return chapters
 
-@cache('menu',None)
+@cache('menu',CACHE_EXPIRE)
 def build_menu(dummy=None):
     menu = []
     submenu = []
@@ -209,3 +214,37 @@ def rebuild_sources():
     with open(dest, 'w') as g:
         g.write('ok')
     return 'ok'
+
+
+def batch_static_chaps():
+    if request.is_local:
+        # override replace_at_urls of gluon.contrib.markmin.markmin2html
+        import gluon.contrib.markmin.markmin2html
+        def replace_at_urls(text,url):
+            def u1(match,url=url):
+                a,c,f,args = match.group('a','c','f','args')
+                return url(a=a or None,c=c or None,f = f or None,
+                           args=(args or '').split('/'), scheme=None, host=None)
+            return gluon.contrib.markmin.markmin2html.regex_URL.sub(u1,text)
+        gluon.contrib.markmin.markmin2html.replace_at_urls = replace_at_urls
+
+        # create files on static_chaps
+        for subfolder in FOLDERS:
+            info = get_info(subfolder)
+            book_id = subfolder.split('-')[0]
+            chapters = get_chapters(subfolder)
+            for chapter in chapters:
+                chapter_id = int(chapter[0])
+                filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
+                dest = os.path.join(request.folder, 'static_chaps', subfolder, '%.2i.html' % chapter_id)
+                try:
+                    content = open(filename).read()
+                    content = convert2html(book_id,content).xml()
+                    if not os.path.exists(os.path.dirname(dest)):
+                        os.makedirs(os.path.dirname(dest))
+                    open(dest, 'w').write(content)
+                except:
+                    continue
+        return 'completed'
+    else:
+        return
