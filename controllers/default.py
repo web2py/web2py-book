@@ -3,6 +3,7 @@ import os, datetime
 from gluon.validators import urlify
 from w2p_book_cidr import CIDRConv
 from gluon.serializers import loads_json
+import re
 session.forget()
 
 TIME_EXPIRE = 60*60*24
@@ -134,6 +135,8 @@ def chapter():
         return locals()
 
 def search():
+    def fix_relative_link(match):
+        return "%s%s%s%s" % (match.group(1),'../chapter/',book_id,match.group(3))  #link rewritten to be relative to the search URL
     book_id = request.args(0) or redirect(URL('index'))
     search = request.vars.search or redirect(URL('chapter',args=book_id))
     subfolder = get_subfolder(book_id)
@@ -141,6 +144,7 @@ def search():
     chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=TIME_EXPIRE)
     results = []
     content = H2('No results for "%s"' % search)
+    relative_link_re = re.compile('(\[\[.*)(\.\.)(\/[0-9][0-9]#.*\]\])')
     for chapter in chapters:
         chapter_id = int(chapter[0])
         filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
@@ -148,6 +152,8 @@ def search():
         k = data.find(search)
         if k>=0:
             snippet = data[data.rfind('\n\n',0,k)+1:data.find('\n\n',k)].strip()
+            snippet = relative_link_re.sub(fix_relative_link,snippet)
+
             results.append((chapter[0],chapter[1],chapter[2],convert2html(book_id,snippet)))
             content = CAT(*[DIV(H2(A(chapter[1],
                                      _href=URL('chapter',
