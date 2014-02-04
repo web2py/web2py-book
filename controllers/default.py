@@ -153,7 +153,6 @@ def search():
         if k>=0:
             snippet = data[data.rfind('\n\n',0,k)+1:data.find('\n\n',k)].strip()
             snippet = relative_link_re.sub(fix_relative_link,snippet)
-
             results.append((chapter[0],chapter[1],chapter[2],convert2html(book_id,snippet)))
             content = CAT(*[DIV(H2(A(chapter[1],
                                      _href=URL('chapter',
