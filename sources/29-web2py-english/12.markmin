@@ -160,7 +160,7 @@ If no ``.load`` view is specified, there is a ``generic.load`` that renders the 
 
 If you LOAD a component having the ``.load`` extension and the corresponding controller function redirects to another action (for example a login form), the ``.load`` extension propagates and the new url (the one to redirect too) is also loaded with a ``.load`` extension.
 
-##### Redirect after submission
+#### Reload page via redirect after component submission
 If you call an action via Ajax and you want the action to force a redirect of the parent page you can do it with a redirect from the LOADed controller function. 
 If you want to reload the parent page, you can redirect to it. The parent URL is known (see [[Client-Server component communications #client_server_coms]] )
 
@@ -171,9 +171,39 @@ if form.process().accepted:
     redirect( request.env.http_web2py_component_location,client_side=True)
 ``:code
 
-Note that the section below, [[Client-Server component communications #client_server_coms]], describes how the component can return javascript, which could be used for more sophisticated actions when the component is submitted.
+Note that the section below, [[Client-Server component communications #client_server_coms]], describes how the component can return javascript, which could be used for more sophisticated actions when the component is submitted. The specific case of reloading another component is described next.
 
-##### Ajax post does not support multipart forms
+
+#### Reload another component 
+If you use multiple components on a page, you may want the submission of one component to reload another.
+You do this by getting the submitted component to return some javascript.
+
+It's possible to hard-code the target DIV, but in this recipe we use a query-string variable to inform the submitting-controller which component we want to reload. It's identified by the id of the DIV containing the target component. In this case, the DIV has id 'map'. Note that it is necessary to use ``target='map'`` in the LOAD of the target; without this, the target id is randomised and reload() won't work. See LOAD signature above.
+
+In the view, do this:
+``
+{{=LOAD('default','submitting_component.load',ajax=True,vars={'reload_div':'map'})}}
+
+``:code
+
+The controller belonging to the submitting component needs to send javascript back, so just add this to the existing controller code when processing the submit:
+``
+if form.process().accepted:
+...
+    if request.vars.reload_div:
+        response.js =  "jQuery('#%s').get(0).reload()" % request.vars.reload_div
+``:code
+
+(Of course, remove the redirect if you were using the approach of the previous section.)
+ 
+That's it. web2py's javascript libraries look after the reload. This could be generalised to handle multiple components with javascript looking like:
+``
+jQuery('#div1,#div2,#div3').get(0).reload()
+``:code
+
+For more information about response.js see [[Client-Server component communications #client_server_coms]] (below).
+
+#### Ajax post does not support multipart forms
 
 Because Ajax post does not support multipart forms, i.e. file uploads, upload fields will not work with the LOAD component. You could be fooled into thinking it would work because upload fields will function normally if POST is done from the individual component's .load view. Instead, uploads are done with ajax-compatible 3rd-party widgets and web2py manual upload store commands.
 
