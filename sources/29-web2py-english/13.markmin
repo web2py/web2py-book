@@ -99,7 +99,8 @@ Both of these scripts should run out of the box, but every Linux installation is
 
 #### Apache setup
 
-In this section, we use Ubuntu 8.04 Server Edition as the reference platform. The configuration commands are very similar on other Debian-based Linux distribution, but they may differ for Fedora-based systems (which uses ``yum`` instead of ``apt-get``).
+In this section, we use Ubuntu Server Edition as the reference platform. The configuration commands are very similar on other Debian-based Linux distribution, but they may differ for Fedora-based systems (which uses ``yum`` instead of ``apt-get``).
+You can use either 2.2.x or 2.4.x
 
 First, make sure all the necessary Python and Apache packages are installed by typing the following shell commands:
 ``
@@ -170,12 +171,15 @@ and include the following code:
   WSGIProcessGroup web2py
   WSGIScriptAlias / /home/www-data/web2py/wsgihandler.py
 
+#This is Apache 2.2.x permission syntax. See Apache docs for 2.4 syntax
+# http://httpd.apache.org/docs/2.4/upgrading.html#run-time
+
   <Directory /home/www-data/web2py>
     AllowOverride None
     Order Allow,Deny
     Deny from all
     <Files wsgihandler.py>
-      Allow from all
+      Allow from all  
     </Files>
   </Directory>
 
@@ -201,6 +205,11 @@ and include the following code:
 
 When you restart Apache, it should pass all the requests to web2py without going through the Rocket wsgiserver.
 
+##### Move the handler script
+
+Finally, you need to relocate the handler script ``web2py/handlers/wsgihandler.py``. As documented in the handlers directory, the script you want should be moved or copied to the parent directory (i.e. the same directory as the ``web2py.py`` script). symlinking may cause apache permission problems.
+
+##### Some wsgi background
 Here are some explanations:
 ``
 WSGIDaemonProcess web2py user=www-data group=www-data display-name=%{GROUP}
@@ -359,7 +368,7 @@ http://www.example.com/examples/appadmin
 
 Some Unix/Linux distributions can run Apache, but do not support mod_wsgi. In this case, the simplest solution is to run Apache as a proxy and have Apache deal with static files only.
 
-Here is a minimalist Apache configuration:
+Here is a minimal Apache configuration:
 ``
 NameVirtualHost *:80
 #### deal with requests on port 80
@@ -898,49 +907,33 @@ sudo status web2py-scheduler
 
 #### Apache and mod_wsgi
 
-Installing Apache, and mod_wsgi under Windows requires a different procedure.
-Here are assuming Python 2.5 is installed, you are running from source and web2py is located at ``c:/web2py``.
+Installing Apache, and mod_wsgi, under Windows requires a slightly different procedure. However, it is quite similar to Linux, so please read the Linux Apache notes above.
 
-First download the requires packages:
-- Apache ``apache_2.2.11-win32-x86-openssl-0.9.8i.msi`` from  ``apache1``:cite
-- mod_wsgi from ``modwsgi1``:cite
+Here we assume a Windows binary Python 2.x is installed, you are running from source and web2py is located at ``c:/web2py``.
 
-Second, run ``apache...msi`` and follow the wizard screens. On the server information screen
+Modern apache Windows binaries (e.g. 2.4.x) are not actually downloaded from apache.org.
+Instead, you download them from partner sites, such as [[ApacheHaus http://www.apachehaus.com/cgi-bin/download.plx]].
+The Apache site has a full list of such partners; search for Apache 2.4 windows binaries.
 
-[[image @///image/en9200.png center 300px]]
+However, the Windows binary may not come with the wsgi module.
+In that case, visit [[the modwsgi home http://code.google.com/p/modwsgi/wiki/InstallationOnWindows]] (currently at http://code.google.com/p/modwsgi/) and download the precompiled binary for your version of python and Apache. After you install Apache, put the .so library in the modules directory. 
 
-enter all requested values:
-- **Network Domain**: enter the DNS domain in which your server is or will be registered in.  For example, if your server's full DNS name is server.mydomain.net, you would type mydomain.net here
-- **ServerName**: Your server's full DNS name. From the example above, you would type server.mydomain.net here. Enter a fully qualified domain name or IP address from the web2py install, not a shortcut, for more information see ``apache2``:cite.
-- **Administrator's Email Address**: Enter the server administrator's or webmaster's email address here. This address will be displayed along with error messages to the client by default.
-
-Continue with a typical install to the end unless otherwise required
-
-The wizard, by default, installed Apache in the folder:
-``
-C:/Program Files/Apache Software Foundation/Apache2.2/
-``:code
-
-From now on we refer to this folder simply as ``Apache2.2``.
-
-Third, copy the downloaded mod_wsgi.so to
-``Apache2.2/modules``
-
-written by Chris Travers, published by the Open Source Software Lab at Microsoft, December 2007.
-
-Fourth, create ``server.crt`` and ``server.key`` certificates (as discussed in the previous section) and place them in the folder  ``Apache2.2/conf``. Notice the cnf file is in ``Apache2.2/conf/openssl.cnf``.
-
-Fifth, edit ``Apache2.2/conf/httpd.conf``,
-remove the comment mark (the # character) from the line
-``
-LoadModule ssl_module modules/mod_ssl.so
-``:code
-
-add the following line after all the other LoadModule lines
+You'll need to modify httpd.conf to load the wsgi module; follow the example of other module load config lines.
 ``
 LoadModule wsgi_module modules/mod_wsgi.so
 ``:code
 
+The modwsgi wiki mentions Windows specifics: recommended reading. 
+
+You will need to setup httpd.conf as per any new Apache installation.
+
+Certificate installation is the same for Windows as under Linux.
+
+The Windows binary is most likely configured to load and configure the SSL modules 'out of the box' (the Apache Haus binary is like this). 
+
+web2py should be served on https and optionally on http. Typically this means port 80 and port 443 although your Windows server may be using these ports because IIS may be installed, in which case choose alternate ports.
+
+However, we'll assume 80 and 443 for now. 
 look for "Listen 80" and add this line after it
 ``
 Listen 443
@@ -970,8 +963,10 @@ NameVirtualHost *:443
   </LocationMatch>
 
   WSGIScriptAlias / "C:/web2py/wsgihandler.py"
+#and don't forget to move the handler script out of the handlers directory
 
   SSLEngine On
+#these cert settings are correct for self-signed certificates
   SSLCertificateFile conf/server.crt
   SSLCertificateKeyFile conf/server.key
 
@@ -993,60 +988,21 @@ or better yet start the taskbar monitor
 
 Now you can right-click on the red feather-like taskbar icon to "Open Apache Monitor" and then start, stop and restart Apache as required.
 
-This section was created by Jonathan Lundell.
+This section was first contributed by Jonathan Lundell.
 
-#### Start as Windows service
-##### This method is deprecated. Consider using nssm (below)
-``Windows service``:inxx
+[[nssm]]
+#### Using nssm to run as a Windows service
 
 What Linux calls a daemon, Windows calls a service.
-The web2py server can easily be installed/started/stopped as a Windows service.
+The web2py built-in rocket server can easily be installed/started/stopped as a Windows service. The same is true of the web2py scheduler.
 
-In order to use web2py as a Windows service, you must create a file "options.py"
-with startup parameters:
-``
-import socket, os
-ip = socket.gethostname()
-port = 80
-password = '<recycle>'
-pid_filename = 'httpserver.pid'
-log_filename = 'httpserver.log'
-ssl_certificate = "
-ssl_private_key = "
-numthreads = 10
-server_name = socket.gethostname()
-request_queue_size = 5
-timeout = 10
-shutdown_timeout = 5
-folder = os.getcwd()
-``:code
-
-You don't need to create "options.py" from scratch since there is already an "options_std.py" in the web2py folder that you can use as a model.
-
-After creating "options.py" in the web2py installation folder, you can install web2py as a service with:
-``
-python web2py.py -W install
-``:code
-
-optionally you can specify an options.py file:
-
-``
-python web2py.py -W install -L options.py
-``:code
-
-You can start/stop the service with:
-``
-python web2py.py -W start
-python web2py.py -W stop
-``:code
-
-#### Using nssm to run as a Windows service
 ``Windows services with nssm``:inxx
-Rather than maintaining Windows service code in web2py.py, the developers plan to move to an external tool 'nssm'. 
-nssm is a well respected windows tool with technical advantages, such as automatic restart of services. It also means a consistent way of running web2py services, scheduler services and clean-up processes like session deletes. The use of the -W command-line option is deprecated. 
-The nssm method does not use the options.py file. Instead, options are passed on the command line (some exmaples are provided below)
+Rather than maintaining Windows service code in web2py.py, the developers support the external wrapper-tool 'nssm'. 
 
-##### nssm example: running the scheduler as a Windows service with nssm
+nssm is a well respected Windows tool with good features, such as automatic restart of services. It also means a consistent way of running web2py services, scheduler services and clean-up processes like session deletes. The use of the previous -W command-line option is no longer supported. 
+The nssm method does not use the options.py file of the old method. Instead, options are passed on the command line (some exmaples are provided below)
+
+##### nssm recipe: running the scheduler as a Windows service with nssm
 ``Windows scheduler service``:inxx
 
 Running the scheduler as a Windows service makes a lot of sense.
@@ -1058,7 +1014,7 @@ Before doing this, you need to choose a name for your service.
 There are strong advantages to creating a specific service for each app which needs a scheduler.
 Therefore, your naming convention for services may be web2py_scheduler_app1
 
-After extracting the nssm zip file, open a Windows command prompt in the folder containing the version for your architecture, and type
+After extracting the nssm zip file, open a Windows command prompt in the folder containing the version for your architecture (32-bit or 64-bit), and type
 ``
 nssm install web2py_scheduler_app1``:code
 
@@ -1070,9 +1026,9 @@ where app1 is the name of your application.
 
 It is possible to invoke the scheduler with multiple applications. However, in this mode, web2py detaches each application's scheduler into a subprocess.
 Therefore, the process started by the service will not die if one of the scheduler instances runs into problems; rather, that child process would die.
-We then can't take advantage of automatic restarting of services in case of failure. Using one app per service avoids this weakness.
+We then can't take advantage of Windows automatic service restart in case of failure. Using one app per service enables this feature.
 
-##### nssm example: running web2py.py as a service 
+##### nssm recipe: running web2py.py as a service 
 The example above shows how to use nssm.
 To run web2py in SSL mode on port 8041, and including some other options, you could give nssm a command line (in the options field of the nssm dialog) like this:
 
