@@ -2425,9 +2425,11 @@ This type of background process should not be executed via cron (except perhaps 
 In chapter 8, we will provide an example of how to use the above method to send emails.
 
 
-#### Scheduler 
+[[scheduler]]
+### web2py Scheduler 
 
-Prior to version 2.6.0 the scheduler was considered experimental. From v2.6.0 the documented API is stable.
+The mainstream web2py solution for running tasks in the background (and therefore away from the webserver process) is the built-in scheduler.
+
 The stable API consists of these functions:
 - disable()
 - resume()
@@ -2479,7 +2481,7 @@ scheduler.queue_task(task_add,pvars=dict(a=1,b=2))
 ``:code
 
 
-##### Parameters
+#### Parameters
 
 The first argument of the ``Scheduler`` class must be the database to be used by the scheduler to communicate with the workers. This can be the ``db`` of the app or another dedicated ``db``, perhaps one shared by multiple apps. If you use SQLite it's recommended to use a separate db from the one used by your app in order to keep the app responsive.
 Once the tasks are defined and the ``Scheduler`` is instantiated, all that is needed to do is to start the workers. You can do that in several ways:
@@ -2495,7 +2497,7 @@ python web2py.py -K myapp:group1:group2,myotherapp:group1
 
 If you have a model called ``scheduler.py`` you can start/stop the workers from web2py's default window (the one you use to set the ip address and the port).
 
-##### Scheduler Deployment
+#### Scheduler Deployment
 One last nice addition: if you use the embedded webserver, you can start the webserver and the scheduler with just one line of code (this assumes you don't want the web2py window popping up, else you can use the "Schedulers" menu instead)
 
 ``
@@ -2506,7 +2508,8 @@ You can pass the usual parameters (-i, -p, here -a prevents the window from show
 Windows users looking to create a service should see the Deployment Recipes chapter.
 
 
-##### Complete Scheduler signature
+[[scheduler_signature]]
+#### Complete Scheduler signature
 Scheduler's complete signature is:
 
 ``
@@ -2549,7 +2552,7 @@ NB: scheduler_run records will be created as before for **FAILED**, **TIMEOUT** 
 Now we have the infrastructure in place: defined the tasks, told the scheduler about them, started the worker(s). What remains is to actually schedule the tasks
 
 
-##### Tasks
+#### Tasks
 Tasks can be scheduled programmatically or via appadmin. In fact, a task is scheduled simply by adding an entry in the table "scheduler_task", which you can access via appadmin:
 
 ``
@@ -2579,7 +2582,7 @@ scheduler.queue_task('mytask',...)
 which is documented [[below #queue_task_sig]] .
 
 
-##### Task Lifecycle
+#### Task Lifecycle
 All tasks follow a lifecycle
 
 
@@ -2626,7 +2629,7 @@ Summary: you have
 - ``retry_failed`` to control how many times the task can "fail"
 - ``start_time`` and ``stop_time`` to schedule a function in a restricted timeframe
 
-##### ``queue_task`` and ``task_status`` [[queue_task_sig]]
+#### ``queue_task`` [[queue_task_sig]]
 
 The method:
 ``
@@ -2701,7 +2704,36 @@ you get the result of the validation, and id and uuid will be None
 <Row {'errors': {'period': 'enter an integer greater than or equal to 0'}, 'id': None, 'uuid': None}>
 ``
 
-##### Results and output
+#### ``task_status`` [[task_status]]
+
+To query the scheduler about tasks, use ``task_status``
+``
+scheduler.task_status(ref, output=False)
+``:code
+
+The argument ``ref`` can be
+- integer --> lookup will be done by scheduler_task.id
+- string --> lookup will be done by scheduler_task.uuid
+- query --> lookup as you wish (as in db.scheduler_task.task_name == 'test1')
+``output=True`` fetches the scheduler_run record
+
+It returns a single Row object, for the most recent queued task matching the criteria.
+
+scheduler_run record is fetched by a left join, so it can
+have all fields == None
+
+##### Example: retrieving scheduler task status, results and tracebacks
+Here the scheduler instance is ``mysched``
+
+``
+task = mysched.queue_task(f, ....)
+task_status = mysched.task_status(task.id, output=True)
+traceback = task_status.scheduler_run.traceback
+result = task_status.scheduler_run.run_result #or
+result = task_status.result
+``:code
+
+#### Results and output
 
 The table "scheduler_run" stores the status of all running tasks. Each record references a task that has been picked up by a worker.  One task can have multiple runs. For example, a task scheduled to repeat 10 times an hour will probably have 10 runs (unless one fails or they take longer than 1 hour). Beware that if the task has no return values, it is removed from the scheduler_run table as soon as it is finished.
 
@@ -2723,7 +2755,7 @@ Using appadmin, one can check all ``RUNNING`` tasks, the output of ``COMPLETED``
 
 The scheduler also creates one more table called "scheduler_worker", which stores the workers' heartbeat and their status.
 
-##### Managing processes
+#### Managing processes
 
 Worker fine management is hard. This module tries not to leave behind any platform (Mac, Win, Linux) .
 
@@ -2789,7 +2821,7 @@ completed_runs = db(db.scheduler_run.run_status='COMPLETED').select()
 The scheduler is considered experimental because it needs more extensive testing and because the table structure may change as more features are added.
 ------
 
-##### Reporting percentages
+#### Reporting progress percentages
 
 A special "word" encountered in the print statements of your functions clear all
 the previous output. That word is ``!clear!``.
@@ -2816,6 +2848,7 @@ scheduler.queue_task(reporting_percentages,
 ``:code
 
 
+[[modules]]
 ### Third party modules
 ``import``:inxx
 
