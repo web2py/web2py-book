@@ -1,4 +1,3 @@
-
 ## Other recipes
 
 ### Upgrading
@@ -12,7 +11,10 @@ Simply unzip the latest version of web2py over the old installation.
 
 This will upgrade all the libraries as well as the applications **admin**, **examples**, **welcome**. It will also create a new empty file "NEWINSTALL". Upon restarting, web2py will delete the empty file and package the welcome app into "welcome.w2p" that will be used as the new scaffolding app.
 
-web2py does not upgrade any file in other existing applications.
+web2py does not upgrade any file in your applications. Some important parts of the framework are not part of the libraries, but part of the Welcome app. New apps will inherit these framework changes, but not existing apps.
+You need to do copy or merge changes manually. Sometimes this is necessary to take advantage of new functionality, and sometimes it is necessary for compatibility with new releases, particularly if you are using experimental features. The web2py group at Google Groups is a good way to keep track of necessary changes. 
+Parts of the welcome app to copy to existing apps are the appadmin controller, the top-level views including appadmin.html and the generic views, and the contents of the static folder which contains the latest version of important javascript files. Obviously you need to merge your changes (if any). Keeping backups or using a version control system is a sound idea.
+
 
 ### How to distribute your applications as binaries
 
@@ -27,7 +29,7 @@ Here we explain how to do it for Windows:
 - Download a web2py windows binary distribution
 - Unzip it in folder "myapp" and start it (two clicks)
 - Upload using **admin** the previously packed and compiled app with the name "init" (one click)
-- Create a file "myapp/start.bat" that contains "cd web2py; web2py.exe"
+- Create a file "myapp/start.bat" that contains "web2py/web2py.exe"
 - Create a file "myapp/license" that contains a license for your app and make sure it states that it is being "distributed with an unmodified copy of web2py from web2py.com"
 - Zip the myapp folder into a file "myapp.zip"
 - Distribute and/or sell "myapp.zip"
@@ -36,6 +38,176 @@ When users will unzip "myapp.zip" and click "run" they will see your app instead
 There is no requirement on the user side, not even Python pre-installed.
 
 For Mac binaries the process is the same but there is no need for the "bat" file.
+
+### WingIDE, Rad2Py, Eclipse and PyCharm
+
+``WingIDE``:inxx ``Eclipse``:inxx ``Rad2Py``:inxx
+
+You can use web2py with third party IDEs with as WingIDE, Rad2Py, Eclipse and PyCharm.
+
+#### PyCharm
+``PyCharm``:inxx
+PyCharm v3 Professional Edition introduces built-in support for web2py. 
+
+As of v3.0, PyCharm will recognise web2py applications belong to a web2py parent directory, and this will activate the web2py support.
+However, currently it will not recognise web2py directories which have a different name (according to the developers, this will be fixed).
+In this case, start a PyCharm project by opening the directory of the web2py installation, and then navigate through the applications directory. 
+PyCharm's git integration copes with this; it supports multiple git repositories inside the one project directory structure.  
+
+The default launcher for a web2py project starts web2py.py and therefore launches the integrated rocket server.
+You can also drop into PyCharm's debugger like any other Python session. However, this seems to require removal of
+``from gluon.debug import dbg`` statements.
+
+Note that web2py support is not included in the opensource version of PyCharm 3. In this case, please consider the notes below.
+
+#### WingIDE
+Here is a screenshot of using web2py with WingIDE:
+
+[[image @///image/wingide.png center 480px]]
+
+#### Using general purpose IDEs with web2py
+The general problem with these IDEs (except those which support web2py) is that they do not understand the context in which models and controllers are executed and therefore autocompletion does not work out of the box.
+
+To make autocompletion work the general trick consists in editing your models and controllers and adding the following code:
+
+``
+if False:
+    from gluon import *
+    request = current.request
+    response = current.response
+    session = current.session
+    cache = current.cache
+    T = current.T
+``:code
+
+The import block does not change the logic as this is never executed but it forces the IDE to parse it and understand where the objects in the global namespace come from (the ``gluon`` module) thus making autocompletion work.
+
+If you are relying on variables in your models (such as database definitions) you may consider adding to the list like this:
+``
+   from db import *
+``:code
+
+You can also consider importing all models.
+``
+if False:  
+    from gluon import *
+    from db import *  #repeat for all models
+    from menu import *
+``:code
+
+As well, if using Eclipse with PyDev you should add the web2py folder to the system python path (in PyDev preferences for the python interpreter). 
+In some versions of PyDev, it has been possible to use the debugging support inside Eclipse by launching web2py.py.
+It is probably wise to remove the import of the gluon debug module. Also, to do this you should make the pydev project the web2py directory, not your specific application.
+
+PyDev's git integration copes with this; it supports multiple git repositories inside the one project directory structure.  
+
+
+### SQLDesigner
+
+There is a software called SQLDesigner which allows you to build web2py models visually and then generate the corresponding code. Here is a screenshot.
+
+[[image @///image/designer.png center 480px]]
+
+The version of SQLDesigner which works with web2py can be found here:
+
+``https://github.com/elcio/visualdal``
+
+### Publishing a folder
+
+Consider the problem of sharing a folder (and subfolders) on the web. web2py makes this very easy. You just need a controller like this:
+
+``
+from gluon.tools import Expose
+def myfolder():
+    return dict(files=Expose('/path/to/myfolder'))
+``:code
+
+which you can render in a view with ``{{=files}}``. It will create an interface to view the files and folders, and navigate the tree structure. Images will have a preview. 
+
+The path prefix "/path/to/myfolder" will be hidden to the visitors. For example a file called "/path/to/myfolder/a/b.txt" will be replaced with "base/a/b.txt". The "base" prefix can be specified using the ``basename`` argument of the Expose function. Using the argument ``extensions`` can specify a list of file extensions to be listed, other files will be hidden. For example:
+
+``
+def myfolder():
+    return dict(files=Expose('/path/to/myfolder',basename='.',
+                             extensions=['.py', '.jpg']))
+``:code
+
+Files and folders that contain the word "private" in the path or have file that start with "." or terminate in "~" are always hidden.
+
+### Functional testing
+
+web2py comes with a module ``gluon.contrib.webclient`` which allows functional testing of local and remote web2py applications. Actually, this module is not web2py specific and it can be used for testing and interacting programmatically with any web application, yet it is designed to understand web2py session and web2py postbacks.
+
+
+Here is an example of usage. The program below creates a client,
+connects to the "index" action in order to establish a session,
+registers a new user, then logouts, and logins again using the
+newly created credentials:
+
+``
+from gluon.contrib.webclient import WebClient
+
+client = WebClient('http://127.0.0.1:8000/welcome/default/',
+                   postbacks=True)
+
+client.get('index')
+# register
+data = dict(first_name='Homer',
+            last_name='Simpson',
+            email='homer@web2py.com',
+            password='test',
+            password_two='test',
+            _formname='register')
+client.post('user/register', data=data)
+
+# logout
+client.get('user/logout')
+
+# login again
+data = dict(email='homer@web2py.com',
+            password='test',
+            _formname='login')
+client.post('user/login', data=data)
+
+# check registration and login were successful
+client.get('index')
+assert('Welcome Homer' in client.text)
+``:code
+
+The WebClient constructor takes a URL prefix as argument. In the example that is "http://127.0.0.1:8000/welcome/default/". It does not perform any network IO. The ``postbacks`` argument defaults to ``True`` and tells the client how to handle web2py postbacks.
+
+The WebClient object, ``client``, has only two methods:
+``get`` and ``post``.  The first argument is always a URL postfix.
+The full URL for the GET of POST request is constructed simply by concatenating the prefix and the postfix. The purpose of this is imply making the syntax less verbose for long conversations between client and server.
+
+``data`` is a parameter specific of POST request and contains a dictionary of the data to be posted. Web2py forms have a hidden ``_formname`` field and its value must be provided unless there is a single form in the page. Web2py forms also contain a hidden ``_formkey`` field which is designed to prevent CSRF attacked. It is handled automatically by WebClient.
+
+Both ``client.get`` and ``client.post`` accept the following extra arguments:
+- ``headers``: a dictionary of optional HTTP headers.
+- ``cookies``: a dictionary of optional HTTP cookies.
+- ``auth``: a dictionary of parameters to be passed to ``urllib2.HTTPBasicAuthHandler().add_password(**auth)`` in order to perform basic authentication. For more information about this we refer to the Python documentation for the urllib2 module.
+
+The ``client`` object in the example carries on a conversation with the server specified in the constructor by making GET and POST requests. It automatically handles all cookies and sends them back to maintain sessions. If it detects that a new session cookie is issued while an existing one is already present, it interprets it as a broken session and raises an exception. If the server returns an HTTP error, it raises an exception. If the server returns an HTTP error which contains a web2py ticket, it returns a RuntimeError exception containing the ticket code.
+
+The ``client`` object maintains a log of requests in ``client.history`` and a state associated with its last successful request. The state consists of:
+
+- ``client.status``: the returned status code
+- ``client.text``: the content of the page
+- ``client.headers``: a dictionary of parsed headers
+- ``client.cookies``: a dictionary of parsed cookies
+- ``client.sessions``: a dictionary of web2py sessions in the form ``{appname: session_id}``.
+- ``client.forms``: a dictionary of web2py forms detected in the ``client.text``. The dictionary has the form ``{_formname,_formkey}``.
+
+The WebClient object does not perform any parsing of the ``client.text`` returned by the server but this can easily be accomplished with many third-party modules such as BeautifulSoup. For example here is an example code that finds all links in a page downloaded by the client and checks all of them:
+
+``
+from BeautifulSoup import BeautifulSoup
+dom = BeautifulSoup(client.text)
+for link in dom.findAll('a'):
+    new_client = WebClient()
+    new_client.get(a.href)
+    print new_client.status
+``
 
 ### Building a minimalist web2py
 
@@ -73,7 +245,7 @@ page = urllib.urlopen('http://www.web2py.com').read()
 
 This is often fine, but the ``urllib`` module does not work on the Google App Engine. Google provides a different API for downloading URLs that works on GAE only. In order to make your code portable, web2py includes a ``fetch`` function that works on GAE as well as other Python installations:
 ``
-from google.tools import fetch
+from gluon.tools import fetch
 page = fetch('http://www.web2py.com')
 ``:code
 
@@ -156,7 +328,7 @@ Here is the "default/list_items.html" view:
 {{pass}}
 ``:code
 
-In this way we have obtained pagination with one single select per action, and that one select only selects one row more then we need.
+In this way we have obtained pagination with one single select per action, and that one select only selects one row more than we need.
 
 ### httpserver.log and the Log File Format
 ``httpserver.log``:inxx
@@ -194,7 +366,7 @@ This logging is disabled by default when using mod_wsgi since it would be the sa
 
 ### Populating database with dummy data
 
-For testing purposes it is convenient to be able to populate database tables with dummy data. web2py includes a Bayesian classifier already trained to generate dummy but readable text for this purpose.
+For testing purposes, it is convenient to be able to populate database tables with dummy data. web2py includes a Bayesian classifier already trained to generate dummy but readable text for this purpose.
 
 Here is the simplest way to use it:
 ``
@@ -229,7 +401,7 @@ print ell.generate(1000,prefix=None)
 There are multiple ways to accept credit card payments online. web2py provides specific APIs for some of the most popular and practical ones:
 
 - Google Wallet ``googlewallet``:cite
-- PayPal ``paypal``cite
+- PayPal ``paypal``:cite
 - Stripe.com ``stripe``:cite
 - Authorize.net ``authorizenet``:cite
 - DowCommerece ``dowcommerce``:cite
@@ -241,7 +413,7 @@ There are times when you need more control and you want to generate yourself the
 
 For this reason web2py provide integration out of the box with Stripe, Authorize.net (the module was developed by John Conde and slightly modified) and DowCommerce. Stripe is the simplest to use and also the cheapest for low volume of transactions (they charge no fix cost but charge about 3% per transaction). Authorize.net is better for high volumes (has a fixed yearly costs plus a lower cost per transaction).
 
-Mind that in the case of Stripe and Authorize.net your program will be accepting credit cards information. You do not have to store this information and we advice you not to because of the legal requirements involved (check with Visa or Mastercard) but there are times when you may want to store the information for recurrent payments or to reproduce the Amazon one-click pay button.
+Mind that in the case of Stripe and Authorize.net your program will be accepting credit cards information. You do not have to store this information and we advise you not to because of the legal requirements involved (check with Visa or MasterCard), but there are times when you may want to store the information for recurrent payments or to reproduce the Amazon one-click pay button.
 
 #### Google Wallet
 
@@ -269,11 +441,11 @@ Then you simply need to create the following code in your view:
 
 When a visitor clicks on the button, the visitor will be redirected to the Google page where he/she can pay for the items. Here products is a list of products and each product is a dictionary of parameters that you want to pass describing your items (name, quantity, price, currency, description, and other optional ones which you can find described in the Google Wallet documentation).
 
-If you choose to use this mechanism you may want to generate the values passed to the button programmatically based on your inventory and the visitor shopping chart.
+If you choose to use this mechanism, you may want to generate the values passed to the button programmatically based on your inventory and the visitor shopping chart.
 
 All the tax and shipping information will be handled on the Google side. Same for accounting information. By default your application is not notified that the transaction has been completed therefore you will have to visit your Google Merchant site to see which products have been purchased and paid for, and which products you need to ship to your buyers there. Google will also send you an email with the information.
 
-If you want a tighter integration you have to use the Level 2 notification API. In that case you can pass more information to Google and Google will call your API to notify about purchases. This allows you to keep accounting information within your application but it requires you expose web services that can talk to Google Wallet.
+If you want a tighter integration, you have to use the Level 2 notification API. In that case you can pass more information to Google and Google will call your API to notify about purchases. This allows you to keep accounting information within your application but it requires you expose web services that can talk to Google Wallet.
 
 This is a considerable more difficult problem but such API has already been implemented and it is available as plugin from
 
@@ -303,7 +475,7 @@ Once you have the API key you can accept credit cards with the following code:
 from gluon.contrib.stripe import Stripe
 stripe = Stripe(api_key)
 d = stripe.charge(amount=100,
-	      currency='usd',
+              currency='usd',
               card_number='4242424242424242',
               card_exp_month='5',
               card_exp_year='2012',
@@ -317,7 +489,7 @@ elif:
 
 The response, ``d``, is a dictionary which you can explore yourself. The card number used in the example is a sandbox and it will always succeed. Each transaction is associated to a transaction id stored in ``d['id']``.
 
-Stripe also allows you verify a transaction at a later time:
+Stripe also allows you to verify a transaction at a later time:
 
 ``
 d = Stripe(key).check(d['id'])
@@ -330,7 +502,7 @@ r = Stripe(key).refund(d['id'])
 if r.get('refunded',False):
     # refund was successful
 elif:
-    # error is in d.get('error','unkown')
+    # error is in d.get('error','unknown')
 ``
 
 Stripe makes very easy to keep the accounting within your application.
@@ -344,7 +516,7 @@ Another simple way to accept credit cards is to use Authorize.Net. As usual you 
 ``
 from gluon.contrib.AuthorizeNet import process
 if process(creditcard='4427802641004797',
-           expiration="122012,
+           expiration="122012",
            total=100.0,cvv='123',tax=None,invoice=None,
            login='cnpdev4289', transkey='SR2P8g4jdEn7vFLQ',testmode=True):
    # payment was processed
@@ -415,9 +587,9 @@ you will get an ``APP_KEY`` and an ``APP_SECRET``. Once you have them you can us
 
 Create a file called "yourapp/private/dropbox.key" and in it write
 ``
-<APP_KEY>:<APP_SECERT>:app_folder
+<APP_KEY>:<APP_SECRET>:app_folder
 ``
-where ``<APP_KEY>`` and ``APP_SECRET`` are your key and secret.
+where ``<APP_KEY>`` and ``<APP_SECRET>`` are your key and secret.
 
 Then in "models/db.py" do:
 
@@ -505,4 +677,3 @@ route_in=(
 ``:code
 
 The first time you are attacked you may incur a small overhead, but our experience is that the same attacker will not try twice.
-
