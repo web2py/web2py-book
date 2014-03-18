@@ -144,7 +144,7 @@ def search():
     chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=TIME_EXPIRE)
     results = []
     content = H2('No results for "%s"' % search)
-    relative_link_re = re.compile('(\[\[.*)(\.\.)(\/[0-9][0-9]#.*\]\])')
+    relative_link_re = re.compile('(\[\[.*)(\.\.)(\/[0-9][0-9](?:#.*)?\]\])')
     for chapter in chapters:
         chapter_id = int(chapter[0])
         filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
