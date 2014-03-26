@@ -11,7 +11,10 @@ Simply unzip the latest version of web2py over the old installation.
 
 This will upgrade all the libraries as well as the applications **admin**, **examples**, **welcome**. It will also create a new empty file "NEWINSTALL". Upon restarting, web2py will delete the empty file and package the welcome app into "welcome.w2p" that will be used as the new scaffolding app.
 
-web2py does not upgrade any file in other existing applications.
+web2py does not upgrade any file in your applications. Some important parts of the framework are not part of the libraries, but part of the Welcome app. New apps will inherit these framework changes, but not existing apps.
+You need to do copy or merge changes manually. Sometimes this is necessary to take advantage of new functionality, and sometimes it is necessary for compatibility with new releases, particularly if you are using experimental features. The web2py group at Google Groups is a good way to keep track of necessary changes. 
+Parts of the welcome app to copy to existing apps are the appadmin controller, the top-level views including appadmin.html and the generic views, and the contents of the static folder which contains the latest version of important javascript files. Obviously you need to merge your changes (if any). Keeping backups or using a version control system is a sound idea.
+
 
 ### How to distribute your applications as binaries
 
@@ -26,7 +29,7 @@ Here we explain how to do it for Windows:
 - Download a web2py windows binary distribution
 - Unzip it in folder "myapp" and start it (two clicks)
 - Upload using **admin** the previously packed and compiled app with the name "init" (one click)
-- Create a file "myapp/start.bat" that contains "cd web2py; web2py.exe"
+- Create a file "myapp/start.bat" that contains "web2py/web2py.exe"
 - Create a file "myapp/license" that contains a license for your app and make sure it states that it is being "distributed with an unmodified copy of web2py from web2py.com"
 - Zip the myapp folder into a file "myapp.zip"
 - Distribute and/or sell "myapp.zip"
@@ -36,17 +39,34 @@ There is no requirement on the user side, not even Python pre-installed.
 
 For Mac binaries the process is the same but there is no need for the "bat" file.
 
-### WingIDE, Rad2Py, and Eclipse
+### WingIDE, Rad2Py, Eclipse and PyCharm
 
 ``WingIDE``:inxx ``Eclipse``:inxx ``Rad2Py``:inxx
 
-You can use web2py with third party IDEs with as WingIDE, Rad2Py, and Eclipse.
+You can use web2py with third party IDEs with as WingIDE, Rad2Py, Eclipse and PyCharm.
 
+#### PyCharm
+``PyCharm``:inxx
+PyCharm v3 Professional Edition introduces built-in support for web2py. 
+
+As of v3.0, PyCharm will recognise web2py applications belong to a web2py parent directory, and this will activate the web2py support.
+However, currently it will not recognise web2py directories which have a different name (according to the developers, this will be fixed).
+In this case, start a PyCharm project by opening the directory of the web2py installation, and then navigate through the applications directory. 
+PyCharm's git integration copes with this; it supports multiple git repositories inside the one project directory structure.  
+
+The default launcher for a web2py project starts web2py.py and therefore launches the integrated rocket server.
+You can also drop into PyCharm's debugger like any other Python session. However, this seems to require removal of
+``from gluon.debug import dbg`` statements.
+
+Note that web2py support is not included in the opensource version of PyCharm 3. In this case, please consider the notes below.
+
+#### WingIDE
 Here is a screenshot of using web2py with WingIDE:
 
 [[image @///image/wingide.png center 480px]]
 
-The general problem with these IDEs (except Rad2Py which is designed specifically to work with web2py) is that they do not understand the context in which models and controllers are executed and therefore autocompletion does not work out of the box.
+#### Using general purpose IDEs with web2py
+The general problem with these IDEs (except those which support web2py) is that they do not understand the context in which models and controllers are executed and therefore autocompletion does not work out of the box.
 
 To make autocompletion work the general trick consists in editing your models and controllers and adding the following code:
 
@@ -60,7 +80,27 @@ if False:
     T = current.T
 ``:code
 
-it does not change the logic as this is never executed but it forces the IDE to parse it and understand where the objects in the global namespace come from (the ``gluon`` module) thus making autocompletion work.
+The import block does not change the logic as this is never executed but it forces the IDE to parse it and understand where the objects in the global namespace come from (the ``gluon`` module) thus making autocompletion work.
+
+If you are relying on variables in your models (such as database definitions) you may consider adding to the list like this:
+``
+   from db import *
+``:code
+
+You can also consider importing all models.
+``
+if False:  
+    from gluon import *
+    from db import *  #repeat for all models
+    from menu import *
+``:code
+
+As well, if using Eclipse with PyDev you should add the web2py folder to the system python path (in PyDev preferences for the python interpreter). 
+In some versions of PyDev, it has been possible to use the debugging support inside Eclipse by launching web2py.py.
+It is probably wise to remove the import of the gluon debug module. Also, to do this you should make the pydev project the web2py directory, not your specific application.
+
+PyDev's git integration copes with this; it supports multiple git repositories inside the one project directory structure.  
+
 
 ### SQLDesigner
 
@@ -82,9 +122,9 @@ def myfolder():
     return dict(files=Expose('/path/to/myfolder'))
 ``:code
 
-which you can render in a view with ``{{=fiels}}``. It will create an interface to view the files and folders, and navigate the tree structure. Images will have a preview. 
+which you can render in a view with ``{{=files}}``. It will create an interface to view the files and folders, and navigate the tree structure. Images will have a preview. 
 
-The path prefix "/path/to/myfolder" will be hidden to the visitors. For example a file called "/path/to/myfolder/a/b.txt" and replaced with "base/a/b.txt". The "base" prefix can be specified using the ``basename`` argument of the Expose function. Using the argument ``extensions`` can specify a list of file extensions to be listed, other files will be hidden. For example:
+The path prefix "/path/to/myfolder" will be hidden to the visitors. For example a file called "/path/to/myfolder/a/b.txt" will be replaced with "base/a/b.txt". The "base" prefix can be specified using the ``basename`` argument of the Expose function. Using the argument ``extensions`` can specify a list of file extensions to be listed, other files will be hidden. For example:
 
 ``
 def myfolder():
@@ -112,13 +152,13 @@ client = WebClient('http://127.0.0.1:8000/welcome/default/',
 
 client.get('index')
 # register
-data = dict(first_name = 'Homer',
-            last_name = 'Simpson',
-            email = 'homer@web2py.com',
-            password = 'test',
-            password_two = 'test',
-            _formname = 'register')
-client.post('user/register',data = data)
+data = dict(first_name='Homer',
+            last_name='Simpson',
+            email='homer@web2py.com',
+            password='test',
+            password_two='test',
+            _formname='register')
+client.post('user/register', data=data)
 
 # logout
 client.get('user/logout')
@@ -126,8 +166,8 @@ client.get('user/logout')
 # login again
 data = dict(email='homer@web2py.com',
             password='test',
-            _formname = 'login')
-client.post('user/login',data = data)
+            _formname='login')
+client.post('user/login', data=data)
 
 # check registration and login were successful
 client.get('index')
@@ -361,7 +401,7 @@ print ell.generate(1000,prefix=None)
 There are multiple ways to accept credit card payments online. web2py provides specific APIs for some of the most popular and practical ones:
 
 - Google Wallet ``googlewallet``:cite
-- PayPal ``paypal``cite
+- PayPal ``paypal``:cite
 - Stripe.com ``stripe``:cite
 - Authorize.net ``authorizenet``:cite
 - DowCommerece ``dowcommerce``:cite
@@ -476,7 +516,7 @@ Another simple way to accept credit cards is to use Authorize.Net. As usual you 
 ``
 from gluon.contrib.AuthorizeNet import process
 if process(creditcard='4427802641004797',
-           expiration="122012,
+           expiration="122012",
            total=100.0,cvv='123',tax=None,invoice=None,
            login='cnpdev4289', transkey='SR2P8g4jdEn7vFLQ',testmode=True):
    # payment was processed
@@ -547,9 +587,9 @@ you will get an ``APP_KEY`` and an ``APP_SECRET``. Once you have them you can us
 
 Create a file called "yourapp/private/dropbox.key" and in it write
 ``
-<APP_KEY>:<APP_SECERT>:app_folder
+<APP_KEY>:<APP_SECRET>:app_folder
 ``
-where ``<APP_KEY>`` and ``APP_SECRET`` are your key and secret.
+where ``<APP_KEY>`` and ``<APP_SECRET>`` are your key and secret.
 
 Then in "models/db.py" do:
 

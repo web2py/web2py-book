@@ -1,51 +1,54 @@
 ## デプロイレシピ
 
-本番環境にweb2pyをデプロイするには、いくつかの方法があります。詳細は、ホストによって提供されているサーバーの構成とサービスに依存します。
+本番環境にweb2pyをデプロイするには、幾つかの方法があります。詳細は、ホストによって提供されているサーバーの構成とサービスに依存します。
 
-この章では次の点を考えてみます：
-- 本番環境（Apache、Lighttpd、Cherokee）
+この章では次の点を考えてみます:
+- 本番環境（Apache、Nginx、Lighttpd、Cherokee）
 - セキュリティ
-- スケーラビリティ
-- Google App Engine プラットフォーム（GAE``gae``:cite）へのデプロイ
+- Redis とロードバランサを使った、スケーラビリティ
+- PythonAnywhere、Heroku、Amazon EC2、 そして Google App Engine プラットフォーム（GAE ``gae``:cite）へのデプロイ
 
 ``Apache``:inxx ``CGI``:inxx ``mod_python``:inxx ``mod_wsgi``:inxx ``mod_proxy``:inxx
-``WSGI``:inxx
+``WSGI``:inxx ``Nginx``:inxx ``Heroku``:inxx ``PythonAnywhere``:inxx
 
-web2pyにはSSL``ssl``:citeが有効なRocket wsgiserver``rocket``:citeというwebサーバーがあります。これは高速なwebサーバーですが、キャパシティ設定に制限があります。これによりweb2pyを、Apache``apache``:cite 、 Lighttpd``lighttpd``:cite 、 Cherokee``cherokee``:cite でデプロイするのが最適です。これらのサーバーは無償のオープンソースで、カスタマイズでき、トランザクションの多い本番環境での信頼性が証明されています。静的なファイルを直接表示したり、HTTPSを処理したり、動的なコンテンツでweb2pyにコントロールを渡すことができます。
+web2pyにはSSL ``ssl``:cite が有効な Rocket wsgiserver``rocket``:cite というwebサーバーがあります。これは高速なwebサーバーですが、キャパシティ設定に制限があります。これによりweb2pyを、Apache``apache``:cite 、``Nginx``:cite Lighttpd``lighttpd``:cite 、 Cherokee``cherokee``:cite でデプロイするのが最適です。これらのサーバーは無償のオープンソースで、カスタマイズでき、トランザクションの多い本番環境での信頼性が証明されています。静的なファイルを直接表示したり、HTTPSを処理したり、動的なコンテンツでweb2pyにコントロールを渡すことができます。
 
 数年前までwebサーバーとwebアプリケーション間で通信に使う、標準的なインターフェースはCommon Gateway Interface (CGI)``cgi``:citeでした。CGIの一番の問題は、HTTPリクエストのたびに新しいプロセスを作成することです。もしwebアプリケーションがインタプリタ言語で書かれている場合は、CGIスクリプトによって実行されたHTTPリクエストが新しいインタプリタ・インスタンスを作成します。これは処理が遅く、本番環境では避けるべきです。さらに、CGIは簡単な処理結果だけを扱えます。例えばファイルストリーミングを扱うことはできません。
 
-web2pyはCGIへのインターフェースに、``cgihandler.py``ファイルを提供しています。
+web2pyはCGIへのインターフェースに、``cgihandler.py`` ファイルを提供しています。
 
-この問題に対する一つの解決策として、Apcheのmod_pythonモジュールを使う方法があります。mod_pythonプロジェクトはApache Software Foundationにおける、正式な開発は既に中止されていますが、今だに一般的な方法なのでここで説明することにします。mod_pythonはApacheが起動するとPythonのインタプリタのインスタンスを開始し、Pythonを毎回再起動せずに自身のスレッドでそれぞれのHTTPリクエストを処理します。mod_pythonはwebサーバーとwebアプリケーション間の通信に、独自のインターフェイスを使うので最適ではないですが、CGIよりは優れた解決策です。mod_pythonではホストされている全てのアプリケーションが、同じuser_id/group_idで実行されるので、セキュリィティ上の問題があります。
+この問題に対する一つの解決策として、Apcheのmod_pythonモジュールを使う方法があります。Apache Software Foundationにより、mod_pythonプロジェクトは正式には破棄されましたが、今だに一般的な方法なのでここで説明することにします。mod_pythonはApacheが起動するとPythonのインタプリタのインスタンスを開始し、Pythonを毎回再起動せずに自身のスレッドでそれぞれのHTTPリクエストを処理します。mod_pythonはwebサーバーとwebアプリケーション間の通信に、独自のインターフェイスを使うので最適ではないですが、CGIよりは優れた解決策です。mod_pythonではホストされている全てのアプリケーションが、同じuser_id/group_idで実行されるので、セキュリィティ上の問題があります。
 
-web2pyはmod_pythonへのインターフェースに、``modpythonhandler.py``ファイルを提供しています。
+web2pyはmod_pythonへのインターフェースに、``modpythonhandler.py`` ファイルを提供しています。
 
-近年Pythonコミュニティは、webサーバーとwebアプリケーションを通信する、Pythonで書かれた新しい標準インターフェイスを開発する方向に進みました。それはWeb Server Gateway Interface (WSGI)``wsgi-w, wsgi-o``:citeと呼ばれています。web2pyはWSGI上で構築されており、WSGIが使用できない時には、別のインターフェイスを使用するためのハンドラを提供しています。
+近年Pythonコミュニティは、webサーバーとwebアプリケーションを通信する、Pythonで書かれた新しい標準インターフェイスを開発する方向に進みました。それは Web Server Gateway Interface (WSGI) ``wsgi-w``:cite ``wsgi-o``:cite と呼ばれています。web2pyはWSGI上で構築されており、WSGIが使用できない時には、別のインターフェイスを使用するためのハンドラを提供しています。
 
-ApacheはGraham Dumpletonが開発した、mod_wsgi``modwsgi``:citeモジュール経由でWSGIをサポートします。
+ApacheはGraham Dumpletonが開発した、mod_wsgi``modwsgi``:cite モジュール経由でWSGIをサポートします。
 
-web2pyはWSGIへのインターフェースに、``wsgihandler.py``ファイルを提供しています。
+web2pyはWSGIへのインターフェースに、``wsgihandler.py`` ファイルを提供しています。
 
-一部のwebホスティングサービスは、mod_wsgiをサポートしていません。この場合はApaacheをproxyとして使用し、入ってくる全てのリクエストをweb2py組み込みのwebサーバー（例えばlocalhost:8000などで動作）に転送する必要があります。
+一部のwebホスティングサービスは、mod_wsgiをサポートしていません。このケースではApaacheをproxyとして使用し、入ってくる全てのリクエストをweb2py組み込みのwebサーバー（例えばlocalhost:8000などで動作）に転送する必要があります。
 
 mod_wsgiとmod_proxyどちらの場合でも、Apacheは静的なファイルとSSL暗号化を直接処理するように設定でき、web2pyの負荷を軽減します。
 
-Lighttpd webサーバーはWSGIインターフェースをサポートしませんが、CGIを改良したFastCGI``fastcgi``:citeインターフェイスをサポートします。FastCGIの主な目的は、webサーバーとCGIプログラム間のインターフェイスに関係するオーバーヘッドを削減することで、サーバーが一度により多くのHTTPリクエストを処理できるようになることです。
+NginxはWSGIの代わりにuWSGIを使用します。独自のpythonアダプタが必要で、似ていますが異なるプロトコルです。
+
+Lighttpd webサーバーはWSGIインターフェースをサポートしませんが、CGIを改良したFastCGI ``fastcgi``:cite インターフェイスをサポートします。FastCGIの主な目的は、webサーバーとCGIプログラム間のインターフェイスに関係するオーバーヘッドを削減することで、サーバーが一度により多くのHTTPリクエストを処理できるようになることです。
 
 Lighttpd webサイトによると、"LighttpdはYouTubeやWikipediaといった、有名なWeb2.0サイトで使用されています。その高速なIOインフラストラクチャによって、同じハードウェアーを使った他のwebサーバーと比べても、数倍高いパフォーマンスを実現しています"。FastCGIを利用したLighttpdは実際、mod_wsgiを利用したApacheよりも高速です。
 
-web2pyはFastCGIへのインターフェースに、``fcgihandler.py``ファイルを提供しています。
+web2pyはFastCGIへのインターフェースに、``fcgihandler.py`` ファイルを提供しています。
 
-web2pyにはGoogle App Engine (GAE)へのインターフェースである、``gaehandler.py``もあります。GAEでは、webアプリケーションは"クラウド"で動作します。これはフレームワークが、ハードウェアの詳細から、完全に抽象化されていることを意味します。全てのリクエストを処理するのに必要な分だけ、webアプリケーションは自動で複製されます。ここで言う複製とは、単一のサーバー上で複数のスレッドというだけではなく、複数サーバー間でのマルチプロセスという意味です。GAEはファイルシステムへの書き込みを禁止し、全ての永続的なデータは Google BigTable か memcache に保存することで、このスケーラビリティのレベルを実現しています。
+web2pyにはGoogle App Engine (GAE)へのインターフェースである、``gaehandler.py`` もあります。GAEでは、webアプリケーションは "クラウド" で動作します。これはフレームワークが、ハードウェアの詳細から、完全に抽象化されていることを意味します。全てのリクエストを処理するのに必要な分だけ、webアプリケーションは自動で複製されます。ここで言う複製とは、単一のサーバー上で複数のスレッドというだけではなく、複数サーバー間でのマルチプロセスという意味です。GAEはファイルシステムへの書き込みを禁止し、全ての永続的なデータは Google BigTable か memcache に保存することで、このスケーラビリティのレベルを実現しています。
 
-GAE以外のプラットフォームでは拡張性は懸念事項であり、web2pyアプリケーションでの調整が必要になる場合があります。拡張性を実現する最も一般的な方法は、ロードバランサ（簡単なラウンドロビン方式やそれぞれのサーバーからハートビートをフィードバックとして受け取るような高度な方式)の後方で、複数のwebサーバーを動作させることです。
+GAE以外のプラットフォームでは拡張性は懸念事項であり、web2pyアプリケーションでの調整が必要になる場合があります。拡張性を実現する最も一般的な方法は、ロードバランサ(簡単なラウンドロビン方式やそれぞれのサーバーからハートビートをフィードバックとして受け取るような高度な方式)の後方で、複数のwebサーバーを動作させることです。
 
-複数のwebサーバーがあったとしても、データベースサーバーは常に一つだけです。デフォルトのweb2pyは、セッション、エラーチケット、アップロードファイル、キャッシュをファイルシステムに保存します。このためデフォルトの構成では、それらのフォルダは共有フォルダである必要があります：
+複数のwebサーバーがあったとしても、データベースサーバは常に一つだけです。デフォルトのweb2pyは、セッション、エラーチケット、アップロードファイル、キャッシュをファイルシステムに保存します。このためデフォルトの構成では、それらのフォルダは共有フォルダである必要があります。
 
 [[image @///image/en9100.png center 300px]]
 
-この章の残りの部分で、この標準のアプローチを改善するいくつかのレシピを考えます。次のようなことを含みます：
+この章の残りの部分で、この標準のアプローチを改善する幾つかのレシピを考えます。次のようなことが含まれます:
+
 - セッションをデータベースやキャッシュに保存します。もしくは全く保存しません。
 - チケットをローカルのファイルシステムに保存した後に、バッチでデータベースに移動します。
 - cache.ramとcache.diskの代わりに、memcachedを利用します。
@@ -53,11 +56,11 @@ GAE以外のプラットフォームでは拡張性は懸念事項であり、we
 
 最初の三つのレシピには従うことを推奨しますが、一方で四つ目は、サイズの小さなファイルではメリットがありますが、大きなファイルで逆効果になる可能性があります。
 
-#### ``anyserver.py``
+### ``anyserver.py``
 
-``anyserver``:inxx ``bjoern``:inxx ``cgi``:inxx ``cherrypy``:inxx ``diesel``:inxx ``eventlet``:inxx ``fapws``:inxx ``flup``:inxx ``gevent``:inxx ``gunicorn``:inxx ``mongrel2``:inxx ``paste``:inxx `` ``tornado``:inxx ``twisted``:inxx ``wsgiref
+``anyserver``:inxx ``bjoern``:inxx ``cgi``:inxx ``cherrypy``:inxx ``diesel``:inxx ``eventlet``:inxx ``fapws``:inxx ``flup``:inxx ``gevent``:inxx ``gunicorn``:inxx ``mongrel2``:inxx ``paste``:inxx ``tornado``:inxx ``twisted``:inxx ``wsgiref``:inxx
 
-web2pyには、次のポピュラーなサーバーへのWSGIインターフェイスを実装した、``anyserver.py``ファイルがあります: bjoern, cgi, cherrypy, diesel, eventlet,
+web2pyには、次のポピュラーなサーバーへのWSGIインターフェイスを実装した、``anyserver.py`` ファイルがあります: bjoern, cgi, cherrypy, diesel, eventlet,
 fapws, flup, gevent, gunicorn, mongrel2, paste,
 rocket, tornado,  twisted, wsgiref
 
@@ -67,8 +70,8 @@ rocket, tornado,  twisted, wsgiref
 python anyserver.py -s tornado -i 127.0.0.1 -p 8000 -l -P
 ``
 
-(``-l``はロギング用、  ``-P``はプロファイラ用です。）
-全てのコマンドラインオプションの情報を知るには"-h"を使ってください:
+ここで ``-l`` はロギング用、``-P`` はプロファイラ用です。
+全てのコマンドラインオプションの情報には、"-h" を使用してください:
 
 ``
 python anyserver.py -h
@@ -80,15 +83,13 @@ python anyserver.py -h
 
 ここでは apache+python+mod_wsgi+web2py+postgresql を、ゼロからインストールする手順を説明します。
 
-Ubuntuの場合：
-On Ubuntu:
+Ubuntuでは:
 ``
 wget http://web2py.googlecode.com/hg/scripts/setup-web2py-ubuntu.sh
 chmod +x setup-web2py-ubuntu.sh
 sudo ./setup-web2py-ubuntu.sh
 ``
-Fedoraの場合：
-On Fedora:
+Fedoraでは:
 ``
 wget http://web2py.googlecode.com/hg/scripts/setup-web2py-fedora.sh
 chmod +x setup-web2py-fedora.sh
@@ -98,9 +99,9 @@ sudo ./setup-web2py-fedora.sh
 
 #### Apacheセットアップ
 
-このセクションでは、Ubuntu 8.04 Server Editionをプラットフォームとして使用します。設定コマンドは他のDebianベースのLinuxディストリ ビューションによく似ていますが、Fedoraベースのシステム(``apt-get``の代わりに``yum``を使う）とは異なります。
+このセクションでは、Ubuntu 8.04 Server Editionをプラットフォームとして使用します。設定コマンドは他のDebianベースのLinuxディストリ ビューションによく似ていますが、Fedoraベースのシステム(``apt-get`` の代わりに ``yum`` を使う)とは異なります。
 
-初めに次のシェルコマンドを実行し、必要な全てのPythonとApacheのパッケージをインストールします：
+初めに次のシェルコマンドを実行し、必要な全てのPythonとApacheのパッケージをインストールします:
 ``
 sudo apt-get update
 sudo apt-get -y upgrade
@@ -112,7 +113,7 @@ sudo apt-get -y install libapache2-mod-wsgi
 sudo apt-get -y install libapache2-mod-proxy-html
 ``:code
 
-そして、ApacheのSSLモジュール、proxyモジュール、WSGIモジュールを有効にします：
+そして、ApacheのSSLモジュール、proxyモジュール、WSGIモジュールを有効にします:
 ``
 sudo ln -s /etc/apache2/mods-available/proxy_http.load \
            /etc/apache2/mods-enabled/proxy_http.load
@@ -122,24 +123,24 @@ sudo a2enmod proxy_http
 sudo a2enmod wsgi
 ``:code
 
-SSLフォルダを作成し、SSL証明書をその中に配置します：
+SSLフォルダを作成し、SSL証明書をその中に配置します:
 ``
 sudo mkdir /etc/apache2/ssl
 ``:code
 
-SSL証明書はverisign.comのような認証局から取得する必要がありますが、テスト目的では、``openssl``:citeに従うことで自己署名証明書の生成できます。
+SSL証明書はverisign.comのような認証局から取得する必要がありますが、テスト目的では、``openssl``:cite での手順に従うことで自己署名証明書の生成できます。
 
-そしてwebサーバーを再起動します：
+そしてwebサーバーを再起動します:
 ``
 sudo /etc/init.d/apache2 restart
 ``:code
 
-Apache設定ファイル：
+Apache設定ファイル次にあります:
 ``
 /etc/apache2/sites-available/default
 ``:code
 
-Apacheログ：
+Apacheログは次の所にあります：
 ``
 /var/log/apache2/
 ``:code
@@ -148,29 +149,28 @@ Apacheログ：
 
 上記のwebサーバーをインストールしたマシンに、web2pyソースをダウンロードして解凍します。
 
-例えば、web2pyを``/users/www-data/``配下にインストールし、www-dataユーザとwww-dataグループに権限を与えます。この手順は次のシェルコマンドで実行できます：
+例えば、web2pyを ``/home/www-data/`` 配下にインストールし、www-dataユーザとwww-dataグループに権限を与えます。この手順は次のシェルコマンドで実施できます:
 ``
-cd /users/www-data/
+cd /home/www-data/
 sudo wget http://web2py.com/examples/static/web2py_src.zip
 sudo unzip web2py_src.zip
-sudo chown -R www-data:www-data /user/www-data/web2py
+sudo chown -R www-data:www-data /home/www-data/web2py
 ``:code
 
-web2pyをmod_wsgiでセットアップするには、新しいApache設定ファイルを作成して：
+web2pyをmod_wsgiでセットアップするには、新しいApache設定ファイルを作成します:
 ``
 /etc/apache2/sites-available/web2py
 ``:code
 
-次のコードを追加します：
+そして、次のコードを追加します:
 ``
 <VirtualHost *:80>
   ServerName web2py.example.com
-  WSGIDaemonProcess web2py user=www-data group=www-data \
-                           display-name=%{GROUP}
+  WSGIDaemonProcess web2py user=www-data group=www-data display-name=%{GROUP}
   WSGIProcessGroup web2py
-  WSGIScriptAlias / /users/www-data/web2py/wsgihandler.py
+  WSGIScriptAlias / /home/www-data/web2py/wsgihandler.py
 
-  <Directory /users/www-data/web2py>
+  <Directory /home/www-data/web2py>
     AllowOverride None
     Order Allow,Deny
     Deny from all
@@ -201,24 +201,24 @@ web2pyをmod_wsgiでセットアップするには、新しいApache設定ファ
 
 Apacheを再起動すると、全てのリクエストはRocket wsgiserverを経由しないで、web2pyに渡されます。
 
-説明すると：
+ここで、幾つかの説明しますと:
 ``
-WSGIDaemonProcess web2py user=www-data group=www-data
-                         display-name=%{GROUP}
+WSGIDaemonProcess web2py user=www-data group=www-data display-name=%{GROUP}
 ``:code
 
-上のコードは、"web2py.example.com"に関連するデーモンプロセスグループを定義しています。
+上のコードは、"web2py.example.com" に関連するデーモンプロセスグループを定義しています。
 バーチャルホスト内にこれを定義することで、バーチャルホストはWSGIProcessGroupを使用してアクセスできます。これは同じサーバー名のポートが違うバーチャルホストも含みます。
-"user"と"group"オプションには、web2pyをセットアップしたディレクトリへの書き込み権限があるユーザをセットするべきです。
-Apacheを実行するデフォルトユーザに、web2pyインストレーション・ディレクトリへの書き込み権限を設定している場合、"user"と"group"を設定する必要はありません。
-"display-name"オプションは、PSコマンドによって表示する実行可能なApache webサーバーのプロセス名の代わりに、"(wsgi-web2py)"のように出力する設定をします。
-"processes"や"threads"オプションを指定しないことで、デーモンプロセスグループはプロセス内で１５個のスレッドを実行する単一のプロセスを持ちます。
+"user" と "group" オプションには、web2pyをセットアップしたディレクトリへの書き込み権限があるユーザをセットするべきです。
+Apacheを実行するデフォルトユーザに、web2pyインストレーション・ディレクトリへの書き込み権限を設定している場合、"user" と "group" を設定する必要はありません。
+"display-name" オプションは、PSコマンドによって表示する実行可能なApache webサーバーのプロセス名の代わりに、"(wsgi-web2py)" のように出力する設定をします。
+"processes" や "threads" オプションを指定しないことで、デーモンプロセスグループはプロセス内で１５個のスレッドを実行する単一のプロセスを持ちます。
 これは通常のほとんどのサイトで十分過ぎる設定なので、そのまま使用するべきです。
-設定を上書きする場合、"wsgi.multiprocess"フラグをチェックする全てのブラウザ内WSGIデバッグツールが無効になるため、"processes=1"は使用しないでください。
-これはどの"processes"オプションの使用でも、例え単一プロセスでさえも、フラグをtrueにセットしてしまいます。それらのツールではフラグがfalseにセットされていることが前提になります。
-注意：もしアプリケーションコードやサードパーティ性の拡張モジュールがスレッドセーフでない場合は、"processes=5 threads-1"オプションを使用してください。
+設定を上書きする場合、"wsgi.multiprocess" フラグをチェックする全てのブラウザ内WSGIデバッグツールが無効になるため、"processes=1" は使用しないでください。
+これはどの "processes" オプションの使用でも、例え単一プロセスでさえも、フラグをtrueにセットしてしまいます。それらのツールではフラグがfalseにセットされていることが前提になります。
+注意：もしアプリケーションコードやサードパーティ性の拡張モジュールがスレッドセーフでない場合は、"processes=5 threads-1" オプションを使用してください。
 これは個々のプロセスがシングルスレッドであるデーモンプロセスグループに、五つのプロセスを作成します。
-ガベージコレクトを適切に実施できずに、アプリケーションがPythonオブジェクトをリークする場合は、"maximum-requests=1000"を使うことも検討してください。
+ガベージコレクトを適切に実施できずに、アプリケーションがPythonオブジェクトをリークする場合は、"maximum-requests=1000" を使うことも検討してください。
+
 ``
 WSGIProcessGroup web2py
 ``:code
@@ -250,35 +250,45 @@ ApacheにWSGIスクリプトファイルにアクセスする権限を与えま�
 </Location>
 ``:code
 
-及び、
+そして、
 ``
 <LocationMatch ^/([^/]+)/appadmin>
   Deny from all
 </LocationMatch>
 ``:code
 
-**admin**と**appadmin**へのパブリックアクセスをブロックします。
+**admin** と **appadmin** へのパブリックアクセスをブロックします。
 
 通常はWSGIスクリプトがあるディレクトリ全体にアクセスを許可するだけで良いですが、web2pyは管理者パスワードを含む他のソースコードが入っているディレクトリに、WSGIスクリプトを配置します。
 技術的にはApacheは、マッピングされたURL経由してディレクトリを通過する全ユーザに対して、全てのファイルを提供する権限を与えます。このため、ディレクトリ全体を公開することは、セキュリティ上の問題を引き起こします。
-セキュリティ問題を回避するため、WSGIスクリプトファイルを除くディレクトリのファイルへのアクセスを明示的に拒否し、より安全にするためにユーザーによる.htaccessファイルの上書きを禁止します。
+セキュリティ問題を回避するため、WSGIスクリプトファイルを除くディレクトリのファイルへのアクセスを明示的に拒否し、より安全にするために、ユーザーによる.htaccessファイルの上書きを禁止します。
 
-以上をまとめた、コメントの入ったApache wsgi設定ファイルは以下にあります：
+以上をまとめた、コメントの入ったApache wsgi設定ファイルは以下にあります:
 ``
 scripts/web2py-wsgi.conf
 ``:code
 
 このセクションは、mod_wsgi開発者のGraham Dumpletonの協力を得て作成されました。
 
-#### mod_wsgiとSSL
+#### パスワード設定
 
-アプリケーション（例えば**admin**と**appadmin**）で強制的にHTTPSを利用させるには、SSL証明書と秘密鍵を以下に保存し：
+開発で、プログラムで管理者パスワードをセットする必要があるかもしれません。
+これは、Bashシェルから行うことができます。
+
+``
+sudo -u www-data python -c "from gluon.main import save_password; save_password(raw_input('admin password: '),443)"
+``:code
+
+#### mod_wsgiとSSL
+#### mod_wsgi and SSL
+
+アプリケーション(例えば **admin** と **appadmin**)で強制的にHTTPSを利用させるには、SSL証明書と秘密鍵を以下に保存します:
 ``
 /etc/apache2/ssl/server.crt
 /etc/apache2/ssl/server.key
 ``:code
 
-Apacheの設定ファイル``web2py.conf``を編集し、次のコードを追加します：
+そして、Apacheの設定ファイル``web2py.conf``を編集し、次のコードを追加します:
 ``
 <VirtualHost *:443>
   ServerName web2py.example.com
@@ -313,7 +323,7 @@ Apacheの設定ファイル``web2py.conf``を編集し、次のコードを追�
 </VirtualHost>
 ``:code
 
-Apacheを再起動すると、次にアクセスできますが：
+Apacheを再起動すると、次にアクセスできます:
 
 ``
 https://www.example.com/admin
@@ -321,7 +331,7 @@ https://www.example.com/examples/appadmin
 http://www.example.com/examples
 ``:code
 
-次のものにはアクセスできません：
+しかし、次のものにはアクセスできません:
 
 ``
 http://www.example.com/admin
@@ -332,7 +342,7 @@ http://www.example.com/examples/appadmin
 
 幾つかのUnix/LinuxディストリビューションはApacheを実行できますが、mod_wsgiをサポートしてないものがあります。この場合の一番簡単な解決策は、Apacheをプロキシとして実行し、静的ファイルのみをApacheに処理させます。
 
-以下は最低限のApacheの設定です：
+以下は最低限のApacheの設定です:
 ``
 NameVirtualHost *:80
 #### deal with requests on port 80
@@ -357,26 +367,26 @@ NameVirtualHost *:80
 </VirtualHost>
 ``:code
 
-上記のスクリプトは、"welcome"アプリケーションだけを公開します。他のアプリケーションを公開したい場合は、対応する<Location>...</Location>に"welcome"アプリケーションと同様の構文を追加する必要があります。
+上記のスクリプトは、"welcome" アプリケーションだけを公開します。他のアプリケーションを公開したい場合は、対応する<Location>...</Location>に "welcome" アプリケーションと同様の構文を追加する必要があります。
 
-スクリプトはweb2pyサーバーが、ポート8000を使用することを前提にしています。Apacheを再起動する前に、この点を再確認してください：
+スクリプトはweb2pyサーバーが、ポート8000を使用することを前提にしています。Apacheを再起動する前に、この点を再確認してください:
 ``
 nohup python web2py.py -a '<recycle>' -i 127.0.0.1 -p 8000 &
 ``:code
 
-``-a``オプションでパスワードを指定するか、パスワードの代わりに"<recycle>"パラメータを指定することができます。後者の場合は、前回保存されたパスワードが再利用され、シェル履歴にパスワードが保存されることはありません。
+``-a`` オプションでパスワードを指定するか、パスワードの代わりに "<recycle>" パラメータを指定することができます。後者の場合は、前回保存されたパスワードが再利用され、シェル履歴にパスワードが保存されることはありません。
 
-"<ask>"パラメータを使って、パスワードの入力要求させることもできます。
+"<ask>" パラメータを使って、パスワード入力の要求を行うことも可能です。
 
-``nohup``コマンドは、シェルを閉じた時にサーバーが落ちないようにします。``nohup``は``nohup.out``に全てのログを出力します。
+``nohup`` コマンドは、シェルを閉じた時にサーバーが落ちないようにします。``nohup`` は ``nohup.out`` に全てのログを出力します。
 
-adminとappadminにHTTPSを強制的に利用させるには、代わりに次のApacheの設定ファイルを使用します：
+adminとappadminにHTTPSを強制的に利用させるには、代わりに次のApacheの設定ファイルを使用します:
 ``
 NameVirtualHost *:80
 NameVirtualHost *:443
 #### deal with requests on port 80
 <VirtualHost *:80>
-   Alias / /usres/www-data/web2py/applications
+   Alias / /users/www-data/web2py/applications
    ### admin requires SSL
    <LocationMatch "^/admin">
      SSLRequireSSL
@@ -416,7 +426,8 @@ NameVirtualHost *:443
 ``:code
 
 -------
-web2pyを共有ホスト上でmod_proxyを使用し動かす場合、管理画面は無効にしておく必要があります。そうしないと他のユーザに公開されてしまいます。
+web2pyを共有ホスト上でmod_proxyを使用して動かす場合、管理画面は無効にしておく必要があります。そうしないと他のユーザに公開されてしまいます。
+The administrative interface must be disabled when web2py runs on a shared host with mod_proxy, or it will be exposed to other users.
 -------
 
 #### Linuxデーモンとして起動
@@ -425,35 +436,183 @@ mod_wsgiを使用する場合を除き、他のLinuxデーモンとして起動/
 
 これを設定する方法は、個々のLinux/Unixディストリビューションで固有です。
 
-web2pyフォルダには、この設定のために二つのスクリプトが用意されています：
+web2pyフォルダには、この設定のために二つのスクリプトが用意されています:
 ``
 scripts/web2py.ubuntu.sh
 scripts/web2py.fedora.sh
 ``:code
 
-Ubuntuや他のDebianベースのLinuxディストリビューションでは、"web2py.ubunu.sh"を編集し"/usr/lib/web2py"パスをweb2pyインストールパスに置き換え、次のシェルコマンドを実行することでファイルを適切なフォルダへ移動し、スタートアップサービスに登録し起動します：
+Ubuntuや他のDebianベースのLinuxディストリビューションでは、"web2py.ubunu.sh" を編集し "/usr/lib/web2py" パスをweb2pyインストールパスに置き換え、次のシェルコマンドを実行することでファイルを適切なフォルダへ移動し、スタートアップサービスに登録し起動します:
 ``
 sudo cp scripts/web2py.ubuntu.sh /etc/init.d/web2py
 sudo update-rc.d web2py defaults
 sudo /etc/init.d/web2py start
 ``:code
 
-Fedoraや他のFedoraベースのディストリビューションでは、"web2py.fedora.sh"を編集し"/usr/lib/web2py"パスをweb2pyインストールパスに置き換え、次のシェルコマンドを実行することでファルを適切なフォルダに移動し、スタートアップサービスに登録し起動します：
+Fedoraや他のFedoraベースのディストリビューションでは、"web2py.fedora.sh" を編集し "/usr/lib/web2py" パスをweb2pyインストールパスに置き換え、次のシェルコマンドを実行することでファルを適切なフォルダに移動し、スタートアップサービスに登録し起動します:
 ``
 sudo cp scripts/web2py.fedora.sh /etc/rc.d/init.d/web2pyd
 sudo chkconfig --add web2pyd
 sudo service web2py start
 ``:code
 
+#### Nginx
+
+Nginx は、その驚くべきパフォーマンスのために人気を集めている、フリーでオープンソースのwebサーバです。
+
+従来のサーバとは異なり、Nginxはスレッドを使用しません。その代わりに並列性をハンドルするために、非同期/イベンドドリブン型アーキテクチャを使用しています。このアーキテクチャの結果、重い負荷の下でも、小さくそして予測可能なメモリを使用します。
+
+Nginxは、HTTPサーバとリバースプロキシ以上です。これはまた、IMAP/POP3プロキシサーバでもあります。
+
+Nginxの設定は容易です。そして設定ファイルはシンプルで、Apacheと較べてもコンパクトです。
+
+NginxはWSGIをサポートしませんが、uWSGI ``uwsgi``:cite プロトコルのネイティブサポートを提供します。``uwsgi``:inxx
+
+Ubuntuでは、次のようにNginxをインストールできます:
+``
+apt-get -y install nginx-full
+``:code
+
+その後、次のように設定ファイルを作成する必要があります:
+
+``
+# file /etc/nginx/sites-available/web2py
+server {
+        listen          80;
+        server_name     $hostname;
+        #to enable correct use of response.static_version
+        #location ~* /(\w+)/static(?:/_[\d]+\.[\d]+\.[\d]+)?/(.*)$ {
+        #    alias /home/www-data/web2py/applications/$1/static/$2;
+        #    expires max;
+        #}
+        location ~* /(\w+)/static/ {
+            root /home/www-data/web2py/applications/;
+            #remove next comment on production
+            #expires max;
+        }
+        location / {
+            #uwsgi_pass      127.0.0.1:9001;
+            uwsgi_pass      unix:///tmp/web2py.socket;
+            include         uwsgi_params;
+            uwsgi_param     UWSGI_SCHEME $scheme;
+            uwsgi_param     SERVER_SOFTWARE    nginx/$nginx_version;
+        }
+}
+server {
+        listen 443 default_server ssl;
+        server_name     $hostname;
+        ssl_certificate         /etc/nginx/ssl/web2py.crt;
+        ssl_certificate_key     /etc/nginx/ssl/web2py.key;
+        ssl_prefer_server_ciphers on;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+        ssl_ciphers ECDHE-RSA-AES256-SHA:DHE-RSA-AES256-SHA:DHE-DSS-AES256-SHA:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA;
+        ssl_protocols SSLv3 TLSv1;
+        keepalive_timeout    70;
+        location / {
+            #uwsgi_pass      127.0.0.1:9001;
+            uwsgi_pass      unix:///tmp/web2py.socket;
+            include         uwsgi_params;
+            uwsgi_param     UWSGI_SCHEME $scheme;
+            uwsgi_param     SERVER_SOFTWARE    nginx/$nginx_version;
+        }
+ 
+}
+``:code		
+
+ファイルのシンボリックリンクとデフォルトの削除が必要です。
+
+``
+ln -s /etc/nginx/sites-available/web2py /etc/nginx/sites-enabled/web2py
+rm /etc/nginx/sites-enabled/default
+``:code
+
+また、証明書のSSLフォルダを作成し、証明書を配置する必要があるかもしれません:
+``
+mkdir /etc/nginx/ssl
+cp web2py.key /etc/nginx/ssl
+cp web2py.crt /etc/nginx/ssl
+``:code
+ 
+その後、uWSGIをインストールしセットアップを行う必要があります。
+ 
+``
+sudo mkdir /etc/uwsgi
+sudo mkdir /var/log/uwsgi
+``:code
+
+さらに、"/etc/uwsgi/web2py.xml" 設定ファイルを作成します:
+ 
+``
+<uwsgi>
+    <socket>/tmp/web2py.socket</socket>
+    <pythonpath>/home/www-data/web2py/</pythonpath>
+    <mount>/=wsgihandler:application</mount>
+    <master/>
+    <processes>4</processes>
+    <harakiri>60</harakiri>
+    <reload-mercy>8</reload-mercy>
+    <cpu-affinity>1</cpu-affinity>
+    <stats>/tmp/stats.socket</stats>
+    <max-requests>2000</max-requests>
+    <limit-as>512</limit-as>
+    <reload-on-as>256</reload-on-as>
+    <reload-on-rss>192</reload-on-rss>
+    <uid>www-data</uid>
+    <gid>www-data</gid>
+    <no-orphans/>
+</uwsgi>
+``:code
+
+このファイルはApacheのケースと同様に、"/home/www-data/web2py" にweb2pyがインストールされていることを想定しています。
+
+また二番目の設定ファイル "/etc/init/uwsgi-emperor.conf" の編集も必要です:
+
+``
+# Emperor uWSGI script 
+description "uWSGI Emperor"
+start on runlevel [2345]
+stop on runlevel [06]
+respawn
+exec uwsgi --master --die-on-term --emperor /etc/uwsgi --logto /var/log/uwsgi/uwsgi.log
+``:code
+
+最後に全てを再起動します:
+
+``
+start uwsgi-emperor
+/etc/init.d/nginx restart 
+``:code
+
+次のコマンドで、uwsgiをリロードできます。
+``
+restart uwsgi-emperor
+``:code
+次のコマンドで、ストップできます。
+``
+stop uwsgi-emperor
+``:code
+次のコマンドで、web2pyのみ(uwsgiのリスタートなしで)リロードできます。
+``
+touch /etc/uwsgi/web2py.xml
+``:code
+
+これらの全ての手順は、次に提供されているスクリプトによって、自動的に実行されます:
+
+``
+scripts/setup-web2py-nginx-uwsgi-on-centos.sh
+scripts/setup-web2py-nginx-uwsgi-ubuntu.sh
+``:code
+
 #### Lighttpd
 ``Lighttpd``:inxx ``FastCGI``:inxx ``fcgihandler``:inxx
 
-次のシェルコマンドで、Ubuntuや他のDebianベースのLinuxディストリビューションに、Lighttpdをインストールできます：
+次のシェルコマンドで、Ubuntuや他のDebianベースのLinuxディストリビューションに、Lighttpdをインストールできます:
 ``
 apt-get -y install lighttpd
 ``:code
 
-インストールされたら、``/etc/rc.local``を編集し、fcgi web2pyバックグランドプロセスを作成します
+インストールされたら、``/etc/rc.local`` を編集し、fcgi web2pyバックグランドプロセスを作成します。
 ``
 cd /var/www/web2py && sudo -u www-data nohup python fcgihandler.py &
 ``:code
@@ -463,7 +622,7 @@ cd /var/www/web2py && sudo -u www-data nohup python fcgihandler.py &
 /etc/lighttpd/lighttpd.conf
 ``:code
 
-上記のプロセスで作成されたソケットを見つけることができます。設定ファイルに以下のように記述します：
+上記のプロセスで作成されたソケットを見つけることができます。設定ファイルに以下のように記述します:
 ``
 server.modules              = (
         "mod_access",
@@ -501,17 +660,17 @@ $HTTP["host"] = "(^|\.)example\.com$" {
 }
 ``:code
 
-次に構文エラーをチェックします：
+次に構文エラーをチェックします:
 ``
 lighttpd -t -f /etc/lighttpd/lighttpd.conf
 ``:code
 
-そして次のように、webサーバーを（再）起動します：
+そして次のように、webサーバーを(再)起動します:
 ``
 /etc/init.d/lighttpd restart
 ``:code
 
-FastCGIは、web2pyをIPソケットで無く、Unixソケットにバインドする点に注意してください：
+FastCGIは、web2pyをIPソケットで無く、Unixソケットにバインドする点に注意してください:
 ``
 /tmp/fcgi.sock
 ``:code
@@ -529,11 +688,11 @@ web2pyをFastCGIを使った共有ホストで動かす場合、管理画面は�
 
 しばしば、特に共有ホスト環境で、Apche設定ファイルを直接編集する権限がない場合があります。この本を書いている現在、mod_wsgiの登場によってメンテナンスがされていませんが、ほとんどのホストで未だmod_pythonを動かしています。
 
-このような環境でもweb2pyを動かすことができます。ここでは、どのように設定するか例を見せます。
+このような環境でもweb2pyを動かすことができます。ここでは、設定方法の例を示します。
 
-web2pyの中身を"htdocs"フォルダに入れます。
+web2pyの中身を "htdocs" フォルダに入れます。
 
-web2pyフォルダに、次の内容の"web2py_modpython.py"を作成します：
+web2pyフォルダに、次の内容の "web2py_modpython.py" を作成します:
 
 ``
 from mod_python import apache
@@ -544,7 +703,7 @@ def handler(req):
     return modpythonhandler.handler(req)
 ``:code
 
-次の内容の".htaccess"ファイルを作成/更新します：
+次の内容の ".htaccess" ファイルを作成/更新します:
 
 ``
 SetHandler python-program
@@ -555,16 +714,15 @@ PythonHandler web2py_modpython
 この例は、Niktarによって提供されました。
 
 
-#### CherokeeとFastCGI
+#### FastCGIを使ったCherokee
 ``Cherokee``:inxx ``FastCGI``:inxx
-
 Cherokeeは高速なwebサーバーで、web2pyのように設定用にAJAXが有効なwebベースの管理画面を提供します。管理画面はPythonで書かれており、ほとんどの変更に対してサーバーの再起動を必要としません。
 
-こちらが、web2pyをCherokeeでセットアップするのに必要な手順です：
+以下、web2pyをCherokeeでセットアップするのに必要な手順です:
 
-Cherokee``cherokee``:citeをダウンロード
+Cherokee``cherokee``:cite をダウンロードします。
 
-tarの展開、ビルド、そしてインストール：
+tarの展開、ビルド、そしてインストールします:
 
 ``
 tar -xzf cherokee-0.9.4.tar.gz
@@ -573,9 +731,9 @@ cd cherokee-0.9.4
 make install
 ``:code
 
-"applications"フォルダの作成を確認するために、少なくとも一度はweb2pyを正常に起動します。
+"applications" フォルダの作成を確認するために、少なくとも一度はweb2pyを正常に起動します。
 
-次のコードで、"startweb2py.sh"という名前のシェルスクリプトを作成します：
+次のコードで、"startweb2py.sh" という名前のシェルスクリプトを作成します:
 
 ``
 #!/bin/bash
@@ -585,27 +743,27 @@ python /var/web2py/fcgihandler.py &
 
 そして、スクリプトに実行権限を与えて実行してください。これはFastCGIハンドラで、web2pyが起動します。
 
-Cherokeeとchroke-adminを起動：
+Cherokeeとchroke-adminを起動します:
 
 ``
 sudo nohup cherokee &
 sudo nohup cherokee-admin &
 ``:code
 
-デフォルトでchrokee-adminは、ローカルのポート9090だけを使用します。マシンへ完全な物理的アクセス権があれば問題ではありません。もうしそうでない場合は、次のオプションを利用し、強制的にIPアドレスとポートをバインドできます：
+デフォルトではchrokee-adminは、ローカルのポート9090だけを使用します。マシンへ完全な物理的アクセス権があれば問題ではありません。もうしそうでない場合は、次のオプションを利用し、強制的にIPアドレスとポートをバインドできます:
 ``
 -b,  --bind[=IP]
 -p,  --port=NUM
 ``:code
 
-もしくは、SSHポートフォワード（より安全で、推奨される）を使用します：
+もしくは、SSHポートフォワード(より安全で、推奨される)を使用します:
 ``
 ssh -L 9090:localhost:9090 remotehost
 ``:code
 
-ブラウザで"http://localhost:9090"を開き、もし全ての設定がＯＫであれば、cherokee-adminが開きます。
+ブラウザで "http://localhost:9090" を開きます。もし全ての設定がＯＫであれば、cherokee-adminが表示されます。
 
-cherokee-admin webインターフェイスで、"info sources"をクリックします。"Local Interpreter"を選びます。次のコードを記述して"Add New"をクリックします。
+cherokee-admin webインターフェイスで、"info sources" をクリックします。"Local Interpreter" を選びます。次のコードを記述して "Add New" をクリックします。
 
 ``
 Nick: web2py
@@ -613,33 +771,35 @@ Connection: /tmp/fcgi.sock
 Interpreter: /var/web2py/startweb2py.sh
 ``:code
 
-最後に次のように、残りステップを実行します：
-- "Virtual Servers"をクリックし、更に"Default"をクリックします。
-- "Behavior"をクリックし、更にその下の、"default"をクリックします。
-- リストボックスから"List and Send"の代わりに、"FastCGI"を選択します。
-- 一番下で、"web2py"を"Application Server"として選択します。
-- 全てのチェックボックス（Allow-x-sendfileは外すことも可能）をチェックします。もし警告表示がでたら、どれか一つのチェックボックスを無効にしてから有効にします。（そうすることで、アプリケーションサーバーのパラメータを自動で再送信します。バグで上手く行かない時もあります。）
-- ブラウザで"http://あなたのサイト"を開くと、"Welcom to web2py"が表示されます。
+最後は次のように、残りのステップを実行します:
+- "Virtual Servers" をクリックし、更に "Default" をクリックします。
+- "Behavior" をクリックし、更にその下の、"default" をクリックします。
+- リストボックスで、"List and Send" の代わりに、"FastCGI" を選択します。
+- 下部で、"web2py" を "Application Server" として選択します。
+- 全てのチェックボックス(Allow-x-sendfileは外すことも可能)をチェックします。もし警告表示がでたら、どれか一つのチェックボックスを無効にしてから有効にします(そうすることで、アプリケーションサーバーのパラメータを自動で再送信します。バグで上手く行かない時もあります)。
+- ブラウザで "http://あなたのサイト" を開くと、"Welcom to web2py" が表示されます。
 
 #### Postgresql
 
-PostgreSQLはフリーでオープンソースのデータベースで、本番環境で使用されています。例えば、.orgドメイン名を保存するデータベースに使用されて、データが何百テラバイトに拡張できることを証明されています。非常に高速で安定したトランザクションサポートを持ち、多くのデータベース保守タスクから管理者を解放するauto-vacuumという機能があります。
+PostgreSQLはフリーでオープンソースのデータベースで、実稼働を要求される環境で使用されています。例えば、.orgドメイン名を保存するデータベースに使用されて、データが何百テラバイトに拡張できることを証明されています。非常に高速で安定したトランザクションサポートを持ち、多くのデータベース保守タスクから管理者を解放するauto-vacuumという機能があります。
 
-Ubuntuや他のDebianベースLinuxディストリビューションでは、PostgreSQLとそのPython APIを間単にインストールできます：
+Ubuntuや他のDebianベースLinuxディストリビューションでは、PostgreSQLとそのPython APIを間単にインストールできます:
 ``
 sudo apt-get -y install postgresql
 sudo apt-get -y install python-psycopg2
 ``:code
 
-webサーバーとデータベースは異なるマシンで運用したほうが賢明です。この場合、webサーバーを動かしているマシンは安全な内部（物理）ネットワーク、またはSSLトンネルでデータベースサーバーと接続されるべきです。
+webサーバーとデータベースは異なるマシンで運用したほうが賢明です。この場合、webサーバーを動かしているマシンは安全な内部(物理)ネットワーク、またはSSLトンネルでデータベースサーバーと接続されるべきです。
 
-PostgreSQLの設定ファイルを編集します
+PostgreSQLの設定ファイルを編集します。
 ``
-sudo nano /etc/postgresql/8.4/main/postgresql.conf
+sudo nano /etc/postgresql/9.1/main/postgresql.conf
 ``:code
 
-次の二行を記述します
+そして、次の二行を記述します。
 ``
+...
+listen_addresses = 'localhost' 
 ...
 track_counts = on
 ...
@@ -647,19 +807,36 @@ autovacuum = on   # Enable autovacuum subprocess?  'on'
 ...
 ``:code
 
-データベースサーバーを起動します：
+PostgreSQLのクライアント認証ファイルを編集します。
+``
+sudo nano /etc/postgresql/9.1/main/pg_hba.conf
+``:code
+
+そして、これらのメソッドの行を、``trust`` に変更します。
+``
+...
+# "local" is for Unix domain socket connections only
+local   all             all                                     trust
+# IPv4 local connections:
+host    all             all             127.0.0.1/32            trust
+# IPv6 local connections:
+host    all             all             ::1/128                 trust
+...
+``:code
+
+データベースサーバーを起動します:
 ``
 sudo /etc/init.d/postgresql restart
 ``:code
 
-PostgreSQLサーバーの再起動時に、どのポートで実行されているか表示されます。データベースサーバーが複数で構成される場合を除き、5432のはずです。
+PostgreSQLサーバーの再起動時に、どのポートで実行されているか表示されます。データベースサーバが複数で構成される場合を除き、5432のはずです。
 
-PostgreSQLのログは、次の場所にあります：
+PostgreSQLのログは、次の場所にあります:
 ``
 /var/log/postgresql/
 ``:code
 
-データベースサーバーが立ち上がって動き出したら、web2pyアプリケーションに必要なユーザとデータベースを作成します：
+データベースサーバが起動し始めたら、web2pyアプリケーションに必要なユーザとデータベースを作成します:
 ``
 sudo -u postgres createuser -PE -s myuser
 postgresql> createdb -O myself -E UTF8 mydb
@@ -668,56 +845,78 @@ postgresql> psql -l
 postgresql> psql mydb
 ``:code
 
-最初のコマンドは新規作成ユーザ``myuser``に、スーパーユーザ・アクセス権限を与えます。そして、パスワードを入力するようプロンプトを表示します。
+最初のコマンドは新規作成ユーザ ``myuser`` に、スーパーユーザ・アクセス権限を与えます。パスワードを入力するようプロンプトが表示されます。
 
-どのweb2pyアプリケーションでも、以下のコマンドでこのデータベースに接続できます：
+どのweb2pyアプリケーションも、次のコマンドでこのデータベースに接続できます:
 ``
 db = DAL("postgres://myuser:mypassword@localhost:5432/mydb")
 ``:code
 
-``mypassword``はプロンプト時に入力したパスワードで、5432はデータベースサーバーが実行されているポートです。
+``mypassword`` はプロンプトの時に入力したパスワードであり、5432はデータベースサーバが起動しているポートです。
 
-通常はアプリケーションごとに一つのデータベースを作成し、同じアプリケーションの複数のインスタンスは同じデータベースに接続します。異なるアプリケーション間で同じデータベースを共有することもできます。
+通常はアプリケーション毎に一つのデータベースを作成し、同じアプリケーションの複数のインスタンスは同じデータベースに接続します。異なるアプリケーション間で、同じデータベースを共有することもできます。
 
-データベースバックアップについては、PostgreSQLドキュメントにある、``pg_dump``と``pg_restore``コマンドを読んでください。
+データベースのバックアップについては、PostgreSQLドキュメントにある、``pg_dump`` と ``pg_restore`` コマンドの部分を読んでください。
+
+#### Linuxサービスとしてのスケジューラ開始 (upstart)
+Linux (Upstartを使用した)上で、恒久的なデーモンとしてスケジューラをインストールするには、下の記述を /etc/init/web2py-scheduler.conf に入れます。web2pyインスタンスは<user>のホームディレクトリにインストールされており、ネットワークインターフェース eth0 上で、<user>としてアプリ<myapp>で実行されていると、仮定しています。
+
+``
+description "web2py task scheduler"
+start on (local-filesystems and net-device-up IFACE=eth0)
+stop on shutdown
+respawn limit 8 60 # Give up if restart occurs 8 times in 60 seconds.
+exec sudo -u <user> python /home/<user>/web2py/web2py.py -K <myapp>
+respawn
+``:code
+
+その後に次のコマンドで、デーモンの起動/終了/再起動/状態チェック を行うことができます:
+``
+sudo start web2py-scheduler
+sudo stop web2py-scheduler
+sudo restart web2py-scheduler
+sudo status web2py-scheduler
+``:code
 
 ### Windows
 
 #### Apacheとmod_wsgi
+#### Apache and mod_wsgi
 
 WindowsでApacheとmod_wsgiをインストールするには、異なる手順が必要になります。
-Python 2.5がインストールされていて、web2pyがソースから実行され、さらに``c:/web2py``にあることを前提に説明します。
+Python 2.5がインストールされ、web2pyがソースから起動されており、さらに ``c:/web2py`` にあることを前提に説明します。
 
-最初に、必要なパッケージをダウンロードします：
+最初に、必要なパッケージをダウンロードします:
 - ``apache1``:cite から Apache ``apache_2.2.11-win32-x86-openssl-0.9.8i.msi``
 - ``modwsgi1``:cite から mod_wsgi
 
-二つ目に、``apache...msi``を実行し、ウィザード画面に従います。サーバー・インフォメーション画面で
+二つ目に、``apache...msi`` を実行し、ウィザード画面に従います。サーバー・インフォメーション画面において、
 
 [[image @///image/en9200.png center 300px]]
 
-全ての要求項目を入力します：
+全ての要求項目を入力します:
 - **Network Domain**: サーバーの現在のまたは登録予定のDNSドメインを入力します。もしサーバーの正式なDNS名がserver.mydomain.netの場合は、mydomain.netと入力します。
-- **ServerName**: サーバーの完全なDNS名です。上記の例で言うと、server.mydomain.netと入力します。完全修飾ドメイン名、もしくはショートカットではないweb2pyインストールのIPアドレスを入力します。詳細は、``apache2``:cite.を参照してください。
+- **ServerName**: サーバーの完全なDNS名です。上記の例で言うと、server.mydomain.netと入力します。完全修飾ドメイン名、もしくはショートカットではないweb2pyインストールのIPアドレスを入力します。詳細は、``apache2``:cite を参照してください。
 - **Administrator's Email Address**: サーバー管理者またはwebマスターのメールアドレスを入力します。このアドレスはデフォルトで、クライアントへのエラーメッセージと共に表示されます。
 
-特に必要がなければ、標準インストールで最後まで続行します
+特に必要がなければ、標準インストールで最後まで続行します。
 
-ウィザードはデフォルトで、以下のフォルダにApacheをインストールします：
+ウィザードはデフォルトで、以下のフォルダにApacheをインストールします:
 ``
 C:/Program Files/Apache Software Foundation/Apache2.2/
 ``:code
 
-ここからは簡単にするためフォルダを、``Apache2.2``と呼びます。
+ここからは簡単にするためフォルダを、``Apache2.2`` と呼びます。
 
-三つ目に、ダウンロードしたmod_wsgi.soを``Apache2.2/modules``にコピーします
+三つ目に、ダウンロードしたmod_wsgi.soを ``Apache2.2/modules`` にコピーします。
 ``Apache2.2/modules``
 
 Chris Traversによって書かれ、2007年12月にMicrosoftのOpen Source Software Labで公開されました。
 
-四つ目に、``server.crt``と``server.key``証明書（前のセクションで説明した）を作成し、``Apache2.2/conf``フォルダに設置します。cnfファイルは、``Apache2.2/conf/openssl.cnf``にあることに注意してください。
+四つ目に、``server.crt`` と ``server.key`` 証明書(前のセクションで説明した)を作成し、``Apache2.2/conf`` フォルダに設置します。cnfファイルは、``Apache2.2/conf/openssl.cnf`` にあることに注意してください。
 
-五つ目に、``Apache2.2/conf/httpd.conf``を編集し、次の行のコメント(#文字)を外します。
+五つ目に、``Apache2.2/conf/httpd.conf`` を編集し、次の行のコメント(#文字)を外します。
+
 ``
 LoadModule ssl_module modules/mod_ssl.so
 ``:code
@@ -727,7 +926,7 @@ LoadModule ssl_module modules/mod_ssl.so
 LoadModule wsgi_module modules/mod_wsgi.so
 ``:code
 
-"Listen 80"の記述を検索し、次の行をその後に追加します
+"Listen 80" の記述を検索し、次の行をその後に追加します。
 ``
 Listen 443
 ``:code
@@ -767,7 +966,7 @@ NameVirtualHost *:443
 
 設定を保存し、[Start > Program > Apache HTTP Server 2.2 > Configure Apache Server > Test Configuration] を使って設定を確認します。
 
-もし問題が無ければコマンド画面が開いて閉じます。これで、次のようにApacheを起動できます：
+もし問題が無ければコマンド画面が開いて閉じます。これで、次のようにApacheを起動できます:
 
 [Start > Program > Apache HTTP Server 2.2 > Control Apache Server > Start]
 
@@ -775,7 +974,7 @@ NameVirtualHost *:443
 
 ``[Start > Program > Apache HTTP Server 2.2 > Control Apache Server]``
 
-これで赤い羽根のようなタスクバーアイコン上の右クリックで、"Open Apache Monitor"を選択し、起動、停止、再起動を必要に応じて実行できます。
+これで赤い羽根のようなタスクバーアイコン上の右クリックで、"Open Apache Monitor" を選択し、起動、停止、再起動を必要に応じて実行できます。
 
 このセクションはJonathan Lundellによって作成されました。
 
@@ -785,7 +984,8 @@ NameVirtualHost *:443
 Linuxのデーモンは、Windowsではサービスと呼ばれます。
 web2pyサーバーはWindowsサービスとして簡単に、インストール/起動/停止ができます。
 
-web2pyをWindowsサービスとして使用するには、起動パラメータを使用した"options.py"を作成する必要があります：
+web2pyをWindowsサービスとして使用するには、起動パラメータを使用した "options.py" を作成する必要があります:
+
 ``
 import socket, os
 ip = socket.gethostname()
@@ -803,47 +1003,81 @@ shutdown_timeout = 5
 folder = os.getcwd()
 ``:code
 
-既にモデルとして使用できる、"options_std.py"というファイルがweb2pyフォルダにあるため、"options.py"を一から作成する必要はありません。
+既にモデルとして使用できる、"options_std.py" というファイルがweb2pyフォルダにあるため、"options.py" を一から作成する必要はありません。
 
-"options.py"をweb2pyのインストール・フォルダに作成したら、次のコマンドでweb2pyをサービスとして追加できます：
+"options.py" をweb2pyのインストール・フォルダに作成したら、次のコマンドでweb2pyをサービスとして追加できます：
+
 ``
 python web2py.py -W install
 ``:code
 
-そして、次のコマンドで起動/停止できます：
+オプションで、options.pyファイルを指定することができます:
+
+``
+python web2py.py -W install -L options.py
+``:code
+
+次のコマンドで、サービスの起動/停止を行うことができます:
 ``
 python web2py.py -W start
 python web2py.py -W stop
 ``:code
 
-### セッション保護と**admin**
+#### Windowsサービスとしてスケジューラの起動
+``Windows scheduler service``:inxx
+
+Windowsサービスとしてスケジューラを動かすと、多くの利点があります。
+最も簡単な方法は、nssm(htp://www.nssm.cc より)をダウンロードすることです。nssmはオープンソースのスケジューリングヘルパーです。
+これは実行可能コマンドを、ラップし変換してサービスに入れます。
+スケジューラの起動コマンドは、''pythonw.exe -K <appname>'' です。
+ラップし、サービスにするために、nssmを使用しています。
+実行前に、サービスの名前を選択する必要があります。
+スケジューラを必要とする各アプリのために、特定のサービスを作成する強い利点があります。
+従って、サービスのための命名規則は、web2py_scheduler_app1となるかもしれません。
+
+nssm zipファイルを解凍した後に、使用しているアーキテクチャ用のバージョンを含んだフォルダでWindowsプロンプトを開き、次のように入力します。
+``
+nssm install web2py_scheduler_app1``:code
+
+これは、アプリケーションとオプションの入力を求める、ダイアログを表示します。
+アプリケーションは、Pythonインストールから、pythonw.exeで実行可能です。
+オプションはコマンドラインの残りの部分です。web2py.pyスクリプトへのフルパスを、指定する必要があるかもしれません。例えば、nssmダイアログのオプションフィールドは次のようになります:
+``c:\web2py\web2py.py -K app1``:code
+app1はアプリケーションの名前です。
+where app1 is the name of your application.
+
+これは複数のアプリケーションとスケジューラを起動することができます。しかしこのモードでは、web2pyは各アプリケーションのスケジューラを、サブプロセスに切り離します。
+従って、もしスケジューラインスタンスのいづれかに問題が発生した場合でも、サービスによって起動したプロセスは死ぬことがなく、むしろ子プロセスが死にます。
+その後の障害発生時に、自動によるサービス再起動を利用することができません。サービス毎に一つのアプリを利用すると、この弱点を回避することができます。
+
+### セッション保護と **admin**
 ``security``:inxx ``admin``:inxx
 
-HTTPS経由で実行されている場合を除き、**admin**アプリケーションと**appadmin**コントローラを公開することは、とても危険です。そしてパスワードと証明書は、暗号化無しで通信されるべきではありません。これはweb2pyと、他のどのwebアプリケーションにも当てはまります。
+HTTPS経由で実行されている場合を除き、**admin** アプリケーションと **appadmin** コントローラを公開することは非常に危険です。そしてパスワードと証明書は、暗号化無しで通信されるべきではありません。これはweb2pyと、他のどのwebアプリケーションにも当てはまります。
 
-アプリケーションで認証が必要な場合は、次のようにセッションクッキーを保護するべきです：
+アプリケーションで認証が必要な場合は、次のようにセッションクッキーを保護するべきです:
 ``
 session.secure()
 ``:code
 
-サーバー上で安全な本番環境をセットアップする簡単な方法は、まずweb2pyを停止し、web2pyのインストール・フォルダから全ての``parameters_*.py``ファイルを削除することです。そしてパスワード無しでweb2pyを起動します。これでadminとappadminは完全に無効になります。
+サーバー上で安全な本番環境をセットアップする簡単な方法は、まずweb2pyを停止し、web2pyのインストール・フォルダから全ての ``parameters_*.py`` ファイルを削除することです。そしてパスワード無しでweb2pyを起動します。これでadminとappadminは完全に無効になります。
 ``
 nohup python web2py --nogui -p 8001 -i 127.0.0.1 -a '' &
 ``:code
 
-次に、ローカルホストからだけアクセス可能な二つ目のweb2pyインスタンスを起動します：
+次に、ローカルホストからだけアクセス可能な二つ目のweb2pyインスタンスを起動します:
 ``
 nohup python web2py --nogui -p 8002 -i 127.0.0.1 -a '<ask>' &
 ``:code
 
-そして、ローカルマシン（管理画面にアクセスしたいマシン）からサーバー（web2pyが実行されている、example.com）へ、SSHトンネルを作成します：
+そして、ローカルマシン(管理画面にアクセスしたいマシン)からサーバー(web2pyが実行されている、example.com)へ、SSHトンネルを作成します:
 ``
 ssh -L 8002:127.0.0.1:8002 username@example.com
 ``:code
 
-これでブラウザ経由の``localhost:8002``で、管理画面へローカルに接続することができます。
+これでブラウザ経由の ``localhost:8002`` で、管理画面へローカルに接続することができます。
 
-トンネルが閉じている（ユーザがログアウト）時は、**admin**へ接続できないので設定は安全になります。
+トンネルが閉じている(ユーザがログアウト)時は、**admin** へ接続できないので設定は安全になります。
 
 -------
 この方法は他のユーザが、web2pyを含むフォルダへの読み取りアクセスを持たない共有ホスト環境では安全です。そうでない時は、ユーザがサーバーから直接セッションクッキーを盗むことが可能です。
@@ -864,11 +1098,11 @@ applications/myapp/uploads
 applications/myapp/cache
 ``:code
 
-共有フォルダは、ファイルロックをサポートしなければいけません。方法としては ZFS(ZFSはSun Microsystemsに開発されており、推奨する選択肢です）、NFS（ファイルロックを有効にするためにnlockmgrデーモンを実行する必要があるかもしれません）、もしくは、Samba(SMB)です。
+共有フォルダは、ファイルロックをサポートしなければいけません。方法としては ZFS(ZFSはSun Microsystemsに開発されており、推奨する選択肢です)、NFS(ファイルロックを有効にするためにnlockmgrデーモンを実行する必要があるかもしれません)、もしくは、Samba(SMB)です。
 
 web2pyフォルダ全体やアプリケーションフォルダ全体を共有することも可能ですが、ネットワーク帯域使用量が無駄に増加するだけなので良い方法ではありません。
 
-共有する必要があるが、トランザクションの安全性を必要としないリソースを、共有ファイルシステムに移動します。これによってデータベースの負荷を減らすため、上記の設定の説明は、非常に拡張性が高いと考えます（一回一クライアントのみのセッションファイルのアクセス想定、常時必要なキャッシュのグローバルロック、一度のuploadsとerrorsへの書き込み/たくさんのファイルの読み取り）。
+共有する必要があるが、トランザクションの安全性を必要としないリソースを、共有ファイルシステムに移動します。これによってデータベースの負荷を減らすため、上記で説明した設定は、非常に拡張性が高いと考えます(一回一クライアントのみのセッションファイルのアクセス想定、常時必要なキャッシュのグローバルロック、一度のuploadsとerrorsへの書き込み/たくさんのファイルの読み取り)。
 
 理想的には、データベースと共有ストレージは両方ともRAID構成であるべきです。データベースを共有フォルダと同じストレージに保存する間違いをしないでください、新しいボトルネックを作ってしまいます。
 
@@ -876,31 +1110,31 @@ web2pyフォルダ全体やアプリケーションフォルダ全体を共有�
 
 #### 効率のトリック
 
-web2pyアプリケーションコードはリクエストのたびに実行されるので、コードの量を最小限に抑えたい時があります。ここで以下の方法があります：
+web2pyアプリケーションコードはリクエストの度に実行されるので、コードの量を最小限に抑えたい時があります。ここで以下の方法があります:
 
-- 一度だけ``migrate=True``を実行してから、全てのテーブルに``migrate=False``をセットします。
-- **admin**を使った、アプリケーションのバイトコードコンパイルします。
-- ``cache.ram``をできる限り使用するため、有限なキーセットを使っているか確認します。そうしないと、使用するキャッシュ量は任意に成長します。
-- モデル内のコードを最小化します：ここに関数を定義せずそれを必要とするコントローラに定義します。もっといい方法は、モジュールに関数を定義して必要に応じてインポートして使用します。
-- たくさんの関数を同じコントローラに設定しないで、たくさんのコントローラにいくつかの関数を定義します。
-- セッションを変更しない全てのコントローラや関数で、``session.forget(response)``を実行します。
-- web2py cronを使わず、代わりにバックグラウンドプロセスを利用するようにします。web2py cronは大量のPythonインスタンスを起動し過剰にメモリを使用します。
+- 一度だけ ``migrate=True`` を実行してから、全てのテーブルに ``migrate=False`` をセットします。
+- **admin** を使用し、アプリをバイトコードコンパイルします。
+- ``cache.ram`` をできる限り使用するため、有限なキーセットを使っているか確認します。あるいは、任意に拡張可能なキャッシュを使用してください。
+- モデル内のコードを最小化します: ここに関数を定義せず、それを必要とするコントローラに定義します。もっと良い方法は、モジュールに関数を定義し必要に応じてインポートして使用します。
+- 多くの関数を同じコントローラに記述するのではなく、多くのコントローラに幾つかの関数を定義します。
+- セッションを変更しない全てのコントローラや関数で、``session.forget(response)`` を実行します。
+- web2py cronを使わず、代わりにバックグラウンドプロセスを利用するようにします。web2py cronは大量のPythonインスタンスを起動し、過剰にメモリを使用します。
 
 #### データベースでのセッション
 
 セッションフォルダの代わりに、データベースにセッションを保存するようにweb2pyに指示することが可能です。セッションの保存に同じデータベースを使用することになるとしても、それぞれ個別のアプリケーションに対して設定が必要です。
 
-データベース接続を作成
+データベース接続を作成します。
 ``
 db = DAL(...)
 ``:code
 
-接続を確立する同じモデルファイル内に次のコードを追加するだけで、データベースにセッションを保存することができます：
+接続を確立する同じモデルファイル内に次のコードを追加するだけで、データベースにセッションを保存することができます:
 ``
 session.connect(request, response, db)
 ``:code
 
-テーブルがまだ存在しない場合、we2pyは``web2py_session_``''アプリケーション名''という、以下のフィールドを持ったデータベースのテーブルを作成します：
+もしテーブルがまだ存在しない場合、we2pyは ``web2py_session_``''アプリケーション名'' という、以下のフィールドを持ったデータベースのテーブルを作成します:
 ``
 Field('locked', 'boolean', default=False),
 Field('client_ip'),
@@ -910,18 +1144,20 @@ Field('unique_key'),
 Field('session_data', 'text')
 ``:code
 
-"unique_key"は、クッキー内のセッションを特定するために使用するuuidキーです。
-"session_data"はcPickledセッションデータです。
+"unique_key" は、クッキー内のセッションを特定するために使用するuuidキーです。
+"session_data" は、cPickledセッションデータです。
 
-データベースアクセスを最小限にするために、必要がない場合はセッションを保存しないようにするべきです：
+データベースアクセスを最小限にするために、必要がない場合はセッションを保存しないようにするべきです:
 ``
 session.forget()
 ``:code
 
-この変更により、"sessions"フォルダはアクセスされなくなるので、共有フォルダにする必要は無くなります。
+自動でforgetされたセッションは変更されません。
+
+データベース上のセッションにより、"sessions" フォルダはアクセスされなくなるので、共有フォルダにする必要はなくなります。
 
 -------
-セッションが無効の場合は、``session``を``form.accepts``に渡してはいけません。また、``session.flash``やCRUDも使用できない点に注意してください。
+セッションが無効の場合は、``session`` を ``form.accepts`` に渡してはいけません。また、``session.flash`` やCRUDも使用できない点に、注意してください。
 -------
 
 #### HAProxy 高可用性ロードバランサ
@@ -929,18 +1165,18 @@ session.forget()
 
 複数のweb2pyプロセスを複数のマシンで実行する必要がある場合は、データベースにセッションを保存したり、キャッシュする代わりに、スティッキー・セッションを利用したロードバランサを使用するオプションがあります。
 
-Pound``pound``:citeとHQProxy``haproxy``:citeは、スティッキー・セッションを提供する、二つのHTTPロードバランサとリバースプロキシです。ここでは商用VPSホスティングで、より一般的な後者について説明します。
+Pound``pound``:cite と HQProxy``haproxy``:cite は、スティッキー・セッションを提供する、二つのHTTPロードバランサとリバースプロキシです。ここでは商用VPSホスティングで、より一般的な後者について説明します。
 
 スティッキー・セッションは一度セッションクッキーが発行されたら、ロードバランサはセッションに関連付けられたクライアントからのリクエストを、常に同じサーバーにルーティングします。こうすることでファイルシステムを共有せずに、ローカルのファイルシステムにセッションを保存することができます。
 
-HAProxyを使うには：
+HAProxyを使うためには:
 
-初めに、Ubuntu テストマシンにインストールします：
+初めに、Ubuntu テストマシンにインストールします:
 ``
 sudo apt-get -y install haproxy
 ``:code
 
-二つ目に、設定ファイル"/etc/haproxy.cfg"を以下のように編集します：
+二つ目に、設定ファイル "/etc/haproxy.cfg" を以下のように編集します:
 ``
 ## this config needs haproxy-1.1.28 or haproxy-1.2.1
 
@@ -970,16 +1206,16 @@ listen 0.0.0.0:80
       appsession WEB2PYSTICKY len 52 timeout 1h
 ``:code
 
-``listen``ディレクティブは、どのポートで接続を待つかをHAProxyに指示します。
-``server``ディレクティブは、プロキシサーバーがどこにあるかを指示します。
-``appsession``ディレクトリは、スティッキー・セッションを作成し``WEB2PYSTICKY``というクッキーをこの目的で使用します。
+``listen`` ディレクティブは、どのポートで接続を待つかをHAProxyに指示します。
+``server`` ディレクティブは、プロキシサーバがどこにあるかを指示します。
+``appsession`` ディレクトリは、スティッキー・セッションを作成し ``WEB2PYSTICKY`` というクッキをこの目的で使用します。
 
-三つ目に、この設定を有効にし、HAProxyを起動します：
+三つ目に、この設定を有効にし、HAProxyを起動します:
 ``
 /etc/init.d/haproxy restart
 ``:code
 
-以下のURLに、Poundのセットアップの同様の手順があります
+次のURLに、Poundのセットアップの同様の手順説明があります
 
 ``
 http://web2pyslices.com/main/slices/take_slice/33
@@ -987,37 +1223,39 @@ http://web2pyslices.com/main/slices/take_slice/33
 
 #### セッションのクリーンアップ
 
-本番環境では、セッションが速く積み重なることに注意してください。web2pyは次のスクリプトを提供しています：
+本番環境では、セッションが速く積み重なることに注意してください。web2pyは次のスクリプトを提供しています:
 ``
 scripts/sessions2trash.py
 ``:code
 
-バックグラウンドで実行され、定期的に一定期間アクセスされていない全てのセッションを削除します。web2pyは、これらのセッションをクリーンアップするスクリプトを提供します（ファイルベースのセッション及びデータベースのセッションのどちらでも有効です）。
+バックグラウンドで実行され、定期的に一定期間アクセスされていない全てのセッションを削除します。web2pyは、これらのセッションをクリーンアップするスクリプトを提供します(ファイルベースのセッション及びデータベースのセッションのどちらでも有効です)。
 
-次に典型的な使用例を挙げます：
+次に典型的な使用例を挙げます:
 
-- 5分毎に期限切れのセッションを消去します：
+- 5分毎に期限切れのセッションを消去します:
 ``
 nohup python web2py.py -S app -M -R scripts/sessions2trash.py &
 ``:code
 
-- 詳細な出力と共に、有効期限に関わらず60分より古いセッションを消去し、終了します。
+もしくはWindowsでは、上記のスケジューラのセクションで説明したnssmを使用します。恐らく、web2py.pyとスクリプトフォルダの両方のフルパスが含まれることが必要で、末尾の & は必要ないです。
+
+- 詳細な出力と共に、有効期限に関わらず60分より古いセッションを消去し、終了します:
 ``
 python web2py.py -S app -M -R scripts/sessions2trash.py -A -o -x 3600 -f -v
 ``:code
 
-- 有効期限に関わらず全てのセッションを消去し、終了します：
+- 有効期限に関わらず全てのセッションを消去し、終了します:
 ``
 python web2py.py -S app -M -R scripts/sessions2trash.py -A -o -x 0
 ``:code
 
-``app``に、対象のアプリケーション名を指定します。
+ここで、``app`` はアプリケーション名です。
 
-#### データベース上でのファイルアップロード
+#### データベースでのファイルアップロード
 
-デフォルトでは、SQLFORMによって処理されたアップロードファイルは、安全に名前変更されフィルシステムの"uploads"フォルダに保存されます。web2pyに対して指示し、フォルダの代わりにデータベースにアップロードファイルを保存させることも可能です。
+デフォルトで、SQLFORMによって処理されたアップロードファイルは、安全に名前変更されフィルシステムの "uploads" フォルダに保存されます。フォルダの代わりにデータベースにアップロードファイルを保存させることを、web2pyに指示することも可能です。
 
-次のテーブルを考えてみます：
+次のテーブルを考えてみます:
 
 ``
 db.define_table('dog',
@@ -1025,7 +1263,7 @@ db.define_table('dog',
     Field('image', 'upload'))
 ``:code
 
-``dog.image``はuploadタイプです。犬の名前と同じレコードにアップロード画像を保存するには、blobフィールドを追加しuploadフィールドにリンクするようにテーブル定義を修正する必要があります：
+``dog.image`` はuploadタイプです。犬の名前と同じレコードにアップロード画像を保存するには、blobフィールドを追加しuploadフィールドにリンクするようにテーブル定義を修正する必要があります:
 ``
 db.define_table('dog',
     Field('name')
@@ -1033,28 +1271,28 @@ db.define_table('dog',
     Field('image_data', 'blob'))
 ``:code
 
-ここで"image_data"は、任意につけた新しいblobフィールドの名前です。
+ここで "image_data" は、任意につけた新しいblobフィールドの名前です。
 
-3行目は通常通りアップロードされた画像の名前を安全に変更し、変更された新しい名前をimageフィールドに保存し、ファイルシステムに保存する代わりに"image_data"というuploadフィールドにデータを保存します。この全ての処理がSQLFORMによって自動で実行され、他のコードを変更する必要はありません。
+3行目は通常通りアップロードされた画像の名前を安全に変更し、変更された新しい名前をimageフィールドに保存します。そして、ファイルシステムに保存する代わりに、"image_data" というuploadフィールドにデータを保存します。この全ての処理がSQLFORMによって自動で実行され、他のコードを変更する必要はありません。
 
-この変更で、"uploads"フォルダは必要なくなります。
+この変更で、"uploads" フォルダは必要なくなります。
 
 Google App Engineでは、デフォルトでuploadfieldが自動作成されるので、uploadfieldを定義しなくてもデータベースに保存されます。
 
 #### チケットの収集
 
-デフォルトで、web2pyはチケット（エラー)をローカルのファイルシステムに保存します。一番のエラー原因は、本番環境でのデータベース障害であるため、データベースにチケットを直接保存することは意味がありません。
+デフォルトでは、web2pyはチケット(エラー)をローカルのファイルシステムに保存します。一番のエラー原因は、本番環境でのデータベース障害であるため、データベースにチケットを直接保存することは意味がありません。
 
-通常は稀なイベントのため、チケットの保存はボトルネックになりません。このため複数サーバーで構成された本番環境では、共有フォルダに保存するのも適当です。とはいえ管理者だけがチケットを取り出す必要があるので、共有されていないローカルの"エラー"フォルダにチケットを保存し、定期的に収集して削除するのでも大丈夫です。
+通常は稀なイベントのため、チケットの保存はボトルネックになりません。このため複数サーバーで構成された本番環境では、共有フォルダに保存するのも適当です。とはいえ管理者だけがチケットを取り出す必要があるので、共有されていないローカルの "エラー" フォルダにチケットを保存し、定期的に収集して削除するというのでも大丈夫です。
 
 定期的にローカルのチケットをデータベースに移動する、という方法もあります。
 
-このために、web2pyは次のスクリプトを提供します：
+このために、web2pyは次のスクリプトを提供します:
 ``
 scripts/tickets2db.py
 ``:code
 
-デフォルトでこのスクリプトは**ticket_storage.txt**という、プライベートフォルダに保存されたファイルからdbのuriを取得します。このファイルには次のような、**DAL**インスタンスへ直接渡す文字列を含める必要があります：
+デフォルトでこのスクリプトは **ticket_storage.txt** という、プライベートフォルダに保存されたファイルからのdb uriを取得します。このファイルには次のような、**DAL** インスタンスへ直接渡す文字列を含める必要があります:
 
 ``
 mysql://username:password@localhost/test
@@ -1062,28 +1300,29 @@ postgres://username:password@localhost/test
 ...
 ``:code
 
-これは、スクリプトをそのまま残すことができます：もし複数のアプリケーションがある場合、全アプリケーションへの適切な接続を動的に選択します。もしuriをハードコーディングしたい場合は、''except''行の直後に、db_stringへの2つめの参照を記述してください。
-次のコマンドでスクリプトを実行できます：
+これは、スクリプトをそのまま残すことができます: もし複数のアプリケーションがある場合、全アプリケーションへの適切な接続を動的に選択します。もしuriをハードコーディングしたい場合は、''except'' 行の直後に、db_stringへの2つめの参照を記述してください。
+次のコマンドでスクリプトを実行できます:
+
 ``
 nohup python web2py.py -S myapp -M -R scripts/tickets2db.py &
 ``:code
 
 myappは対象となるアプリケーション名です。
 
-このスクリプトはバックグラウンドで動作し、5分毎に全てチケットをデータベースに移動し、ローカルチケットを消去します。
-adminアプリの上部にある"switch to:db"ボタンをクリックすると、ファイルシステムに保存されている場合と全く同じような機能で、エラーを表示することができます。
+このスクリプトはバックグラウンドで動作し、5分毎に全てのチケットをデータベースに移動して、ローカルチケットを消去します。
+adminアプリの上部にある "switch to:db" ボタンをクリックすると、ファイルシステムに保存されている場合と全く同じように、エラーを表示することができます。
 
-この変更で、エラーはデータベースに保存されるので、"errors"フォルダは共有フォルダである必要はありません。
+この変更で、エラーはデータベースに保存されるので、"errors" フォルダは共有フォルダである必要はありません。
 
 #### Memcache
 ``memcache``:inxx
 
-web2pyが提供する二つのタイプのキャッシュ: ``cache.ram``と``cache.disk``を説明してきました。
-どちらも複数のサーバーによる分散環境で動作しますが、期待通りには動作しません。具体的には、``cache.ram``は、サーバーレベルでのみキャッシュします。このため、役には立ちません。``cache.disk``は、"cache"フォルダーがファイルロックをサポートする共有フォルダの場合を除き、同様にサーバーレベルでキャッシュします。このため、スピードアップでは無く、主なボトルネックになります。
+web2pyが提供する二つのタイプのキャッシュ: ``cache.ram`` と ``cache.disk`` を説明しました。
+どちらも複数のサーバーによる分散環境で動作しますが、期待通りには動作しません。具体的には ``cache.ram`` は、サーバレベルでのみキャッシュします。このため役には立ちません。``cache.disk`` は、"cache" フォルダーがファイルロックをサポートする共有フォルダの場合を除き、同様にサーバレベルでキャッシュします。このため、スピードアップでは無く、主なボトルネックになります。
 
 解決策としてはこれらは使わず、代わりにmemacheを使います。web2pyにはmemcache APIが付属しています。
 
-memcacheを使うためには、例えば``0_memcache.py``という新規のモデルファイルを作成し、次のコードを記述（または追記）します：
+memcacheを使うためには、例えば ``0_memcache.py`` という新規のモデルファイルを作成し、次のコードを記述(もしくは追記)します:
 ``
 from gluon.contrib.memcache import MemcacheClient
 memcache_servers = ['127.0.0.1:11211']
@@ -1091,17 +1330,17 @@ cache.memcache = MemcacheClient(request, memcache_servers)
 cache.ram = cache.disk = cache.memcache
 ``:code
 
-最初の行はmemcacheをインポートします。2行目はmemcache socket(サーバー:ポート)のリストです。3行目はcache.memcacheを定義します。4行目は``cache.ram``と``cache.disk``を、memcacheで再定義します。
+最初の行はmemcacheをインポートします。2行目はmemcache socket(サーバー:ポート)のリストです。3行目はcache.memcacheを定義します。4行目は ``cache.ram`` と 
 
-Memcacheオブジェクトを指している全く新しいキャッシュオブジェクトを定義するために、それらの1つだけを再定義するために選択することができます。
+Memcacheオブジェクトを指している全く新しいキャッシュオブジェクトを定義するために、それらの一つだけを再定義するために選択することができます。
 
-この変更で、"cache"フォルダはアクセスが無くなるので、共有フォルダである必要はありません。
+この変更で、"cache" フォルダはアクセスが無くなるので、共有フォルダである必要はありません。
 
 このコードは、memcacheサーバーがローカルネットワークで動作していることが前提です。サーバーのセットアップ方法は、memcacheドキュメントを参照してください。
 
 #### Memcacheでのセッション
 
-セッションが必要だが、ロードバランサでスティッキー・セッションを使用したくない場合は、memcacheにセッションを保存するオプションがあります：
+セッションが必要だが、ロードバランサでスティッキ-・セッションを使用したくない場合は、memcacheにセッションを保存するオプションがあります:
 ``
 from gluon.contrib.memdb import MEMDB
 session.connect(request,response,db=MEMDB(cache.memcache))
@@ -1111,35 +1350,50 @@ session.connect(request,response,db=MEMDB(cache.memcache))
 ``redis``:cite
 Memcacheの代替としてRedisが使用できます。 ``Redis``:inxx
 
-Redisがインストールされており、localhostの6379ポートで実行されていると仮定すると、次のコードで接続可能です（モデルに記述します）：
+Redisがインストールされており、localhostの6379ポートで実行されていることを前提にすると、次のコードで接続可能です(モデルに記述します):
 
 ``
-from gluon.contrib.redis import RedisCache
+from gluon.contrib.redis_cache import RedisCache
 cache.redis = RedisCache('localhost:6379',db=None, debug=True)
 ``
 
-'localhost:6379'は接続文字列です。``db``はDALオブジェクトではなく、Redisのデータベース名です。
+'localhost:6379' は接続文字列です。``db`` はDALオブジェクトではなく、Redisのデータベース名です。
 
-``cache.ram``と``cache.disk``の代わりに（または一緒に）、``cache.redis``を使用できます。
+``cache.ram`` と ``cache.disk`` の代わりに(もしくは一緒に)、``cache.redis`` を使用できます。
 
-次のコードでRedisの統計情報を取得できます：
+次のコードでRedisの統計情報を取得できます:
 
 ``
 cache.redis.stats()
 ``:code
 
+#### Redisでのセッション
+もしスタックとしてRedisがある場合、なぜセッションとして使用しないのでしょうか？。
+``
+from gluon.contrib.redis_session import RedisSession
+sessiondb = RedisSession('localhost:6379',db=0, session_expiry=False)
+session.connect(request, response, db = sessiondb)
+``
+コードは1Mセッションまでテストされています。Redisがメモリに収まることができる限り、1もしくは1Mセッションを処理するのに必要な時間は同じです。ファイルベースのセッションやDBベースのセッションは、40Kセッションまででスピードアップを感じさせない一方、その障壁の改善が顕著です。
+セッション毎に1キー、プラス2キーが必要です。一つは整数値を保持(異なるセッションキーを割り当てるのに必要)し、他は生成されたセッション全てのセットを保持します(つまり1000セッションなら1002キー)。
+
+``session_expiry`` がセットされていない場合、セッションは通常通り処理され、 [[通常のセッションのクリーンアップ @///chapter/13#セッションのクリーンアップ]] を一度はしばらく行う必要があります。
+
+しかしながら、``session_expiry`` がセットされている時は、自動的に n 秒後にセッションを削除します(例えば3600をセットすると、セッションが最後に更新されてから、正確に1時間後に期限切れになります)。
+ただし時々、キーが保持している以前に発行された全てのセッションをセットを消去する、sessions2trash.py を実行する必要があります(1Mセッションを消去するのに3秒必要です)。
+
 #### アプリケーションの削除
 ``removing application``:inxx
 
-本番環境では、デフォルトアプリケーション:**admin**、**examples**、**welcome**をインストールしないほうが良いかもしれません。小さいですが必要のないアプリケーションだからです。
+本番環境では、デフォルトアプリケーション: **admin**、**examples**、**welcome** をインストールしないほうが良いかもしれません。小さいですが必要がないアプリケーションだからです。
 
-これらのアプリケーションを削除するのは簡単です。applicationsフォルダ下の対象のフォルダを削除するだけです。
+これらのアプリケーションを削除するのは簡単です、applicationsフォルダ下の対象のフォルダを削除するだけです。
 
 #### レプリカデータベースの使用
 
-高いパフォーマンスを必要とする本番環境では、たくさんのレプリカスレーブを持つマスタースレーブ・データベース構成や、恐らく一組のレプリカサーバーがあるかもしれません。
-DALは、このような状況を処理し、条件付きリクエストパラメータに応じて異なるサーバーに接続することができます。
-それを実現するAPIは、6章で説明済みです。以下はその例です：
+高いパフォーマンスを必要とする本番環境では、たくさんのレプリカスレーブを持つマスタースレーブ・データベース構成や、恐らく一組のレプリカサーバがあるかもしれません。
+DALは、このような状況を処理し、条件付きリクエストパラメータに応じて異なるサーバに接続することができます。
+それを実現するAPIは、6章で説明済みです。以下はその例です:
 
 ``
 from random import sample
@@ -1148,7 +1402,7 @@ db = DAL(sample(['mysql://...1','mysql://...2','mysql://...3'], 3))
 
 この場合、異なるHTTPリクエストがランダムで異なるデータベースによって処理され、それぞれのDBが同じような頻度で使用されます。
 
-シンプルなラウンドロビンを実装することもできます
+シンプルなラウンドロビンを実装することもできます。
 
 ``
 def fail_safe_round_robin(*uris):
@@ -1161,12 +1415,12 @@ db = DAL(fail_safe_round_robin('mysql://...1','mysql://...2','mysql://...3'))
 
 これは、リクエストに割り当てられたデータベースサーバーの接続に失敗した場合は、DALは順番に次のサーバーに接続を試みるという意味で、フェイルセーフです。
 
-リクエストされたアクションやコントローラによって、異なるデータベースに接続することも可能です。マスタースレーブ・データベース構成で、あるアクションは読み取り専用で、いくらかの人物は読み取り/書き込みを両方します。前者はスレーブDBサーバーに安全に接続でき、後者はマスターに接続されるべきです。これは以下のように記述できます：
+リクエストされたアクションやコントローラによって、異なるデータベースに接続することも可能です。マスタースレーブ・データベース構成で、あるアクションは読み取り専用で、いくらかの人物は読み取り/書き込みを両方します。前者はスレーブDBサーバーに安全に接続でき、後者はマスターに接続されるべきです。これは以下のように記述できます:
 
 ``
 if request.function in read_only_actions:
    db = DAL(sample(['mysql://...1','mysql://...2','mysql://...3'], 3))
-if request.action in read_only_actions:
+elif request.action in read_only_actions:
    db = DAL(shuffle(['mysql://...1','mysql://...2','mysql://...3']))
 else:
    db = DAL(sample(['mysql://...3','mysql://...4','mysql://...5'], 3))
@@ -1174,53 +1428,212 @@ else:
 
 1、2、3はスレーブで、3、4、5はマスターです。
 
+#### 静的ファイルの圧縮
+
+ブラウザは実行中にコンテンツの解凍ができ、これらのブラウザのための圧縮コンテンツは、帯域幅のセーブとレスポンスタイムを低減します。
+今日では、ほとんどのwebサーバは実行中にコンテンツの圧縮と、要求するgzipコンテンツをブラウザに送信することができます。
+しかしながら静的ファイルに対しては、何度も同じコンテンツを圧縮するため、CPUサイクルを無駄にしています。
+
+''scripts/zip_static_files.py'' を使えばCPUを無駄にすることなく、静的ファイルのgzipバージョンを作成できます。
+cronで ``python web2py.py -S myapp -R scripts/zip_static_files.py`` のように実行します。スクリプトはgzipバージョンを作成(もしくは更新)し、ファイルと共に保存し、それらの名前に a.gz を追加する手配をします。
+それらのファイルの送信を、webサーバが分かるようにする必要があるだけです。 ``apache-content-negotiation``:cite ``nginx-gzipstatic``:cite
+
+### PythonAnywhereでのデプロイ
+
+``PythonAnywhere``:code ``PythonAnywhere``:inxx
+
+PythonAnywhereはweb2pyアプリケーションをデプロイする、最も簡単な方法です。
+
+PythonAnywhereはPython開発と、webブラウザでの表示とクラウドサーバ上で実行するホスティング環境です。それらは既に、Pythonを実行するために必要な全てのものがセットアップされています。我々の経験上、PythonAnywhereは使いやすく、速く、そしてパワフルです。そしてまた、MySQLデータベース、pythonシェル、Dropbox統合も提供しています。
+もしフリー・ベーシックでは十分でない場合、プロフェッショナル・ホスティングが可能です。
+
+PythonAnywhereを使用するには、アカウント作成、ログインが必要です。次に提供されたwebダッシュボードを使用し、web2pyタイプの新しいWebアプリを追加します。
+
+[[image @///image/pythonanywhere1.png center 300px]]
+[[image @///image/pythonanywhere2.png center 300px]]
+
+インターフェースはまた、管理パスワードの入力を求めます。
+
+[[image @///image/pythonanywhere3.png center 300px]]
+
+web2pyフォルダがユーザフォルダに作成されます。
+
+代わりに通常のようにweb2pyをインストールするのに、webベースBASHも使用可能です:
+
+``
+wget http://www.web2py.com/examples/static/web2py_src.zip
+unzip web2py_src.zip
+``:code
+
+シェルからは常に、後で使用するために管理者パスワードを作成すべきです:
+
+``
+python -c "from gluon.main import save_password; save_password(raw_input('admin  password: '),433)"
+``:code
+
+その後、webインターフェースを使用して "Web" パネルに移動し、"/var/www/<username>_pythonanywhere_com_wsgi.py" ファイルを編集します。これはプログラム(私達のケースではweb2py)のエントリポイントで、推測できるような、WSGIプロトコルに基づいています。
+
+"/var/www/<username>_pythonanywhere_com_wsgi.py" ファイルを編集し、次を記述します:
+
+``
+import sys
+path = '/home/<username>/web2py'
+if path not in sys.path: sys.path.append(path)
+from wsgihandler import application # the web2py handler
+``:code
+
+ここで、"<username>" はPythonAnywhereのユーザ名です。
+
+web2pyをインストールした後に、起動やwebサーバの設定が必要ないことに注意してください。PythonAnywhereはそれらを提供し、上記の設定ファイルを編集された時にリロードされます。
+もしくは、ダッシュボード上の "Reload web app" ボタンを押してください。次のurlで、誰でも直ぐにアクセスできます:
+``
+http://yourusername.pythonanywhere.com/
+``:code
+
+そしてまた、サイトのセキュアなバージョンも提供されており、web2py管理インターフェースを使用する場合は次のように利用を強制されます:
+
+``
+https://yourusername.pythonanywhere.com/admin/default/index
+``:code
+
+PythonAnywhereチームのヘルプとサポートに感謝します。
+
+### Herokuでのデプロイ
+``heroku``:cite ``Heroku``:inxx
+
+Herokuはモダンでアジャイルなマルチプラットフォーム・ソリューションです。Gitを使用して、クラウドサーバにアプリケーションをプッシュすることができます。Herokuユーザには、GitのインストールとHeroku SDKのインストールをしている必要があります。herokuのローカルで使用するSDK、プッシュするコマンド、そしてサーバ上での実行が、相互作用します。
+
+定期的に更新されるためHeroku上で実行されるアプリケーションは、永続的なファイルシステムに依存することができません。このため、アプリケーションコードはファイルシステムに格納することができますが、全データはデータベースに格納することが必要です。HerokuはPostgreSQLに依存します。けれどもPostgreSQLはまた、Heroku SDKを使って設定され、さらにデータベースのURLは実行時に動的に割り当てられ、環境変数に格納されます。
+
+これはweb2pyアプリケーションが、Heroku上で動作しデータベースを使用するためには、修正する必要があることを意味しています。
+
+web2pyはこれを助けるため、"heroku.py" スクリプトを提供します。実施する必要がある全ては、次のコードの置き換えです:
+
+``
+db = DAL(...)
+``:code
+
+を次のようにします:
+
+``
+from gluon.contrib.heroku import get_db
+db = get_db(name=None, pool_size=10)
+``:code
+
+ここで ``name`` は、Heroku PostgreSQL URIを含む環境変数です(``HEROKU_POSTGRESQL_RED_URL`` のようなものです)。デフォルトは ``None`` で、もし ``HEROKU_POSTGRESQL_*_URL`` 環境変数だけある場合はそれを使用します。``pool_size`` は、DALプールサイズです。
+
+Herokuプラットフォーム上で非実行の場合は、``get_db`` は開発データベース "sqlite://heroku.test.sqlite" を使用します。
+
+両方のケースで、セッションはデータベースに保存されます。
+
+web2pyは、heroku上でweb2pyインストールのデプロイのために、"scripts/setup-web2py-heroku.py" スクリプトを提供します。これは次の手順で実行します:
+
+virtualenvとpsycopg2ドライバのインストールをします:
+``
+sudo pip install virtualenv
+sudo pip install psycopg2
+``:code
+
+virtualenvの作成とアクティベートします。
+``
+virtualenv venv --distribute
+source venv/bin/activate
+``:code
+
+その後、必要なファイルの作成を行います:
+``
+pip freeze > requirements.txt
+``:code
+
+そして、どのようにweb2pyを起動するかHerokuに指示するために、"Procfile" を作成します:
+
+``
+echo "web: python web2py.py -a 'yourpassword' -i 0.0.0.0 -p \$PORT" > Procfile
+``:code
+
+別サーバを使用するために、変更が可能です。管理者パスワードを編集することが必要です。``\$PORT`` は実行時に値がセットされるため、正しくエスケープされている変数です。Python用の推奨サーバの一つのため、``anyserver.py`` を使用したgunicornでの、web2pyの起動も検討すべきです。
+
+最後に、次のスクリプトでGitリポジトリを作成します:
+
+``
+git init
+git add .
+git add Procfile
+git commit -a -m "first commit"
+``:code
+
+Herokuに全てをプッシュし、起動します:
+
+``
+heroku create
+git push heroku master
+heroku addons:add heroku-postgresql:dev
+heroku scale web=1
+heroku open
+``:code
+
+``heroku`` は、Heroku SDKのシェルコマンドの一部です。
+
+このレシピを手助けしてくれた、HerokuのCraig Krestiensに感謝します。
+
+### EC2でのデプロイ
+``Amazon EC2``:inxx
+
+Amazon Elastic Compute Cloud (Amazon EC2) は、クラウドで変更可能なコンピューティング能力を提供するwebサービスです。これは、最大かつ、最も人気があるクラウドです。たくさんの他のクラウドプラットフォームもEC2で稼働しています。ディスクイメージを作成しデプロイすることにより、任意のアプリをEC2で動作させることができます。Amazonはまた、ファイルシステムの一部を共有しながら、画像を複製するためのAPIを提供します。
+
+全体のプロセスの説明は、この本の範囲を超えています。しかし Amazon EC2 アカウントを持っている場合、次のTurnkey Hubを使い、準備作成されたweb2pyイメージの検索とデプロイすることが可能です:
+
+``https://hub.turnkeylinux.org/amazon/launch/web2py/``
+
+一度イメージをデプロイしたら、通常のVPSでログイン可能です。そしてAmazon EC2 webインターフェースで、管理(バックアップ/リストア/コピー)可能です。
+
 ### Google App Engineでのデプロイ
 ``Google App Engine``:inxx
 
-DALコードを含めて、Google App Engine(GAE)``gae``:citeで、web2pyを動かすことは可能です。
+DALコードを含めて、Google App Engine(GAE)``gae``:cite で、web2pyを動かすことが可能です。
 
-GAEは2つのバージョンのPythonをサポートします：2.5（デフォルト）と2.7（ベータ）です。web2pyは、デフォルトでは2.5を採用していますが両方サポートします（デフォルトは将来変更される可能であります）。"app.yaml"ファイルに、詳細な設定が書かれていますので参照ください。
+GAEは2つのバージョンのPythonをサポートします：2.5と2.7です。web2pyは、デフォルトでは2.5を採用していますが両方サポートします(デフォルトは将来変更される可能であります)。"app.yaml" ファイルに、詳細な設定が書かれていますので参照ください。
 
-GAEは、Google SQLデータベース（MySQLと互換）とGoogle NoSQL（"Datastore"と呼ばれています）の両方をサポートします。
+GAEは、Google SQLデータベース(MySQLと互換)とGoogle NoSQL("Datastore" と呼ばれています)の両方をサポートします。
 
-web2pyはどちらもサポートしています。もしGoogle SQLデータベースを使用する場合は、6章の指示に従ってください。このセクションでは、Google Datastoreを使用すると仮定しています。
+web2pyはどちらもサポートしており、実際には6章で詳しく説明した接続文字列で、同時に両方に接続することができます。
 
-GAEプラットフォームは、通常のホスティング環境よりも幾つか良い点があります：
+GAEプラットフォームは、通常のホスティング環境よりも幾つか良い点があります:
 
 - 簡単にデプロイができます。Googleは内部の構造を完全に抽象化します。
 - スケーラビリティがあります。同時アクセスリクエストの数だけ、何度でもアプリケーションを複製します。
-- SQLとNoSQLを選択できます（両方可）。
+- SQLとNoSQLを選択できます(両方可)。
 
-しかし、不利な点もあります：
+しかし、不利な点もあります:
 - ファイルシステムへの読み書きができません。
 - Googleの証明書で、appspot.comドメインを使用しないとHTTPSが利用できません。
+- 全てのPythonライブラリがサポートされているわけではありません(scipyは現時点でサポートされていない著名なライブラリです)。
 
-幾つかDatastoreの仕様で不利な点があります：
+Google Cloud SQL は通常のmyaslデータベースですが、Google Datastoreは幾つかの特定の不利な点があります:
 
-- 典型的なトランザクションがありません。
-- 複雑なDatastoreクエリがありません。具体的には``JOIN``、``LIKE``、 ``DATE/DATETIME``演算子がありません。
-- あるフィールドと同じフィールド以外のサブクエリの、複数の``OR``がありません。
-
-読み取り専用のファイルシステムのため、web2pyはセッション、エラーチケット、キャッシュファイルやアップロードファイルをファイルシステムに保存できません。このようなものはファイルシステムではなく、Datastoreに保存しなければいけません。
+- 標準的なトランザクションがありません。クエリの強い一貫性より、''結果整合性'' です。
+- 複雑なDatastoreクエリがありません。具体的には ``JOIN``、``LIKE``、 ``DATE/DATETIME`` 演算子がありません。
+- あるフィールドと同じフィールドを伴わない限り、複数の ``OR`` サブクエリがありません。
 
 ここではGAEの簡単な解説とweb2py特有の問題を説明しました。詳細については公式のGAEドキュメントを参考にしてください。
 
 -----
-注意：執筆時点ではGAEはPython 2.5しかサポートしていません。それ以外のバージョンでは問題が発生します。また、web2pyはバイナリではなく、ソースディストリビューションを実行する必要があります。
+注意：web2pyはバイナリ版ではなく、ソース版を実行する必要があります。
 -----
 
 #### 設定
 
-注意すべき3つの設定ファイルがあります：
+注意すべき3つの設定ファイルがあります:
 ``
 web2py/app.yaml
 web2py/queue.yaml
 web2py/index.yaml
 ``:code
 
-``app.yaml``と``queue.yaml``の設定案を、テンプレートファイル``app.example.yaml``と``queue.example.yaml``から簡単に作成できます。 ``index.yaml``はGoogleデプロイメントソフトウェアで自動で作成されたものです。
+開始点として ``app.yaml`` と ``queue.yaml`` は、テンプレートファイル ``app.example.yaml`` と ``queue.example.yaml`` から最も簡単に作成できます。 ``index.yaml`` はGoogleデプロイメントソフトウェアで自動で作成されたものです。
 
-``app.yaml``は次の構造を持っています（...の部分は省略しています）：
+``app.yaml`` は次の構造を持っています(...の部分は省略しています):
+``app.yaml`` has the following structure (it has been shortened using ...):
 
 ``
 application: web2py
@@ -1242,26 +1655,26 @@ skip_files:
 ...
 ``:code
 
-``app.example.yaml``(``app.yaml``にコピーする時）は、web2pyの``welcome``アプリケーションのデプロイ用に設定できますが、``admin``や``example``アプリケーション用ではありません。Google App Engineに登録したアプリケーションidで、``web2py``を置き換える必要があります。
+``app.example.yaml`` (``app.yaml`` にコピーする時）は、web2pyの ``welcome`` アプリケーションをデプロイするよう設定されますが、``admin`` や ``example`` アプリケーションに対しては行いません。また、Google App Engineに登録したアプリケーションidで、``web2py`` を置き換える必要があります。
 
-``url: /(.+?)/static/(.+)``は処理速度を上げるため、web2pyロジックを呼び出すことなく、直接アプリの静的ファイルを提供するようGAEに指示します。
+``url: /(.+?)/static/(.+)`` は処理速度を上げるため、web2pyロジックを呼び出すことなく、直接アプリの静的ファイルを提供するようGAEに指示します。
 
-``url:.*``は他の全てのリクエストに、``gaehandler.py``を使うようにweb2pyに指示します。
+``url:.*`` は他の全てのリクエストに、``gaehandler.py`` を使うようにweb2pyに指示します。
 
-``skip_files:``セッションは、GAEでデプロイする必要がないファイルのための、正規表現のリストです。次の特定の行について説明します：
+``skip_files:`` セッションは、GAEでデプロイする必要がないファイルのための、正規表現のリストです。次の特定の行について説明します:
 
 ``
  (applications/(admin|examples)/.*)|
  ((admin|examples|welcome)\.(w2p|tar))|
 ``:code
 
-アンパックしたwelcomeの雛形アプリケーションを除いて、デフォルトアプリケーションをデプロイしないようにGAEに指示しています。ここに無視するべきアプリケーションをさらに追加することができます。
+アンパックしたwelcomeの雛形アプリケーションを除いて、デフォルトアプリケーションをデプロイしないようにGAEに指示しています。ここに無効すべきアプリケーションを、さらに追加することができます。
 
-アプリケーションidとバージョン設定以外には、``app.yaml``を編集する必要はあまりないかもしれません。もっとも、welcomeアプリケーションは除外するかもしれません。
+アプリケーションidとバージョン設定以外には、``app.yaml`` を編集する必要はあまりないかもしれません。もっとも、welcomeアプリケーションは除外するかもしれません。
 
-ファイル``queue.yaml``は、GAEタスクキューを設定するのに使用されます。
+ファイル ``queue.yaml`` は、GAEタスクキューを設定するのに使用されます。
 
-ファイル``index.yaml``は、GAEのappserver（Google SDKについてくるwebサーバー）で、アプリケーションをローカルで実行する際に自動で作成されます。中身には以下のコードを含みます：
+ファイル ``index.yaml`` は、GAEのappserver(Google SDKについてくるwebサーバー)で、アプリケーションをローカルで実行する際に自動で作成されます。中身には以下のコードを含みます:
 
 ``
 indexes:
@@ -1271,28 +1684,28 @@ indexes:
     direction: desc
 ``:code
 
-この例ではGAEに、"name"フィールドをアルファベットの降順ソートした、"person"というテーブルのindexを作成するように指示します。対応するindexがないと、アプリケーションで検索やソートを行うことができません。
+この例ではGAEに、"name" フィールドをアルファベットの降順ソートした、"person" というテーブルのindexを作成するように指示します。対応するindexがないと、アプリケーションで検索やソートを行うことができません。
 
-デプロイメントの前には常にappserverを使って、アプリをローカルで動かし全ての機能を確認することが重要です。これはテスト目的だけではなく、"index.yaml"を自動で作成する目的もあります。
-時々このファイルを編集し、重複したエントリーなどを削除したりするなど掃除をしたほうがいいでしょう。
+デプロイメントの前には常にappserverを使って、アプリをローカルで動かし全ての機能を確認することが重要です。これはテスト目的だけではなく、"index.yaml" を自動で作成する目的もあります。
+時々このファイルを編集し、重複したエントリーなどを削除したりするなど掃除をした方が良いでしょう。
 
 #### 実行とデプロイメント
 
 ##### Linux
 
-GAE SDKをインストール済みであるとします。執筆時にはGAEはPython 2.5.2で動作します。以下のappserverコマンドで、"web2py"フォルダ中のアプリケーションを実行できます:
+GAE SDKをインストール済みであるとします。執筆時にはGAEはPython 2.5.2で動作します。以下のappserverコマンドで、"web2py" フォルダ中のアプリケーションを実行できます:
 
 ``
 python2.5 dev_appserver.py ../web2py
 ``:code
 
-これでappserverが起動します。そして、次のURLでアプリケーションを実行できます：
+これでappserverが起動します。そして、次のURLでアプリケーションを実行できます:
 
 ``
 http://127.0.0.1:8080/
 ``:code
 
-GAEにアプリケーションをアップロードするには、前述したように"app.yaml"を編集し、適切なアプリケーションidをセットしたことを確認した上で、次を実行します：
+GAEにアプリケーションをアップロードするには、前述したように "app.yaml" を編集し、適切なアプリケーションidをセットしたことを確認した上で、次を実行します:
 
 ``
 python2.5 appcfg.py update ../web2py
@@ -1303,7 +1716,7 @@ python2.5 appcfg.py update ../web2py
 MacやWindowsでは、Google App Engineランチャを使用できます。
 次のリンクからダウンロードできます。``gae``:cite
 
-[File][Add Existing Application]を選択し、web2pyフォルダのトップレベルのパスをpathにセットし、そしてツールバーにある[Run]ボタンを押します。ローカルで動作確認できたら、ツールバーにある[Deploy]ボタンをクリックするだけでデプロイできます（アカウントを持っているのが前提です）。
+[File][Add Existing Application]を選択し、web2pyフォルダのトップレベルのパスをpathにセットし、そしてツールバーにある[Run]ボタンを押します。ローカルで動作確認できたら、ツールバーにある[Deploy]ボタンをクリックするだけでデプロイできます(アカウントを持っているのが前提です)。
 
 [[image @///image/en9300.png center 300px]]
 
@@ -1314,7 +1727,7 @@ GAE上でのweb2pyのチケット/エラーは、ログにアクセスしオン�
 
 #### ハンドラの設定
 
-``gaehandler.py``はGAE用に提供されているファイルで、いくつかのオプションがあります。以下はデフォルトの値です：
+``gaehandler.py`` はGAE用に提供されているファイルで、いくつかのオプションがあります。以下はデフォルトの値です:
 
 ``
 LOG_STATS = False
@@ -1322,23 +1735,23 @@ APPSTATS = True
 DEBUG = False
 ``:code
 
-``LOG_STATS``はページ表示にかかった時間をGAEのログに出力します。
+``LOG_STATS`` はページ表示にかかった時間をGAEのログに出力します。
 
-``APPSTATS``はプロファイリング統計を提供するGAE appstatsを有効にします。次のURLでアクセスできます:
+``APPSTATS`` はプロファイリング統計を提供するGAE appstatsを有効にします。次のURLでアクセスできます:
 
 ``
 http://localhost:8080/_ah/stats
 ``:code
 
-``DEBUG``はデバッグモードをセットします。gluon.settings.web2py_runtimeを使って、コードで明示的にチェックしない限り、実際には違いはありません。
+``DEBUG`` はデバッグモードをセットします。gluon.settings.web2py_runtimeを使って、コードで明示的にチェックしない限り、実際には違いはありません。
 
 #### ファイルシステムの無効
 
 GAEではファイルシステムにアクセスできません。書き込みのためにファイルを開くこともできません。
 
-このためGAEでは、"upload"フィールドが``uploadfiled``属性を持つ持たないにかかわらず、web2pyは自動で全てのアップロードファイルをデータストアに保存します。
+このためGAEでは、"upload" フィールドが ``uploadfiled`` 属性を持つ持たないにかかわらず、web2pyは自動で全てのアップロードファイルをデータストアに保存します。
 
-セッションとチケットもデータベースに保存する必要があり、以下のように明示しなければいけません：
+セッションとチケットもデータベースに保存する必要があり、以下のように明示しなければいけません:
 
 ``
 if request.env.web2py_runtime_gae
@@ -1348,11 +1761,11 @@ else:
     db = DAL('sqlite://storage.sqlite')
 ``:code
 
-上記のコードはGAEで動作しているかをチェックし、BigTableに接続し、そしてweb2pyにセッションとチケットをそこに保存するように指示します。それ以外の場合はsqliteデータベースに接続します。このコードは雛形アプリケーションの"db.py"に、既に存在しています。
+上記のコードは、GAEで動作しているかをチェック、BigTableに接続、そしてweb2pyにセッションとチケットをそこに保存するように指示します。それ以外の場合はsqliteデータベースに接続します。このコードは雛形アプリケーションの "db.py" に、既に存在しています。
 
 #### Memcache
 
-必要であれば、memcacheにセッションを保存することができます：
+必要であれば、memcacheにセッションを保存することができます:
 
 ``
 from gluon.contrib.gae_memcache import MemcacheClient
@@ -1364,15 +1777,58 @@ db = DAL('gae')
 session.connect(request,response,MEMDB(cache.memcache))
 ``:code
 
-GAEではcache.ramとcache.diskは使用されるべきでありません、そこでcache.memcacheを使用している点に注意してください。
+GAEではcache.ramとcache.diskは使用されるべきでありません、cache.memcacheを使用している点に注意してください。
 
 #### Datastoreの問題
 
-マルチエンティティ・トランザクションが無く、リレーショナルデータベースの標準的な関数を使用できない点で、GAEは他のホスティング環境と異なります。これは高い拡張性への代償です。これらの制限を受け入れることができるなら、GAEは非常に優れたプラットフォームです。そうでない場合は、代わりにリレーショナルデータベースを使った、通常のホスティング・プラットフォームを検討したほうが良いでしょう。
+Google Clould SQLは普通のSQLデータベースのように機能し、書き込み時は実際にmysqlに基いています。Google Datastoreとは大きな違いがあります。
 
-もしGAE上でweb2pyアプリケーションが動作しなかったら、前述した制限の一つが原因です。多くの問題は、web2pyクエリからJOINを削除し、非正規化することで解決します。
+##### 結果整合性
 
-Google App Engineは``ListPeroperty``や``StringListProperty``といった、特別なフィールドタイプをサポートします。web2pyは以下の古い構文を使うことで、これらのタイプを使用できます：
+Google Datastoreが提供する ''結果整合性'' は特別な注意を要します。
+
+Datastoreでは、Datasore主キー、もしくは共有エンティティグループに依存した、強い一貫性があるトランザクションを提供しています: 全ての後続のトランザクションもしくはクエリは、同一キーもしくはエンティティグループの、どの以前のトランザクションの結果も参照されます。
+
+一方、主キーもしくは共有エンティティグループに依存しないクエリは ''結果整合性'' のみ提供しています: 新規もしくは更新されたデータは、通常数秒の明示されない遅延の後、最終的にクエリで利用可能になります。
+
+web2pyは、Datastore主キーもしくはエンティティグループに依存しません。次の命令文は:
+
+``
+id = db.table.insert(field1=value1, field2=value2)
+``:code
+
+下記のような効果があります:
+- 新規行が、``db.table`` に挿入されます。行はweb2pyによって値が割り当てられる、``id`` を持ちます。行はDetastore主キーを持ちますが、しかしこの主キーは、``id`` では ''なく''、そして公開もされません。
+- ``db.table`` のインデックスは更新されます。特に、``id`` のインデックスが更新され、新規行は ''最終的に'' ``db.table.id`` でクエリすることが可能になります。 
+この2つのステップが完了した後のみ、新規データの ``id`` によるクエリが可能になります。
+とりわけ、下のようなweb2pyで通常使われる模範例は ''フェイル'' します:
+
+``
+def insert():
+    form = SQLFORM(db.table)
+    if form.process().accepted:
+        session.flash = T('The data has been inserted.')
+        redirect(URL('view', args=[form.vars.id]))
+    return dict(form=form)
+
+def view():
+    row = db.table(request.args(0))
+    if row is None:
+        session.flash = T('Data not found')
+        redirect(URL(index))
+    form = SQLFORM(db.table, record=row, readonly=True)
+    return dict(form=form)
+``:code
+
+ユーザが ``insert`` ページを訪れデータを挿入した後すぐに、ユーザは ``view`` ページにリダイレクトされます。Google Datastore を使用している場合、しばしば挿入したばかりのデータが ``view`` コントローラで見つかりません。なぜでしょう？。
+
+何が起こっているのでしょう。``insert`` コントローラでは、データベースにデータが挿入されており、そしてトランザクションは完了しています。その後、非同期でさらにトランザクション終了後に、Google Datastoreは ``db.table`` の ``id`` フィールドを含むインデックスの再構成をします。ユーザが ``view`` コントローラにアクセスした時に、新しいデータを既に含む ``db.table.id`` のインデックスが存在する保証はありません。このためユーザには、"Data not found" というメッセージが頻繁に表示されます。
+
+##### JOINの無効
+
+JOIN操作が無効です。Datastoreの典型的なリレーション機能は、web2pyのクエリからJOINを削除することと、データベースの非正規化を要求します。
+
+Google App Engineは ``ListPeroperty`` や ``StringListProperty`` といった、特別なフィールドタイプをサポートします。web2pyは以下の古い構文を使うことで、これらのタイプを使用できます:
 
 ``
 from gluon.dal import gae
@@ -1381,7 +1837,7 @@ db.define_table('product',
     Field('tags', type=gae.StringListProperty())
 ``:code
 
-もしくは、同等の新しい構文：
+もしくは、同等の新しい構文:
 
 ``
 db.define_table('product',
@@ -1389,16 +1845,39 @@ db.define_table('product',
     Field('tags', 'list:string')
 ``:code
 
-どちらの場合も"tags"フィールドは``StringListProperty``タイプで、値はストリングのリストである必要があります。GAEのドキュメントに互換性に関する記載があります。
+どちらの場合も "tags" フィールドは ``StringListProperty`` タイプで、値はストリングのリストである必要があります。GAEのドキュメントに互換性に関する記載があります。
 we2pyがフォームのコンテキストでフィールドをスマートに扱えること、リレーショナルデータベースでも動作すること、これらの理由により二つ目の記述の方が好ましいです。
 
-同様にListProperty(int)にマッピングする``list:integer``と``list:reference``を、web2pyはサポートします。
+同様にListProperty(int)にマッピングする ``list:integer`` と ``list:reference`` を、web2pyはサポートします。
 
-``list``タイプの詳細は6章で説明されています。
+``list`` タイプの詳細は6章で説明されています。
 
-#### GAEとHTTPS
+#### データベースのマイグレーション
 
-アプリケーションのidが"myapp"の場合、GAEドメインは
+Google AppEngineへのマイグレーションに関して、良いプラクティスは次の通りです。
+AppEngineは複数のコードバージョンをサポートしています。
+ユーザに表示するサイトのコードバージョンを使用し(例えば、バージョン1)、管理者コードは他のコードバージョンを使用します(例えば、バージョン2)。``app.yaml`` でバージョン2のために、次のようにハンドラを宣言します(Python2.7を使用していると仮定)。
+
+``
+- url: .*
+  script: gaehandler.wsgiapp    # WSGI (Python 2.7 only)
+  secure: optional
+  login: admin
+``:code
+
+``login: admin`` 句は、管理者がバージョン2を使用することができるようにします。
+データベース接続文字列では、``migrate_enabled=False`` を指定します。
+マイグレーション実行では、マイグレーションへのデータベース同時アクセスを無効にすることをお勧めします。
+
+次の手順に従ってください:
+- バージョン1のトップディレクトリ(``/controllers``、``/views`` などのディレクトリの親ディレクトリのこと)に ``DISABLED`` という名前のファイルを追加し、GAEに新しいバージョンをアップロードします。これはバージョンを1を無効にし、''"The site is temporarily down for maintenance"'' というメッセージを表示します。
+- データベース接続文字列に ``migrate_enabled=True`` と記述し、バージョン2をアップロードします。そして管理者アカウントでサイトを訪問し、マイグレーションを動かします。
+- ``migrate_enabled=False`` にしてバージョン2をアップロードし、マイグレーションの実行を無効にします。
+- バージョン1から ``DISABLED`` ファイルを削除し、バージョン1のコードをアップロードします。これにより、サイトの全てが表示されるようになります。
+
+#### GAEとhttps
+
+アプリケーションのidが "myapp" の場合、GAEドメインは、
 
 ``
 http://myapp.appspot.com/
@@ -1410,32 +1889,10 @@ http://myapp.appspot.com/
 https://myapp.appspot.com/
 ``:code
 
-この場合、Googleによって提供される"appspot.com"の証明書を使用します。
+この場合、Googleによって提供される "appspot.com" の証明書を使用します。
 
 DNSエントリーの登録で、他のドメイン名でアプリを使用できますが、HTTPSは使用できません。執筆時点で、これはGAEの制限です。
 
-### Jython
-``Jython``:inxx
-
-web2pyは普段CPython(C言語で実装されたPythonインタプリタ)で稼動しますが、Jython(Java言語で実装されPythonインタプリタ)でも動作します。これはweb2pyをJavaの基盤で稼働できることを意味します。
-
-web2pyはJythonですぐに実行できますが、JythonやzxJDBC(Jythonのデータベースアダプタ)のセットアップで、いくつかの複雑でトリッキーなことがあります。以下はその手順です：
-- ``Jython.org``から "jython_installer-2.5.0.jar" (または 2.5.x) をダウンロードします
-- それをインストールします：
-``
-java -jar jython_installer-2.5.0.jar
-``:code
-- ``jdbcsource``:citeから"zxJDBC.jar"をダウンロードしインストールします
-- ``jdbcjar``:citeから"sqlitejdbc-v056.jar"ファイルをダウンロードしインストールします
-- zxJDBCとsqlitejdbcをjavaのCLASSPATHに追加します
-- web2pyをJythonで起動します
-
-``
-/path/to/jython web2py.py
-``:code
-
-執筆時点で、Jythonでは``sqlite``と``postgres``のみサポートされています。
-
-
 ##### 第3版 - 翻訳: Omi Chiba　レビュー: 中垣健志
 ##### 第4版 - 翻訳: Yota Ichino　レビュー: Hitoshi Kato
+##### 第5版 - 翻訳: Hitoshi Kato　レビュー: Omi Chiba

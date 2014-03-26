@@ -39,7 +39,7 @@
     $elements.each(function() {
       var $e = $(this);
       var text = $e.text();
-      var anchor = text.replace(/ /g,'-');
+      var anchor = text.replace(/['()\. /<>!?,:-]/g,'-');
 
       $e.before('<a name="' + anchor + '"></a>');
 
