@@ -1,4 +1,4 @@
-# coding: utf8
+# -*- coding: utf-8 -*-
 {
 '!langcode!': 'pl',
 '!langname!': 'Polska',
@@ -8,6 +8,7 @@
 '%s selected': 'wybrano %s',
 '%Y-%m-%d': '%Y-%m-%d',
 '%Y-%m-%d %H:%M:%S': '%Y-%m-%d %H:%M:%S',
+'@markmin\x01An error occured, please [[reload %s]] the page': 'An error occured, please [[reload %s]] the page',
 'About': 'O',
 'Access Control': 'Kontrola dostępu',
 'Administrative Interface': 'Interfejs administracyjny',
@@ -52,7 +53,7 @@
 'Disk Cache Keys': 'Klucze pamięci podręcznej na dysku',
 'Disk Cleared': 'Pamięć podręczna na dysku została wyczyszczona',
 'Documentation': 'Dokumentacja',
-"Don't know what to do?": "Co zrobić?",
+"Don't know what to do?": 'Co zrobić?',
 'done!': 'Zrobione!',
 'Download': 'Pobierz',
 'E-mail': 'Adres e-mail',
@@ -62,6 +63,7 @@
 'Edit Profile': 'Edytuj profil',
 'Edit This App': 'Edytuj tą aplikację',
 'Email and SMS': 'Wiadomości e-mail i SMS',
+'Enter a valid URL': 'Enter a valid URL',
 'Errors': 'Błędy',
 'export as csv file': 'Eksportuj jako plik csv',
 'FAQ': 'FAQ',
@@ -165,6 +167,7 @@
 'Welcome to web2py': 'Witaj w web2py',
 'Welcome to web2py!': 'Witaj w web2py!',
 'Which called the function %s located in the file %s': 'Której nazwa funkcji %s jest umieszczona w pliku %s',
+'Working...': 'Working...',
 'You are successfully running web2py': 'Pomyślnie uruchiomiłeś web2py',
 'You can modify this application and adapt it to your needs': 'Możesz zmienić tą aplikacje i dostosować ją do własnych potrzeb',
 'You visited the url %s': 'Odwiedziłeś adres url %s',

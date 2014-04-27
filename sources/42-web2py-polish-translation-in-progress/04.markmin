@@ -1,38 +1,50 @@
 ## Rdzeń
 
-### Command line options
+### Opcje linii poleceń
 
-It is possible to skip the GUI and start web2py directly from the command line by typing something like:
-``password``:inxx
+Możliwe jest zrezygnowanie z interfejsu UI i rozpoczęcie pracy z web2py bezpośrednio
+z linii poleceń przez wpisanie czegoś takiego:
+``hasło``:inxx
 
 ``
 python web2py.py -a 'your password' -i 127.0.0.1 -p 8000
 ``:code
 
-When web2py starts, it creates a file called "parameters_8000.py" where it stores the hashed password. If you use "<ask>" as the password, web2py prompts you for it.
+Podczas startu web2py tworzony jest plik o nazwie "parameters_8000.py", w którym zapisywane
+jest szyfrowane hasło. Jeśli użyje się "<ask>" jako hasła, web2py poprosi o podanie hasła.
 
-For additional security, you can start web2py with:
+Dla dodatkowego bezpieczeństwa można wystartować web2py poleceniem:
 ``
 python web2py.py -a '<recycle>' -i 127.0.0.1 -p 8000
 ``:code
 
-In this case web2py reuses the previously stored hashed password. If no password is provided, or if the "parameters_8000.py" file is deleted, the web-based administrative interface is disabled.
+W tym przypadku web2py ponownie wykorzystuje przechowywane zaszyfrowane hasło.
+Jeśli hasło nie zostało podane lub jeśli plik "parameters_8000.py" został usunięty,
+nie jest dostępny internetowy interfejs administracyjny.
 
 ``PAM``:inxx
-On some Unix/Linux systems, if the password is
+W niektórych systemach Unix/Linux, jeśli hasło to
 ``
 <pam_user:some_user>
 ``:code
 
-web2py uses the PAM password of the Operating System account of ``some_user`` to authenticate the administrator, unless blocked by the PAM configuration.
+web2py używa hasła PAM konta systemu operacyjnego ``some_user`` do uwierzytelniania
+administratora, chyba że jest zablokowany przez konfigurację PAM.
 
 -------
-web2py normally runs with CPython (the C implementation of the Python interpreter created by Guido van Rossum), but it can also run with PyPy and Jython. The latter possibility allows the use of web2py in the context of a Java EE infrastructure. To use Jython, simply replace "python web2py.py ..." with "jython web2py.py". Details about installing Jython, zxJDBC modules required to access the databases can be found in Chapter 14.
+Platforma web2py zwykle działa z CPython (implementaja C interpretera Python stworzona
+przez Guido van Rossum), ale również może działać z PyPy i Jython. Ta ostatnia
+implementacja umożliwia używanie web2py w kontekście infrastruktury Java EE.
+W celu umożliwienia stosowania Jythona, wystarczy zamienić wyrażenie "python web2py.py ..."
+na "jython web2py.py". Szczegółowe informacje o instalacji Jython, modułu zxJDBC
+wymaganego do dostępu do bazy danych można znaleźć w rozdziale 14.
 -------
 
-The "web2py.py" script can take many command-line arguments specifying the maximum number of threads, enabling of SSL, etc. For a complete list type:
+Skrypt "web2py.py" może przyjmować wiele argumentów linii poleceń określających
+maksymalną liczbę wątków, udostępniających SSL itd. W celu uzyskania pełnego wykazu
+wpisz:
 
-``command line``:inxx
+``linia poleceń``:inxx
 ``
 >>> python web2py.py -h
 Usage: python web2py.py
@@ -135,15 +147,24 @@ Options:
 ``:code
 
 ------
-Please note: The option ``-W``, used to install a Windows service, has been removed. Please see [[nssm in the Deployment Recipes chapter ../13/#nssm]]
+Uwaga: Opcja ``-W``, używana do instalacji usługi Windows, została usunięta.
+Proszę zobaczyć [[nssm w rozdziale Deployment Recipes ../13/#nssm]]
 ------
 
-Lower-case options are used to configure the web server. The ``-L`` option tells web2py to read configuration options from a file, ``-W`` installs web2py as a windows service, while ``-S``, ``-P`` and ``-M`` options start an interactive Python shell. The ``-T`` option finds and runs controller doctests in a web2py execution environment. For example, the following example runs doctests from all controllers in the "welcome" application:
+Opcje pisane małymi literami są używane do konfiguracji serwera internetowego.
+Opcja ``-L`` informuje web2py aby czytał opcje konfiguracyjne z pliku, ``-W``
+instaluje web2py jako usługę Windows, podczas gdy opcje ``-S``, ``-P`` i ``-M``
+uruchamiają interaktywną powłokę Pythona. Opcja ``-T`` wyszukuje i uruchamia
+kontroler doctests w środowisku wykonawczym web2py. Poniższy przykład uruchamia
+doctests ze wszystkich kontrolerów w aplikacji "welcome":
 ``
 python web2py.py -vT welcome
 ``:code
 
-if you run web2py as a Windows Service, ``-W``,  it is not convenient to pass the configuration using command line arguments. For this reason, in the web2py folder there is a sample "options_std.py" configuration file for the internal web server:
+jeśli uruchomi się web2py jako usługę Windows przez opcję ``-W``, to nie jest wygodne
+przekazywanie konfiguracji przy użyciu argumentów linii poleceń. Z tego powodu
+w folderze web2py znajduje się prosty plik konfiguracyjny "options_std.py" dla
+wewnętrznego serwera internetowego:
 
 ``
 import socket
@@ -171,155 +192,185 @@ extcron = None
 nocron = None
 ``:code
 
-This file contains the web2py defaults. If you edit this file, you need to import it explicitly with the ``-L`` command-line option. It only works if you run web2py as a Windows Service.
+Plik ten zawiera wartości domyślne web2py. Jeśli edytuje się ten plik, to musi się
+go importować jawnie z użyciem opcji ``-L`` linii poleceń. Działa to tylko gdy
+uruchomi się web2py jako usługę Windows.
 
-### Workflow
+### Proces przetwarzania
 
-The web2py workflow is the following:
-- An HTTP requests arrives to the web server (the built-in Rocket server or a different server connected to web2py via WSGI or another adapter). The web server handles each request in its own thread, in parallel.
-- The HTTP request header is parsed and passed to the dispatcher (explained later in this chapter).
-- The dispatcher decides which of the installed application will handle the request and maps the PATH_INFO in the URL into a function call. Each URL corresponds to one function call.
-- Requests for files in the static folder are handled directly, and large files are automatically streamed to the client.
-- Requests for anything but a static file are mapped into an action (i.e. a function in a controller file, in the requested application).
-- Before calling the action, a few things happen: if the request header contains a session cookie for the app, the session object is retrieved; if not, a session id is created (but the session file is not saved until later); an execution environment for the request is created; models are executed in this environment.
-- Finally the controller action is executed in the pre-built environment.
-- If the action returns a string, this is returned to the client (or if the action returns a web2py HTML helper object, it is serialized and returned to the client).
-- If the action returns an iterable, this is used to loop and stream the data to the client.
-- If the action returns a dictionary, web2py tries to locate a view to render the dictionary. The view must have the same name as the action (unless specified otherwise) and the same extension as the requested page (defaults to .html); on failure, web2py may pick up a generic view (if available and if enabled). The view sees every variable defined in the models as well as those in the dictionary returned by the action, but does not see global variables defined in the controller.
-- The entire user code is executed in a single database transaction unless specified otherwise.
-- If the user code succeeds, the transaction is committed.
-- If the user code fails, the traceback is stored in a ticket, and a ticket ID is issued to the client. Only the system administrator can search and read the tracebacks in tickets.
+Proces przetwarzania danych w web2py jest następujący:
+- Żądanie HTTP dociera do serwera internetowego (wbudowanego serwera Rocket lub innego serwera połączonego z web2py poprzez WSGI lub inny adapter). Serwer internetowy obsługuje każde żądanie w oddzielnym wątku, równolegle.
+- Nagłówek żądania HTTP jest parsowany i przekazywany do dyspozytora (''ang. dispatcher'') (wyjaśnionego dalej w tym rozdziale).
+- Dyspozytor decyduje, która z zainstalowanych aplikacji będzie obsługiwać żądanie i odwzorowuje PATH_INFO z adresu URL na wywołanie funkcji. Każdy adres URL odpowiada jednemu wywołaniu funkcji.
+- Żądania dla plików w folderze statycznym są obsługiwane bezpośrednio a większe pliki są automatycznie strumieniowane do klienta.
+- Żądania pozostałe (nie dotyczące plików statycznych) są odwzorowywane do akcje (tj. funkcji w pliku kontrolera z żądanej aplikacji).
+- Przed wywołaniem akcji dzieje się kilka rzeczy: jeśli żądanie zawiera nagłówek ciasteczka dla aplikacji, pobierany jest obiekt sesji; jeśli nie, tworzony jest id sesji (ale plik sesji jest zapisywany później); tworzone jest środowisko dla żądania; w tym środowisku wykonywane są modele.
+- Na koniec, we wstępnie zbudowanym środowisku wykonywana jest akcja kontrolera.
+- Jeśli akcja zwraca ciąg znakowy, to jest on zwracany klientowi (lub jeśli akcja zwraca obiekt helpera HTML web2py, to jest on serializowany i zwracany klientowi).
+- Jeśli akcja zwraca element iterowalny, to zostaje na nim zastosowana pętla i strumień danych przesyłany klientowi.
+- Jeśli akcja zwraca słownik, web2py próbuje zlokalizować widok do renderowana słownika. Widok musi mieć tą sama nazwę co akcja (chyba, że określono to inaczej) i to samo rozszerzenie, co żądana strona (domyślnie .html); w przypadku błędu web2py może zastosować widok ogólny (jeśli jest dostępny i włączony). Widok widzi każdą zmienną zdefiniowana w modelach, jak również te zmienne w słowniku zwracane przez akcje, ale nie ma tu zmiennych globalnych zdefiniowanych w kontrolerze.
+- Cały kod wykonywany jest w pojedynczej transakcji bazy danych, chyba że określono to inaczej.
+- Jeśli kod użytkownika powiedzie się, transakcja jest zatwierdzana.
+- Jeśli kod użytkownika nie powiedzie się, w bilecie zostaje jest zapisany komunikat z ostatniego wywołania (''ang. traceback'') i uzytkownikowi zostaje wysłany identyfikator biletu. Tylko administrator systemu może wyszukiwać i odczytywać w bilecie komunikat z ostatniego wywołania.
 
-There are some caveats to keep in mind:
-- Models in the same folder/subfolder are executed in alphabetical order.
-- Any variable defined in a model will be visible to other models following alphabetically, to the controllers, and to the views.
+Istnieje kilka uwag, o których warto pamiętać:
+- Modele w tym samym folderze (podfolderze) są wykonywane w alfabetycznej kolejności.
+- Każda zmienna zdefiniowana w modelu będzie widoczna dla innych modeli w kolejności alfabetycznej, dla kontrolerów i widoków.
 ``models_to_run``:inxx
-- Models in subfolders are executed conditionally. For example, if the user has requested "/a/c/f" where "a" is the application, "c" is the controller, and "f" is the function (action), then the following models are executed:
+- Modele w podfolderach są wykonywane warunkowo . Na przykład, jeśli użytkownik wysyła żądanie "/a/c/f", gdzie "a" to aplikacja, "c" to kontroler a "f" to funkcja
+(akcja), to następnie wykonywane są następujące modele:
 
 ``
 applications/a/models/*.py
 applications/a/models/c/*.py
 applications/a/models/c/f/*.py
 ``
-  This behaviour is enforced by default. Altering the ``response.models_to_run`` regex list, you can force the behaviour you want. Look at [[response #response_models_to_run]] for additional details
+Zachowanie takie jest wymuszane domyślnie. Zmieniając listę wyrażeń regularnych
+``response.models_to_run`` można wymusić takie zachowanie, jakie się chce (zobacz
+do [[response #response_models_to_run]] w celu poznania szczegółów)
 
-- The requested controller is executed and the requested function is called. This means all top-level code in the controller is also executed at every request for that controller.
-- The view is only called if the action returns a dictionary.
-- If a view is not found, web2py tries to use a generic view. By default, generic views are disabled, although the 'welcome' app includes a line in /models/db.py to enable them on localhost only. They can be enabled per extension type and per action (using ``response.generic_patterns``). In general, generic views are a development tool and typically should not be used in production. If you want some actions to use a generic view, list those actions in ``response.generic_patterns`` (discussed in more detail in the chapter on Services).
+- Wykonywany jest żądany kontroler i wywoływana jest potrzebna funkcja. Oznacza to, że dla każdego żądania  dla określonego kontrolera wykonywany jest również cały kod na najwyższym poziomie w tym kontrolerze.
+- Widok jest wywoływany tylko wtedy, gdy akcja zwraca słownik.
+- Jeżeli widok nie zostanie znaleziony, web2py spróbuje użyć widoku ogólnego. Domyślnie, widok ogólne są wyłączone, lecz aplikacja 'welcome' zawiera linię w /models/db.py do ich włączenie, ale tylko na localhost. Mogą one być włączone dla każdego typu i każdej akcji (za pomocą ``response.generic_patterns``). Ogólnie, ogólne widoki są narzędziem programistycznym i zazwyczaj nie powinny być wykorzystywane w środowisku produkcyjnym. Jeśli chce się aby jakieś akcje wykorzystywały widok ogólny, trzeba umieścić je na liście ``response.generic_patterns`` (omówionej w rozdziale Usługi).
 
-The possible behaviors of an action are the following:
+Możliwe zachowania akcji są następujące:
 
-**Return a string**
+**Zwracanie ciąga znakowego**
 ``
 def index(): return 'data'
 ``
 
-**Return a dictionary for a view**:
+**Zwracanie słownika dla widoku**:
 ``
 def index(): return dict(key='value')
 ``
 
-**Return all local variables**:
+**Zwracanie wszystkich lokalnych zmiennych**:
 ``
 def index(): return locals()
 ``
 
-**Redirect the user to another page**:
+**Przekierowanie użytkowników do innej strony**:
 ``
 def index(): redirect(URL('other_action'))
 ``
 
-**Return an HTTP page other than "200 OK"**:
+**Zwracanie strony HTTP innej niż "200 OK"**:
 ``
 def index(): raise HTTP(404)
 ``
 
-**Return a helper** (for example, a FORM):
+**Zwracanie helpera** (na przykład FORM):
 ``
 def index(): return FORM(INPUT(_name='test'))
 ``
-(this is mostly used for Ajax callbacks and components, see chapter 12)
+(jest to najczęściej stosowane dla wywołań zwrotnych Ajax i komentarzy, patrz rozdział 12)
 
-When an action returns a dictionary, it may contain code generated by helpers, including forms based on database tables or forms from a factory, for example:
+Gdy akcja zwraca słownik, to może zawierać kod generowany przez helpery, w tym
+formularze oparte na tabelach bazy danych lub formularze z fabryki, na przykład:
 
 ``
 def index(): return dict(form=SQLFORM.factory(Field('name')).process())
 ``
-(all forms generated by web2py use postbacks, see chapter 3)
+(Wszystkie formularze generowane przez web2py wykorzystują zgłoszenia zwrotne
+(''ang. postback''), patrz rozdział 3)
 
-### Dispatching
-``url mapping``:inxx ``dispatching``:inxx
+### Rozdzielanie
+``mapowanie url``:inxx ``odwzorowywanie url``:inxx ``rozdzielanie``:inxx
 
-web2py maps a URL of the form:
+Platforma web2py odwzorowuje adres URL formularza o postaci:
 
 ``
 http://127.0.0.1:8000/a/c/f.html
 ``:code
 
-to the function ``f()`` in controller "c.py" in application "a". If ``f`` is not present, web2py defaults to the ``index`` controller function. If ``c`` is not present, web2py defaults to the "default.py" controller, and if ``a`` is not present, web2py defaults to the ``init`` application. If there is no ``init`` application, web2py tries to run the ``welcome`` application. This is shown schematically in the image below:
+do funkcji ``f()`` w kontrolerze "c.py" w aplikacji"a". Jeśli ``f`` nie jest podana,
+web2py stosuje domyślnie funkcję ``index`` kontrolera. Jeśli ``c`` nie jest podany,
+web2py stosuje domyślnie kontroler "default.py" a przy braku ``a``, web2py wykorzystuje
+domyślnie aplikację ``init``. Jeśli nie ma aplikacji ``init``, web2py próbuje uruchomić
+aplikację ``welcome``. Jest to pokazane na poniższym obrazie:
 
-[[image @///image/en5700.png center 480px]]
+[[image @///image/pl5700.png center 480px]]
 
-By default, any new request also creates a new session. In addition, a session cookie is returned to the client browser to keep track of the session.
+Domyślnie, każde nowe żądanie tworzy nową sesję. Ponadto, ciasteczko sesji jest
+zwracane do przeglądarki klienta w celu śledzenia sesji.
 
-The extension ``.html`` is optional; ``.html`` is assumed as default. The extension determines the extension of the view that renders the output of the controller function ``f()``. It allows the same content to be served in multiple formats (html, xml, json, rss, etc.).
+Rozszerzenie ``.html`` jest opcjonalne i jest rozszerzeniem domyślnym. Rozszerzenie
+determinuje rozszerzenie widoku, który renderuje wyjście funkcji kontrolera ``f()``.
+Pozwala aby ta sama zawartość była serwowana w wielu formatach (html, xml, json, rss itd.).
 
 -------
-Functions that take arguments or start with a double underscore are not publicly exposed and can only be called by other functions.
+Funkcje posiadające argumenty lub rozpoczynające się dwoma znakami podkreślenia
+nie są publicznie widoczne i mogą tylko być wywoływane przez inne funkcje.
 -------
 
-``static files``:inxx
-There is an exception made for URLs of the form:
+``pliki statyczne``:inxx
+Istnieje wyjątek zrobiony dla adresów URL formularzy o postaci:
 ``
 http://127.0.0.1:8000/a/static/filename
 ``:code
 
-There is no controller called "static". web2py interprets this as a request for the file called "filename" in the subfolder "static" of the application "a".
+Nie ma kontrolera o nazwie "static". web2py interpretuje to jako żądanie dla pliku
+o nazwie "filename" w podfolderze "static" aplikacji "a".
 
 ``PARTIAL CONTENT``:inxx ``IF_MODIFIED_SINCE``:inxx
-When static files are downloaded, web2py does not create a session, nor does it issue a cookie or execute the models. web2py always streams static files in chunks of 1MB, and sends PARTIAL CONTENT when the client sends a RANGE request for a subset of the file.
+Po pobraniu plików statycznych, web2py nie tworzy sesji, ani nie wystawia ciasteczka
+lub wykonuje modele. web2py zawsze strumieniuje pliki statyczne kawałkami o rozmiarze
+1MB i wysyła PARTIAL CONTENT, gdy klient wysyła żądanie RANGE dla podzbioru pliku.
 
-web2py also supports the IF_MODIFIED_SINCE protocol, and does not send the file if it is already stored in the browser's cache and if the file has not changed since that version.
+Platforma web2py również obsługuje protokół IF_MODIFIED_SINCE i nie wysyła pliku,
+jeśli jest on już przechowywany w pamięci podręcznej przeglądarki i jeśli plik
+ten nie został zmieniony od czasu przesłania go do przeglądarki.
 
-When linking to an audio or video file in the static folder, if you want to force the browser to download the file instead of streaming the audio/video via a media player, add ``?attachment`` to the URL. This tells web2py to set the ``Content-Disposition`` header of the HTTP response to "attachment". For example:
+Podczas linkowania do plików audio lub wideo w folderze statycznym, jeśli chce się
+wymusić na przeglądarce aby pobierała pliki audio lub wideo, a nie je strumieniowała
+w odtwarzaczu medialnym, trzeba dodać ``?attachment`` do adresu URL. To poinformuje
+web2py aby ustawił nagłówek ``Content-Disposition`` odpowiedzi HTTP na "attachment".
+Na przykład:
 
 ``
 <a href="/app/static/my_audio_file.mp3?attachment">Download</a>
 ``:code
 
-When the above link is clicked, the browser will prompt the user to download the MP3 file rather than immediately streaming the audio. (As discussed [[below #response]], you can also set HTTP response headers directly by assigning a ``dict`` of header names and their values to ``response.headers``.)
+Po kliknięciu powyższego odnośnika, przeglądarka poprosi użytkownika aby pobrał
+plik MP3 zamiast go strumieniować w odtwarzaczu audio. Tak jak opisano [[poniżej #response]],
+można również bezpośrednio ustawiać nagłówki odpowiedzi HTTP przypisując ``dict``
+nazw nagłówków i ich wartości do ``response.headers``.
 
 ``request.application``:inxx ``request.controller``:inxx ``request.function``:inxx ``GET``:inxx ``POST``:inxx ``request.args``:inxx
-web2py maps GET/POST requests of the form:
+web2py odwzorowuje żądania GET i POST formularza:
 ``
 http://127.0.0.1:8000/a/c/f.html/x/y/z?p=1&q=2
 ``:code
 
-to function ``f`` in controller "c.py" in application ``a``, and it stores the URL parameters in the ``request`` variable as follows:
+do funkcji ``f`` w kontrolerze "c.py" w aplikacji ``a`` i przechowuje parametry
+adresu URL w zmiennej ``request`` jak niżej:
 ``
 request.args = ['x', 'y', 'z']
 ``:code
 
-and:
+i:
 ``
 request.vars = {'p':1, 'q':2}
 ``:code
 
-and:
+i:
 ``
 request.application = 'a'
 request.controller = 'c'
 request.function = 'f'
 ``:code
 
-In the above example, both ``request.args[i]`` and ``request.args(i)`` can be used to retrieve the i-th element of the ``request.args``, but while the former raises an exception if the list does not have such an index, the latter returns None in this case.
+W powyższym przykładzie zarówno ``request.args[i]`` jak i ``request.args(i)`` mogą
+być używane do pobrania i-tego elementu ``request.args``, ale gdy pierwszy zgłasza
+wyjątek jeśli na liście nie występuje index, to drugi zwraca w takim przypadku None.
 
 ``request.url``:inxx
 ``
 request.url
 ``:code
 
-stores the full URL of the current request (not including GET variables).
+przechowuje pełny adres URL bieżącego żądania (nie dołączając zmiennych GET).
 
 ``request.ajax``:inxx ``request.cid``:inxx
 
@@ -327,66 +378,83 @@ stores the full URL of the current request (not including GET variables).
 request.ajax
 ``:code
 
-defaults False but it is True if web2py determines that the action was called by an Ajax request.
+domyślnie wartość False, ale True jeśli web2py stwierdzi, że akcja została wywołana
+przez żądanie Ajax.
 
-If the request is an Ajax request and it is initiated by a web2py component, the name of the component can be found in:
+Jeśli żądanie jest żądaniem Ajax i jeśli zostało zainicjowane przez komponent
+web2py, nazwę komponentu można znaleźć w:
 
 ``
 request.cid
 ``:code
 
-Components are discussed in more detail in Chapter 12.
+Komponenty omówione są bardziej szczegółowo w rozdziale 12.
 
 ``request.get_vars``:inxx ``request.post_vars``:inxx ``request.vars``:inxx
-If the HTTP request is a GET, then ``request.env.request_method`` is set to "GET"; if it is a POST, ``request.env.request_method`` is set to "POST". 
-URL query variables are stored in ``request.get_vars``.
-``request.post_vars`` contains all parameters passed into the body of a request (usually a POST, PUT or a DELETE one).
-The ``request.vars`` Storage dictionary contains both of them (``get_vars`` and ``post_vars`` get merged)
+Jeśli żądanie HTTP jest typu GET, to ``request.env.request_method`` zostaje
+ustawiona na "GET", jeśli natomiast typu POST, to na "POST". 
+Parametry zapytania z adresu URL są przechowywane w zmiennej ``request.get_vars``.
+Zmienna ``request.post_vars`` zawiera wszystkie parametry przekazane do ciała żądania (zazwyczaj POST, PUT lub DELETE).
+Słownik ``request.vars`` zawiera je oba (``get_vars`` i ``post_vars``)
 
-web2py stores WSGI and web2py environment variables in ``request.env``, for example:
+Platforma web2py przechowuje zmienne środowiskowe WSGI i web2py w zmiennej
+``request.env``, na przykład:
 ``
 request.env.path_info = 'a/c/f'
 ``:code
 
-and HTTP headers into environment variables, for example:
+a nagłówki HTTP w zmiennych środowiskowych, na przykład:
 ``
 request.env.http_host = '127.0.0.1:8000'
 ``:code
 
 -------
-Notice that web2py validates all URLs to prevent directory traversal attacks.
+Proszę zwrócić uwagę, że web2py sprawdza wszystkie adresy URL, aby zapobiegać
+atakom z przeglądaniem katalogów.
 -------
 
-URLs are only allowed to contain alphanumeric characters, underscores, and slashes; the ``args`` may contain non-consecutive dots. Spaces are replaced by underscores before validation. If the URL syntax is invalid, web2py returns an HTTP 400 error message``http-w``:cite ``http-o``:cite .
+Adresy URL mogą zawierać tylko znaki alfanumeryczne, znaki podkreślenia i ukośniki.
+Parametr ``args`` nie może zawierać występujących po sobie kropek. Spacje są
+zamieniane na znaki podkreślenia przed walidacją. Jeśli składnia adresu URL jest
+nieprawidłowa, web2py zwraca komunikat błędu 400 HTTP``http-w``:cite ``http-o``:cite .
 
-If the URL corresponds to a request for a static file, web2py simply reads and returns (streams) the requested file.
+Jeśli adres URL zgodny jest z żądaniem dla plików statycznych, web2py po prostu
+czyta  i zwraca (strumieniuje) żądany plik.
 
-If the URL does not request a static file, web2py processes the request in the following order:
-- Parses cookies.
-- Creates an environment in which to execute the function.
-- Initializes ``request``, ``response``, ``cache``.
-- Opens the existing ``session`` or creates a new one.
-- Executes the models belonging to the requested application.
-- Executes the requested controller action function.
-- If the function returns a dictionary, executes the associated view.
-- On success, commits all open transactions.
-- Saves the session.
-- Returns an HTTP response.
+Jeśli adres URL nie żąda pliku statycznego, web2py przetwarza żądanie w następującej kolejności:
+- Analizuje ciasteczka.
+- Tworzy środowisko.
+- Inicjuje obiekty  ``request``, ``response``, ``cache``.
+- Otwiera isteniejący obiekt  ``session`` lub tworzy nowy.
+- Wykonuje modele należące do żądanej aplikacji.
+- Wykonuje żądaną funkcję akcji kontrolera.
+- Jeśli funkcja zwraca słownik, wykonuje związany widok.
+- W razie sukcesu zatwierdza wszystkie otwarte transakcje.
+- Zapisuje sesję.
+- Zwraca odpowiedź HTTP.
 
-Notice that the controller and the view are executed in different copies of the same environment; therefore, the view does not see the controller, but it sees the models and it sees the variables returned by the controller action function.
+Proszę zauważyć, że kontroler i widok są wykonywane w różnych kopiach tego samego
+środowiska, dlatego widok nie widzi kontrolera, ale widzi modele i zmienne zwracane
+przez funkcje akcji kontrolera.
 
-If an exception (other than HTTP) is raised, web2py does the following:
-- Stores the traceback in an error file and assigns a ticket number to it.
-- Rolls back all open database transactions.
-- Returns an error page reporting the ticket number.
+Jeśli zostaje wywołany wyjątek (inny niż HTTP), web2py wykonuje następujące rzeczy:
+- Zapisuje komunikat z ostatniego wywołania (traceback) w pliku błędu i przypisuje mu numer biletu.
+- Wycofuje wszystkie otwarte transakcje bazy danych.
+- Zwraca stronę błędu raportującą numer biletu.
 
-If the exception is an ``HTTP`` exception, this is assumed to be the intended behavior (for example, an ``HTTP`` redirect), and all open database transactions are committed. The behavior after that is specified by the ``HTTP`` exception itself. The ``HTTP`` exception class is not a standard Python exception; it is defined by web2py.
+Jeśli wyjątek jest wyjątkiem ``HTTP``, to zakłada się, że zamierzone zachowanie
+(na przykład, przekierowanie ``HTTP``) i wszystkie otwarte transakcje bazy danych
+zostały zatwierdzone. Zachowanie późniejsze jest określone przez sam wyjątek ``HTTP``.
+Klasa wyjątku ``HTTP`` nie jest standardowym wyjątkiem Pythona – jest zdefiniowana
+przez web2py.
 
-### Libraries
+### Biblioteki
 
-The web2py libraries are exposed to the user applications as global objects. For example (``request``, ``response``, ``session``, ``cache``), classes (helpers,  validators, DAL API), and functions (``T`` and ``redirect``).
+Biblioteki web2py są dostępne dla aplikacji użytkownika jako obiekty globalne.
+Na przykład obiekty ``request``, ``response``, ``session``, ``cache``, klasy helperów,
+walidatorów, API DAL oraz  funkcje ``T`` i ``redirect``.
 
-These objects are defined in the following core files:
+Obiekty te sa zdefiniowane w nastęþujacych plikach rdzenia:
 ``
 web2py.py
 gluon/__init__.py    gluon/highlight.py   gluon/restricted.py  gluon/streamer.py
@@ -402,199 +470,215 @@ gluon/globals.py     gluon/reserved_sql_keywords.py
 ``:code
 
 ------
-Notice that many of these modules, specifically ``dal`` (the Database Abstraction Layer), ``template`` (the template language), ``rocket`` (the web server), and
-``html`` (the helpers) have no dependencies and can be used outside of web2py.
+Proszę zauważyć, że wiele z tych modułów, w szczególności ``dal`` (warstwa abstrakcji
+bazy danych), ``template`` (język szablonowania), ``rocket`` (serwer internetowy)
+i ``html`` (helpery) nie mają zależności i mogą być używane poza web2py.
 -----
 
-The tar gzipped scaffolding app that ship with web2py is
+Skompresowane przez gzip archiwum tar aplikacji dostarczane wraz z web2py to
 ``
 welcome.w2p
 ``:code
 
-This is created upon installation and overwritten on upgrade.
+Aplikacja ta jest tworzona podczas instalacji i nadpisywana podczas aktualizacji.
 
 -------
-The first time you start web2py, two new folders are created: deposit and applications. The deposit folder is used as temporary storage for installing and uninstalling applications.
+Podczas pierwszego uruchomienia web2py tworzy dwa nowe foldery: deposit i applications.
+Folder deposit jest używany jako tymczasowy magazyn dla instalowania i odinstalowywania
+aplikacji.
 
-The first time you start web2py and after an upgrade, the "welcome" app is zipped into a "welcome.w2p" file to be used as a scaffolding app.
+Podczas pierwszego uruchomienia web2py i po aktualizacji, aplikacja "welcome" jest
+pakowana do pliku "welcome.w2p" aby mogła być używana jako aplikacja szkieletowa.
 -------
 
-When web2py is upgraded it comes with a file called "NEWINSTALL". If web2py finds this file, it understands an upgrade was performed, hence it removed the file and creates a new "welcome.w2p".
+Kiedy web2py zostaje uaktualniany, to dostarczany jest wraz z plikiem o nazwie
+"NEWINSTALL". Jeśli web2py odnajdzie ten plik, to rozumie, że uaktualnienie zostało
+zrealizowane, dlatego usuwa plik "welcome.w2p" i tworzy w jego miejsce nowy, o tej
+samej nazwie.
 
-The current web2py version is stored in the field "VERSION" and it follows standard semantic versioning notation where the build id is the build timestamp.
+Aktualna wersja web2py jest zapisywana w polu "VERSION" i spełnia standardową notację
+wersjonowania, wg której identyfikator budowania jest znacznikiem czasowym budowania.
 
-web2py unit-tests are in
+Jednostkowe testy web2py znajduja się w
 ``
 gluon/tests/
 ``:code
 
-There are handlers for connecting with various web servers:
+Istnieją handlery  do połączeń z różnymi serwerami internetowymi:
 ``
-cgihandler.py       # discouraged
-gaehandler.py       # for Google App Engine
-fcgihandler.py      # for FastCGI
-wsgihandler.py      # for WSGI
-isapiwsgihandler.py # for IIS
-modpythonhandler.py # deprecated
+cgihandler.py       # nie zalecany
+gaehandler.py       # dla Google App Engine
+fcgihandler.py      # dla FastCGI
+wsgihandler.py      # dla WSGI
+isapiwsgihandler.py # dla IIS
+modpythonhandler.py # przestarzały
 ``:code
 
-("fcgihandler" calls  "gluon/contrib/gateways/fcgi.py" developed by Allan Saddi) and
+("fcgihandler" wywołuje "gluon/contrib/gateways/fcgi.py" stworzony przez Allana Saddi) i
 
 ``
 anyserver.py
 ``
 
-which is a script to interface with many different web servers, described in Chapter 13.
+który jest skryptem do współdziałania z wieloma serwerami internetowymi, co opisane
+zostało w rozdziale 13.
 
-There are three example files in the "examples" directory:
+W katalogu "examples" znajdują się trzy przykładowe pliki:
 ``
 options_std.py
 routes.parametric.example.py
 routes.patterns.example.py
 ``:code
 
-They are all meant to be copied to the root dir (where web2py.py or web2py.exe is) and edited according to your own preferences.
-The former is an optional configuration file that can be passed to web2py.py with the ``-L`` option. The second is an example of a URL mapping file. It is loaded automatically when renamed "routes.py". The third is an alternative syntax for URL mapping, and can also be renamed (or copied to) "routes.py".
+Wszystkie te pliki trzeba skopiować do głównego katalogu (tam gdzie jest plik web2py.py
+lub web2py.exe) i można je edytować, zgodnie ze swoimi potrzebami.
+Pierwszy jest opcjonalnym plikiem konfiguracyjnym, który może być przekazany do web2py.py
+przy pomocy opcji ``-L``. Drugi jest przykładem pliku mapującego adres URL. Będzie
+ładowany automatycznie, jeśli zmieni się jego nazwę na "routes.py". Trzeci jest
+alternatywna składnią dla mapowania adresów URL i może być też przemianowany na
+"routes.py" (lub skopiowany do tego pliku).
 
-The files
+Pliki
 ``
 app.example.yaml
 queue.example.yaml
 ``:code
 
-are example configuration files used for deployment on the Google App Engine. You can read more about them in the Deployment Recipes chapter and on the Google Documentation pages.
+są przykładowymi plikami konfiguracyjnymi używanymi do wdrożeń na Google App Engine.
+Można przeczytać więcej na ten temat w rozdziale "Receptury wdrożeniowe" i na stronach
+dokumentacji Google.
 
-There are also additional libraries, some developed by a third party:
+Istnieją również dodatkowe biblioteki, niektóre opracowane przez osoby trzecie:
 
-**feedparser**``feedparser``:cite  by Mark Pilgrim for reading RSS and Atom feeds:
+**feedparser**``feedparser``:cite  opracowana przez by Marka Pilgrima dla odczytu kanałów RSS i Atom:
 ``
 gluon/contrib/__init__.py
 gluon/contrib/feedparser.py
 ``:code
 
-**markdown2**``markdown2``:cite  by Trent Mick for wiki markup:
+**markdown2**``markdown2``:cite  opracowana przez Trenta Micka dla znaczników wiki:
 ``
 gluon/contrib/markdown/__init__.py
 gluon/contrib/markdown/markdown2.py
 ``:code
 
-**markmin** markup:
+**markmin** język znaczników:
 ``
 gluon/contrib/markmin
 ``:code
-(see [[MARKMIN syntax ../05/#markmin_syntax]] for more)
+(patrz [[składnia MARKMIN ../05/#markmin_syntax]] w celu uzyskania wiecej informacji)
 
-**fpdf** created my Mariano Reingart for generating PDF documents:
+**fpdf** stworzona przez Mariano Reingart dla generowania dokumentów PDF:
 ``
 gluon/contrib/fpdf
 ``
-This is not documented in this book but it is hosted and documented here:
+Nie są one udokumentowane w tej książce, ale są hostowane i udokumentowane tutaj:
 ``
 http://code.google.com/p/pyfpdf/
 ``
 
-**pysimplesoap** is a lightweight SOAP server implementation created by Mariano Reingart:
+**pysimplesoap** jest implementacją lekkiego serwerem SOAP stworzona przez  Mariano Reingarta:
 
 ``
 gluon/contrib/pysimplesoap/
 ``:code
 
-**simplejsonrpc** is a lightweight JSON-RPC client also created by Mariano Reingart: ``jsonrpc``:inxx
+**simplejsonrpc** jest lekkim klientem JSON-RPC stworzonym przez Mariano Reingarta: ``jsonrpc``:inxx
 
 ``
 gluon/contrib/simplejsonrpc.py
 ``
 
-**memcache**``memcache``:cite  Python API by Evan Martin:
+**memcache**``memcache``:cite  API Pythona stworzone przez Evana Martina:
 ``
 gluon/contrib/memcache/__init__.py
 gluon/contrib/memcache/memcache.py
 ``
 
-**redis_cache** ``redis``:inxx is a module to store cache in the redis database:
+**redis_cache** ``redis``:inxx jest modułem pamięci podręcznej dla bazy danych redis:
 ``
 gluon/contrib/redis_cache.py
 ``
 
-**gql**, a port of the DAL to the Google App Engine:
+**gql**, port DAL dla Google App Engine:
 ``
 gluon/contrib/gql.py
 ``:code
 
-**memdb**, a port of the DAL on top of memcache:
+**memdb**, port DAL górnej części memcache:
 ``
 gluon/contrib/memdb.py
 ``:code
 
-**gae_memcache** is an API to use memcache on the Google App Engine:
+**gae_memcache** to API wykorzystujące memcache dla Google App Engine:
 ``
 gluon/contrib/gae_memcache.py
 ``:code
 
-**pyrtf**``pyrtf``:cite  for generating Rich Text Format (RTF) documents, developed by Simon Cusack and revised by Grant Edwards:
+**pyrtf**``pyrtf``:cite  do generowania dokumentów Rich Text Format (RTF), opracowana przez Simona Cusacka i  poprawiona przez Granta Edwardsa:
 ``
 gluon/contrib/pyrtf/
 ``:code
 
-**PyRSS2Gen**``pyrss2gen``:cite  developed by Dalke Scientific Software, to generate RSS feeds:
+**PyRSS2Gen**``pyrss2gen``:cite  opracowana przez Dalke Scientific Software do generowania kanałów RSS:
 ``
 gluon/contrib/rss2.py
 ``:code
 
-**simplejson**``simplejson``:cite  by Bob Ippolito, the standard library for parsing and writing JSON objects:
+**simplejson**``simplejson``:cite  standardowa biblioteka do paesowania i pisania obiektów JSON opracowana przez Boba Ippolito:
 ``
 gluon/contrib/simplejson/
 ``:code
 
 **Google Wallet** ``googlewallet``:cite
-provides "pay now" buttons which link Google as payment processor:
+dostarcza przyciski "pay now" linkujący Google jako procesor płatności:
 ``
 gluon/contrib/google_wallet.py
 ``:code
 
-**Stripe.com** ``stripe``:cite provides a simple API for accepting credit card payments:
+**Stripe.com** ``stripe``:cite dostarcza proste API do przyjmowania płatności kartami kredytowymi::
 ``
 gluon/contrib/stripe.py
 ``:code
 
-**AuthorizeNet** ``authorizenet``:cite  provides API to accept credit card payments via Authorize.net network
+**AuthorizeNet** ``authorizenet``:cite dostarcza API do przyjmowania płatności kartami kredytowymi poprzez sieć Authorize.net
 ``
 gluon/contrib/AuthorizeNet.py
 ``:code
 
-**Dowcommerce** ``dowcommerce``:cite credit card processing API:
+**Dowcommerce** ``dowcommerce``:cite API przetwarzania kart kredytowych:
 ``
 gluon/contrib/DowCommerce.py
 ``:code
 
-**PaymentTech** credit card processing API:
+**PaymentTech** API przetwarzania kart kredytowych::
 
 ``
 gluon/contrib/paymentech.py
 ``:code
 
-**PAM**``PAM``:cite  authentication API created by Chris AtLee:
+**PAM**``PAM``:cite  API uwierzytelniania stworzone przez Chrisa AtLee:
 ``
 gluon/contrib/pam.py
 ``:code
 
-A Bayesian classifier to populate the database with dummy data for testing purposes:
+Klasyfikator Bayesian do wypełniania bazy danych danymi fikcyjnymi w celach testowych:
 ``
 gluon/contrib/populate.py
 ``:code
 
-A file with API for running on Heroku.com : ``heroku``:inxx
+Plik z API do uruchamiania na Heroku.com : ``heroku``:inxx
 
 ``
 gluon/contrib/heroku.py
 ``:code
 
-A file that allows interaction with the taskbar in windows, when web2py is running as a service:
+Plik umożliwiający interakcje z paskiem zadań w Windows, gdy web2py jest uruchomiony jako usługa:
 ``
 gluon/contrib/taskbar_widget.py
 ``:code
 
-Optional **login_methods** and login_forms to be used for authentication:
+Opcjonalne **login_methods** i login_forms używane do uwierzytelniania:
 ``
 gluon/contrib/login_methods/__init__.py
 gluon/contrib/login_methods/basic_auth.py
@@ -616,7 +700,7 @@ gluon/contrib/login_methods/rpx_account.py
 gluon/contrib/login_methods/x509_auth.py
 ``:code
 
-web2py also contains a folder with useful scripts including
+Paltforma web2py zawiera również folder z przydatnymi skryptami, w tym
 ``
 scripts/setup-web2py-fedora.sh
 scripts/setup-web2py-ubuntu.sh
@@ -637,77 +721,98 @@ scripts/access.wsgi
 scripts/cpdb.py
 ``:code
 
-The ``setup-web2py-*`` are particularly useful because they attempt a complete installation and setup of a web2py production environment from scratch.
-Some of these are discussed in Chapter 14, but all of them contain a documentation string inside that explains their purpose and usage.
+Skrypty ``setup-web2py-*`` są szczególnie przydatne, ponieważ próbują realizować
+od podstaw pełną instalację i konfigurację środowiska produkcyjnego web2py.
+Niektóre z nich zostały omówione w rozdziale 14, ale wszystkie z nich zawierają
+wewnątrz opis dokumentacyjny, który wyjaśnia ich przeznaczenie i używanie.
 
-Finally web2py includes these files required to build the binary distributions.
+Wreszcie web2py zawiera pliki wymagane do budowy dystrybucji binarnej.
 ``
 Makefile
 setup_exe.py
 setup_app.py
 ``:code
 
-These are setup scripts for **py2exe** and **py2app**, respectively, and they are only required to build the binary distributions of web2py. YOU SHOULD NEVER NEED TO RUN THEM.
+Są to skrypty konfiguracyjne odpowiednio dla **py2exe** i **py2app** i są tylko
+wymagane przy budowaniu dystrybucji binarnej web2py. NIGDY NIE ZAJDZIE POTRZEBA
+ICH URUCHOMIENIA.
 
-web2py applications contain additional files, particularly third-party JavaScript libraries, such as jQuery, calendar, and Codemirror. Their authors are acknowledged in the files themselves.
+Aplikacje web2py zawierają dodatkowe pliki, zwłaszcza biblioteki JavaScript osób
+trzecich, takie jak jQuery, calendar i Codemirror. Ich autorzy są wymienieniu
+w plikach tych bibliotek.
 
-### Applications
+### Aplikacje
 
-Applications developed in web2py are composed of the following parts:
-- **models** describe a representation of the data as database tables and relations between tables.
-- **controllers** describe the application logic and workflow.
-- **views** describe how data should be presented to the user using HTML and JavaScript.
-- **languages** describe how to translate strings in the application into various supported languages.
-- **static files** do not require processing (e.g. images, CSS stylesheets, etc).
-- **ABOUT** and **README** documents are self-explanatory.
-- **errors** store error reports generated by the application.
-- **sessions** store information related to each particular user.
-- **databases** store SQLite databases and additional table information.
-- **cache** store cached application items.
-- **modules** are other optional Python modules.
-- **private** files are accessed by the controllers but not directly by the developer.
-- **uploads** files are accessed by the models but not directly by the developer (e.g., files uploaded by users of the application).
-- **tests** is a directory for storing test scripts, fixtures and mocks.
+Aplikacje stworzone w web2py są złożone z następujących części (znajdujących sie w swoich katalogach):
+- **models** (modele) opisuje reprezentację danych w tabelach bazy danych i relacje pomiędzy tabelami;
+- **controllers** (kontrolery) opisuje logikę aplikację i proces przetwarzania;
+- **views** (widoki) opisuje jak dane powinny być prezentowane użytkownikowi przy użyciu HTML i JavaScript;
+- **languages** (języki) opisują jak przetłumaczyć ciągy tekstowe w aplikacji na różne obsługiwane języki;
+- **static files** (pliki statyczne) nie wymagają przetwarzania (np. obrazy, arkusze stylów CSS itd.);
+- **ABOUT** i **README** - te pliki są oczywiste;
+- **errors** (błędy) przechowuje sie tu raporty o błędach wygenerowane przez aplikację;
+- **sessions** (sesje) przechowuje się tu informacje odnoszące się do każdego określonego użytkownika;
+- **databases** (bazy danych) przechowuje się tu bazy danych SQLite i dodatkowe tabelaryczne informacje;
+- **cache** (pamięc podręczna) przechowuje się tu buforowane elementy aplikacje;
+- **modules** (moduły) są tu opcjonalne moduły Pythona;
+- **private** (prywatne) pliki, które są dostępne dla kontrolerów ale nie bezpośrednio dla programisty;
+- **uploads** (przesłane) pliki są dostępne dla modeli ale nie bezpośrednio dla programisty (np. pliki przesłane na serwer przez użytkowników aplikacji).
+- **tests** (testy) jest katalogiem do przechowywania skrytów testów, wyposażenia i makiet.
 
-Models, views, controllers, languages, and static files are accessible via the web administration [design] interface. ABOUT, README, and errors are also accessible via the administration interface through the corresponding menu items. Sessions, cache, modules and private files are accessible to the applications but not via the administration interface.
+Modele, widoki, kontrolery, języki i pliki statyczne są dostępne poprzez interfejs
+administracyjny [design]. Pliki ABOUT i README oraz katalog errors są również dostępne
+przez interfejs administracyjny za pośrednictwem odpowiednich elementów menu. Pliki
+sesji, pamięci podręcznej, modułów i pliki prywatne są dostępne przez aplikacje,
+ale nie za pomocą interfejsu administracyjnego.
 
-Everything is neatly organized in a clear directory structure that is replicated for every installed web2py application, although the user never needs to access the filesystem directly:
+Wszystko jest uporządkowane w jasne struktury katalogów, które są replikowane dla
+każdej zainstalowanej aplikacji web2py, choć użytkownik nie potrzebuje bezpośredniego
+dostępu do systemu plików:
 
-``about``:inxx ``license``:inxx ``cache``:inxx ``controllers``:inxx ``databases``:inxx ``errors``:inxx ``languages``:inxx ``models``:inxx ``modules``:inxx ``private``:inxx ``session``:inxx ``static``:inxx ``tests``:inxx ``uploads``:inxx ``views``:inxx ``__init__.py``:inxx
+``o aplikacji``:inxx ``licecja``:inxx ``pamięć podręczna``:inxx ``kontrolery``:inxx ``bazy danych``:inxx ``błedy``:inxx ``języki``:inxx ``modele``:inxx ``moduły``:inxx ``prywatne pliki``:inxx ``sesje``:inxx ``pliki statyczne``:inxx ``testy``:inxx ``pliki przesłane``:inxx ``widoki``:inxx ``__init__.py``:inxx
 ``
 __init__.py  ABOUT        LICENSE    models    views
 controllers  modules      private    tests     cron
 cache        errors       upload     sessions  static
 ``:code
 
-"__init__.py" is an empty file which is required in order to allow Python (and web2py) to import the modules in the ``modules`` directory.
+Plik "__init__.py" to pusty plik wymagany w celu umożliwienia Pythonowi (i web2py)
+importowanie modułów w katalogu ``modules``.
 
-Notice that the **admin** application simply provides a web interface to web2py applications on the server file system. web2py applications can also be created and developed from the command-line or your preferred text editor/IDE; you don't have to use the browser **admin** interface.  A new application can be created manually by replicating the above directory structure under ,e.g., "applications/newapp/" (or simply untar the ``welcome.w2p`` file into your new application directory). Application files can also be created and edited from the command-line without having to use the web **admin** interface.
+Proszę zwrócić uwagę, że aplikacja **admin** po prostu dostarcza interfejs internetowy
+dla aplikacji web2py w systemie plików serwera. Aplikacje web2py mogą być również
+tworzone i programowane z poziomu linii poleceń lub poprzez wybrany edytor tekstowy
+(np. w IDE) – nie jest konieczne korzystanie z interfejsu **admin** w przeglądarce.
+Nową aplikację można utworzyć ręcznie przez replikowanie powyższej struktury katalogów,
+np. "applications/newapp/" (lub po prostu rozpakowanie pliku ``welcome.w2p`` do
+katalogu nowej aplikacji). Pliki aplikacji mogą być również stworzone i edytowane
+z poziomu linii poleceń bez konieczności korzystania z interfejsu **admin**.
 
 ### API
 
-Models, controllers, and views are executed in an environment where the following objects are already imported for us:
+Modele, kontrolery i widoki są wykonywane w środowisku, w którym następujące obiekty
+są już za nas zaimportowane:
 
-**Global Objects:** ``request``:inxx ``response``:inxx ``session``:inxx ``cache``:inxx
+**Obiekty globalne:** ``request``:inxx ``response``:inxx ``session``:inxx ``cache``:inxx
 
 ``
 request, response, session, cache
 ``:code
 
-**Internationalization:** ``T``:inxx ``internationalization``:inxx
+**Umiędzynarodowienie :** ``T``:inxx ``umiędzynarodowienie``:inxx
 
 ``
 T
 ``:code
 
-**Navigation:** ``redirect``:inxx ``HTTP``:inxx
+**Nawigacja:** ``redirect``:inxx ``HTTP``:inxx
 
 ``
 redirect, HTTP
 ``:code
 
 
-**Helpers:** ``helpers``:inxx
+**Helpery:** ``helpery``:inxx
 
 ``
 XML, URL, BEAUTIFY
@@ -723,13 +828,13 @@ TITLE, TR, TT, URL, XHTML, xmlescape, embed64
 CAT, MARKMIN, MENU, ON
 ``:code
 
-**Forms and tables**
+**Formularze i tabele**
 
 ``
 SQLFORM (SQLFORM.factory, SQLFORM.grid, SQLFORM.smartgrid)
 ``
 
-**Validators:** ``validators``:inxx
+**Walidatory:** ``walidatory``:inxx
 
 ``
 CLEANUP, CRYPT, IS_ALPHANUMERIC, IS_DATE_IN_RANGE, IS_DATE,
@@ -741,76 +846,99 @@ IS_NOT_IN_DB, IS_NULL_OR, IS_SLUG, IS_STRONG, IS_TIME,
 IS_UPLOAD_FILENAME, IS_UPPER, IS_URL
 ``:code
 
-**Database:** ``DAL``:inxx
+**Baza danych:** ``DAL``:inxx
 
 ``
 DAL, Field
 ``:code
 
-For backward compatibility ``SQLDB=DAL`` and ``SQLField=Field``. We encourage you to use the new syntax ``DAL`` and ``Field``, instead of the old syntax.
+W celu zachowania wstecznej kompatybilności ``SQLDB=DAL`` i ``SQLField=Field``.
+Zachęcamy do stosowania nowej składni ``DAL`` i ``Field``, zamiast starej.
 
-Other objects and modules are defined in the libraries, but they are not automatically imported since they are not used as often.
+W bibliotekach są zdefiniowane inne obiekty i moduły, ale nie są one importowane
+automatycznie, ponieważ używane są rzadko.
 
-The core API entities in the web2py execution environment are ``request``, ``response``, ``session``, ``cache``, ``URL``, ``HTTP``, ``redirect`` and ``T`` and are discussed below.
+Podstawowe encje API w środowisku wykonawczym web2py, to ``request``, ``response``,
+``session``, ``cache``, ``URL``, ``HTTP``, ``redirect`` i ``T``. Są one omówione niżej.
 
-A few objects and functions, including **Auth**, **Crud** and **Service**, are defined in "gluon/tools.py" and they need to be imported as necessary:
+Kilka obiektów i funkcji, w tym **Auth**, **Crud** i **Service** są zdefiniowane
+w "gluon/tools.py" i jeśli są potrzebne, to muszą zostać zaimportowane:
 ``
 from gluon.tools import Auth, Crud, Service
 ``:code
-They are imported in ``db.py`` in the scaffolding application.
+Są one importowane w ``db.py`` w aplikacji szkieletowej.
 
-#### Accessing the API from Python modules
+#### Dostęp do API z modułów Pythona
 
-Your models or controller may import python modules, and these may need to use some of the web2py API. The way to do it is by importing them:
+Twoje modele lub kontrolery mogą importować moduły Pythona, które do działania
+wymagają zastosowania jakichś interfejsów API web2py API. Sposobem na to jest
+ich zaimportowanie:
 
 ``
 from gluon import *
 ``
 
-In fact, any Python module, even if not imported by a web2py application, can import the web2py API as long as web2py is in the ``sys.path``.
+W rzeczywistości, każdy moduł Pythona, jeśli nawet nie został zaimportowany przez
+aplikację web2py, może importować API web2py, jeśli web2py jest w ``sys.path``.
 
-There is one caveat, though. Web2py defines some global objects (request, response, session, cache, T) that can only exist when an HTTP request is present (or is faked). Therefore, modules can access them only if they are called from an application. For this reasons they are placed into a container caller ``current``, which is a thread local object. Here is an example.
+Choć jest jedno zastrzeżenie. Web2py definiuje niektóre obiekty globalne (request,
+response, session, cache, T), które mogą istnieć tylko wtedy, gdy obecne jest żądanie
+HTTP (lub zostało ono sfałszowane). Dlatego moduły mogą z nich korzystać tylko wtedy,
+gdy są wywoływane z aplikacji. Z tego powodu są one umieszczane w kontenerze wywołującym
+``current``, który jest obiektem lokalnego wątku. Oto przykład.
 
-Create a module "/myapp/modules/test.py" that contains:
+Utwórz moduł "/myapp/modules/test.py" zawierający:
 ``
 from gluon import *
 def ip(): return current.request.client
 ``
-Now from a controller in "myapp" you can do
+Teraz w kontrolerze "myapp" możesz napisać
 ``
 import test
 def index():
-    return "Your ip is " + test.ip()
+    return "Twój ip to " + test.ip()
 ``
 
-Notice a few things:
+Zwróć uwagę na kilka rzeczy:
 
-- ``import test`` looks for the module first in the current app's modules folder, then in the folders listed in ``sys.path``. Therefore, app-level modules always take precedence over Python modules. This allows different apps to ship with different versions of their modules, without conflicts.
+- Wyrażenie ``import test`` wyszukuje moduł najpierw w folderze bieżącej aplikacji,
+  następnie w folderach wykazanych w ``sys.path``. Dlatego moduły poziomu aplikacji
+  zawsze mają pierwszeństwo przed modułami Pythona. Umożliwia to, aby różne aplikacje
+  korzystały bez konfliktu z różnych wersji swoich modułów.
 
-- Different users can call the same action ``index`` concurrently, which calls the function in the module, and yet there is no conflict because ``current.request`` is a different object in different threads. Just be careful not to access ``current.request`` outside of functions or classes (i.e., at the top level) in the module.
+- Różni użytkownicy mogą wywoływać równocześnie tą sama akcję ``index``, która
+  wywołuje funkcję w module bez powodowania konfliktu, ponieważ obiekt ``current.request``
+  jest innym obiektem w każdym wątku. Wystarczy zachować ostrożność, aby nie przejść do
+  ``current.request`` poza funkcjami lub klasami w module (czyli na najwyższym poziomie).
 
-- ``import test`` is a shortcut for ``from applications.appname.modules import test``. Using the longer syntax, it is possible to import modules from other applications.
+- Wyrażenie ``import test`` jest skrótem wyrażenia ``from applications.appname.modules import test``.
+  Używając dłuższej składni można zaimportować moduły z innej aplikacji.
 
-For uniformity with normal Python behavior, by default web2py does not reload modules when changes are made. Yet this can be changed. To turn on the auto-reload feature for modules, use the ``track_changes`` function as follows (typically in a model file, before any imports):
+W celu jednolitości z normalnym zachowaniem Pythona, web2py domyślnie nie przeładowuje
+modułów po wprowadzeniu zmian. Lecz można to zmienić. Aby włączyć możliwość automatycznego
+przeładowywania modułów, trzeba użyć funkcję ``track_changes`` w sposób następujący
+(zwykle w pliku modelu, przed jakimkolwiek wyrażeniem import):
 
 ``
 from gluon.custom_import import track_changes; track_changes(True)
 ``:code
 
-From now on, every time a module is imported, the importer will check if the Python source file (.py) has changed. If it has changed, the module will be reloaded. 
+Od teraz, za każdym razem, moduł jest importowany, importer sprawdza, czy plik
+źródłowy Pythona (.py) został zmieniony. Jeśli tak, to moduł zostanie przeładowany. 
 
 ------
-Do not call track_changes in the modules themselves.
+Nie wywołuj track_changes w samych modułach.
 ------
 
-Track changes only tracks changes for modules that are stored in the application.
-Modules that import ``current`` can access:
+Śledzenie zmian obywa się tylko dla modułów, które są przechowywane w aplikacji.
+Moduły importujące ``current`` uzyskują dostęp do:
 - ``current.request``
 - ``current.response``
 - ``current.session``
 - ``current.cache``
 - ``current.T``
-and any other variable your application chooses to store in current. For example a model could do
+oraz każdej innej zmiennej aplikacji wybranej do przechowywania w current.
+Na przykład. możnaby zrobić taki model
 
 ``
 auth = Auth(db)
@@ -818,24 +946,31 @@ from gluon import current
 current.auth = auth
 ``
 
-and now all modules imported can access ``current.auth``.
+co spowoduje, że teraz wszystkie moduły mogą mieć dostęp do ``current.auth``.
 
-``current`` and ``import`` create a powerful mechanism to build extensible and reusable modules for your applications.
+Wyrażenia ``current`` i ``import`` tworzą pełnowartościowy mechanizm do budowania
+rozszerzalnych i mogących być wielokrotnie używanych modułów dla aplikacji.
 
 -------
-Beware! Given ``from gluon import current``, it is correct to use ``current.request`` and any of the other thread local objects but one should never assign them to global variables in the module, such as in
+Uważaj! Biorąc ``from gluon import current``, dobrze jest użyć ``current.request``
+i którykolwiek z innych obiektów lokalnego wątku, ale nigdy nie należy przypisywać
+go do zmiennych globalnych w module, tak jak tu
 ``
-request = current.request # WRONG! DANGER!
+request = current.request # ŹLE! NIEBEZPIECZNIE!
 ``
-nor one should use it assign class attributes
+ani też nie należy przypisywać go do atrybutu klasy
 ``
 class MyClass:
-    request = current.request # WRONG! DANGER!
+    request = current.request # ŹLE! NIEBEZPIECZNIE!
 ``
-This is because the thread local object must be extracted at runtime. Global variables instead are defined only once when the model is imported for the first time.
+To dlatego, że obiekt lokalnego wątku musi być ekstrahowany w czasie wykonania.
+Natomiast zmienne globalne są definiowane tylko raz, podczas importowania modelu
+po raz pierwszy.
 -------
 
-Another caveat has to do with cache. You cannot use the ``cache`` object to decorate functions in modules, that is because it would not behave as expected. In order to cache a function ``f`` in a module you must use ``lazy_cache``:
+Inne zastrzeżenie dotyczy operacji z pamięcią podręczną. Nie można używać obiektu
+``cache`` do dekorowania funkcji w modułach, dlatego że nie zachowuje się on zgodnie
+z oczekiwaniami. Aby buforować funkcje ``f`` w module musi się użyć ``lazy_cache``:
 
 ``
 from gluon.cache import lazy_cache
@@ -844,76 +979,81 @@ from gluon.cache import lazy_cache
 def f(a,b,c,): ....
 ``:code
 
-Mind that the key is user defined but must be uniquely associated to the function. If omitted web2py will automatically determine a key.
+Pamiętaj, że klucz jest określany przez użytkownika, ale musi on być jednoznacznie
+powiązany z funkcją. Jeśli zostanie pominięty, to web2py określi go automatycznie.
 
-### ``request``
+### Obiekt ``request``
 ``request``:inxx ``Storage``:inxx ``request.cookies``:inxx ``user_agent``:inxx
 
-The ``request`` object is an instance of the ubiquitous web2py class that is called ``gluon.storage.Storage``, which extends the Python ``dict`` class. It is basically a dictionary, but the item values can also be accessed as attributes:
+Obiekt ``request`` jest instancją wszechobecnej klasy web2py o nazwie ``gluon.storage.Storage``,
+która rozszerza klasę ``dict`` Pythona. W zasadzie jest to słownik, ale wartości
+jego elementów mogą być również dostępne jako atrybuty:
 ``
 request.vars
 ``:code
 
-is the same as:
+jest tym samym, co:
 ``
 request['vars']
 ``:code
 
-Unlike a dictionary, if an attribute (or key) does not exist, it does not raise an exception. Instead, it returns ``None``.
+W przeciwieństwie do słownika, jeśli atrybut (lub klucz) nie istnieje, to nie jest
+zgłaszany wyjątek. Zamiast tego zwracane jest ``None``.
 
 -----
-It is sometimes useful to create your own Storage objects. You can do so as follows:
+Czasem jest to przydatne do tworzenia własnych obiektów Storage. Można to zrobić
+następująco:
 ``
 from gluon.storage import Storage
-my_storage = Storage() # empty storage object
-my_other_storage = Storage(dict(a=1, b=2)) # convert dictionary to Storage
+my_storage = Storage() # pusty obket storage
+my_other_storage = Storage(dict(a=1, b=2)) # konwersja słownika do Storage
 ``:code
 -----
 
-``request`` has the following items/attributes, some of which are also an instance of the ``Storage`` class:
-- ``request.cookies``: a ``Cookie.SimpleCookie()`` object containing the cookies passed with the HTTP request. It acts like a dictionary of cookies. Each cookie is a Morsel object ``morsel``:cite.
-- ``request.env``: a ``Storage`` object containing the environment variables passed to the controller, including HTTP header variables from the HTTP request and standard WSGI parameters. The environment variables are all converted to lower case, and dots are converted to underscores for easier memorization.
-- ``request.application``: the name of the requested application.
-- ``request.controller``: the name of the requested controller.
-- ``request.function``: the name of the requested function.
-- ``request.extension``: the extension of the requested action. It defaults to "html". If the controller function returns a dictionary and does not specify a view, this is used to determine the extension of the view file that will render the dictionary (parsed from the ``request.env.path_info``).
-- ``request.folder``: the application directory. For example if the application is "welcome", ``request.folder`` is set to the absolute path "/path/to/welcome". In your programs, you should always use this variable and the ``os.path.join`` function to build paths to the files you need to access. Although web2py always uses absolute paths, it is a good rule never to explicitly  change the current working folder (whatever that is) since this is not a thread-safe practice.
-- ``request.now``: a ``datetime.datetime`` object storing the datetime of the current request.
-- ``request.utcnow``: a ``datetime.datetime`` object storing the UTC datetime of the current request.
-- ``request.args``: A list of the URL path components following the controller function name; equivalent to ``request.env.path_info.split('/')[3:]``
-- ``request.vars``: a ``gluon.storage.Storage`` object containing all request parameters.
-- ``request.get_vars``: a ``gluon.storage.Storage`` object containing only parameters passed into the query string (a request to ``/a/c/f?var1=1&var2=2`` will end in ``{var1: "1", var2: "2"}``)
-- ``request.post_vars``: a ``gluon.storage.Storage`` object containing only the parameters passed into the body of the request (usually in POST, PUT, DELETE requests).
-- ``request.client``: The ip address of the client as determined by, if present, ``request.env.http_x_forwarded_for`` or by ``request.env.remote_addr`` otherwise. While this is useful it should not be trusted because the ``http_x_forwarded_for`` can be spoofed.
-- ``request.is_local``: ``True`` if the client is localhost, ``False`` otherwise. Should work behind a proxy if the proxy supports ``http_x_forwarded_for``.
-- ``request.is_https``: ``True`` if the request is using the HTTPS protocol, ``False`` otherwise.
-- ``request.body``: a read-only file stream that contains the body of the HTTP request. This is automatically parsed to get the ``request.post_vars`` and then rewinded. It can be read with ``request.body.read()``.
-- ``request.ajax`` is True if the function is being called via an Ajax request.
-- ``request.cid`` is the ``id`` of the component that generated the Ajax request (if any). You can read more about components in Chapter 12.
-- ``request.requires_https()`` prevents further code execution if the request is not over HTTPS and redirects the visitor to the current page over HTTPS.
-- ``request.restful`` this is a new and very useful decorator that can be used to change the default behavior of web2py actions by separating GET/POST/PUSH/DELETE requests. It will be discussed in some detail in Chapter 10.
-- ``request.user_agent()`` parses the user_agent field from the client and returns the information in the form of a dictionary. It is useful to detect mobile devices. It uses "gluon/contrib/user_agent_parser.py" created by Ross Peoples. To see what it does, try to embed the following code in a view:
+Obiekt ``request`` ma następujące elementy (atrybuty), z których niektóre również są dostępne w instancji klasy ``Storage``:
+- ``request.cookies``: obiekt ``Cookie.SimpleCookie()`` zawierający ciasteczka przekazywane przez żądania HTTP. Działa on jak słownik ciasteczek. Każde ciasteczko jest obiektem Morsel ``morsel``:cite;
+- ``request.env``: obiekt ``Storage`` zawierający zmienne środowiskowe przekazywane do kontrolera, w tym zmienne nagłówka HTTP z żądania HTTP i standardowe parametry WSGI. Wszystkie zmienne środowiskowe są konwertowane na małe litery a kropki na znaki podkreślenia w celi łatwiejszego zapamiętania;
+- ``request.application``: nazwa żądanej aplikacji;
+- ``request.controller``: nazwa żądanego kontrolera;
+- ``request.function``: nazwa żądanej funkcji;
+- ``request.extension``: rozszerzenie żądanej akcji. Domyślną wartością jest "html". Jeśli kontroler zwraca słownik i nie określa widoku, to jest używany do określenia rozszerzenia pliku widoku, który będzie renderował słownik (parsowany w ``request.env.path_info``);
+- ``request.folder``: słownik aplikacji. Na przykład, jeśli aplikacją jest "welcome", ``request.folder`` zostaje ustawione na ścieżkę bezwzględną "/path/to/welcome". W programie należy zawsze używać tej zmiennej oraz funkcji ``os.path.join`` do budowy ścieżek do plików, do których potrzeba uzyskać dostęp. Chociaż web2py zawsze używa ścieżek bezwzględnych, to dobrą praktyką jest niezmienianie nigdy jawnie bieżącego folderu roboczego (cokolwiek nim jest) ponieważ nie jest to bezpieczne dla wątku;
+- ``request.now``: obiekt ``datetime.datetime`` przechowujący datę i czas bieżącego żądania;
+- ``request.utcnow``: obiekt ``datetime.datetime`` przechowujący datę i czas UTC bieżącego żądania;
+- ``request.args``: lista parametrów ścieżki URL występujących po nazwie funkcji kontrolera; ekwiwalent ``request.env.path_info.split('/')[3:]``
+- ``request.vars``: obiekt ``gluon.storage.Storage`` zawierający wszystkie parametry żądania;
+- ``request.get_vars``: obiekt ``gluon.storage.Storage`` zawierający tylko parametry przekazane do ciąga zapytania (żądanie dla ``/a/c/f?var1=1&var2=2`` będzie się kończyć ciągiem ``{var1: "1", var2: "2"}``);
+- ``request.post_vars``: obiekt ``gluon.storage.Storage`` zawierający tylko parametry przekazane do ciała żądania (zwykle w żądaniach POST, PUT, DELETE);
+- ``request.client``: adres IP klienta, zgodnie z ustaleniem ``request.env.http_x_forwarded_for``, jeśli obecne, a jeśli nie to przez ``request.env.remote_addr``. Chociaż jest to użyteczne, to jednak nie należy temu ufać, ponieważ ``http_x_forwarded_for`` może być sfałszowane;
+- ``request.is_local``: ``True`` jeśli klientem jest localhost, w przeciwnym razie ``False``. Powinno działać na proxy, jeśli proxy obsługuje ``http_x_forwarded_for``;
+- ``request.is_https``: ``True`` jeśli żądanie używa protokołu HTTPS, w przeciwnym razie ``False``;
+- ``request.body``: strumień plikowy tylko do odczytu zawierający ciało żądania HTTP. Jest on automatycznie parsowany w celu pobrania ``request.post_vars`` i następnie przewinięty. Można go odczytać poprzez ``request.body.read()``;
+- ``request.ajax`` True jeśli funkcja jest wywoływana poprzez żądanie Ajax;
+- ``request.cid`` jest to identyfikator komponentu, który wygenerował żądanie Ajax (jeśli miało to miejsce). Więcej informacji na ten temat znajduje się w rozdziale 12;
+- ``request.requires_https()`` uniemożliwia dalsze wykonywanie kodu, jeśli żądanie nie jest realizowane poprzez HTTPS i przekierowuje odwiedzającego do bieżącej strony poprzez HTTPS.
+- ``request.restful`` jest to nowy i bardzo przydatny dekorator, który może być wykorzystany do zmiany zachowania akcji web2py przez oddzielne żądania GET/POST/PUSH/DELETE. Jest to omówione w rozdziale 10.
+- ``request.user_agent()`` analizuje pole user_agent w nagłówku żądania i zwraca informację w formie słownika. Jest to przydatne do wykrywania urządzeń mobilnych. Wykorzystuje kod "gluon/contrib/user_agent_parser.py" stworzony przez Rossa Peoples. Aby zobaczyć jak to działa, spróbuj osadzić w widoku następujący kod:
 ``
 {{=BEAUTIFY(request.user_agent())}}
 ``:code
 
-- ``request.global_settings`` ``request.global_settings``:inxx contains web2py system wide settings. They are set automatically and you should not change them. For example ``request.global_settings.gluon_parent`` contains the full path to the web2py folder, ``request.global_settings.is_pypy`` determines if web2py is running on PyPy.
+- ``request.global_settings`` ``request.global_settings``:inxx zawiera ustawienia ogólnosystemowe web2py. Są one ustawiane automatycznie i nie ma potrzeby zmieniania ich. Na przykład ``request.global_settings.gluon_parent`` zawiera pełną ścieżkę do folderu web2py, ``request.global_settings.is_pypy`` określa czy web2py jest uruchomiony na PyPy;
 
-- ``request.wsgi`` is a hook that allows you to call third party WSGI applications from inside actions
+- ``request.wsgi`` jest to hak, który umożliwia wywołanie aplikacji WSGI osób trzecich z poziomu akcji.
 
-The latter includes:
+Ostatnio dołączono:
 - ``request.wsgi.environ``
 - ``request.wsgi.start_response``
 - ``request.wsgi.middleware``
-their usage is discussed at the end of this Chapter.
+ich użycie jest omówione na końcu tego rozdziału.
 
-As an example, the following call on a typical system:
+Jako przykład, następujące adres na typowym systemie:
 
 ``
 http://127.0.0.1:8000/examples/default/status/x/y/z?p=1&q=2
 ``:code
 
-results in the following ``request`` object:
+da w wyniku następujący obiekt ``request``:
 ``request``:inxx ``env``:inxx
 
 ----------
@@ -957,15 +1097,21 @@ results in the following ``request`` object:
 ``request.env.wsgi_url_scheme`` | ``http``
 --------
 
-Which environment variables are actually defined depends on the web server. Here we are assuming the built-in Rocket wsgi server. The set of variables is not much different when using the Apache web server.
+To jakie zmienne środowiskowe zostaną zdefiniowane zależy od serwera internetowego.
+Tutaj założyliśmy użycie wbudowanego serwera WSGI Rocket. Ten zestaw zmiennych nie
+różni zbyt od tego, jaki otrzymuje się przy użyciu serwera internetowego Apache.
 
-The ``request.env.http_*`` variables are parsed from the request HTTP header.
+Zmienne ``request.env.http_*`` z nagłówka żądania HTTP są parsowane.
 
-The ``request.env.web2py_*`` variables are not parsed from the web server environment, but are created by web2py in case your applications need to know about the web2py location and version, and whether it is running on the Google App Engine (because specific optimizations may be necessary).
+Zmienne ``request.env.web2py_*`` ze środowiska serwera internetowego nie są parsowane,
+ale są tworzone przez web2py. W przypadku naszej aplikacji trzeba znać lokalizację
+i wersję oraz czy jest ona uruchomiona na Google App Engine (ponieważ może być konieczna
+specyficzna optymalizacja).
 
-Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi adapter.
+Warto również zwrócić uwagę na zmienne ``request.env.wsgi_*``. Są one specyficzne
+dla adaptera wsgi.
 
-### ``response``
+### Obiekt ``response``
 ``response``:inxx
 ``response.body``:inxx
 ``response.cookies``:inxx
@@ -994,60 +1140,153 @@ Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi 
 ``response._caller``:inxx
 ``response.models_to_run``:inxx
 
-``response`` is another instance of the ``Storage`` class. It contains the following:
+Obiekt ``response`` jest inną instancją klasy ``Storage``. Zawiera co następuje:
 
-- ``response.body``: a ``StringIO`` object into which web2py writes the output page body. NEVER CHANGE THIS VARIABLE.
-- ``response.cookies``: similar to ``request.cookies``, but while the latter contains the cookies sent from the client to the server, the former contains cookies sent by the server to the client. The session cookie is handled automatically.
-- ``response.download(request, db)``: a method used to implement the controller function that allows downloading of uploaded files. ``response.download`` expects the last ``arg`` in ``request.args`` to be the encoded filename (i.e., the filename generated at upload time and stored in the upload field). It extracts the upload field name and table name as well as the original filename from the encoded filename. ``response.download`` takes two optional arguments: ``chunk_size`` sets the size in bytes for chunked streaming (defaults to 64K), and ``attachments`` determines whether the downloaded file should be treated as an attachment or not (default to ``True``). Note, ``response.download`` is specifically for downloading files associated with ``db`` upload fields. Use ``response.stream`` (see below) for other types of file downloads and streaming. Also, note that it is not necessary to use ``response.download`` to access files uploaded to the /static folder -- static files can (and generally should) be accessed directly via URL (e.g., /app/static/files/myfile.pdf).
-- ``response.files``: a list of ``.css``, ``.js``, ``.coffee``, and ``.less`` files required by the page. They will automatically be linked in the head of the standard "layout.html" via the included "web2py_ajax.html". To include a new CSS, JS, COFFEE, or LESS file, just append it to this list. It will handle duplicates. The order is important.
-- ``response.include_files()`` generates html head tags to include all ``response.files`` (used in "views/web2py_ajax.html").
-- ``response.flash``: optional parameter that may be included in the views. Normally used to notify the user about something that happened.
-- ``response.headers``: a ``dict`` for HTTP response headers. Web2py sets some headers by default, including "Content-Length", "Content-Type", and "X-Powered-By" (set equal to web2py). Web2py also sets the "Cache-Control", "Expires", and "Pragma" headers to prevent client-side caching, except for static file requests, for which client-side caching is enabled. The headers that web2py sets can be overwritten or removed, and new headers can be added (e.g., ``response.headers['Cache-Control'] = 'private'``). You can remove a header by removing its key from the response.headers dict, e.g. ``del response.headers['Custom-Header']``, however web2py's default headers will be re-added just before returning the response. To avoid this behavior, just set the header value to None, e.g. to remove the default Content-Type header, ``response.headers['Content-Type'] = None``
-- ``response.menu``: optional parameter that may be included in the views, normally used to pass a navigation menu tree to the view. It can be rendered by the MENU helper.
-- ``response.meta``: a Storage object that contains optional ``<meta>`` information like ``response.meta.author``, ``.description``, and/or ``.keywords``. The content of each meta variable is automatically placed in the proper ``META`` tag by the code in "views/web2py_ajax.html", which is included by default in "views/layout.html".
-- ``response.include_meta()`` generates a string that includes all ``response.meta`` headers serialized (used in "views/web2py_ajax.html").
-- ``response.postprocessing``: this is a list of functions, empty by default. These functions are used to filter the response object at the output of an action, before the output is rendered by the view. It can be used to implement support for other template languages.
-- ``response.render(view, vars)``: a method used to call the view explicitly inside the controller. ``view`` is an optional parameter which is the name of the view file, ``vars`` is a dictionary of named values passed to the view.
-- ``response.session_file``: file stream containing the session.
-- ``response.session_file_name``: name of the file where the session will be saved.
-- ``response.session_id``: the id of the current session. It is determined automatically. NEVER CHANGE THIS VARIABLE.
-- ``response.session_id_name``: the name of the session cookie for this application. NEVER CHANGE THIS VARIABLE.
-- ``response.static_version``: a version number for the static asset management.  
-- ``response.status``: the HTTP status code integer to be passed to the response. Default is 200 (OK).
-- ``response.stream(file, chunk_size, request=request, attachment=False, filename=None)``: when a controller returns it, web2py streams the file content back to the client in blocks of size ``chunk_size``. The ``request`` parameter is required to use the chunk start in the HTTP header. ``file`` should be a file path (for backward compatibility, it can also be an open file object, but this is not recommended). As noted above, ``response.download`` should be used to retrieve files stored via an upload field. ``response.stream`` can be used in other cases, such as returning a temporary file or StringIO object created by the controller. If ``attachment`` is True, the Content-Disposition header will be set to "attachment", and if ``filename`` is also provided, it will be added to the Content-Disposition header as well (but only when ``attachment`` is True). If not already included in ``response.headers``, the following response headers will be set automatically: Content-Type, Content-Length, Cache-Control, Pragma, and Last-Modified (the latter three are set to allow browser caching of the file). To override any of these automatic header settings, simply set them in ``response.headers`` before calling ``response.stream``.
-- ``response.subtitle``: optional parameter that may be included in the views. It should contain the subtitle of the page.
-- ``response.title``: optional parameter that may be included in the views. It should contain the title of the page and should be rendered inside the html title tag in the header.
-- ``response.toolbar``: a function that allows you to embed a toolbar into page for debugging purposes ``{{=response.toolbar()}}``. The toolbar displays request, response, session variables and database access time for each query.
-- ``response._vars``: this variable is accessible only in a view, not in the action. It contains the values returned by the action to the view.
-- ``response._caller``: this is a function that wraps all action calls. It defaults to the identity function, but it can be modified in order to catch special types of exception to do extra logging;
+- ``response.body``: obiekt ``StringIO`` w którym web2py zapisuje ciało strony wyjściowej. NIGDY NIE ZMIENIAJ TEJ ZMIENNEJ;
+- ``response.cookies``: podobne do ``request.cookies`` z tą różnicą, że zamiast
+  ciasteczek przesłanych od klienta zawiera ciasteczka ciasteczka wysłane przez serwer
+  do klienta. Ciasteczko sesji jest obsługiwane automatycznie.
+- ``response.download(request, db)``: metoda używana do implementowania funkcji
+  kontrolera umożliwiającej pobieranie przesyłanych plików. Metoda ``response.download``
+  oczekuje aby ostatni ``arg`` w ``request.args`` był zakodowaną nazwą pliku (np.
+  nazwą pliku generowaną w czasie przesyłania i zapisana w polu upload). Ekstrahuje
+  ona nazwę przesyłanego pliku oraz nazwę tabeli, jak również oryginalną nazwę pliku.
+  Metoda ``response.download`` pobiera dwa opcjonalne argumenty: ``chunk_size`` ustawia
+  rozmiar w bajtach dla pakietowego przesyłania strumieniowego (domyślnie to 64K)
+  a ``attachments`` określa czy pobrany plik powinien być traktowany jako załącznik czy
+  też nie (domyślnie to ``True``). Trzeba mieć na uwadze, że ``response.download``
+  jest specjalnie przeznaczony dla pobieranie plików związanych z polami upload w
+  ``db``. Używaj ``response.stream`` (patrz niżej) dla innych typów pobieranych plików
+  i strumieniowania. Proszę również zwrócić uwagę, że nie jest konieczne użycie
+  ``response.download`` w celu uzyskania dostępu do plików przesyłanych do folderu
+  /static – pliki statyczne mogą (i na ogół powinny) być dostępne bezpośrednio poprzez
+  adres URL (np. /app/static/files/myfile.pdf);
+- ``response.files``: lista plików ``.css``, ``.js``, ``.coffee`` i ``.less``
+  wymaganych przez stronę. Będą one automatycznie linkowane w sekcji standardowego
+  widoku "layout.html" za pomocą "web2py_ajax.html". W celu dołączenia nowych plików
+  CSS, JS, COFFEE lub LESS wystarczy je dołączyć do tej listy. Będą obsługiwane
+  duplikaty. Kolejność jest ważna;
+- ``response.include_files()`` generuje znaczniki sekcji head pliku html w celu
+  dołączenia wszystkich ``response.files`` (używanych w "views/web2py_ajax.html");
+- ``response.flash``: opcjonalny parametr, który może zostać zawarty w widokach.
+  Zwykle używany do powiadamiania użytkownika o czymś co się stało.
+- ``response.headers``: słownik dla nagłówków odpowiedzi HTTP. Platforma web2py
+  ustawia domyślnie kilka nagłówków, w tym "Content-Length", "Content-Type" i "X-Powered-By"
+  (ustawiany na ``web2py``). Platforma web2py ustawia również nagłówki "Cache-Control",
+  "Expires" i "Pragma" w celu zapobiegania buforowaniu po stronie klienta, z wyjątkiem
+  żądań dla plików statycznych, dla których buforowanie po stronie klienta jest włączone.
+  Nagłówki ustawiane przez web2py mogą być nadpisywane lub usuwane oraz mogą być dodawane
+  nowe nagłówki (np. ``response.headers['Cache-Control'] = 'private'``). Nagłówek może
+  zostać usunięty przez usunięcie jego klucza ze słownika, np. ``del response.headers['Custom-Header']``,
+  jednak domyślne nagłówki web2py zostaną po prostu dodane ponownie przed zwróceniem
+  odpowiedzi. Aby uniknąć tego problemu, potrzeba ustawić wartość nagłówka na None,
+  np. w celu usunięcia domyśłnego nagłówka Content-Type, trzeba ustawić ``response.headers['Content-Type'] = None``;
+- ``response.menu``: opcjonalny parametr, który może być zawarty w widokach, zwykle
+  używany do przekazania nawigacyjnego drzewa menu do widoku. Może być renderowany
+  przez helper MENU;
+- ``response.meta``: obiekt klasy Storage, który zawiera opcjonalne informacje
+  ``<meta>``, takie jak ``response.meta.author``, ``.description`` lub ``.keywords``.
+  Zawartość każdej zmiennej meta jest automatycznie umieszczana w odpowiednim znaczniku
+  ``META`` przez kod w widoku "views/web2py_ajax.html", który jest dołączany przez
+  domyślny widok "views/layout.html";
+- ``response.include_meta()`` generuje ciąg znakowy zawierający wszystkie serializowane
+  nagłówki ``response.meta`` (używane w widoku "views/web2py_ajax.html");
+- ``response.postprocessing``: jest to lista funkcji, domyślnie pusta. Funkcje te
+  są wykorzystywane do filtrowania obiektu odpowiedzi na wyjściu akcji, zanim wyjście
+  zostanie zrenderowane przez widok. Listę ta można wykorzystać do implementacji
+  innych języków szablonowania;
+- ``response.render(view, vars)``: metoda używana do wywołania widoku w sposób
+  jawny wewnątrz kontrolera. Opcjonalny parametr ``view`` jest nazwą pliku widoku,
+  ``vars`` jest słownikiem nazwanych wartości przekazywanych do widoku;
+- ``response.session_file``: plik strumienia zawierający sesję;
+- ``response.session_file_name``: nazwa pliku w którym będą zapisywane sesje;
+- ``response.session_id``: identyfikator bieżącej sesji. Jest ustalany automatycznie. NIGDY NIE ZMIENIAJ TEJ ZMIENNEJ;
+- ``response.session_id_name``: nazwa ciasteczka sesji dla tej aplikacji. NIGDY NIE ZMIENIAJ TEJ ZMIENNEJ;
+- ``response.static_version``: numer wersji dla zarządzania statycznymi aktywami;  
+- ``response.status``: kod stanu HTTP, który ma być przekazany do odpowiedzi. Domyślnie, to 200 (OK);
+- ``response.stream(file, chunk_size, request=request, attachment=False, filename=None)``:
+  gdy kontroler to zwraca, web2py strumieniuje z powrotem zawartość pliku do klienta
+  w blokach o wielkości określonej w ``chunk_size``. Parametr ``request`` jest wymagany
+  do korzystania z początku fragmentu w nagłówku HTTP. Parametr ``file``powinien być
+  ścieżką do pliku (z powodu wstecznej kompatybilności, może to być również obiekt
+  otwartego pliku, lecz nie jest to zalecane). Jak wspomniano powyżej, metoda
+  ``response.download`` powinna być używana do pobierania przechowywanych plików
+  poprzez pole upload. Metodę ``response.stream`` można wykorzystywać w innych przypadkach,
+  takich jak zwracanie pliku tymczasowego lub obiektu StringIO utworzonego przez kontroler.
+  Jeśli parametr ``attachment`` to True, nagłówek Content-Disposition zostanie ustawiony
+  na "attachment", a jeśli ``filename`` jest też dostarczone, to zostanie dodany również
+  nagłówek Content-Disposition (ale tylko wtedy, gdy ``attachment`` ma wartość True).
+  Jeśli nic nie zawarto w ``response.headers``, to następujące nagłówki odpowiedzi
+  zostaną automatycznie ustawione: Content-Type, Content-Length, Cache-Control, Pragma
+  i Last-Modified (trzy ostatnie będą ustawione w celu umożliwienia przeglądarce buforowania
+  pliku). Aby nadpisać któryś z tych automatycznych ustawień, wystarczy ustawić go
+  w ``response.headers`` przed wywołaniem ``response.stream``;
+- ``response.subtitle``: opcjonalny parametr, który może zostać zawarty w widokach.
+  Powinien zawierać podtytuł strony;
+- ``response.title``: opcjonalny parametr, który może zostać zawarty w widokach.
+  Powinien zawierać tytuł strony i powinien być renderowany wewnątrz znacznika title
+  HTML w sekcji header.
+- ``response.toolbar``: funkcja umożliwiająca osadzenie paska narzędziowego na
+  stronie do celów debugowania ``{{=response.toolbar()}}``. Ten pasek narzędziowy
+  wyświetla żądania, odpowiedzi, zmienne sesji oraz czas dostępu do bazy danych
+  w każdym zapytaniu;
+- ``response._vars``: ta zmienna jest dostępna tylko w widoku, nie w akcji. Zawiera
+  wartości zwracane przez akcję do widoku;
+- ``response._caller``: jest to funkcja opakowująca wszystkie wywołania akcji.
+  Domyślnie jest to funkcja identyczna, ale może zostać zmodyfikowana w celu wyłapania
+  specjalnych typów wyjątków i ich dodatkowym zarejestrowaniu w dzienniku;
   ``
   response._caller = lambda f: f()
   ``
-- ``response.optimize_css``: can be set to "concat,minify,inline" to concatenate, minify and inline the CSS files included by web2py.
-- ``response.optimize_js``: can be set to "concat,minify,inline" to concatenate, minify and inline the JavaScript files included by web2py. 
-- ``response.view``: the name of the view template that must render the page. This is set by default to:
+- ``response.optimize_css``: można ustawić na "concat,minify,inline" w celu łączenia,
+  minifikacji i łączenia w jedną linię kodu plików CSS dołączonych przez web2py;
+- ``response.optimize_js``: można ustawić na "concat,minify,inline" w celu łączenia,
+  minifikacji i łączenia w jedną linię kodu plików CSS dołączonych przez web2py; 
+- ``response.view``: nazwa szablonu widoku, który musi renderować stronę. Domyślnie
+  ustawione jest na:
   ``
   "%s/%s.%s" % (request.controller, request.function, request.extension)
   ``:code
-  or, if the above file cannot be located, to
+  lub jeżeli powyższy plik nie może zostać zlokalizowany, to na
   ``
   "generic.%s" % (request.extension)
   ``:code
-  Change the value of this variable to modify the view file associated with a particular action.
+  Można zmienić wartość tej zmiennej w celu zmodyfikowania pliku widoku związanego
+  z określona akcją.
 
-- ``response.delimiters`` defaults to ``('{{','}}')``. It allows you to change the delimiter of code embedded in views.
-- ``response.xmlrpc(request, methods)``: when a controller returns it, this function exposes the methods via XML-RPC``xmlrpc``:cite . This function is deprecated since a better mechanism is available and described in Chapter 10.
-- ``response.write(text)``: a method to write text into the output page body.
-- ``response.js`` can contain Javascript code. This code will be executed if and only if the response is received by a web2py component as discussed in Chapter 12.
-- ``response.models_to_run`` [[response_models_to_run]] contains a list of regexes that chooses what models to run.
--- By default, this is set automatically to load /a/models/*.py, /a/models/c/*.py, and /a/models/c/f/*.py files when ``/a/c/f`` is requested. You can set, e.g., ``response.models_to_run = ['myfolder/']`` to force the execution only of the models inside your application's ``models/myfolder`` subfolder.
--- NB: ``response.models_to_run`` is a list of regex, not a list of filepaths. The regex are relative to the models/ folder, so any model file with a relative file path that matches one of the regexes will be executed. Note also that this can not affect any models which have already been evaluated because they were earlier in the alphabetic sort order. That is, if a conditional model for controller orange was orange/orange_model.py and it set the regex to [.*], that change does not affect any models previously rejected for loading such as the model apple/apple_model.py ; it matches the new regex, but it was evaluated and rejected before orange/orange_model.py changed the regex.
--- This means that if you want to use models_to_run to share conditional models between controllers, put the models in a sub-directory that will sort last such as zzz, and then use a regex 'zzz'.
-. 
+- ``response.delimiters`` domyślnie to ``('{{','}}')``. Pozwala to na zmianę
+  separatora kodu osadzanego w widokach;
+- ``response.xmlrpc(request, methods)``: gdy kontroler to zwraca, funkcja udostępnia
+  metody poprzez XML-RPC``xmlrpc``:cite . Funkcja ta jest przestarzała ponieważ dostępne
+  są lepsze mechanizmy opisane w rozdziale 10;
+- ``response.write(text)``: metoda do wpisywania tekstu do ciała strony wyjściowej;
+- ``response.js`` może zawierać kod JavaScript. Kod ten będzie wykonywany tylko
+  jeśli odpowiedź jest odbierana przez komponent web2py, tak jak opisano to w rozdziale 12;
+- ``response.models_to_run`` [[response_models_to_run]] zawiera listę wyrażeń regularnych wybierających to co modele uruchamiają;
+-- Domyślnie jest ustawiane dla ładowania plików /a/models/*.py, /a/models/c/*.py
+  i /a/models/c/f/*.py gdy żądany jest ``/a/c/f``. Można ustawić np. ``response.models_to_run = ['myfolder/']``
+  aby wymuszać tylko modele wewnątrz podfolderu ``models/myfolder`` aplikacji;
+-- NB: ``response.models_to_run`` jest listą wyrażeń regularnych a nie listą ścieżek
+   do pliku. Wyrażenia regularne są względne w stosunku do folderu models/, tak więc
+   każdemu plikowi modelu odpowiada jedna ścieżka do pliku, który ma być wykonany.
+   Należy również zwrócić uwagę, że to nie może wpływać na żadne modele które zostały
+   już ewaluowane, ponieważ zostały wcześniej posortowane alfabetycznie. Tak jest,
+   jeśli warunkowy model dla kontrolera orange to orange/orange_model.py i ustawiono
+   wyrażenie regularne na [.*], którego zmiany nie wpływają na żaden poprzednio odrzucony
+   model do załadowania, taki jak apple/apple_model.py – dopasowuje to nowe wyrażenie
+   regularne, ale będzie to ewaluowane i odrzucane zanim orange/orange_model.py zmieni
+   wyrażenie regularne;
+-- Oznacza to, że jeśli chce się użyć models_to_run w celu udostępnienia warunkowych
+   modeli pomiędzy kontrolerami, to trzeba umieścić model w podfolderze, w którym
+   elementy są sortowane malejąco, taki jak zzz i następnie użycie wyrażenia regularnego
+   'zzz'.
 
-Since ``response`` is a ``gluon.storage.Storage`` object, it can be used to store other attributes that you may want to pass to the view. While there is no technical restriction, our recommendation is to store only variables that are to be rendered by all pages in the overall layout ("layout.html").
+Ponieważ ``response`` jest obiektem ``gluon.storage.Storage``, to może być zastosowane
+do przechowywania innych atrybutów, które chce się przekazać do widoku. Chociaż
+nie ma technicznych ograniczeń, naszym zaleceniem jest przechowywanie tylko zmiennych,
+które mają być renderowane przez wszystkie strony z ogólnym układem ("layout.html").
 
-Anyway, we strongly suggest to stick to the variables listed here:
+W każdym razie, zdecydowanie sugerujemy aby utrzymywać zmienne wymienione tutaj:
 ``
 response.title
 response.subtitle
@@ -1059,51 +1298,77 @@ response.meta.keywords
 response.meta.*
 ``:code
 
-because this will make it easier for you to replace the standard "layout.html" file that comes with web2py with another layout file, one that uses the same set of variables.
+ponieważ w ten sposób łatwiej jest zamienić standardowy plik "layout.html", na taki,
+który stosuje ten sam zestaw zmiennych.
 
-Old versions of web2py used ``response.author`` instead of ``response.meta.author`` and similar for the other meta attributes.
+W starszych wersjach web2py używano ``response.author`` zamiast ``response.meta.author``
+i podobne do innych meta atrybutów.
 
-### ``session``
+### Obiekt ``session``
 ``session``:inxx ``session.connect``:inxx ``session.forget``:inxx ``session.secure``:inxx
-``session`` is another instance of the ``Storage`` class. Whatever is stored into ``session`` for example:
+Obiekt ``session`` jest jedną z instancji klasy ``Storage``. Cokolwiek zostanie
+zapisywane w ``session``, na przykład:
 ``
 session.myvariable = "hello"
 ``:code
 
-can be retrieved at a later time:
+może być odzyskane w późniejszym czasie:
 ``
 a = session.myvariable
 ``:code
 
-as long as the code is executed within the same session by the same user (provided the user has not deleted session cookies and the session has not expired). Because ``session`` is a ``Storage`` object, trying to access an attribute/key that has not been set does not raise an exception; it returns ``None`` instead.
+tak długo, jak kod jest wykonywany w ramach tej samej sesji przez tego samego
+użytkownika (o ile użytkownik nie usunie ciasteczek sesji a sesja nie wygasła).
+Ponieważ ``session`` jest obiektem ``Storage``, próba uzyskania dostępu do atrybutu
+(klucza), który nie został ustawiony nie zgłasza wyjątku, zamiast tego zwraca ``None``.
 
-The session object has three important methods. One is ``forget``:
+Obiekt sesji ma trzy ważne metody. Jedna z nich, to ``forget``:
 ``
 session.forget(response)
 ``:code
 
-It tells web2py not to save the session. This should be used in those controllers whose actions are called often and do not need to track user activity. ``session.forget()`` prevents the session file from being written, regardless of whether it has been modified. ``session.forget(response)`` additionally unlocks and closes the session file. You rarely need to call this method since sessions are not saved when they are not changed. However, if the page makes multiple simultaneous Ajax requests, it is a good idea for the actions called via Ajax to call ``session.forget(response)`` (assuming the session is not needed by the action). Otherwise, each Ajax action will have to wait for the previous one to complete (and unlock the session file) before proceeding, which will slow down the page loading. Notice that sessions are not locked when stored in the database.
+Informuje ona web2py, aby nie zapisywał sesji. Powinna być stosowana w tych kontrolerach,
+których akcje są wywoływane często i nie ma potrzeby śledzenia aktywności użytkownika.
+Metoda ``session.forget()`` zapobiega przed przepisywaniem pliku sesji niezależnie
+od tego czy był on modyfikowany. Metoda ``session.forget(response)`` dodatkowo
+otwiera i zamyka plik sesji. Rzadko trzeba korzystać z tej metody, ponieważ sesje
+nie są zapisywana, gdy nie zostały zmienione. Jednakże, jeśli strona wykonuje wiele
+jednoczesnych żądań Ajax, to dobrym pomysłem na wywoływanie akcji poprzez Ajax jest
+wywołanie ``session.forget(response)`` (zakładając, że sesja nie jest potrzebna
+dla akcji). W przeciwnym razie każda akcja Ajax będzie musiała czekać na zakończenie
+poprzedniej akcji (i odblokowanie pliku sesji) przed kontynuowaniem, co spowalnia
+ładowanie strony. Należy mieć na uwadze, że sesje nie zostają zablokowane, gdy są
+przechowywane w bazie danych.
 
-Another method is:
+Inna metoda to:
 
 ``
 session.secure()
 ``:code
 
-which tells web2py to set the session cookie to be a secure cookie. This should be set if the app is going over https. By setting the session cookie to be secure, the server is asking the browser not to send the session cookie back to the server unless over an https connection.
+który informuje web2py, aby ustawił ciasteczko sesji jako bezpieczne ciasteczko.
+Powinno się to ustawiać, jeśli aplikacja używa połączenia https. Przez ustawienie
+ciasteczka sesji jako bezpiecznego, serwer prosi przeglądarkę aby nie odsyłał z
+powrotem ciasteczka do serwera, chyba że przez połączenie https.
 
-The other method is ``connect``.
-By default sessions are stored on the filesystem and a session cookie is used to store and retrieve the ``session.id``. Using the connect method it is possible to tell web2y to store sessions in the database or in the cookies thus eliminating need to access the filesystem for session management.
+Następną metodą jest ``connect``.
+Domyślnie sesje są przechowywane w systemie plików a ciasteczko jest używane do
+przechowywania i pobierania ``session.id``. Używając metody connect jest możliwe
+poinformowanie web2y aby przechowywał sesje w bazie danych albo w ciasteczkach,
+eliminując konieczność dostępu do systemu plików w zarządzaniu sesją.
 
-For example to **store sessions in the database**:
+Na przykład, aby **przechować sesje w bazie danych**:
 
 ``
 session.connect(request, response, db, masterapp=None)
 ``:code
 
-where ``db`` is the name of an open database connection (as returned by the DAL). It tells web2py that you want to store the sessions in the database and not on the filesystem. ``session.connect`` must come after ``db=DAL(...)``, but before any other logic that requires session, for example, setting up ``Auth``.
+gdzie ``db`` jest nazwą otwartego połączenia z bazą danych (tak jak zwrócił to DAL).
+Powiadamia to web2py, że chce się przechować sesje w bazie danych a nie w systemie
+plików. Metoda ``session.connect`` musi być wywołana po ``db=DAL(...)``, ale przed
+jakąkolwiek logika wymagajacą sesji, na przykład, konfiguracją ``Auth``.
 
-web2py creates a table:
+web2py tworzy tabelę:
 ``
 db.define_table('web2py_session',
                  Field('locked', 'boolean', default=False),
@@ -1114,57 +1379,74 @@ db.define_table('web2py_session',
                  Field('session_data', 'text'))
 ``:code
 
-and stores cPickled sessions in the ``session_data`` field.
+i zapisze speklowane sesje w polu ``session_data``.
 
-The option ``masterapp=None``, by default, tells web2py to try to retrieve an existing session for the application with name in ``request.application``, in the running application.
+Opcja ``masterapp=None`` (domyślnie) informuje web2py aby próbował odzyskać istniejącą
+sesję z nazwą w ``request.application``, w uruchomionej aplikacji.
 
-If you want two or more applications to share sessions, set ``masterapp`` to the name of the master application.
+Jeśli chce się aby dwie lub więcej aplikacji współdzieliły sesje, trzeba ustawić
+``masterapp`` na nazwę głównej aplikacji.
 
-
-To **store sessions in cookies** instead you can do:
+Aby zamiast tego **zapisać sesje w ciasteczkach** można zrobić:
 
 ``
 session.connect(request,response,cookie_key='yoursecret',compression_level=None)
 ``:code
 
-Here ``cookie_key`` is a symmetric encryption key.
-``compression_level`` is an optional ``zlib`` encryption level.
+Tutaj ``cookie_key`` to symetryczny klucz szyfrowania.
+``compression_level`` jest opcjonalnym poziomem szyfrowania ``zlib`.
 
-While sessions in cookie are often recommended for scalability reason they are limited in size. Large sessions will result in broken cookies.
+Natomiast sesje w ciasteczku są często zalecane z powodu skalowalności, gdyż mają
+ograniczoną wielkość. Duże sesje będą powodować załamanie się ciasteczek.
 
-You can check the state of your application at any time by printing the ``request``, ``session`` and ``response`` system variables. One way to do it is to create a dedicated action:
+Można sprawdzić stan swojej aplikacji w dowolnym momencie przez wydrukowanie zmiennych
+systemowych  ``request``, ``session`` i ``response``. Jednym sposobem na wykonanie
+tego jest utworzenie dedykowanej akcji:
 ``
 def status():
     return dict(request=request, session=session, response=response)
 ``:code
 
-In the "generic.html" view this is done using ``{{=response.toolbar()}}``.
+W widoku "generic.html" osiąga się to używając ``{{=response.toolbar()}}``.
 
-#### Don't store user-defined classes in session
+#### Nie przechowuj w sesji klas zdefiniowanych przez użytkownika
 
-Variables stored in the session are preserved between requests by serialisation.
+Zmienne przechowywane w sesji są zachowywane pomiędzy żądaniami dzięki  serializacji.
 
-Sessions are retrieved before module code is executed and therefore before classes are defined. Therefore user defined classes cannot be pickled. 
+Sesje są pobierane przed wykonaniem kodu modułu, a więc przed zdefiniowaniem klas.
+Dlatego klasy zdefiniowane przez użytkownika nie mogą zostać speklowane. 
 
-Classes defined in modules are also a grey area and they should not put in storage. Most of the time they work but they can break. This is because, for example, if you restart the web server and a user retrieves a session, this may happen before the module is imported. Same problem when the web server starts a new worker process. Same problem in a distributed environment.
+Klasy zdefiniowane w modułach są również szarą strefą i nie powinny być umieszczane
+w pamięci. Będą one działać przez większość czasu ale w końcu mogą załamać sesję.
+Tak jest ponieważ, na przykład, jeśli zrestartuje się serwer internetowy w chwili
+pobierania sesji przez użytkownika, to może się zdarzyć, że moduł zostanie zaimportowany.
+Ten sam problem wystąpi podczas uruchamiania przez serwer internetowy nowego procesu
+roboczego oraz w środowisku rozproszonym.
 
-#### Separate sessions
+#### Oddzielne sesje
 
-If you are storing sessions on the filesystem and you have lots of them, the file system access may become a bottle-neck. One solution is the following:
+Jeśli sesje są przechowywane w systemie plików i ma się ich wiele, to system plików
+może stać się wąskim gardłem. Jedno z rozwiązań jest następujące:
 ``
 session.connect(request, response, separate=True)
 ``:code
 
-By setting ``separate=True`` web2py will store sessions not in the "sessions/" folder but in subfolders of the "sessions/" folder. The subfolder will be created automatically. Sessions with the same prefix will be in the same subfolder. Again, note that the above must be called before any logic that might require the session.
+Ustawiając ``separate=True`` web2py będzie przechowywał sesje nie w folderze "sessions/"
+ale w podfolderze folderu "sessions/". Podfolder będzie tworzony automatycznie.
+Sesje z tym samym przedrostkiem będą zapisywane w tym samym podfolderze. Znowu trzeba
+mieć na uwadze, że powyższe wyrażenie musi być wywołane przed jakąkolwiek logiką,
+którą może wymagać sesja.
 
-### ``cache``
+### Obiekt ``cache``
 ``cache``:inxx ``cache.ram``:inxx ``cache.disk``:inxx
-``cache`` a global object also available in the web2py execution environment. It has two attributes:
-- ``cache.ram``: the application cache in main memory.
-- ``cache.disk``: the application cache on disk.
-``cache`` is callable, this allows it to be used as a decorator for caching actions and views.
+Globalny obiekt ``cache`` jest również dostępny w środowisku uruchomieniowym web2py.
+Ma on dwa atrybuty:
+- ``cache.ram``: pamięć podręczna aplikacji w głównej pamięci;
+- ``cache.disk``: pamięć podręczna aplikacji na dysku.
+Atrybut ``cache`` jest wywoływalny, co pozwala na stosowanie go jako dekoratora
+akcji lub widoków.
 
-The following example caches the ``time.ctime()`` function in RAM:
+Powyższy przykład buforuje funkcję ``time.ctime()`` w RAM:
 ``
 def cache_in_ram():
     import time
@@ -1172,9 +1454,10 @@ def cache_in_ram():
     return dict(time=t, link=A('click me', _href=request.url))
 ``:code
 
-The output of ``lambda: time.ctime()`` is cached in RAM for 5 seconds. The string ``'time'`` is used as cache key.
+Wyjście funkcji ``lambda: time.ctime()`` jest buforowane w RAM przez 5 sekund.
+Ciąg ``'time'`` został tu użyty jako klucz.
 
-The following example caches the ``time.ctime()`` function on disk:
+Poniższy przykład buforuje funkcję ``time.ctime()`` na dysku:
 ``
 def cache_on_disk():
     import time
@@ -1182,14 +1465,17 @@ def cache_on_disk():
     return dict(time=t, link=A('click me', _href=request.url))
 ``:code
 
-The output of ``lambda: time.ctime()`` is cached on disk (using the shelve module) for 5 seconds.
+Wyjście funkcji ``lambda: time.ctime()`` jest buforowane na dysku (z wykorzystaniem
+modułów shelve) na 5 sekund.
 
-Note, the second argument to ``cache.ram`` and ``cache.disk`` must be a function or callable object. If you want to cache an existing object rather than the output of a function, you can simply return it via a lambda function:
+Trzeba mieć na uwadze, że drugi argument ``cache.ram`` i ``cache.disk`` musi być
+funkcją lub wywoływalnym obiektem. Jeśli chce się buforować istniejący obiekt,
+a nie wyjście funkcji, można po prostu zwrócić to przez funkcję lambda:
 ``
 cache.ram('myobject', lambda: myobject, time_expire=60*60*24)
 ``:code
 
-The next example caches the ``time.ctime()`` function to both RAM and disk:
+Następny przykład buforuje funkcję ``time.ctime()`` zarówno w RAM jak i na dysku:
 ``
 def cache_in_ram_and_disk():
     import time
@@ -1199,11 +1485,17 @@ def cache_in_ram_and_disk():
     return dict(time=t, link=A('click me', _href=request.url))
 ``:code
 
-The output of ``lambda: time.ctime()`` is cached on disk (using the shelve module) and then in RAM for 5 seconds. web2py looks in RAM first and if not there it looks on disk. If it is not in RAM or on disk, ``lambda: time.ctime()`` is executed and the cache is updated. This technique is useful in a multiprocessor environment. The two times do not have to be the same.
+Wyjście ``lambda: time.ctime()`` jest buforowane na dysku (z wykorzystaniem moduły
+shelve) a następnie w RAM na 5 sekund. Najpierw web2py przeszukuje pamięć RAM
+i jeśli nic tam nie znajdzie, to przeszukuje dysk. Jeśli nie ma tego co potrzeba
+ani w pamieci RAM ani na dysku, to wykonywana jest funkcja ``lambda: time.ctime()``
+i pamięć podręczna zostaje zaktualizowana. Technika ta jest użyteczna w środowisku
+wieloprocesorowym. Dwa czasy nie muszą być takie same.
 
-The following example is caching in RAM the output of the controller function (but not the view):
+W poniższym przykładzie buforowane jest wyjście kontrolera funkcji (ale nie widoku)
+w pamięci RAM:
 
-``cache controller``:inxx
+``buforowanie kontrolera``:inxx
 ``
 @cache(request.env.path_info, time_expire=5, cache_model=cache.ram)
 def cache_controller_in_ram():
@@ -1212,9 +1504,12 @@ def cache_controller_in_ram():
     return dict(time=t, link=A('click me', _href=request.url))
 ``:code
 
-The dictionary returned by ``cache_controller_in_ram`` is cached in RAM for 5 seconds. Note that the result of a database select cannot be cached without first being serialized. A better way is to cache the database select directly using the ``select`` method's ``cache`` argument.
+Słownik zwracany przez ``cache_controller_in_ram`` jest buforowany w RAM na 5 sekund.
+Proszę zwrócić uwagę, że wynik wyboru bazy danych nie może być buforowany bez wykonania
+najpierw serializacji. Lepszym sposobem jest buforowanie wybranej bazy danych bezpośrednio
+przy wykorzystaniu argumentu ``select`` metody ``cache``.
 
-The following example is caching the output of the controller function on disk (but not the view):
+Poniższy przykład buforuje wyjście funkcji kontrolera (ale nie widoku) na dysk:
 ``
 @cache(request.env.path_info, time_expire=5, cache_model=cache.disk)
 def cache_controller_on_disk():
@@ -1224,11 +1519,17 @@ def cache_controller_on_disk():
                               _href=request.url))
 ``:code
 
-The dictionary returned by ``cache_controller_on_disk``  is cached on disk for 5 seconds. Remember that web2py cannot cache a dictionary that contains un-pickleable objects.
+Słownik zwracany przez ``cache_controller_on_disk`` jest buforowany na dysku przez
+5 sekund. Trzeba pamiętać, że web2py nie może buforować słownika, który zawiera
+niepeklowane obiekty.
 
-It is also possible to cache the view. The trick is to render the view in the controller function, so that the controller returns a string. This is done by returning ``response.render(d)`` where ``d`` is the dictionary we intended to pass to the view. The following example caches the output of the controller function in RAM (including the rendered view):
+Możliwe jest również buforowanie widoku. Renderowanie widoku w funkcji kontrolera
+to trik polegający na tym, aby kontroler zwracał ciąg znakowy. Jest to realizowane
+przez zwracanie ``response.render(d)`` gdzie ``d`` jest słownikiem, który chcemy
+przekazać do widoku. Poniższy przykład buforuje w RAM wyjście funkcji kontrolera
+(łącznie z renderowanym widokiem):
 
-``cache view``:inxx
+``buforowanie widoku``:inxx
 ``
 @cache(request.env.path_info, time_expire=5, cache_model=cache.ram)
 def cache_controller_and_view():
@@ -1237,248 +1538,316 @@ def cache_controller_and_view():
     d = dict(time=t, link=A('click to reload', _href=request.url))
     return response.render(d)
 ``:code
-``response.render(d)`` returns the rendered view as a string, which is now cached for 5 seconds. This is the best and fastest way of caching.
+Funkcja ``response.render(d)`` zwraca zrenderowany widok jako ciąg znakowy,
+który jest teraz buforowany przez 5 sekund. Jest to najlepszy i najszybszy sposób buforowania.
 ------
-We recommend [[@cache.action #cache_action]] starting from web2py > 2.4.6 
+Zalecamy stosowanie [[@cache.action #cache_action]] obsługiwane w web2py > 2.4.6 
 ------
 
-Note, ``time_expire`` is used to compare the current time with the time the requested object was last saved in the cache. It does not affect future requests. This enables ``time_expire`` to be set dynamically when an object is requested rather than being fixed when the object is saved. For example:
+Proszę zwrócić uwagę, że ``time_expire`` jest używany do porównania bieżącego czasu
+z czasem żądanego obiektu, który był ostatnio zapisany w pamięci podręcznej. Nie ma
+to wpływu na przyszłe żądania. Umożliwia aby ``time_expire`` był ustawiany dynamicznie
+podczas żądania obiektu, a nie ustalany podczas zapisywania obiektu. Na przykład:
 ``
 message = cache.ram('message', lambda: 'Hello', time_expire=5)
 ``:code
 
-Now, suppose the following call is made 10 seconds after the above call:
+Załóżmy teraz, że następujące wywołanie jest wykonane na 10 sekund przed powyższym wywołaniem:
 ``
 message = cache.ram('message', lambda: 'Goodbye', time_expire=20)
 ``:code
 
-Because ``time_expire`` is set to 20 seconds in the second call and only 10 seconds has elapsed since the message was first saved, the value "Hello" will be retrieved from the cache, and it will not be updated with "Goodbye". The ``time_expire`` value of 5 seconds in the first call has no impact on the second call.
+Ponieważ ``time_expire`` jest ustawione na 20 sekund w drugim wywołaniu i tylko
+10 sekund upłynęło od komunikaty, który był zapisany pierwszy, wartość "Hello"
+będzie pobierana z pamięci podręcznej i nie zostanie zaktualizowana na "Goodbye".
+5 sekundowa wartość ``time_expire`` w pierwszym wywołaniu nie ma wpływu na drugie
+wywołanie.
 
-Setting ``time_expire=0`` (or a negative value) forces the cached item to be refreshed (because the elapsed time since the last save will always be > 0), and setting ``time_expire=None`` forces retrieval of the cached value, regardless of the time elapsed since it was saved (if ``time_expire`` is always ``None``, the cached item will effectively never expire).
+Ustawienie ``time_expire=0`` (lub na wartość ujemną) wymusza, aby buforowana pozycja
+była odświeżana  (ponieważ czas jaki upłynął od ostatniego zapisu zawsze będzie > 0)
+a ustawienie ``time_expire=None`` wymusza pobieranie wartości buforowanej, niezależnie
+od czasu jaki upłynął od ostatnie zapisu (jeśli ``time_expire`` ma zawsze wartość
+``None``, to element buforowany będzie nigdy nie wygasający).
 
-You can clear one or more cache variables with
+Z pamięci podręcznej można usunąć jedna lub więcej zmiennych poleceniem
 ``cache clear``:inxx
 
 ``
 cache.ram.clear(regex='...')
 ``:code
 
-where ``regex`` is a regular expression matching all the keys you want removed from the cache. You can also clear a single item with:
+gdzie ``regex`` jest wyrażeniem regularnym dopasowującym wszystkie klucze, jakie
+chce się usunąć z pamięci podręcznej. Można również usunąć pojedynczy element stosując:
 ``
 cache.ram(key, None)
 ``:code
 
-where ``key`` is the key of the cached item.
+gdzie ``key`` jest kluczem buforowanego elementu.
 
-It is also possible to define other caching mechanisms such as memcache. Memcache is available via ``gluon.contrib.memcache`` and is discussed in more detail in Chapter 14.
-
-------
-Be careful when caching to remember that caching is usually at the app-level not at the user level. If you need, for example, to cache user specific content, choose a key that includes the user id.
-------
+Możliwe jest również określenie innych mechanizmów buforowania, takie jak memcache.
+Memcache jest dostępny poprzez ``gluon.contrib.memcache`` i został omówiony w rozdziale 14.
 
 ------
-The admin app for an application lets you view cache keys (and clear the cache). Access it from the database management screen of admin.
+Bądź ostrożny podczas buforowania, pamiętając, że buforowanie jest zwykle dokonywane
+na poziomie aplikacji, a nie na poziomie użytkownika. Jeśli potrzeba, na przykład,
+buforować zawartość specyficzną dla użytkownika, to trzeba wybrać klucz, który zawiera
+identyfikator użytkownika.
+------
+
+------
+Aplikacja interfejsu administracyjnego aplikacji umożliwia wyświetlanie przycisków
+pamięci podręcznej (i czyszczenia pamięci podręcznej). Dostęp do nich można uzyskać
+z poziomu ekranu zarządzania bazą danych.
 ------
 
 [[cache_action]]
 #### ``cache.action``
-Web2py by default assumes that the returned content is not going to be cached, as this reduces the shortcomings of an improper caching of the page client-side.
+W web2py domyślnie zakłada się, że zwracana zawartość nie będzie buforowana, gdyż
+zmniejsza to złe skutki niewłaściwego buforowania po stronie klienta.
 
-For example, when you show a form to the user, or a list of records, the web page should not be cached, as other users may have inserted new records on the table you are showing.
+Na przykład, gdy wyświetla się formularz użytkownikowi lub listę rekordów, strona
+internetowa nie powinna być buforowana, gdyż inni użytkownicy mogą w tym czasie
+wprowadzać nowe rekordy do tabeli, która się wyświetla.
 
-Instead, if you are showing to the user a wiki page whose content will never change (or it changes once a week), it is useful to store that page, but it is even more useful 
-to tell the client that that page is not going to change.
+Zamiast tego, jeśli wyświetlana jest strona, której zawartość nie będzie się nigdy
+zmieniać (lub zmieniać rzadko, np. raz na tydzień), to warto tą strona przechować,
+ale jeszcze lepiej jest powiadomić klienta, że strona ta jest niezmienna.
 
-This is accomplished sending out some specific headers along with the page: when the client's browser receives the content, it is stored in the browser's cache and it will not be requested again
-to your site. Of course this is a **major** speedup for public-facing sites.
+Osiąga się to przez wysyłanie wraz ze stroną kilku specjalnych nagłówków. Gdy
+przeglądarka klienta odbierze taką zawartość, to przechowa ją w pamięci podręcznej
+przeglądarki i nie będzie żądać ponownie takiej strony od serwera. Jest to **główny**
+mechanizm przyśpieszania witryn o dostępie publicznym.
 
-Web2py > 2.4.6 introduced a new ``cache.action`` decorator to allow a smarter handling of this situation.
-``cache.action`` can be used:
-- for setting smart cache headers
-- to cache the results accordingly
+W wersjach web2py > 2.4.6 wprowadzono nowy dekortor ``cache.action`` umożliwiający
+bardziej inteligentną obsługę takich sytuacji.
+Dekorator ``cache.action`` może zostać użyty do:
+- ustawiania inteligentnych nagłówków buforowania;
+- odpowiedniego buforowania wyników.
 ------
-NB: it will do one or another or **both**.
+NB: Jest stosowane dla jednego lub drugiego celu albo obu naraz.
 ------
-The main problem with caching a view with ``@cache(request.env.path_info, time_expire=300, cache_model=cache.ram)`` is that request.env.path_info as a key leads to several problems, e.g.
-+ URL vars are not considered
-  -- you cached the result of ''/app/default/index?**search=foo**'' : for the next 300 seconds ''/app/default/index?**search=bar**'' will return the exact same thing of ''/app/default/index?**search=foo**''
-+ User is not considered
-  -- you user accesses often a page and you choose to cache it. 
-     However, you cached the result of ''/app/default/index'' using request.env.path_info as the key, so another user
-     will see a page that was not meant for him
-  -- you cached a page for "Bill", but "Bill" accessed the page from the desktop. Now he tries to access it from its phone: if you prepared a template 
-     for mobile users that is different from the standard one, "Joe" will not see it
-+ Language is not considered
-  -- when you cache the page, if you use T() for some elements, the page will be stored with a fixed translation
-+ Method is not considered
-  -- When you cache a page, you should only cache it if it's a result of a GET operation
-+ Status code is not considered
-  -- When you cached the page for the first time, something went wrong and you returned a nice 404 page.
-     You don't want to cache errors ^_^
+Użycie request.env.path_info jako klucza w buforowaniu widoku poprzez
+``@cache(request.env.path_info, time_expire=300, cache_model=cache.ram)`` sprawia
+kilka problemów, np.:
++ Zmienne URL nie są obsługiwane
+  -- Buforowanie wyniku ''/app/default/index?**search=foo**'' : przez następne
+     300 sekund ''/app/default/index?**search=bar**'' zwróci dokładnie ta samą rzecz
+     co ''/app/default/index?**search=foo**'';
++ Użytkownik nie jest obsługiwany
+  -- Jakiś użytkownik uzyskuje często dostęp do strony i wybiera ją z pamięci podręcznej.
+     Jednakże, buforowany był wynik ''/app/default/index'' przy wykorzystaniu request.env.path_info
+     jako klucz, tak więc inny użytkownik będzie widział stronę, która nie była przeznaczona dla niego;
+  -- Buforowana została strona użytkownika "Bill", gdy "Bill" uzyskał dostęp do strony z pulpitu.
+     Teraz próbuje on uzyskać dostęp z telefonu komórkowego: jeśli przygotowany był szablon dla
+     użytkowników mobilnych, który jest inny od standardowego, to "Joe" nie zobaczy go;
++ Język nie jest obsługiwany
+  -- Podczas buforowania strony, jeśli użyje się funkcji T() dla tych samych
+     elementów, strona zostanie zapisana wraz z ustalonym tłumaczeniem;
++ Metoda żądania nie jest obsługiwana
+  -- Gdy buforuje się stronę, to należy je buforować tylko wtedy, gdy jest ona
+     wynikiem operacji GET
++ Kod stan strony nie jest obsługiwany
+  -- Gdy buforuje się stronę po raz pierwszy, czasami może pójść coś nie tak
+     i zwracana jest piękna strona 404.
+     Przecież nie chcesz buforować błędów.
 
-Instead of letting users write a lot of boilerplate code to take care of all those problems, ``cache.action`` was created.
-It will by default use smart cache headers to let the browser cache the result: if you pass a cache model to it, it will also figure out the best key automatically, 
-so different versions of the same page can be stored and retrieved accordingly (e.g. one for English users and one for Spanish ones)
+Zamiast pisać dużo kodu szablonowego rozwiązującego te wszystkie problemy, wystarczy
+utworzyć ``cache.action``.
+Inteligentnie używa to nagłówki buforowania pozwalając przeglądarce buforować wynik:
+jeśli przekaże się do buforowania model, to rozwiązany zostanie automatycznie klucz,
+w najlepszy sposób, tak że różne wersje tej samej strony mogą być przechowywane
+i pobierane odpowiednio (np. jedna w języku angielskim a druga w polskim).
 
-It takes several parameters, with smart defaults:
+Pobiera to kilka parametrów, z inteligentnymi wartościami domyślnymi:
 
-- time_expire : the usual, defaults to 300 seconds
-- cache_model : by default is None. This means that @cache.action will **only** alter the default headers to let the client's browser cache the content
-    -- if you pass, e.g., ``cache.ram``, the result will be stored in the cache as well
-- prefix : if you want to prefix the auto-generated key (useful for clearing it later with, e.g. ``cache.ram.clear(prefix*)``)
-- session : if you want to consider the session, defaults to False
-- vars : if you want to consider URL vars, defaults to True
-- lang : if you want to consider the language, defaults to True
-- user_agent : if you want to consider the user agent, defaults to False
-- public : if you want the same page for all the users that will ever access it, defaults to True
-- valid_statuses : defaults to None. cache.client will cache only pages requested with a GET method, whose status codes begin with 1,2 or 3. 
-  You can pass a list of status codes (when you want pages to be cached with those statuses, e.g. status_codes=[200] will cache only pages
-  that resulted in a 200 status code) 
-- quick : defaults to None, but you can pass a list of initials to set a particular feature:
+- time_expire : domyślnie 300 sekund;
+- cache_model : domyślnie None. Oznacza to, że @cache.action będzie **tylko** zmieniał nagłówki, aby pozwolić przeglądarce klienta buforować tą zawartość;
+    -- jeśli przekaże się, np., ``cache.ram``, to wynik zostanie też zapisany w pamięci podręcznej;
+- prefix : jeśli chce się poprzedzić klucz auto-generated przedrostkiem (przydatne przy usuwaniu go później przez np. ``cache.ram.clear(prefix*)``);
+- session : jeśli chce się wziąść po uwagę sesję, domyślnie False;
+- vars : jeśli chce się wziąć pod uwagę zmienne URL, domyślnie True;
+- lang : jeśli chce się wziąć pod język, domyślnie True;
+- user_agent : jeśli chce się wziąć pod uwagę rodzaj przeglądarki użytkownika (''ang. user agent''), domyślnie False;
+- public : jeśli chce się buforować tą samą stronę dla wszystkich odwiedzających, tak że będzie zawsze dostępna, domyślnie True;
+- valid_statuses : domyślnie None. cache.client będzie buforował tylko strony z metodą GET, których kod stanu rozpoczyna się os 1,2 lub 3; 
+  Można przekazać listę kodów stanu (jeśli chce się aby strony były buforowane z tymi stanami, np. status_codes=[200] spowoduje buforowanie tylko strony, których kod stanu wynosi 200) 
+- quick : domyślnie None, ale można przekazać listę liter w celu ustawienia właściwej  funkcjonalności:
   -- **S**ession, **V**ars, **L**ang, **U**ser_agent, **P**ublic
-     e.g. ``@cache.action(time_expire=300, cache_model=cache.ram, quick='SVP')`` is the same as
+     np. ``@cache.action(time_expire=300, cache_model=cache.ram, quick='SVP')`` to to samo co
      ``@cache.action(time_expire=300, cache_model=cache.ram, session=True, vars=True, public=True)``
 
-"Consider" means for e.g. **vars**, that you want to cache different pages if **vars** are different, 
-so  ''/app/default/index?**search=foo**'' will not be the same one for ''/app/default/index?**search=bar**''
-Some settings override others, so, e.g., if you set ``session=True, public=True`` the latter will be discarded.
-Use them wisely!
+**Obsługiwanie**, opisane wyżej, oznacza np. dla **zmiennych**, że chcąc buforować różne strony,
+gdy **zmienne** są różne, to ''/app/default/index?**search=foo**'' nie będzie takie
+samo jak ''/app/default/index?**search=bar**''.
+To zachowanie jest nadpisywane przez kilka ustawień, tak więc np., jeśli ustawi
+się ``session=True, public=True``, to drugie wyrazenie zostanie odrzucone.
+
+Stosuj to mądrze!
 
 [[URL]]
-### ``URL``
-``URL``:inxx
-The ``URL`` function is one of the most important functions in web2py. It generates internal URL paths for the actions and the static files.
+### Funkcja ``URL``
+``URL``:inxx ``funkcja URL``:inxx
+Funkcja ``URL`` jest jedna z najważniejszych funkcji w web2py. Generuje wewnętrzne
+ścieżki URL dla akcji i plików statycznych.
 
-Here is an example:
+Oto przykład:
 
 ``
 URL('f')
 ``:code
 
-is mapped into
+jest mapowane na
 
 ``
 /[application]/[controller]/f
 ``:code
 
-Notice that the output of the ``URL`` function depends on the name of the current application, the calling controller, and other parameters. web2py supports URL mapping and reverse URL mapping. URL mapping allows you to redefine the format of external URLs. If you use the ``URL`` function to generate all the internal URLs, then additions or changes to URL mappings will prevent broken links within the web2py application.
+Proszę zwrócić uwagę, że wyjście funkcji ``URL`` zależy od nazwy bieżącej aplikacji,
+wywoływanego kontrolera i innych parametrów. Platforma web2py obsługuje mapowanie
+URL i odwrotne mapowanie URL. Mapowanie URL pozwala przedefiniować format zewnętrznych
+adresów URL. Jeśli używa się funkcji ``URL`` do generowania wszystkich zewnętrznych
+adresów URL, to następnie trzeba dodać lub zmienić mapowania URL, co zabezpieczy
+nie działającym linkom w aplikacji web2py.
 
-You can pass additional parameters to the ``URL`` function, i.e., extra terms in the URL path (args) and URL query variables (vars):
+Do funkcji ``URL` można przekazać dodatkowe parametry, tj. dodatkowe warunki
+w ścieżce adresu URL (args) i zmienne zapytań URL (vars):
 
 ``
 URL('f', args=['x', 'y'], vars=dict(z='t'))
 ``:code
 
-is mapped into
+jest mapowane na
 
 ``
 /[application]/[controller]/f/x/y?z=t
 ``:code
 
-The ``args`` attributes are automatically parsed, decoded, and finally stored in ``request.args`` by web2py. Similarly, the ``vars`` are parsed, decoded, and then stored in ``request.vars``.
-``args`` and ``vars`` provide the basic mechanism by which web2py exchanges information with the client's browser.
+Atrybuty ``args`` są automatycznie parsowane, dekodowane i w końcu zapisywane
+w ``request.args``. Podobnie ``vars`` są parsowane, dekodowane i zapisywane w
+``request.vars``. ``args`` i ``vars`` dostarczają podstawowe mechanizmy, przy pomocy
+których web2py wymienia informację z przeglądarką klienta.
 
-If args contains only one element, there is no need to pass it in a list.
+Jeśli ``args`` zawiera tylko jeden element, to nie ma potrzeby przekazywania go w liście.
 
-You can also use the ``URL`` function to generate URLs to actions in other controllers and other applications:
+Można również użyć funkcji ``URL`` do generowania adresów URL dla akcji w innych
+kontrolerach i aplikacjach:
 
 ``
 URL('a', 'c', 'f', args=['x', 'y'], vars=dict(z='t'))
 ``:code
 
-is mapped into
+jest mapowane na 
 
 ``
 /a/c/f/x/y?z=t
 ``
 
-It is also possible to specify application, controller and function using named arguments:
+Możliwe jest też określenie aplikacji, kontrolera i funkcji przy użyciu nazwanych
+argumentów:
 
 ``
 URL(a='a', c='c', f='f')
 ``:code
 
-If the application name ''a'' is missing the current app is assumed.
+Jeśli brak jest nazwy aplikacji ''a'', to przyjmowana jest bieżąca aplikacja.
 
 ``
 URL('c', 'f')
 ``:code
 
-If the controller name ''c'' is missing, the current one is assumed.
+Jeśli brak jest nazwy kontrolera ''c'', to przyjmowany jest bieżący kontroler.
 
 ``
 URL('f')
 ``:code
 
-Instead of passing the name of a controller function it is also possible to pass the function itself
+Zamiast przekazywania nazwy funkcji kontrolera możliwe jest przekazywanie samej
+funkcji
 
 ``
 URL(f)
 ``:code
 
-For the reasons mentioned above, you should always use the ``URL`` function to generate URLs of static files for your applications. Static files are stored in the application's ``static`` subfolder (that's where they go when uploaded using the administrative interface). web2py provides a virtual 'static' controller whose job is to retrieve files from the ``static`` subfolder, determine their content-type, and stream the file to the client. The following example generates the URL for the static file "image.png":
+Z wyżej omówionych powodów, należy zawsze używać funkcji ``URL`` do generowania
+adresów URL plików statycznych aplikacji. Pliki statyczne przechowywane są w podfolderze
+``static`` (tam kierowane są pliki podczas przesyłania ich za pośrednictwem interfejsu
+administracyjnego). Platforma web2py udostępnia wirtualny kontroler 'static', którego
+zadaniem jest pobieranie plików z podfolderu ``static``, ustalenie typu zawartości
+i strumieniowanie pliku dla klienta. Poniższy przykład generuje adres URL dla pliku
+statycznego "image.png":
 
 ``
 URL('static', 'image.png')
 ``:code
 
-is mapped into
+jest mapowane na
 
 ``
 /[application]/static/image.png
 ``:code
 
-If the static file is in a subfolder within the ``static`` folder, you can include the subfolder(s) as part of the filename. For example, to generate:
+Jeśli plik statyczny znajduje się w podfolderze folderu ``static``, można dołączyć
+podfolder (podfoldery) jako część atrybutu filename. Na przykład, aby wygenerować:
 
 ``
 /[application]/static/images/icons/arrow.png
 ``
 
-one should use:
+trzeba użyć:
 
 ``
 URL('static', 'images/icons/arrow.png')
 ``:code
 
-You do not need to encode/escape the ``args`` and ``vars`` arguments; this is done automatically for you.
+Nie ma potrzeby kodowania (zabezpieczania znakami ucieczki) argumentów ``args``
+i ``vars`` - jest to czynione automatycznie.
 
-By default, the extension corresponding to the current request (which can be found in ``request.extension``) is appended to the function, unless request.extension is html, the default. This can be overridden by explicitly including an extension as part of the function name ``URL(f='name.ext')`` or with the extension argument:
+Domyślnie rozszerzenie odpowiadające bieżącemu żądaniu (które można znaleźć
+w ``request.extension``) jest dołączane do funkcji, chyba że request.extension
+to html (domyślnie). Można to przesłonić dołączając jawnie rozszerzenie jako
+część nazwy funkcji ``URL(f='name.ext')`` lub jako wartość argumentu extension:
 ``
 URL(..., extension='css')
 ``:code
 
-The current extension can be explicitly suppressed:
+Bieżące rozszerzenie może być zmazane:
 ``
 URL(..., extension=False)
 ``:code
 
-#### Absolute urls
+#### Bezwzględne adresy URL
 
-By default, ``URL`` generates relative URLs. However, you can also generate absolute URLs by specifying the ``scheme`` and ``host`` arguments (this is useful, for example, when inserting URLs in email messages):
+Domyślnie funkcja ``URL`` generuje względne adresy URL. Jednakże, można również
+generować bezwzględne adresy URL określając argumenty ``scheme`` i ``host`` (jest
+to przydatne, na przykład, przy wstawianiu adresów URL w wiadomościach email):
 
 ``
 URL(..., scheme='http', host='www.mysite.com')
 ``:code
 
-You can automatically include the scheme and host of the current request by simply setting the arguments to ``True``.
+Można automatycznie dołączyć schemat i host bieżącego żądania przez ustawienie
+tych argumentów na ``True``.
 
 ``
 URL(..., scheme=True, host=True)
 ``:code
 
-The ``URL`` function also accepts a ``port`` argument to specify the server port if necessary.
+Funkcja ``URL`` akceptuje również argument ``port`` do określania portu serwera,
+jeśli to konieczne.
 
-#### Digitally signed urls
-``digitally signed URL``:inxx
+#### Adresy URL z podpisem cyfrowym
+``adresy URL z podpisem cfrowym``:inxx
 
-When generating a URL, you have the option to digitally sign it. This will append a ``_signature`` GET variable that can be verified by the server. This can be done in two ways.
+Podczas generowania adresu URL, ma się możliwość jego cyfrowego podpisania.
+Dołącza to zmienną GET ``_signature``, która może być zweryfikowana przez serwer.
+Można to zrobić w dwojaki sposób.
 
-You can pass to the URL function the following arguments:
-- ``hmac_key``: the key for signing the URL (a string)
-- ``salt``: an optional string to salt the data before signing
-- ``hash_vars``: an optional list of names of variables from the URL query string (i.e., GET variables) to be included in the signature. It can also be set to ``True`` (the default) to include all variables, or ``False`` to include none of the variables.
+Można przekazać do funkcji URL następujące argumenty:
+- ``hmac_key``: klucz do podpisania adresu URL (ciąg znakowy);
+- ``salt``: opcjonalny ciąg znakowy będący solą (ciągiem zaburzającym) haszowanie podpisu;
+- ``hash_vars``: opcjonalna lista nazw zmiennych z ciąga zapytania URL (czyli zmiennych GET), które będą dołączone do sygnatury. Można to również ustawić na ``True`` (wartość domyślna) aby dołączać wszystkie zmienne lub na ``False`` aby nie dołączać żadnych zmiennych.
 
-Here is an example of usage:
+Oto przykład zastosowania:
 
 ``
 KEY = 'mykey'
@@ -1492,14 +1861,19 @@ def two():
     return locals()
 ``:code
 
-This makes the action ``two`` accessible only via a digitally signed URL. A digitally signed URL looks like this:
+Sprawia to, że akcja ``two`` jest dostępna tylko poprzez adres URL podpisany cyfrowo.
+Adres URL podpisany cyfrowo wygląda podobnie do tego:
 ``
 '/welcome/default/two?a=123&_signature=4981bc70e13866bb60e52a09073560ae822224e9'
 ``
 
-Note, the digital signature is verified via the ``URL.verify`` function. ``URL.verify`` also takes the ``hmac_key``, ``salt``, and ``hash_vars`` arguments described above, and their values must match the values that were passed to the ``URL`` function when the digital signature was created in order to verify the URL.
+Trzeba mieć na uwadze, że podpis cyfrowy jest weryfikowany przez funkcje ``URL.verify``.
+Funkcja ``URL.verify`` również pobiera argumenty ``hmac_key``, ``salt`` i ``hash_vars``
+opisane powyżej a ich wartości muszą pasować do wartości, które zostały przekazane
+do funkcji ``URL`` podczas tworzenia podpisu cyfrowego.
 
-A second and more sophisticated but more common use of digitally signed URLs is in conjunction with Auth. This is best explained with an example:
+Druga i bardziej zaawansowana i bardziej powszechna metoda cyfrowego podpisywania
+adresów URL to powiązanie tego z uwierzytelnianiem. Najlepiej wyjaśnić to na przykładzie:
 
 ``
 @auth.requires_login()
@@ -1512,24 +1886,31 @@ def two():
     return locals()
 ``:code
 
-In this case the ``hmac_key`` is automatically generated and shared within the session. This allows action ``two`` to delegate any access control to action ``one``. If the link is generated and signed, it is valid; else it is not. If the link is stolen by another user, the link will be invalid.
+W tym przypadku ``hmac_key`` jest generowany automatycznie i udostępniany w sesji.
+Umożliwia to, aby akcja ``two`` delegowała kontrole dostępu do akcji ``one``.
+Jeśli odnośnik został wygenerowany i podpisany, to jest prawidłowy, w innym razie
+nie. Jeśli odnośnik zostanie skradziony przez innego użytkownika, to będzie nieprawidłowy.
 
-It is good practice to always digitally sign Ajax callbacks. If you use the web2py ``LOAD`` function, it has a ``user_signature`` argument too that can be used for this purpose:
+Dobrą praktyka jest podpisywanie cyfrowo zawsze wywołań zwrotnych Ajax. Jeśli używa
+się funkcji ``LOAD`` web2py, to ma się do dyspozycji argument ``user_signature``
+służący temu celowi:
 
 ``
 {{=LOAD('default', 'two', vars=dict(a=123), ajax=True, user_signature=True)}}
 ``
 
-### ``HTTP`` and ``redirect``
+### ``HTTP`` i ``redirect``
 ``HTTP``:inxx ``redirect``:inxx
 
-web2py defines only one new exception called ``HTTP``. This exception can be raised anywhere in a model, a controller, or a view with the command:
+Platforma web2py definiuje tylko jeden nowy wyjątek o nazwie ``HTTP``. Ten wyjątek
+może być wywołany gdziekolwiek w modelu, kontrolerze lub widoku poleceniem:
 
 ``
 raise HTTP(400, "my message")
 ``:code
 
-It causes the control flow to jump away from the user's code, back to web2py, and return an HTTP response like:
+Powoduje to, że przepływ sterowania przechodzi z kodu użytkownika z powrotem do
+web2py i zwraca odpowiedź HTTP podobną do tego:
 ``
 HTTP/1.1 400 BAD REQUEST
 Date: Sat, 05 Jul 2008 19:36:22 GMT
@@ -1542,13 +1923,15 @@ Transfer-Encoding: chunked
 my message
 ``:code
 
-The first argument of ``HTTP`` is the HTTP status code. The second argument is the string that will be returned as the body of the response. Additional optional named arguments are used to build the response HTTP header.
-For example:
+Pierwszy argument funkcji ``HTTP`` to kod stanu HTTP. Drugi argument to ciąg
+znakowy, który będzie zwracany jako ciało odpowiedzi. Dodatkowe nazwane argumenty
+są używane do budowy nagłówka odpowiedzi HTTP.
+Na przyklad:
 ``
 raise HTTP(400, 'my message', test='hello')
 ``:code
 
-generates:
+generuje:
 ``
 HTTP/1.1 400 BAD REQUEST
 Date: Sat, 05 Jul 2008 19:36:22 GMT
@@ -1562,50 +1945,70 @@ test: hello
 my message
 ``:code
 
-If you do not want to commit the open database transaction, rollback before raising the exception.
+Jeśli nie chce się zatwierdzić transakcji otwartej bazy danych, to należy ją
+wycofać przed wywołaniem wyjątku.
 
-Any exception other than ``HTTP`` causes web2py to roll back any open database transaction, log the error traceback, issue a ticket to the visitor, and return a standard error page.
+Wszystkie wyjątki inne niż ``HTTP`` powodują, że web2py cofa wszystkie otwarte
+transakcje bazy danych, rejestruje komunikat dotyczący ostatniego wywołania
+(''ang. traceback''), wydaje bilet odwiedzającemu i zwraca standardową stronę błędu.
 
-This means that only ``HTTP`` can be used for cross-page control flow. Other exceptions must be caught by the application, otherwise they are ticketed by web2py.
+Oznacza to, że dla przepływu sterowania między stronami może zostać użyty tylko
+wyjątek ``HTTP``. Inne wyjątki muszą zostać wyłapane przez aplikację, w przeciwnym
+razie są one biletowane przez web2py.
 
-The command:
+Polecenie:
 ``
 redirect('http://www.web2py.com')
 ``:code
 
-is simply a shortcut for:
+jest po prostu skrótem dla:
 ``
 raise HTTP(303,
-           'You are being redirected <a href="%s">here</a>' % location,
+           'Nastąpi przekierowanie <a href="%s">tutaj</a>' % location,
            Location='http://www.web2py.com')
 ``:code
 
-The named arguments of the ``HTTP`` initializer method are translated into HTTP header directives, in this case, the redirection target location. ``redirect`` takes an optional second argument, which is the HTTP status code for the redirection (303 by default). Change this number to 307 for a temporary redirect or to 301 for a permanent redirect.
+Nazwane argumenty metody inicjatora ``HTTP`` są tłumaczone na dyrektywy nagłówka
+HTTP, w tym przypadku, docelowe miejsce przekierowania. Wyrażenie ``redirect``
+pobiera drugi opcjonalny argument, który jest kodem stanu HTTP dla przekierowania
+(domyślnie 303). Zmień ten numer na 307 dla tymczasowego przekierowania lub na 301
+dla stałego przekierowania.
 
-The most common way to use redirect is to redirect to other pages in the same app and (optionally) pass parameters:
+Najczęstszym sposobem użycia przekierowania jest przekierowanie do innej strony
+tej samej aplikacji i (opcjonalnie) przekazanie parametrów:
 
 ``
 redirect(URL('index', args=(1,2,3), vars=dict(a='b')))
 ``:code
 
-In chapter 12 we discuss web2py components. They make Ajax requests to web2py actions. If the called action performs a redirect, you may want the Ajax request to follow the redirect or you may want the entire page performing the Ajax request redirecting. In this latter case you can set:
+W rozdziale 12 omówimy komponenty web2py. Wykonują one żądania Ajax dla akcji web2py.
+Jeśli wywoływana akcja wykonuje przekierowanie, to można spowodować, że żądanie Ajax
+nastąpi po przekierowaniu albo że cała strona wykona przekierowanie żądania Ajax.
+W tym drugim przypadku można ustawić:
 
 ``
 redirect(...,client_side=True)
 ``:code
 
 
-### Internationalization, and Pluralization with ``T``
-``T``:inxx ``internationalization``:inxx
+### Umiędzynarodowienie i pluralizacja za pomocą ``T``
+``T``:inxx ``umiędzynarodowienie``:inxx
 
-The object ``T`` is the language translator. It constitutes a single global instance of the web2py class ``gluon.language.translator``. All string constants (and only string constants) should be marked by ``T``, for example:
+Obiekt ``T`` jest tłumaczem językowym. Stanowi pojedynczą globalną instancję klasy
+``gluon.language.translator`` web2py. Wszystkie stałe łańcuchowe (i tylko stałe
+łańcuchowe) powinny być oznaczone przez ``T``, na przykład:
 ``
 a = T("hello world")
 ``:code
 
-Strings that are marked with ``T`` are identified by web2py as needing language translation and they will be translated when the code (in the model, controller, or view) is executed. If the string to be translated is not a constant but a variable, it will be added to the translation file at runtime (except on GAE) to be translated later.
+Ciągi znakowe oznaczone przez ``T`` są identyfikowane przez web2py jako wymagające
+tłumaczenia i będą tłumaczone gdy kod (w modelu, kontrolerze lub widoku) będzie
+wykonywany. Jeśli ciąg znakowy do tłumaczenia nie jest stała lecz zmienną, to będzie
+dodany do pliku tłumaczenia w czasie wykonania (z wyjątkiem GAE)w celu późniejszego
+przetłumaczenia.
 
-The ``T`` object can also contain interpolated variables and supports multiple equivalent syntaxes:
+Obiekt ``T`` może również zawierać zmienne interpolowane i obsługiwać wiele
+równoważnych składni:
 ``
 a = T("hello %s", ('Tim',))
 a = T("hello %(name)s", dict(name='Tim'))
@@ -1613,190 +2016,236 @@ a = T("hello %s") % ('Tim',)
 a = T("hello %(name)s") % dict(name='Tim')
 ``:code
 
-The latter syntax is recommended because it makes translation easier.
-The first string is translated according to the requested language file and the ``name`` variable is replaced independently of the language.
+Zalecana jest ostatnia składnia ponieważ czyni tłumaczenie najłatwiejszym.
+Pierwszy ciąg jest tłumaczony zgodnie z żądanym plikiem językowym, a zmienna
+``name`` jest zamieniana niezależnie od języka.
 
-You can concatenate translated strings and normal strings:
+Można łączyć tłumaczone ciągi ze zwykłymi ciągami znakowymi:
 ``
 T("blah ") + name + T(" blah")
 ``:code
 
-The following code is also allowed and often preferable:
+Poniższy kod jest również dozwolony i często stosowany:
 
 ``
 T("blah %(name)s blah", dict(name='Tim'))
 ``:code
 
-or the alternative syntax
+lub alternatywna składnia
 ``
 T("blah %(name)s blah") % dict(name='Tim')
 ``:code
 
-In both cases the translation occurs before the variable name is substituted in the "%(name)s" slot. The following alternative should NOT BE USED:
+W obu przypadkach ciąg tłumaczony występujący przed nazwą zmiennej jest podstawiany
+w wyrażeniu "%(name)s". Poniższej alternatywy NIE NALEŻY STOSOWAĆ:
 ``
 T("blah %(name)s blah" % dict(name='Tim'))
 ``:code
 
-because translation would occur after substitution.
+ponieważ ciąg tłumaczony będzie występował po podstawieniu.
 
-#### Determining the language
+#### Ustalenie języka
 
-The requested language is determined by the "Accept-Language" field in the HTTP header, but this selection can be overwritten programmatically by requesting a specific file, for example:
+Żądany język jest określany w polu "Accept-Language" nagłówka HTTP, ale ten wybór
+może być zastąpiony programowo przez żądanie określonego pliku, na przykład:
 ``
-T.force('it-it')
+T.force('pl-pl')
 ``:code
 
-which reads the "languages/it-it.py" language file. Language files can be created and edited via the administrative interface.
+który czyta plik językowy "languages/pl-pl.py". Pliki językowe mogą być tworzone
+i edytowane poprzez interfejs administracyjny.
 
-You can also force a per-string language:
+Można też wymusić język w każdym tłumaczonym ciągu:
 
 ``
-T("Hello World", language="it-it")
+T("Hello World", language="pl-pl")
 ``:code
 
 --------------
-In the case multiple languages are requested, for example "it-it, fr-ft", web2py tries to locate "it-it.py" and "fr-fr.py" translation files. If none of the requested files is present, it tries to fall back on "it.py" and "fr.py". If these files are not present it defaults to "default.py". If this is not present either, it default to no-translation. The more general rule is that web2py tries "xx-xy-yy.py", "xx-xy.py", "xx.py", "default.py" for each of the "xx-xy-yy" accepted languages trying to find the closest match to the visitor's preferences.
+W przypadku wielu wymaganych języków, na przykład "pl-pl, fr-ft", web2py próbuje
+zlokalizować pliki tłumaczeń "pl-pl.py" i "fr-fr.py". Jeżeli żaden z wymaganych
+plików nie zostanie znaleziony, to następuje próba odnalezienia plików "pl.py"
+i "pl.py". Jeżeli te pliki nie będą odnalezione, to wybrany zostanie domyślny plik
+"default.py". Jeżeli i ten plik nie będzie odnaleziony, to tłumaczenie nie nastąpi.
+Bardziej ogólna zasada jest taka, że web2py próbuje dopasować kolejno nazwy plików
+"xx-xy-yy.py", "xx-xy.py", "xx.py", "default.py" dla każdego z akceptowanych języków
+"xx-xy-yy", próbując znaleźć najbardziej zbliżona nazwę do preferencji językowej
+odwiedzającego.
 -------------
 
-You can turn off translations completely via
+Tłumaczenie można całkowicie wyłączyć poprzez
 
 ``
 T.force(None)
 ``:code
 
-Normally, string translation is evaluated lazily when the view is rendered; hence, the translator ``force`` method should not be called inside a view.
+Zwykle, ciąg tłumaczenia jest ewaluowany leniwie podczas renderowania widoku.
+Dlatego metoda ``force`` translatora nie będzie wywoływana wewnątrz widoku.
 
-It is possible to disable lazy evaluation via
+Możliwe jest wyłączenie leniwej ewaluacji poprzez
 ``
 T.lazy = False
 ``:code
 
-In this way, strings are translated inmediately by the ``T`` operator based on the currently accepted or forced language.
+W ten sposób ciągi są tłumaczone natychmiast przez operator ``T`` na podstawie
+aktualnie akceptowanego lub wymuszanego języka.
 
-It is also possible to disable lazy evaluation for individual strings:
+Możliwe jest też wyłączenie leniwej ewaluacji dla pojedynczych ciągów:
 
 ``
 T("Hello World", lazy=False)
 ``:code
 
-A common issue is the following. The original application is in English. Suppose that there is a translation file (for example Italian, "it-it.py") and the HTTP client declares that it accepts both English (en) and Italian (it-it) in that order. The following unwanted situation occurs: web2py does not know the default is written in English (en). Therefore, it prefers translating everything into Italian (it-it) because it only found the Italian translation file. If it had not found the "it-it.py" file, it would have used the default language strings (English).
+Powszechnie spotykany problem jest następujący. Oryginalna aplikacja jest w języku
+angielskim. Załóżmy, że jest plik tłumaczenia (na przykład polski, "pl-pl.py")
+a klient HTTP deklaruje, że jego akceptowanym językiem jest zarówno angielski (en)
+jak i polski (pl-pl) w tej kolejności. Ma miejsce niepożądana sytuacja: web2py nie
+wie, że domyślny plik tłumaczenia ("default.py") został napisany w języku  angielskim (en).
+Dlatego preferować będzie dla wszystkiego tłumaczenie polskie  (pl-pl) ponieważ
+może znaleźć tylko plik "pl-pl.py". Gdyby nie znalazł tego pliku, to wybrałby
+domyślny plik językowy d"default.py" (angielski).
 
-There are two solutions for this problem: create a translation language for English, which would be redundant and unnecessary, or better, tell web2py which languages should use the default language strings (the strings coded into the application). This can be done with:
+Istnieją dwa rozwiązania tego problemu: utworzenie tłumaczenia dla języka angielskiego,
+co byłoby powtórzeniem istniejącego pliku "default.py" albo rozwiązanie lepsze –
+powiadomienie web2py o tym, że powinien zostać zastosowany język angielski (język
+w którym zakodowano aplikację). Można to zrobić tak:
 ``
 T.set_current_languages('en', 'en-en')
 ``:code
 
-It stores in  ``T.current_languages`` a list of languages that do not require translation and forces a reload of the language files.
+Wyrażenie to przechowuje w ``T.current_languages`` listę języków, które nie wymagają
+tłumaczenia i wymusza przeładowanie plików językowych.
 
-Notice that "it" and "it-it" are different languages from the point of view of web2py. To support both of them, one would need two translation files, always lower case. The same is true for all other languages.
+Trzeba pamiętać, że "pl" i "pl-pl" są różnymi językami z punktu widzenia web2py.
+Do obsługi obydwu potrzeba dwóch różnych plików językowych, o nazwach zawsze pisanych
+małymi literami. To samo odnosi się do innych języków.
 
-The currently accepted language is stored in
+Aktualnie akceptowany język jest przechowywany w
 ``
 T.accepted_language
 ``:code
 
-#### Translating variables
+#### Tłumaczenie zmiennych
 
-T(...) does not only translate strings but it can also transate values stored in variables:
+T(...) tłumaczy nie tylko łańcuchy tekstowe ale też może tłumaczyć wartości przechowywane w zmiennych:
 ``
 >>> a="test"
 >>> print T(a)
 ``:code
 
-In this case the word "test" is translated but, if not found and if the filesystem is writable, it will add it to the list of words to be translated in the language file.
+W tym przypadku słowo "test" jest tłumaczone ale, jeśli jego tłumaczenie nie zostanie
+znalezione i jeśli system plików jest zapisywalny, to zostanie ono dodane w pliku
+językowym do listy słów w celu przetłumaczenia.
 
-Notice that this can result in lots of file IO and you may want to disable it:
+Proszę zauważyć, że może to dać w wyniku wiele plików IO i że można to wyłączyć:
 
 ``
 T.is_writable = False
 ``:code
 
-prevents T from dynamically updating language files.
+zabezpieczając T przed dynamiczną aktualizacją plików językowych.
 
-#### Comments and multiple translations
+#### Komentarze i tłumaczenia złożone
 
-It is possible that the same string appears in different contexts in the application and needs different translations based on context. In order to do this, one can add comments to the original string. The comments will not be rendered but will be used by web2py to determine the most appropriate translation. For example:
+Zdarza się, że ten sam łańcuch tekstowy występujący w różnych kontekstach w aplikacji,
+wymaga różnych tłumaczeń opartych na kontekście. Aby to umożliwić, można dodać
+komentarze do oryginalnego łańcucha tekstowego. Komentarze nie będą renderowane
+ale zostaną wykorzystane przez web2py do określenia najbardziej właściwego tłumaczenia.
+Na przykład:
 
 ``
 T("hello world ## first occurrence")
 T("hello world ## second occurrence")
 ``:code
 
-The text following the ``##``, including the double ``##``, are comments.
+Tekst występujący po znakach ``##``, to komentarz.
 
-#### Pluralization engine
+#### Silnik liczby mnogiej
 
-Since version 2.0, web2py includes a powerful pluralization system (PS). This means that when text marked for translation depends on a numeric variable, it may be translated differently based on the numeric value. For example in English we may render:
+Począwszy od wersji 2.0, web2py zawiera zaawansowany system pluralizacji (PS).
+Oznacza to, że gdy tekst oznaczony do tłumaczenia zależy od zmiennej numerycznej,
+to może zostać przetłumaczony na podstawie wartości numerycznej. Na przykład
+w angielskim możemy zrenderować:
 
 ``
 x book(s)
 ``
 
-with
+z
 
 ``
 a book (x==1)
 5 books (x==5)
 ``
 
-English has one singular form and one plural form. The plural form is constructed by adding a "-s" or "-es" or using an exceptional form. web2py provides a way to define pluralization rules for each languages, as well as exceptions to the default rules. In fact web2py already knows pluralization rules for many languages. It knows, for example, that Slovenian has one singular form and 3 plural forms (for x==1, x==3 or x==4 and x>4). These rules are encoded in "gluon/contrib/plural_rules/*.py" files and new files can be created. Explicit pluralizations for words are created by editing pluralization files using the administrative interface.
+W języku angielskim jest jedna liczba pojedyncza i jedna liczba mnoga. Formę liczby
+mnogiej tworzy się przez dodanie końcówki "-s" lub "-es" albo używając formy wyjątkowej.
+web2py dostarcza sposób definiowania zasad liczby mnogiej dla każdego języka, jak
+również wyjątków od domyślnych reguł. W rzeczywistości web2py już zna zasady tworzenia
+liczby mnogiej dla wielu języków. Wie, na przykład, że w języku słoweńskim są 3
+formy liczby mnogiej (dla x==1, x==3 albo x==4 i x>4). Zasady te są zakodowane w
+pliku "gluon/contrib/plural_rules/*.py" i można tworzyć nowe pliki. Jawne zasady
+tworzenia liczby mnogiej dla słów są tworzone przez edytowanie plików pluralizacyjnych
+w interfejsie administracyjnym.
 
-By default the PS is not activated. It is triggered by the ``symbol`` argument of the ``T`` function. For example:
+Domyślnie PS nie jest aktywowany. Jest on wywoływany przez argument ``symbols``
+funkcji ``T``. Na przykład:
 
 ``
 T("You have %s %%{book}", symbols=10)
 ``:code
 
-Now the PS is activated for the word "book" and for the number 10.
-The result in English will be: "You have 10 books". Notice that "book" has been pluralized into "books".
+Teraz PS jest aktywowany dla słowa "book" i dla liczby 10.
+W wyniku w języku angielskim otrzyma się: "You have 10 books". Proszę zwrócić uwagę,
+że "books" to liczba mnoga rzeczownika "book".
 
-The PS consists of 3 parts:
-- placeholders ``%%{}`` to mark words in the ``T`` input
-- rule to give a decision which word form to use ("rules/plural_rules/*.py")
-- dictionary with word plural forms ("app/languages/plural-*.py")
+PS składa się z 3 elementów:
+- wyrażenia zastępczego ``%%{}`` do zaznaczania słów na wejściu funkcji ``T``;
+- reguły rozstrzygająca, którą formę słowa należy zastosować ("rules/plural_rules/*.py");
+- słownika z formami liczby mnogiej danego słowa ("app/languages/plural-*.py").
 
-The value of symbols can be a single variable, a list/tuple of variables, or a dictionary.
+Wartością symboli może być pojedyncza zmienna, lista (krotka) zmiennych lub słownik.
 
-The placeholder ``%%{}`` consists of 3 parts:
+Wyrażenie zastępcze ``%%{}`` składa sie z 3 elementów:
 
 ``
 %%{[<modifier>]<word>[<parameter>]},
 ``
 
-where:
+gdzie:
 
 ``
 <modifier>::= ! | !! | !!!
-<word> ::= any word or phrase in singular in lower case (!)
+<word> ::= każde słowo lub fraza w liczbie pojedynczej pisane małymi literami (!)
 <parameter> ::= [index] | (key) | (number)
 ``
 
-For example:
+Na przykład:
 
-- ``%%{word}`` is equivalent to ``%%{word[0]}`` (if no modifiers are used).
-- ``%%{word[index]}`` is used when symbols is a tuple. symbols[index] gives us a number used to make a decision on which word form to choose.
-- ``%%{word(key)}`` is used to get the numeric parameter from symbols[key]
-- ``%%{word(number)}`` allows to set a ``number`` directly (e.g.: ``%%{word(%i)}``)
-- ``%%{?word?number}`` returns "word" if ``number==1``, returns the ``number`` otherwise
-- ``%%{?number} or %%{??number}`` returns ``number`` if ``number!=1``, return nothing otherwise
+- ``%%{word}`` jest równoważne ``%%{word[0]}`` (jeśli nie zostały zastosowane jakieś modyfikatory);
+- ``%%{word[index]}`` stosuje się gdy parametr symbols jest krotką. Wyrażenie symbols[index] daje liczbę używaną do podejmowania decyzji o tym, która forma słowa ma być wybrana;
+- ``%%{word(key)}`` jest używane do pobierania parametru numerycznego z wyrażenia symbols[key];
+- ``%%{word(number)}`` umożliwia bezpośrednie ustawienie ``number`` (np.: ``%%{word(%i)}``);
+- ``%%{?word?number}`` zwraca "word" jeśli ``number==1``, w przeciwnym razie zwraca ``number``;
+- ``%%{?number} or %%{??number}`` zwraca ``number`` jeśli ``number!=1``, w przeciwnym razie zwraca nothing
 
 ``T("blabla %s %%{word}", symbols=var)``
 
-``%%{word}`` by default means ``%%{word[0]}``,
-where ``[0]`` is an item index in symbols tuple.
+``%%{word}`` domyślnie oznacza ``%%{word[0]}``,
+gdzie ``[0]`` jest indeksem elementu w krotce symbols.
 
 ``T("blabla %s %s %%{word[1]}", (var1, var2))``
-PS is used for "word" and "var2" respectively.
+PS zostaje zastosowany odpowiednio do "word" i "var2".
 
-You can use several ``%%{}`` placeholders with one index:
+Można użyć kilka wyrażeń zastępczych ``%%{}`` o tym samym indeksie:
 
 ``T("%%{this} %%{is} %s %%{book}", var)``
 
-or
+lub
 
 ``T("%%{this[0]} %%{is[0]} %s %%{book[0]}", var)``
 
-They generate:
+Jest generowane na:
 
 ``
 var  output
@@ -1806,25 +2255,26 @@ var  output
  3   these are 2 books
 ``
 
-Similarly you can pass a dictionary to symbols:
+Podobnie można przekazać słownik do parametru symbols:
 
 ``
 T("blabla %(var1)s %(wordcnt)s %%{word(wordcnt)}",
   dict(var1="tututu", wordcnt=20))
 ``
 
-which produces
+co wytworzy:
 
 ``
 blabla tututu 20 words
 ``
 
-You can replace "1" with any word you wish by this placeholder ``%%{?word?number}``.
-For example
+Można zamienić "1" na każde słowo, które chce się okreśłic w wyrażeniu
+zastępczym ``%%{?word?number}``.
+Na przykład:
 
 ``T("%%{this} %%{is} %%{?a?%s} %%{book}", var)``
 
-produces:
+wytworzy:
 
 ``
 var  output
@@ -1835,151 +2285,188 @@ var  output
  ...
 ``
 
-Inside ``%%{...}`` you can also use the following modifiers:
+Wenątrz ``%%{...}`` można też użyć następujące modyfikatory:
 
-- ``!`` to capitalize the text (equivalent to ``string.capitalize``)
-- ``!!`` to capitalize every word (equivalent to ``string.title``)
-- ``!!!`` to capitalize every character (equivalent to ``string.upper``)
+- ``!`` aby kapitalizować tekst (odpowiednik ``string.capitalize``);
+- ``!!`` aby kapitalizować każde słowo (odpowiednik ``string.title``)
+- ``!!!`` aby kapitalizować każdy znak (odpowiednik ``string.upper``)
 
-Notice you can use \ to escape ``!`` and ``?``.
+Trzeba pamiętać, że można użyć znak ukośnika jako znak ucieczki dla znaków ``!`` i ``?``.
 
-#### Translations, pluralization, and MARKMIN
+#### Tłumaczenia i pluralizacja a MARKMIN
 
-You can also use the powerful MARKMIN syntax inside translation strings by replacing
+Można również użyć zaawansowanej składni MARKMIN wewnątrz ciągów tłumaczeń przez zamienienie
 
 ``
 T("hello world")
 ``:code
 
-with
+na
 
 ``
 T.M("hello world")
 ``
 
-Now the string accepts MARKMIN markup as described in [[Chapter 5 ../05#markmin_syntax]]
+Teraz łańcuch tekstowy akceptuje znaczniki MARKMIN, jak opisano to w [[rozdziale 5 ../05#markmin_syntax]]
 
-### Cookies
+### Ciasteczka
 
 ``cookies``:inxx
 
-web2py uses the Python cookies modules for handling cookies.
+Do obsługi ciasteczek web2py wykorzystuje moduły ciasteczek Pythona.
 
-Cookies from the browser are in ``request.cookies`` and cookies sent by the server are in ``response.cookies``.
+Ciasteczka z przeglądarki przechowywane są w ``request.cookies`` a ciasteczka
+przesłane przez serwer znajdują się w ``response.cookies``.
 
-You can set a cookie as follows:
+Ciasteczka można ustawić w następujący sposób:
 ``
 response.cookies['mycookie'] = 'somevalue'
 response.cookies['mycookie']['expires'] = 24 * 3600
 response.cookies['mycookie']['path'] = '/'
 ``:code
 
-The second line tells the browser to keep the cookie for 24 hours. The third line tells the browser to send the cookie back to any application (URL path) at the current domain. Note, if you do not specify a path for the cookie, the browser will assume the path of the URL that was requested, so the cookie will only be returned to the server when that same URL path is requested.
+Druga linia informuje przeglądarkę aby zachowała ciasteczko przez 24 godziny.
+Trzecia linia informuje przeglądarkę, aby przesłała ciasteczko z powrotem do
+jakiejś aplikacji (ścieżka URL) w bieżącej domenie. Trzeba pamiętać, że jeśli
+nie określa się ścieżki do ciasteczka, to przeglądarka przyjmie ścieżkę URL z
+żądania HTTP, tak więc ciasteczko zwracane jest tylko do serwera, gdy żądana
+jest ta sama ścieżka URL.
 
-The cookie can be made secure with:
+Ciasteczko można zabezpieczyć przez:
 ``
 response.cookies['mycookie']['secure'] = True
 ``:code
 
-This tells the browser only to send the cookie back over HTTPS and not over HTTP.
+Informuje to przeglądarkę aby wysłała ciasteczko z powrotem do serwera tylko
+poprzez HTTPS a nie HTTP.
 
-The cookie can be retrieved with:
+Ciasteczko można pobrać w ten sposób:
 ``
 if request.cookies.has_key('mycookie'):
     value = request.cookies['mycookie'].value
 ``:code
 
-Unless sessions are disabled, web2py, under the hood, sets the following cookie and uses it to handle sessions:
+Jeżeli sesje są włączone, web2py w tle ustawia następujące ciasteczko i używa go
+do obsługi sesji:
 ``
 response.cookies[response.session_id_name] = response.session_id
 response.cookies[response.session_id_name]['path'] = "/"
 ``:code
 
-Note, if a single application includes multiple subdomains, and you want to share the session across those subdomains (e.g., sub1.yourdomain.com, sub2.yourdomain.com, etc.), you must explicitly set the domain of the session cookie as follows:
+Proszę zwrócić uwagę, że jeśli pojedyncza aplikacja zawiera wiele poddomen i chce
+się udostępnić sesję pomiędzy wszystkimi poddomenami (np. sub1.yourdomain.com,
+sub2.yourdomain.com itd.), należy jawnie ustawić domenę ciasteczka sesji w następujący
+sposób:
 ``
 if not request.env.remote_addr in ['127.0.0.1', 'localhost']:
     response.cookies[response.session_id_name]['domain'] = ".yourdomain.com"
 ``:code
 
-The above can be useful if, for example, you want to allow the user to remain logged in across subdomains.
+Powyższy sposób może być przydatny, jeśli, na przykład, chce się aby użytkownik
+mógł się logować równocześnie do wszystkich poddomen.
 
-
-### Application **init**
+### Aplikacja **init**
 ``init``:inxx
 
-When you deploy web2py, you will want to set a default application, i.e., the application that starts when there is an empty path in the URL, as in:
+Podczas wdrażania web2py chce się ustawić domyślną aplikację, czyli aplikację,
+która będzie uruchamiana przy pustej ścieżce URL, tak jak tu:
 ``
 http://127.0.0.1:8000
 ``:code
 
-By default, when confronted with an empty path, web2py looks for an application called **init**. If there is no init application it looks for an application called **welcome**.
+Domyślnie, przy pustej ścieżce, web2py wyszukuje aplikacji o nazwie **init**.
+Jeżeli jej nie znajdzie, to wyszukuje aplikacji **welcome**.
 
 ``default_application``:inxx
-The name of the default application can be changed from **init** to another name by setting ``default_application`` in routes.py:
+Nazwę domyślnej aplikacji można zmienić z **init** na inną, ustawiając odpowiednio
+``default_application`` w pliku routes.py:
 ``
 default_application = "myapp"
 ``:code
 
-Note: ``default_application`` first appeared in web2py version 1.83.
+Uwaga: ``default_application`` po raz pierwszy pojawiło się w web2py w wersji 1.83.
 
-Here are four ways to set the default application:
-- Call your default application "init".
-- Set ``default_application`` to your application's name in routes.py
-- Make a symbolic link from "applications/init" to your application's folder.
-- Use URL rewrite as discussed in the next section.
+Oto cztery sposoby na ustawienie domyślnej aplikacji:
+- Wywołanie domyślnej aplikacji "init".
+- Ustawienie ``default_application`` w routes.py na pożądaną nazwę aplikacji.
+- Wykonanie odwołania symbolicznego z "applications/init" do folderu swojej aplikacji.
+- Użycie przepisania adresu URL, co omówione jest w następnym rozdziale.
 
-### URL rewrite
+### Przepisywanie URL
 ``url rewrite``:inxx
 ``routes_in``:inxx
 ``routes_out``:inxx
 
-web2py has the ability to rewrite the URL path of incoming requests prior to calling the controller action (URL mapping), and conversely, web2py can rewrite the URL path generated by the ``URL`` function (reverse URL mapping). One reason to do this is for handling legacy URLs, another is to simplify paths and make them shorter.
+W web2py istnieje możliwość przepisania ścieżki URL przychodzących żądań przed
+wywołaniem akcji kontrolera (mapowania URL) i odwrotnie, web2py może przepisać
+ścieżkę URL generowaną przez funkcję ``URL`` (odwrotne mapowanie URL). Jednym z
+powodów dla których trzeba to zrobić jest obsługa starszych adresów URL. Innym
+powodem może być uproszenie ścieżek i wykonanie skrótów.
 
-web2py includes two distinct URL rewrite systems: an easy-to-use ''parameter-based'' system for most use cases, and a flexible ''pattern-based'' system for more complex cases. To specify the URL rewrite rules, create a new file in the "web2py" folder called ``routes.py`` (the contents of ``routes.py`` will depend on which of the two rewrite systems you choose, as described in the next two sections). The two systems cannot be mixed.
+Platforma web2py zawiera dwa odrębne systemy przepisywania URL: łatwy w użyciu
+system ''oparty na parametrach'' mający zastosowanie we większości przypadków
+i elastyczny system ''oparty na wzorcach'' dobry dla bardziej skomplikowanych
+zastosowań. W celu określenia reguł przepisywania URL, trzeba utworzyć nowy plik
+w folderze "web2py" o nazwie ``routes.py`` (zawartość ``routes.py`` będzie zależeć
+od tego, który z tych dwóch systemów przepisywania zostanie wybrany, tak jak opisano
+to w nastęþnych dwóch rozdziałach). Te dwa systemy przepisywania nie mogą być mieszane.
 
 -------
-Notice that if you edit routes.py, you must reload it. This can be done in two ways: by restarting the web server or by clicking on the routes reload button in admin. If there is a bug in routes, they will not reload.
+Trzeba pamiętać, że po edytowaniu pliku routes.py trzeba go przeładować. Można to
+zrobić jednym z dwóch sposobów: przez ponowne uruchomienie serwera internetowego
+albo przez klikniecie przycisku ''Przeładuj'' w interfejsie administracyjnym.
+Jeśli popełniony został jakiś błąd trasowania, to nie nastąpi przeładowanie.
 -------
 
-#### Parameter-based system
+#### System trasowania oparty na parametrach
 
-The parameter-based (parametric) router provides easy access to several "canned" URL-rewrite methods. Its capabilities include:
+Router oparty na parametrach (parametryczny) zapewnia łatwy dostęp do różnych
+gotowych metod przepisywania ścieżek URL. Jego możliwości obejmują:
 
-- Omitting default application, controller and function names from externally-visible URLs (those created by the URL() function)
-- Mapping domains (and/or ports) to applications or controllers
-- Embedding a language selector in the URL
-- Removing a fixed prefix from incoming URLs and adding it back to outgoing URLs
-- Mapping root files such as /robots.txt to an applications static directory
+- Pominięcie w zewnętrznej ścieżce URL (tej tworzonej przez funkcję URL) nazw domyślnej aplikacji, kontrolera i funkcji;
+- Odwzorowanie domen (i ewentualnie portów) do aplikacji lub kontrolerów;
+- Osadzenie selektora językowego w adresie URL;
+- Usuwanie stałych przedrostków z nadchodzących adresów URL i dodawanie ich z powrotem w wychodzących adresach URL;
+- Odwzorowywanie plików głównych, takich jak /robots.txt do katalogu plików statycznych (static)  aplikacji.
 
-The parametric router also provides somewhat more flexible validation of incoming URLs.
+Parametryczny router zapewnia również nieco bardziej elastycznej walidacji przychodzących adresów URL.
 
-Suppose you've written an application called ``myapp`` and wish to make it the default, so that the application name is no longer part of the URL as seen by the user. Your default controller is still ``default``, and you want to remove its name from user-visible URLs as well. Here's what you put in ``routes.py``:
+Załóżmy, że napisaliśmy aplikację o nazwie ``myapp`` i uczyniliśmy ja aplikacją
+domyślną, tak więc nazwa tej aplikacji nie jest już częścią adresu URL widzianego
+przez użytkownika. Nasz domyślny kontroler to ciągle ``default``. Chcemy też usunąć
+nazwę kontrolera z adresu URL widzianego przez użytkownika. Oto co należy wpisać
+w pliku ``routes.py``:
 ``
 routers = dict(
   BASE  = dict(default_application='myapp'),
 )
 ``:code
 
-That's it. The parametric router is smart enough to know how to do the right thing with URLs such as:
+To jest to. Parametryczny router jest wystarczająco inteligentny, aby wiedzieć
+jak właściwie przekształcić takie adresy URL jak te:
 ``
 http://domain.com/myapp/default/myapp
 ``:code
-or
+lub
 ``
 http://domain.com/myapp/myapp/index
 ``:code
-where normal shortening would be ambiguous. If you have two applications, ``myapp`` and ``myapp2``, you'll get the same effect, and additionally ``myapp2``'s default controller will be stripped from the URL whenever it's safe (which is mostly all the time).
+gdzie normalnie skracana ścieżka byłaby dwuznaczna. Jeśli ma się dwie aplikacje,
+``myapp`` i ``myapp2``, to można uzyskać ten sam efekt i dodatkowo ze ścieżki URL
+aplikacji ``myapp2`` zostanie usunięta nazwa domyślnego kontrolera, gdy będzie to
+bezpieczne (co ma miejsce w większości przypadków).
 
-Here is another case: suppose you want to support URL-based languages, where your URLs look like this:
+Oto inny przypadek: załóżmy, że chcemy obsługiwać języki w oparciu o URL, gdzie
+ścieżki URL wyglądają tak:
 ``
 http://myapp/en/some/path
 ``:code
-or (rewritten)
+lub (przepisane)
 ``
 http://en/some/path
 ``:code
 
-Here's how:
+Oto jak to zrobić:
 ``
 routers = dict(
   BASE  = dict(default_application='myapp'),
@@ -1987,30 +2474,33 @@ routers = dict(
 )
 ``:code
 
-Now an incoming URL like this:
+Teraz przychodzący adres URL,  wyglądający tak:
 ``
 http:/domain.com/it/some/path
 ``:code
-will be routed to ``/myapp/some/path``, and request.uri_language will be set to 'it', so you can force the translation. You can also have language-specific static files.
+Będzie kierowany do ``/myapp/some/path``, a request.uri_language zostanie ustawiony
+na 'it', wymuszając w ten sposób tłumaczenie. Można również obsługiwać statyczne
+pliki specyficzne dla języka:
 
 ``
 http://domain.com/it/static/filename
 ``:code
-will be mapped to:
+zostanie mapowane do:
 ``
 applications/myapp/static/it/filename
 ``:code
-if that file exists. If it doesn't, then URLs like:
+jeśli ten plik istnieje. Jeśli nie, to adresy URL takie jak:
 ``
 http://domain.com/it/static/base.css
 ``:code
-will still map to:
+będą nadal przekształcane na:
 ``
 applications/myapp/static/base.css
 ``:code
-(because there is no ``static/it/base.css``).
+(ponieważ nie istnieje ``static/it/base.css``).
 
-So you can now have language-specific static files, including images, if you need to.  Domain mapping is supported as well:
+Tak więc można mieć statyczne pliki specyficzne językowo, włączając w to obrazy,
+jeśli potrzeba. Obsługiwane jest również mapowanie domenowe:
 ``
 routers = dict(
   BASE  = dict(
@@ -2021,7 +2511,7 @@ routers = dict(
   ),
 )
 ``:code
-does what you'd expect.
+robi to, czego oczekiwaliśmy.
 
 ``
 routers = dict(
@@ -2033,15 +2523,26 @@ routers = dict(
   ),
 )
 ``:code
-maps ``http://domain.com`` accesses to the controller named ``insecure``, while ``HTTPS`` accesses go to the ``secure`` controller. Alternatively, you can map different ports to different apps, in the obvious way.
+Odwzorowuje ``http://domain.com`` na kontroler o nazwie ``insecure``, ponieważ
+dostęp przez ``HTTPS`` następuje przez kontroler ``secure``. Alternatywnie można
+odwzorować różne porty na różne aplikacje, w oczywisty sposób.
 
-For further information, please consult the file [["routes.parametric.example.py" https://github.com/web2py/web2py/blob/master/examples/routes.parametric.example.py]] provided in the "examples" folder of the standard web2py distribution.
+W celu uzyskania więcej informacji proszę zapoznać się z plikiem
+[["routes.parametric.example.py" https://github.com/web2py/web2py/blob/master/examples/routes.parametric.example.py]]
+umieszczonym w folderze "examples" standardowej dystrybucji web2py.
 
-Note: The ''parameter-based'' system first appeared in web2py version 1.92.1.
+Uwaga: System trasowania ''oparty na parametrach'' został wprowadzony po raz
+pierwszy w wersji 1.92.1 web2py.
 
-#### Pattern-based system
+#### System trasowania oparty na wzorcach
 
-Although the ''parameter-based'' system just described should be sufficient for most use cases, the alternative ''pattern-based'' system provides some additional flexibility for more complex cases. To use the pattern-based system, instead of defining routers as dictionaries of routing parameters, you define two lists (or tuples) of 2-tuples, ``routes_in`` and ``routes_out``. Each tuple contains two elements: the pattern to be replaced and the string that replaces it. For example:
+Pomimo, że właśnie opisany system trasowania  ''oparty na parametrach'' powinien
+być wystarczający dla większości, alternatywny system trasowania ''oparty na wzorcach''
+zapewnia pewną dodatkową elastyczność w bardziej złożonych przypadkach. Aby użyć
+system oparty na wzorcach, zamiast definiowania routerów jako słownika parametrów
+trasowania, definiuje się dwie listy (lub krotki) dwóch krotek, ``routes_in`` i
+``routes_out``. Każda krotka zawiera dwa elementy: wzorzec, który ma zostać być
+zamieniony i ciąg znakowy go zastępujący. Na przykład:
 ``
 routes_in = (
   ('/testme', '/examples/default/index'),
@@ -2051,34 +2552,34 @@ routes_out = (
 )
 ``:code
 
-With these routes, the URL:
+Przy tych trasach adres URL:
 ``
 http://127.0.0.1:8000/testme
 ``:code
 
-is mapped into:
+jest odwzorowywany na:
 ``
 http://127.0.0.1:8000/examples/default/index
 ``:code
 
-To the visitor, all links to
-the page URL looks like ``/testme``.
+Dla odwiedzającego wszystkie odnośniki URL do strony wyglądają podobnie do ``/testme``.
 
-The patterns have the same syntax as Python regular expressions. For example:
+Wzorce mają taką samą składnie jak wyrażenia regularne Pythona. Na przykład:
 ``
   ('.*\.php', '/init/default/index'),
 ``:code
 
-maps all URLs ending in ".php" to the index page.
+odwzorowuje wszystkie adresy URL kończące się na ".php" na stronę index.
 
-The second term of a rule can also be a redirection to another page:
+W drugim warunku reguły można również dokonać przekierowania do innej strony:
 ``
   ('.*\.php', '303->http://example.com/newpage'),
 ``:code
 
-Here 303 is the HTTP code for the redirect response.
+Tutaj 303 jest kodem stanu HTTP do przekierowania odpowiedzi.
 
-Sometimes you want to get rid of the application prefix from the URLs because you plan to expose only one application. This can be achieved with:
+Czasem zachodzi potrzeba pozbycia się przedrostka z adresów URL, ponieważ chce
+się udostępnić tylko jedna aplikację. Można to osiągnąć za pomocą:
 ``
 routes_in = (
   ('/(?P<any>.*)', '/init/\g<any>'),
@@ -2088,7 +2589,9 @@ routes_out = (
 )
 ``:code
 
-There is also an alternative syntax that can be mixed with the regular expression notation above. It consists of using ``$name`` instead of ``(?P<name>\w+)`` or ``\g<name>``. For example:
+Istnieje również alternatywna składnia umożliwiająca mieszanie notacji wyrażeń
+regularnych ze powyższą składnią. Składa się ona ze zmiennej ``$name`` zamiast
+``(?P<name>\w+)`` czy ``\g<name>``. Na przykład:
 ``
 routes_in = (
   ('/$c/$f', '/init/$c/$f'),
@@ -2099,10 +2602,11 @@ routes_out = (
 )
 ``:code
 
-would also eliminate the "/example" application prefix in all URLs.
+Eliminuje to również przedrostek aplikacji "/example" we wszystkich adresach URL.
 
 
-Using the ``$name`` notation, you can automatically map ``routes_in`` to ``routes_out``, provided you don't use any regular expressions. For example:
+Używając notacji ze zmienną ``$name``, można automatycznie odwzorowac ``routes_in``
+na ``routes_out``, pod warunkiem, że nie używa się wyrażeń regularnych. Na przykład:
 ``
 routes_in = (
   ('/$c/$f', '/init/$c/$f'),
@@ -2111,11 +2615,12 @@ routes_in = (
 routes_out = [(x, y) for (y, x) in routes_in]
 ``:code
 
-If there are multiple routes, the first to match the URL is executed. If no pattern matches, the path is left unchanged.
+Jeśli istnieje wiele tras, wykonywana jest pierwsza dopasowana ścieżka URL.
+Jeśli żaden wzorzec nie zostanie dopasowany, tp ścieżka pozostaje nie zmieniona.
 
-You can use ``$anything`` to match anything (``.*``) until the end of the line.
+Można użyć zmiennej ``$anything`` aby dopasować cokolwiek (``.*``) aż do końca linii.
 
-Here is a minimal "routes.py" for handling favicon and robots requests:
+Oto minimalna treść pliku "routes.py" dla obsługi żądań pliku favicon.ico i robots.txt:
 
 ``favicon``:inxx ``robots``:inxx
 ``
@@ -2126,7 +2631,8 @@ routes_in = (
 routes_out = ()
 ``:code
 
-Here is a more complex example that exposes a single app "myapp" without unnecessary prefixes but also exposes **admin**, **appadmin** and static:
+Oto bardziej złożony przykład udostępniający pojedynczą aplikację "myapp", bez
+zbędnych przedrostków, ale również interfejsy **admin** i **appadmin** oraz katalog static:
 
 ``
 routes_in = (
@@ -2139,7 +2645,8 @@ routes_in = (
 routes_out = [(x, y) for (y, x) in routes_in[:-2]]
 ``:code
 
-The general syntax for routes is more complex than the simple examples we have seen so far. Here is a more general and representative example:
+Ogólna składnia trasy jest bardzie skomplikowana, niż widzieliśmy to do tej pory.
+Oto bardziej ogólny i reprezentatywny przykład:
 ``
 routes_in = (
  ('140\.191\.\d+\.\d+:https?://www.web2py.com:post /(?P<any>.*)\.php',
@@ -2147,65 +2654,92 @@ routes_in = (
 )
 ``:code
 
-It maps ``http`` or ``https`` ``POST`` requests (note lower case "post") to host ``www.web2py.com`` from a remote IP matching the regular expression
+Odwzorowuje to ``http`` lub ``https`` żądań ``POST`` (ale nie pisane małymi literami
+"post") dla hosta ``www.web2py.com`` ze zdalnego IP pasującego do wyrażenia regularnego
 ``
 '140\.191\.\d+\.\d+'
 ``:code
 
-requesting a page matching the regular expression
+żądana strona pasująca do wyrażenia regularnego
 ``
 '/(?P<any>.*)\.php'
 ``:code
 
-into
+na
 ``
 '/test/default/index?vars=\g<any>'
 ``:code
 
-where ``\g<any>`` is replaced by the matching regular expression.
+gdzie ``\g<any>`` jest zamieniane przez dopasowanie wyrażenia regularnego.
 
-The general syntax is
+Ogólna składnia to
 ``
 '[remote address]:[protocol]://[host]:[method] [path]'
 ``:code
 
-If the first section of the pattern (all but ``[path]``) is missing, web2py provides a default:
+Jeśli brakuje pierwszej sekcji wzorca (wszystko z wyjątkiem ``[path]``), to web2py
+dostarcza domyślnie:
 ``
 '.*?:https?://[^:/]+:[a-z]+'
 ``:code
 
-The entire expression is matched as a regular expression, so "." must be escaped and any matching subexpression can be captured using ``(?P<...>...)`` using Python regex syntax. The request method (typically GET or POST) must be lower case. The URL being matched has had any ``%xx`` escapes unquoted.
+Całe wyrażenie jest dopasowywane jako wyrażenie regularne, tak więc znak kropki
+(.) musi być poprzedzony znakiem ucieczki (znakiem lewego ukośnika) i każde dopasowywane
+podwyrażenie można przedstawić przy użyciu ``(?P<...>...)`` wykorzystując składnię
+wyrażenia regularnego Pythona. Metoda żądania (zwykle GET lub POST) musi być pisana
+małymi literami. Adres URL, który jest dopasowywany musi mieć jakiekolwiek wyrażenie
+ucieczkowe ``%xx`` ujęte w znaki cudzysłowu.
 
-This allows to reroute requests based on the client IP address or domain, based on the type of the request, on the method, and the path. It also allows web2py to map different virtual hosts into different applications. Any matched subexpression can be used to build the target URL and, eventually, passed as a GET variable.
+Umożliwia to przekierowanie żądań opartych na adresie IP klienta lub domenie, na
+typie żądania, na metodzie i na ścieżce. Umożliwia to również, aby web2py odwzorowywał
+różne wirtualne hosty w różnych aplikacjach. Każde dopasowane podwyrażenie może być
+użyte do budowy docelowej ścieżki URL i ostatecznie przekazane jako zmienna GET.
 
-All major web servers, such as Apache and lighttpd, also have the ability to rewrite URLs. In a production environment that may be an option instead of ``routes.py``. Whatever you decide to do we strongly suggest that you do not hardcode internal URLs in your app and use the URL function to generate them. This will make your application more portable in case routes should change.
+Wszystkie główne serwery internetowe, takie jak Apache czy lighttpd, mają również
+zdolność przepisywania adresów URL. W środowisku produkcyjnym może to być wykorzystane
+zamiast ``routes.py``. Cokolwiek się wybierze, zalecamy aby nie kodować na sztywno
+wewnętrznych ścieżek URL w aplikacji ale do ich generowania używać funkcji URL.
+Sprawi to, że aplikacja będzie bardziej przenośna w przypadku zmiany tras.
 
-##### Application-Specific URL rewrite
+##### Przepisywanie adresów URL specyficzne dla aplikacji
 ``routes_app``:inxx
-When using the pattern-based system, an application can set its own routes in an application-specific routes.py file located in the applications base folder. This is enabled by configuring ``routes_app`` in the base routes.py to determine from an incoming URL the name of the application to be selected. When this happens, the application-specific routes.py is used in place of the base routes.py.
+Gdy stosuje się system trasowania oparty na wzorcach, aplikacja może ustawiać swoje
+własne trasy w pliku routes.py zlokalizowanym w podstawowym folderze danej aplikacji.
+Jest to możliwe przez konfigurację ``routes_app`` w pliku podstawowym routes.py,
+tak aby określić skąd ma być wybrana nazwa przychodzącego adresu URL aplikacji.
+Gdy to nastąpi, będzie używany  plik routes.py danej aplikacji w miejsce podstawowego
+pliku routes.py.
 
-The format of ``routes_app`` is identical to ``routes_in``, except that the replacement pattern is simply the application name. If applying ``routes_app`` to the incoming URL does not result in an application name, or the resulting application-specific routes.py is not found, the base routes.py is used as usual.
+Format ``routes_app`` jest identyczny z ``routes_in`` z tym wyjątkiem, że wymienialny
+wzorzec jest tylko nazwą aplikacja. Jeśli zastosowanie ``routes_app`` do przychodzącego
+adresu URL z dopasowaniem nazwy aplikacji nie da rezultatu lub wynikowy plik routes.py
+określonej aplikacji nie zostanie znaleziony, to zostanie użyty bazowy plik routes.py.
 
-Note: ``routes_app`` first appeared in web2py version 1.83.
+Uwaga: ``routes_app`` został zastosowany po raz pierwszy w wersji 1.83 web2py.
 
-##### Default application, controller, and function
+##### Domyślna aplikacja, kontroler i funkcja
 ``default_application``:inxx
 ``default_controller``:inxx
 ``default_function``:inxx
 
-When using the pattern-based system, the name of the default application, controller, and function can be changed from **init**, **default**, and **index** respectively to another name by setting the appropriate value in routes.py:
+Gdy używa się systemu trasowania opartego na wzorcach nazwa domyślnej aplikacji,
+kontrolera i funkcji mogą być zmienione z **init**, **default** czy **index**
+odpowiednio na inna nazwę, przez odpowiednie ustawienie wartości w routes.py:
 ``
 default_application = "myapp"
 default_controller = "admin"
 default_function = "start"
 ``:code
 
-Note: These items first appeared in web2py version 1.83.
+Uwaga: Elementy te po raz pierwszy zastosowano w wersji 1.83 web2py.
 
-#### Routes on error
+#### Trasy do stron błędu
 ``routes_onerror``:inxx
 
-You can also use ``routes.py`` to re-route requests to special actions in case there is an error on the server. You can specify this mapping globally, for each app, for each error code, or for each app and error code. Here is an example:
+Można również wykorzystać ``routes.py`` do zmiany trasy żądań dla określonych akcji,
+w przypadku gdy pojawi się na serwerze błąd. Można określić to trasowanie globalnie
+dla całej aplikacji, dla każdego kodu błędu lub dla każdej aplikacji i każdego kodu
+błędu. Oto przykład:
 ``
 routes_onerror = [
   ('init/400', '/init/default/login'),
@@ -2215,13 +2749,21 @@ routes_onerror = [
 ]
 ``:code
 
-For each tuple, the first string is matched against "[app name]/[error code]". If a match is found, the failed request is re-routed to the URL in the second string of the matching tuple. If the error handling URL is a not a static file, the following GET variables will be passed to the error action:
-- ``code``: the HTTP status code (e.g., 404, 500)
-- ``ticket``: in the form of "[app name]/[ticket number]" (or "None" if no ticket)
-- ``requested_uri``: equivalent to ``request.env.request_uri``
-- ``request_url``: equivalent to ``request.url``
+Dla każdej krotki, porównywany jest pierwszy ciąg ze wzorcem "[app name]/[error code]".
+Jeśli pasuje, to błędne żądanie jest przekierowywane na ścieżkę URL określoną w drugim
+ciągu dopasowanej krotki. Jeśli ścieżka URL obsługiwanego błędu nie prowadzi do pliku
+statycznego, to do akcji błędu dopasowana zostanie następująca zmienna GET:
+- ``code``: kod stanu HTTP (np. 404, 500);
+- ``ticket``: w postaci "[app name]/[ticket number]" (lub "None" jeśli nie ma biletu);
+- ``requested_uri``: odpowiednik ``request.env.request_uri``;
+- ``request_url``: odpowiednik ``request.url``.
 
-These variables will be accessible to the error handling action via ``request.vars`` and can be used in generating the error response. In particular, it is a good idea for the error action to return the original HTTP error code instead of the default 200 (OK) status code. This can be done by setting ``response.status = request.vars.code``. It is also possible to have the error action send (or queue) an email to an administrator, including a link to the ticket in ``admin``.
+Zmienne te są dostępne dla akcji obsługującej błędy poprzez ``request.vars`` i mogą
+być użyte do generowania odpowiedzi o błędzie. W szczególności, dobrym pomysłem jest
+aby akcja błędu zwracała oryginalny kod błędu HTTP zamiast domyślny kod stanu 200 (OK).
+Można to zrobić przez ustawienie ``response.status = request.vars.code``. Jest też
+możliwe, aby akcja błędu wysyłała (lub kolejkowała) wiadomości email do administratora,
+w tym odnośnik do biletu w interfejsie ``admin``.
 
 Unmatched errors display a default error page. This default error page can also be customized here (see "routes.parametric.example.py" and "routes.patterns.example.py" in the "examples" folder):
 ``
@@ -2247,7 +2789,7 @@ error_handler = dict(application='error',
 If the ``error_handler`` is specified the action is called without user redirection and the handler action will be in charge of dealing with the error. In the event that the error-handling page itself returns an error, web2py will fall back to its old static responses.
 
 
-#### Static asset management
+#### Zarządzanie statycznymi aktywami
 
 Since version 2.1.0, web2py has the ability to manage static assets.
 
@@ -2324,7 +2866,7 @@ location ~* /(\w+)/static(?:/_[\d]+\.[\d]+\.[\d]+)?/(.*)$ {
 }
 ``
 
-### Running tasks in the background
+### Uruchamianie zadań w tle
 
 In web2py, every HTTP request is served in its own thread. Threads are recycled for efficiency and managed by the web server. For security, the web server sets a time-out on each request. This means that actions should not run tasks that take too long, should not create new threads, and should not fork processes (it is possible but not recommended).
 
@@ -2423,7 +2965,7 @@ This type of background process should not be executed via cron (except perhaps 
 In chapter 8, we will provide an example of how to use the above method to send emails.
 
 
-#### Scheduler 
+#### Terminarz 
 
 Prior to version 2.6.0 the scheduler was considered experimental. From v2.6.0 the documented API is stable.
 The stable API consists of these functions:
@@ -2477,7 +3019,7 @@ scheduler.queue_task(task_add,pvars=dict(a=1,b=2))
 ``:code
 
 
-##### Parameters
+##### Parametry
 
 The first argument of the ``Scheduler`` class must be the database to be used by the scheduler to communicate with the workers. This can be the ``db`` of the app or another dedicated ``db``, perhaps one shared by multiple apps. If you use SQLite it's recommended to use a separate db from the one used by your app in order to keep the app responsive.
 Once the tasks are defined and the ``Scheduler`` is instantiated, all that is needed to do is to start the workers. You can do that in several ways:
@@ -2493,7 +3035,7 @@ python web2py.py -K myapp:group1:group2,myotherapp:group1
 
 If you have a model called ``scheduler.py`` you can start/stop the workers from web2py's default window (the one you use to set the ip address and the port).
 
-##### Scheduler Deployment
+##### Terminarz wdrażania
 One last nice addition: if you use the embedded webserver, you can start the webserver and the scheduler with just one line of code (this assumes you don't want the web2py window popping up, else you can use the "Schedulers" menu instead)
 
 ``
@@ -2504,7 +3046,7 @@ You can pass the usual parameters (-i, -p, here -a prevents the window from show
 Windows users looking to create a service should see the Deployment Recipes chapter.
 
 
-##### Complete Scheduler signature
+##### Kompletna sygnatura terminarza
 Scheduler's complete signature is:
 
 ``
@@ -2547,7 +3089,7 @@ NB: scheduler_run records will be created as before for **FAILED**, **TIMEOUT** 
 Now we have the infrastructure in place: defined the tasks, told the scheduler about them, started the worker(s). What remains is to actually schedule the tasks
 
 
-##### Tasks
+##### Zadania
 Tasks can be scheduled programmatically or via appadmin. In fact, a task is scheduled simply by adding an entry in the table "scheduler_task", which you can access via appadmin:
 
 ``
@@ -2577,7 +3119,7 @@ scheduler.queue_task('mytask',...)
 which is documented [[below #queue_task_sig]] .
 
 
-##### Task Lifecycle
+##### Cykl życia zadania
 All tasks follow a lifecycle
 
 
@@ -2624,7 +3166,7 @@ Summary: you have
 - ``retry_failed`` to control how many times the task can "fail"
 - ``start_time`` and ``stop_time`` to schedule a function in a restricted timeframe
 
-##### ``queue_task`` and ``task_status`` [[queue_task_sig]]
+##### ``queue_task`` i ``task_status`` [[queue_task_sig]]
 
 The method:
 ``
@@ -2699,7 +3241,7 @@ you get the result of the validation, and id and uuid will be None
 <Row {'errors': {'period': 'enter an integer greater than or equal to 0'}, 'id': None, 'uuid': None}>
 ``
 
-##### Results and output
+##### Wyniki i dane wyjściowe
 
 The table "scheduler_run" stores the status of all running tasks. Each record references a task that has been picked up by a worker.  One task can have multiple runs. For example, a task scheduled to repeat 10 times an hour will probably have 10 runs (unless one fails or they take longer than 1 hour). Beware that if the task has no return values, it is removed from the scheduler_run table as soon as it is finished.
 
@@ -2721,7 +3263,7 @@ Using appadmin, one can check all ``RUNNING`` tasks, the output of ``COMPLETED``
 
 The scheduler also creates one more table called "scheduler_worker", which stores the workers' heartbeat and their status.
 
-##### Managing processes
+##### Zarządzanie procesami
 
 Worker fine management is hard. This module tries not to leave behind any platform (Mac, Win, Linux) .
 
@@ -2787,7 +3329,7 @@ completed_runs = db(db.scheduler_run.run_status='COMPLETED').select()
 The scheduler is considered experimental because it needs more extensive testing and because the table structure may change as more features are added.
 ------
 
-##### Reporting percentages
+##### Procentowe raportowanie
 
 A special "word" encountered in the print statements of your functions clear all
 the previous output. That word is ``!clear!``.
@@ -2814,7 +3356,7 @@ scheduler.queue_task(reporting_percentages,
 ``:code
 
 
-### Third party modules
+### Moduły osób trzecich
 ``import``:inxx
 
 web2py is written in Python, so it can import and use any Python module, including third party modules. It just needs to be able to find them. As with any Python application, modules can be installed in the official Python "site-packages" directory, and they can then be imported from anywhere inside your code.
@@ -2844,7 +3386,7 @@ import mymodule
 ``
 ------
 
-### Execution environment
+### Środowisko wykonawcze
 ``exec_environment``:inxx
 
 -----
@@ -2885,7 +3427,7 @@ The function call in line 3 does not execute the view; it simply returns the dic
 
 One final caution: don't use ``exec_environment`` inappropriately. If you want the results of actions in another application, you probably should implement an XML-RPC API (implementing an XML-RPC API with web2py is almost trivial). Don't use ``exec_environment`` as a redirection mechanism; use the ``redirect`` helper.
 
-### Cooperation
+### Współpraca
 ``cooperation``:inxx
 
 There are many ways applications can cooperate:
@@ -2917,7 +3459,7 @@ session.connect(request, response, masterapp='appname', db=db)
 Here "appname" is the name of the master application, the one that sets the initial session_id in the cookie. ``db`` is a database connection to the database that contains the session table (``web2py_session``). All apps that share sessions must use the same database for session storage.
 
 
-### Logging
+### Rejestrowanie zdarzeń
 
 Python provides logging APIs. Web2py provides a mechanism to configure it so
 that apps can use it.
@@ -2982,7 +3524,7 @@ Yet web2py allows you to use third party WSGI applications and middleware in thr
 
 The only limitation is that you cannot use third party middleware to replace core web2py functions.
 
-#### External middleware
+#### Zewnętrzna warstwa pośrednia
 
 Consider the file "wsgibase.py":
 ``
@@ -2999,7 +3541,7 @@ else:
 
 When ``LOGGING`` is set to ``True``, ``gluon.main.wsgibase`` is wrapped by the middleware function ``gluon.main.appfactory``. It provides logging to the "httpserver.log" file. In a similar fashion you can add any third party middleware. We refer to the official WSGI documentation for more details.
 
-#### Internal middleware
+#### Wewnętrzna warstwa pośrednia
 
 Given any action in your controllers (for example ``index``) and any third party middleware application (for example ``MyMiddleware``, which converts output to upper case), you can use a web2py decorator to apply the middleware to that action. Here is an example:
 ``
@@ -3018,7 +3560,7 @@ def index():
 
 We cannot promise that all third party middleware will work with this mechanism.
 
-#### Calling ''WSGI'' applications
+#### Wywoływanie aplikacji ''WSGI''
 
 It is easy to call WSGI app from a web2py action. Here is an example:
 ``
