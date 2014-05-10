@@ -1,27 +1,43 @@
-## The views
-``views``:inxx ``template language``:inxx ``HTML``:inxx
+## Widoki
+``widoki``:inxx ``język szablonowania``:inxx ``HTML``:inxx
 
-web2py uses Python for its models, controllers, and views, although it uses a slightly modified Python syntax in the views to allow more readable code without imposing any restrictions on proper Python usage.
+W web2py do tworzenia modeli, kontrolerów i widoków wykorzystuje się Python,
+chociaż w widokach używa się nieco zmodyfikowaną składnię Pythona, aby umożliwić
+większą czytelność kodu bez nakładania jakichkolwiek ograniczeń na możliwości tego
+języka.
 
-The purpose of a view is to embed code (Python) in an HTML document. In general, this poses some problems:
-- How should embedded code be escaped?
-- Should indenting be based on Python or HTML rules?
+Przeznaczeniem widoku jest osadzenie kodu Pythona w dokumencie HTML. Zasadniczo
+sprawia to pewne problemy:
+- Jak opakowywać osadzany kod Pythona?
+- Czy dałoby się uniknąć konieczności stosować w kodzie wcięć, tak jak przewidują
+  to zasady składniowe Pythona lub HTML?
 
-web2py uses ``{{ ... }}`` to escape Python code embedded in HTML. The advantage of using curly brackets instead of angle brackets is that it's transparent to all common HTML editors. This allows the developer to use those editors to create web2py views. These delimiters can be changed for example with
+W web2py używa się znacznik ``{{ ... }}`` do opakowanie kodu Pythona osadzanego
+w HTML. Zaletą używania nawiasów klamrowych zamiast nawiasów ostrych jest to, że
+są przejrzyste dla większości edytorów HTML. Umożliwia to wykorzystywanie edytorów
+HTML do tworzenia widoków web2py. Ograniczniki te można zmienić, na przykład tak
 
 ``
 response.delimiters = ('<?','?>')
 ``:code
 
-If this line is in a model it will be applied everywhere, if in a controller only to views for the controller actions, if inside an action only to the view for that action.
+Jeśli ta linia zostanie umieszczona w modelu, to kod ten będzie dostępny wszędzie,
+jeśli w kontrolerze, to tylko w widokach dla akcji tego kontrolera, jeśli w akcji,
+to tylko w widoku dla tej akcji.
 
-Since the developer is embedding Python code into HTML, the document should be indented according to HTML rules, and not Python rules. Therefore, we allow unindented Python inside the ``{{ ... }}`` tags. Since Python normally uses indentation to delimit blocks of code, we need a different way to delimit them; this is why the web2py template language makes use of the Python keyword ``pass``.
+Ponieważ programista osadza kod Pythona w HTML, dokument powinien dostosowywać się
+do zasad HTML, a nie Pythona. Dlatego pozwalamy na niestosowanie wcięć wewnątrz
+znaczników ``{{ ... }}``. Ponieważ Python zwykle używa wcięć do rozdzielenia bloków
+kodu, potrzebujemy na to inny sposób – to dlatego w szablonach web2py stosuje się
+słowo kluczowe Pythona ``pass``.
 
 -------
-A code block starts with a line ending with a colon and ends with a line beginning with ``pass``. The keyword ``pass`` is not necessary when the end of the block is obvious from the context.
+Blok kodu rozpoczyna się od linii kończącej się znakiem dwukropka a kończy linią
+będącą słowem ``pass``. Słowo kluczowe ``pass`` nie jest konieczne, gdy koniec
+bloku jest oczywisty (wynika z kontekstu).
 -------
 
-Here is an example:
+Oto przykład:
 
 ``
 {{
@@ -33,9 +49,12 @@ pass
 }}
 ``:code
 
-Note that ``pass`` is a Python keyword, not a web2py keyword. Some Python editors, such as Emacs, use the keyword ``pass`` to signify the division of blocks and use it to re-indent code automatically.
+Trzeba mieć na uwadze, że słowo ``pass`` jest słowem kluczowym Pythona,
+a nie słowem kluczowym web2py. Niektóre edytory Pythona, takie jak Emacs, używają
+słowa kluczowego ``pass`` do oznaczania podziału bloków i wykorzystują go do
+automatycznego odtworzenia wcięć bloków.
 
-The web2py template language does exactly the same. When it finds something like:
+Język szablonowania web2py robi dokładnie to samo. Gdy znajdzie coś takiego:
 
 ``
 <html><body>
@@ -43,7 +62,7 @@ The web2py template language does exactly the same. When it finds something like
 </body></html>
 ``:code
 
-it translates it into a program:
+przekształca to do programu:
 ``
 response.write("""<html><body>""", escape=False)
 for x in range(10):
@@ -51,48 +70,67 @@ for x in range(10):
     response.write("""hello<br />""", escape=False)
 response.write("""</body></html>""", escape=False)
 ``:code
-``response.write`` writes to the ``response.body``.
+Metoda ``response.write`` dokonuje zapisu do ``response.body``.
 
-When there is an error in a web2py view, the error report shows the generated view code, not the actual view as written by the developer. This helps the developer debug the code by highlighting the actual code that is executed (which is something that can be debugged with an HTML editor or the DOM inspector of the browser).
+Gdy w widoku web2py pojawi się błąd, widok generuje raport błędu, a nie rzeczywisty
+widok zakodowany przez programistę. Pomaga to programiście debugować kod przez
+podświetlanie rzeczywistego kodu, który jest wykonywany (kodu, który może być
+debugowany w edytorze HTML lub inspektorze DOM przeglądarki).
 
-Also note that:
+Należy również pamiętać, że:
 ``
 {{=x}}
 ``:code
 
-generates
-``response.write``:inxx ``escape``:inxx
+generuje
+``response.write``:inxx ``zabezpieczanie zmiennych``:inxx
 ``
 response.write(x)
 ``:code
 
-Variables injected into the HTML in this way are escaped by default.
-The escaping is ignored if ``x`` is an ``XML`` object, even if escape is set to ``True``.
+Zmienne wstrzykiwane do HTML w ten sposób są domyślnie zabezpieczane znakami
+ucieczki. Zabezpieczanie jest ignorowane, jeśli ``x`` jest obiektem ``XML``,
+nawet jeśli parametr escape jest ustawiony na ``True``.
 
-Here is an example that introduces the ``H1`` helper:
+Oto przykład wprowadzający helper ``H1``:
 ``
 {{=H1(i)}}
 ``:code
 
-which is translated to:
+który jest łumaczony na:
 ``
 response.write(H1(i))
 ``:code
 
-upon evaluation, the ``H1`` object and its components are recursively serialized, escaped and written to the response body. The tags generated by ``H1`` and inner HTML are not escaped. This mechanism guarantees that all text --- and only text --- displayed on the web page is always escaped, thus preventing XSS vulnerabilities. At the same time, the code is simple and easy to debug.
+Po sprawdzeniu, obiekt ``H1`` i jego elementy zostają rekursywnie serializowane,
+zabezpieczane znakami ucieczki i zapisywane do ciała odpowiedzi. Znaczniki generowane
+przez``H1`` i wewnętrzny kod HTML nie są zabezpieczane znakami ucieczki. Ten mechanizm
+gwarantuje, że cały tekst (i tylko tekst) wyświetlany na stronie jest zawsze zabezpieczany
+znakami ucieczki, chroniąc w ten sposób przed atakami XSS. Jednocześnie kod jest prosty
+i łatwy do debugowania.
 
-The method ``response.write(obj, escape=True)`` takes two arguments, the object to be written and whether it has to be escaped (set to ``True`` by default). If ``obj`` has an ``.xml()`` method, it is called and the result written to the response body (the ``escape`` argument is ignored). Otherwise it uses the object's ``__str__`` method to serialize it and, if the escape argument is ``True``, escapes it. All built-in helper objects (``H1`` in the example) are objects that know how to serialize themselves via the ``.xml()`` method.
+Metoda ``response.write(obj, escape=True)`` pobiera dwa argumenty, obiekt do zapisu
+i argument wskazujący, czy tekst w obiekcie ma być zabezpieczony znakami ucieczki
+(domyślnie ustawiony na ``True``). Jeśli ``obj`` ma metodę ``.xml()``, to jest ona
+wywoływana a wynik zapisywany do ciała odpowiedzi (argument ``escape`` jest ignorowany).
+W przeciwnym razie wykorzystywana jest metoda ``__str__`` tego obiektu w celu jego
+serializacji i jeśli argument escape jest ustawiony na ``True``, następuje zabezpieczenie
+tekstu znakami ucieczki. Wszystkie wbudowane helpery HTML (``H1`` w tym przykładzie)
+są obiektami, które wiedzą jak serializować same siebie poprzez metodę ``.xml()``.
 
-This is all done transparently. You never need to (and never should) call the ``response.write`` method explicitly.
+Wszystko to odbywa się w sposób transparenty. Nigdy nie trzeba (i nie powinno się)
+wywoływać jawnie metody ``response.write``.
 
-### Basic syntax
+### Podstawy składni
 
-The web2py template language supports all Python control structures. Here we provide some examples of each of them. They can be nested according to usual programming practice.
+Język szablonowania web2py obsługuje wszystkie instrukcje sterujące języka Python.
+Podano tutaj kilka przykładów każdej z nich. Mogą być one zagnieżdżane według zwykłej
+praktyki programowania.
 
-#### ``for...in``
+#### Instrukcja ``for...in``
 ``for``:inxx
 
-In templates you can loop over any iterable object:
+W szablonie można zapętlić każdy iterowalny obiekt:
 ``
 {{items = ['a', 'b', 'c']}}
 <ul>
@@ -100,7 +138,7 @@ In templates you can loop over any iterable object:
 </ul>
 ``:code
 
-which produces:
+co wytworzy:
 ``
 <ul>
 <li>a</li>
@@ -109,12 +147,15 @@ which produces:
 </ul>
 ``:code
 
-Here ``item`` is any iterable object such as a Python list, Python tuple, or Rows object, or any object that is implemented as an iterator. The elements displayed are first serialized and escaped.
+Tutaj ``item`` jest dowolnym iterowalnym obiektem, takim jak lista Pythona, krotka
+Pythona lub obiekt Rows albo każdy inny obiekt, który jest implementowany
+jako iterator. Wyświetlane elementy są najpierw serializowane a następnie zabezpieczane
+znakami ucieczki.
 
-#### ``while``
+#### Instrukcja ``while``
 ``while``:inxx
 
-You can create a loop using the while keyword:
+Można utworzyć pętlę wykorzystując słowo kluczowe while:
 ``
 {{k = 3}}
 <ul>
@@ -122,7 +163,7 @@ You can create a loop using the while keyword:
 </ul>
 ``:code
 
-which produces:
+co wyprodukuje:
 ``
 <ul>
 <li>3</li>
@@ -131,10 +172,10 @@ which produces:
 </ul>
 ``:code
 
-#### ``if...elif...else``
+#### Instrukcja ``if...elif...else``
 ``if``:inxx ``elif``:inxx ``else``:inxx
 
-You can use conditional clauses:
+Można użyć klauzul warunkowych:
 ``
 {{
 import random
@@ -146,16 +187,19 @@ k = random.randint(0, 100)
 </h2>
 ``:code
 
-which produces:
+co wyprodukuje:
 ``
 <h2>
 45 is odd
 </h2>
 ``:code
 
-Since it is obvious that ``else`` closes the first ``if`` block, there is no need for a ``pass`` statement, and using one would be incorrect. However, you must explicitly close the ``else`` block with a ``pass``.
+Ponieważ oczywistym jest, że ``else`` zamyka blok ``if``, to nie ma potrzeby stosować
+wyrażenie ``pass`` i użycie tego byłoby nieprawidłowe. Jednakże trzeba jawnie zamknąć
+blok ``else`` słowem ``pass``.
 
-Recall that in Python "else if" is written ``elif`` as in the following example:
+Przypominamy, że w Pythonie wyrażenie "else if" jest pisane jako ``elif``, tak
+jak w następującym przykładzie:
 ``
 {{
 import random
@@ -170,17 +214,18 @@ k = random.randint(0, 100)
 </h2>
 ``:code
 
-It produces:
+Wyprodukuje to:
 ``
 <h2>
 64 is divisible by 4
 </h2>
 ``:code
 
-#### ``try...except...else...finally``
+#### Instrukcja ``try...except...else...finally``
 ``try``:inxx ``except``:inxx ``else``:inxx ``finally``:inxx
 
-It is also possible to use ``try...except`` statements in views with one caveat. Consider the following example:
+W widoku można również użyć wyrażenia ``try...except`` z jednym zastrzeżeniem.
+Rozważmy następujący przykład:
 ``
 {{try:}}
 Hello {{= 1 / 0}}
@@ -193,19 +238,23 @@ no division by zero
 {{pass}}
 ``:code
 
-It will produce the following output:
+Wyprodukuje do następujące wyjście:
 ``
 Hello
 division by zero
 <br />
 ``:code
 
-This example illustrates that all output generated before an exception occurs is rendered (including output that preceded the exception) inside the try block. "Hello" is written because it precedes the exception.
+Przykład ten ilustruje, że dane wyjściowe generowane przed zgłoszeniem wyjątku są
+renderowane (łącznie z danymi przetworzonymi przed zgłoszeniem wyjątku) wewnątrz
+bloku try. "Hello" zostaje napisane ponieważ poprzedza wyjątek.
 
-#### ``def...return``
+#### Instrukcja ``def...return``
 ``def``:inxx ``return``:inxx
 
-The web2py template language allows the developer to define and implement functions that can return any Python object or a text/html string. Here we consider two examples:
+Język szablonowania web2py umożliwia programistom definiowanie i implementowanie
+funkcji, które mogą zwracać jakikolwiek obiekt Pythona lub łańcuch tekstowy (w tym
+kod HTML). Przyjrzyjmy się dwóm przykładom:
 ``
 {{def itemize1(link): return LI(A(link, _href="http://" + link))}}
 <ul>
@@ -213,16 +262,17 @@ The web2py template language allows the developer to define and implement functi
 </ul>
 ``:code
 
-produces the following output:
+wytworzy następujące wyjście:
 ``
 <ul>
 <li><a href="http:/www.google.com">www.google.com</a></li>
 </ul>
 ``:code
 
-The function ``itemize1`` returns a helper object that is inserted at the location where the function is called.
+Funkcja ``itemize1`` zwraca obiekt helpera, który jest wkładany w kod w miejscu
+gdzie funkcja została wywołana.
 
-Consider now the following code:
+Rozwazmy poniższy kod:
 ``
 {{def itemize2(link):}}
 <li><a href="http://{{=link}}">{{=link}}</a></li>
@@ -232,27 +282,40 @@ Consider now the following code:
 </ul>
 ``:code
 
-It produces exactly the same output as above. In this case, the function ``itemize2`` represents a piece of HTML that is going to replace the web2py tag where the function is called. Notice that there is no '=' in front of the call to ``itemize2``, since the function does not return the text, but it writes it directly into the response.
+Wytworzy on dokładnie takie samo wyjście jak w powyższym przykładzie. W tym przypadku,
+funkcja ``itemize2`` reprezentuje porcję kodu HTML, który ma zastąpić  znacznik
+web2py w którym funkcja została wywołana. Proszę zwrócić uwagę, że nie ma znaku
+'=' przed wywołaniem ``itemize2``, ponieważ funkcja ta nie zwraca tekstu, ale zapisuje
+dane wyjściowe bezpośrednio do odpowiedzi.
 
-There is one caveat: functions defined inside a view must terminate with a return statement, or the automatic indentation will fail.
+Jest jedno zastrzeżenie: funkcje definiowane wewnątrz widoku muszą kończyć się
+wyrażeniem return albo automatyczne wcięcie zawiedzie.
 
-### HTML helpers
-``helpers``:inxx
+### Helpery HTML
+``helpery html``:inxx
 
-Consider the following code in a view:
+Rozważmy następujący kod widoku:
 ``
 {{=DIV('this', 'is', 'a', 'test', _id='123', _class='myclass')}}
 ``:code
 
-it is rendered as:
+jest on zwracany jako:
 ``
 <div id="123" class="myclass">thisisatest</div>
 ``:code
-``DIV`` is a helper class, i.e., something that can be used to build HTML programmatically. It corresponds to the HTML ``<div>`` tag.
+``DIV`` jest klasą helpera HTML,czyli czymś co może zostać zastosowane do programowego
+zbudowania kodu HTML. Odpowiada on znacznikowi ``<div>`` HTML.
 
-Positional arguments are interpreted as objects contained between the open and close tags. Named arguments that start with an underscore are interpreted as HTML tag attributes (without the underscore). Some helpers also have named arguments that do not start with underscore; these arguments are tag-specific.
+Argumenty pozycyjne są interpretowane jak obiekty zawarte pomiędzy znacznikiem
+otwierającym a zamykającym HTML. Argumenty nazwane rozpoczynające się znakiem
+podkreślenia są interpretowane jako atrybuty znacznika HTML (bez znaków podkreślenia).
+Niektóre helpery maja również nazwane argumenty nie rozpoczynające się znakiem
+podkreślenia – argumenty te są specyficzne dla znacznika.
 
-Instead of a set of unnamed arguments, a helper can also take a single list or tuple as its set of components using the ``*`` notation and it can take a single dictionary as its set of attributes using the ``**``, for example:
+Zamiast ustawienia nienazwanych argumentów, można zrobić tak, że helper pobierze
+pojedynczą listę lub krotkę jako swój zestaw komponentów, gdy użyje się notacji
+ze znakiem gwiazdki ``*`` oraz tak, że pobierze pojedynczy słownik jako zbiór
+atrybutów, gdy użyje się dwóch gwiazdek ``**``, na przykład:
 ``
 {{
 contents = ['this','is','a','test']
@@ -262,33 +325,46 @@ attributes = {'_id':'123', '_class':'myclass'}
 ``:code
 (produces the same output as before).
 
-The following set of helpers:
+Helpery:
 
-``A``,  ``B``,  ``BEAUTIFY``,  ``BODY``,  ``BR``,  ``CAT``,  ``CENTER``,  ``CODE``,  ``COL``, ``COLGROUP``, ``DIV``,  ``EM``,  ``EMBED``,  ``FIELDSET``,  ``FORM``,  ``H1``,  ``H2``,  ``H3``,  ``H4``,  ``H5``,  ``H6``,  ``HEAD``,  ``HR``,  ``HTML``,  ``I``,  ``IFRAME``,  ``IMG``,  ``INPUT``,  ``LABEL``,  ``LEGEND``,  ``LI``,  ``LINK``,  ``MARKMIN``,  ``MENU``,  ``META``,  ``OBJECT``,  ``ON``,  ``OL``,  ``OPTGROUP``,  ``OPTION``,  ``P``,  ``PRE``,  ``SCRIPT``,  ``SELECT``,  ``SPAN``,  ``STYLE``,  ``TABLE``,  ``TAG``,  ``TBODY``,  ``TD``,  ``TEXTAREA``,  ``TFOOT``,  ``TH``,  ``THEAD``,  ``TITLE``,  ``TR``,  ``TT``, ``UL``,   ``URL``,  ``XHTML``,  ``XML``,  ``embed64``,  ``xmlescape``
+``A``,  ``B``,  ``BEAUTIFY``,  ``BODY``,  ``BR``,  ``CAT``,  ``CENTER``,  ``CODE``,
+ ``COL``, ``COLGROUP``, ``DIV``,  ``EM``,  ``EMBED``,  ``FIELDSET``,  ``FORM``,
+ ``H1``,  ``H2``,  ``H3``,  ``H4``,  ``H5``,  ``H6``,  ``HEAD``,  ``HR``,  ``HTML``,
+ ``I``,  ``IFRAME``,  ``IMG``,  ``INPUT``,  ``LABEL``,  ``LEGEND``,  ``LI``,
+ ``LINK``,  ``MARKMIN``,  ``MENU``,  ``META``,  ``OBJECT``,  ``ON``,  ``OL``, 
+ ``OPTGROUP``,  ``OPTION``,  ``P``,  ``PRE``,  ``SCRIPT``,  ``SELECT``,  ``SPAN``,
+ ``STYLE``,  ``TABLE``,  ``TAG``,  ``TBODY``,  ``TD``,  ``TEXTAREA``,  ``TFOOT``,
+ ``TH``,  ``THEAD``,  ``TITLE``,  ``TR``,  ``TT``, ``UL``,   ``URL``,  ``XHTML``,
+ ``XML``,  ``embed64``,  ``xmlescape``
 
-can be used to build complex expressions that can then be serialized to XML``xml-w``:cite ``xml-o``:cite. For example:
+mogą być używane do budowy złożonych wyrażeń, które mogą być serializowane do
+XML``xml-w``:cite ``xml-o``:cite. Na przykład:
 ``
 {{=DIV(B(I("hello ", "<world>"))), _class="myclass")}}
 ``:code
 
-is rendered:
+zostanie renderowane tak:
 ``
 <div class="myclass"><b><i>hello &lt;world&gt;</i></b></div>
 ``:code
 
-Helpers can also be serialized into strings, equivalently, with the ``__str__`` and the ``xml`` methods:
+Helpery można również serialiować do łańcuchów tekstowych, równoważnie z metodami
+``__str__`` i ``xml``:
 
 ``
 >>> print str(DIV("hello world"))
 <div>hello world</div>
 >>> print DIV("hello world").xml()
 <div>hello world</div>
-``
+``:code
 
-``Document Object Model (DOM)``:inxx
-The helpers mechanism in web2py is more than a system to generate HTML without concatenating strings. It provides a server-side representation of the Document Object Model (DOM).
+``obiektowy model dokumentu``:inxx ``Document Object Model (DOM)``:inxx
+Mechanizm helperów w web2py jest czymś więcej niż tylko systemem do generowania
+kodu HTML bez łączenia ciągów znakowych. Zapewnia reprezentację obiektowego modelu
+dokumentu (Document Object Model - DOM) po stronie serwera.
 
-Components of helpers can be referenced via their position, and helpers act as lists with respect to their components:
+Komponenty helperów mogą być odnoszone poprzez ich pozycję a helpery działają jak
+listy w stosunku do ich komponentów:
 ``
 >>> a = DIV(SPAN('a', 'b'), 'c')
 >>> print a
@@ -300,7 +376,8 @@ Components of helpers can be referenced via their position, and helpers act as l
 <div><span>yb</span><b>x</b></div>
 ``:code
 
-Attributes of helpers can be referenced by name, and helpers act as dictionaries with respect to their attributes:
+Atrybuty helperów mogą być odnoszone przez nazwę a helpery działają jak słownik
+w stosunku do ich atrybutów:
 ``
 >>> a = DIV(SPAN('a', 'b'), 'c')
 >>> a['_class'] = 's'
@@ -309,39 +386,52 @@ Attributes of helpers can be referenced by name, and helpers act as dictionaries
 <div class="s"><span class="t">ab</span>c</div>
 ``:code
 
-Note, the complete set of components can be accessed via a list called ``a.components``, and the complete set of attributes can be accessed via a dictionary called ``a.attributes``. So, ``a[i]`` is equivalent to ``a.components[i]`` when ``i`` is an integer, and ``a[s]`` is equivalent to ``a.attributes[s]`` when ``s`` is a string.
+Uwaga, kompletny zestaw komponentów może być dostępny poprzez listę o nazwie
+``a.components`` a kompletny zestaw atrybutów poprzez słownik o nazwie ``a.attributes``.
+Tak więc ``a[i]`` jest równoważnikiem ``a.components[i]`` gdzie ``i`` to liczba
+całkowita, natomiast ``a[s]`` jest równoważnikiem ``a.attributes[s]`` gdzie ``s``
+jest ciągiem znakowym.
 
-Notice that helper attributes are passed as keyword arguments to the helper. In some cases, however, attribute names include special characters that are not allowed in Python identifiers (e.g., hyphens) and therefore cannot be used as keyword argument names. For example:
+Proszę zwrócić uwagę, że atrybuty helpera są przekazywane do helpera jako argumenty
+kluczowe. Jednak w niektórych przypadkach nazwy atrybutów zawierają specjalne znaki,
+które nie są dozwolone w identyfikatorach Pythona (np. myślniki) i dlatego nie mogą
+być użyte jako nazwy argumentów kluczowych. Na przykład:
 
 ``
 DIV('text', _data-role='collapsible')
 ``:code
 
-will not work because "_data-role" includes a hyphen, which will produce a Python syntax error.
+nie będzie działać, ponieważ "_data-role" zawiera myślnik, który będzie powodował
+błąd składni Pythona.
 
-In such cases you have a couple of options.
-You can use the ``data`` argument (this time without a leading underscore) to pass a dictionary of related attributes without their leading hyphen, and the output will have the desired combinations e.g.
+W takich przypadkach ma się kilka możliwości.
+Można zastosować argument ``data`` (tym razem bez wiodącego znaku podkreślenia)
+do przekazania słownika związanych atrybutów bez ich wiodącego myślnika a wyjście
+będzie miało pożądaną kombinacje danych np.
 
 ``
 >>> print DIV('text', data={'role': 'collapsible'})
 <div data-role="collapsible">text</div>
 ``:code
 
-or you can instead pass the attributes as a dictionary and make use of Python's ``**`` function arguments notation, which maps a dictionary of (key:value) pairs into a set of keyword arguments:
+lub można zamiast tego przekazać atrybuty jako słownik i wykorzystać notację dwóch
+gwiazdek (``**``) argumentów funkcji Pythona, co odwzoruje słownik par (klucz:wartość)
+na zestaw argumentów kluczowych:
 
 ``
 >>> print DIV('text', **{'_data-role': 'collapsible'})
 <div data-role="collapsible">text</div>
 ``:code
 
-Note that more elaborate entries will introduce HTML character entities, but they will work nonetheless e.g.
+Proszę zwrócić uwagę, że bardziej skomplikowane zapisy mogą zawierać znaki, które
+powinny być w wyjściu zamienione na znaki encji HTML, np.
 
 ``
 >>> print DIV('text', data={'options':'{"mode":"calbox", "useNewStyle":true}'})
 <div data-options="{&quot;mode&quot;:&quot;calbox&quot;, &quot;useNewStyle&quot;:true}">text</div>
 ``:code
 
-You can also dynamically create special TAGs:
+Można również dynamicznie utworzyć specjalny TAG:
 
 ``
 >>> print TAG['soap:Body']('whatever',**{'_xmlns:m':'http://www.example.org'})
@@ -350,36 +440,46 @@ You can also dynamically create special TAGs:
 
 #### ``XML``
 ``XML``:inxx
-``XML`` is an object used to encapsulate text that should not be escaped. The text may or may not contain valid XML. For example, it could contain JavaScript.
+``XML`` to obiekt stosowany do hermetyzowania tekstu, który nie powinien być
+zabezpieczany sekwencjami ucieczki. Tekst ten może ale nie musi zawierać prawidłowy
+kod XML - na przykład, może zawierać kod JavaScript.
 
-The text in this example is escaped:
+Tekst w tym przykładzie jest zabezpieczany encjami znakowymi XML:
 ``
 >>> print DIV("<b>hello</b>")
 &lt;b&gt;hello&lt;/b&gt;
 ``:code
 
-by using ``XML`` you can prevent escaping:
+stosując ``XML`` można się zabezpieczyć przed wstawianiem w tekstu sekwencji ucieczki:
 ``
 >>> print DIV(XML("<b>hello</b>"))
 <b>hello</b>
 ``:code
 
-Sometimes you want to render HTML stored in a variable, but the HTML may contain unsafe tags such as scripts:
+Czasem zachodzi potrzeba renderowania kodu HTML zapisanego w zmiennej, ale kod
+taki może zawierać niebezpieczne znaczniki, takie jak script:
 ``
 >>> print XML('<script>alert("unsafe!")</script>')
 <script>alert("unsafe!")</script>
 ``:code
 
-Un-escaped executable input such as this (for example, entered in the body of a comment in a blog) is unsafe, because it can be used to generate Cross Site Scripting (XSS) attacks against other visitors to the page.
+Nie zabezpieczenie wykonywalnego kodu, taki jak ten (na przykład, wprowadzonego
+w treści komentarza na blogu) jest niebezpieczne, ponieważ może zostać użyty do
+wygenerowania ataku Cross Site Scripting (XSS) na strony innych odwiedzających.
 
 ``sanitize``:inxx
-The web2py ``XML`` helper can sanitize our text to prevent injections and escape all tags except those that you explicitly allow. Here is an example:
+Helper ``XML`` web2py może zabezpieczyć tekst przed iniekcją poprzez wstawia encji
+znakowych przy wszystkich znacznikach, z wyjątkiem tych, które wskazało się jawnie.
+Oto przykład:
 ``
 >>> print XML('<script>alert("unsafe!")</script>', sanitize=True)
 &lt;script&gt;alert(&quot;unsafe!&quot;)&lt;/script&gt;
 ``:code
 
-The ``XML`` constructors, by default, consider the content of some tags and some of their attributes safe. You can override the defaults using the optional ``permitted_tags`` and ``allowed_attributes`` arguments. Here are the default values of the optional arguments of the ``XML`` helper.
+Konstruktory ``XML`` traktują domyślnie zawartość niektórych znaczników i niektóre
+z ich atrybutów za bezpieczne. Można zastąpić domyślne ustawienie opcjonalnych
+argumentów ``permitted_tags`` i ``allowed_attributes``. Oto domyślne wartości
+opcjonalnych argumentów helpera ``XML``.
 ``
 XML(text, sanitize=False,
     permitted_tags=['a', 'b', 'blockquote', 'br/', 'i', 'li',
@@ -388,11 +488,11 @@ XML(text, sanitize=False,
        'img':['src', 'alt'], 'blockquote':['type']})
 ``:code
 
-### Built-in helpers
+### Helpery wbudowane
 
 #### ``A``
 
-This helper is used to build links.
+Helper ten jest używany do tworzenia odnośników.
 
 ``A``:inxx
 ``
@@ -401,50 +501,59 @@ This helper is used to build links.
 <a href='http://www.web2py.com'>&lt;click&gt;<b>me/b></a>
 ``:code
 
-Instead of ``_href`` you can pass the URL using the ``callback`` argument. For example in a view:
+Zamiast ``_href`` można przekazać adres URL wykorzystując argument ``callback``.
+Oto przykład fragmentu widoku:
 
 ``
 {{=A('click me', callback=URL('myaction'))}}
 ``
 
-and the effect of pressing the link will be an ajax call to "myaction" instead of a redirection.
-In this case, optionally you can specify two more arguments: ``target`` and ``delete``:
+skutkujący tym, że kliknięcie odnośnika wywołany zostanie kod ajax "myaction"
+zamiast przekierowania.
+W tym przypadku, opcjonalnie można podać dwa argumenty: ``target`` i ``delete``:
 ``
 {{=A('click me', callback=URL('myaction'), target="t")}}
 <div id="t"><div>
 ``
-and the response of the ajax callback will be stored in the DIV with id equal to "t".
+Odpowiedź wywołania zwrotnego ajax zostanie zapisana w obiekcie DIV z atrybutem
+id równym "t".
 
 ``
 <div id="b">{{=A('click me', callback=URL('myaction'), delete='div#b")}}</div>
 ``
-and upon response, the closest tag matching "div#b" will be deleted. In this case, the button will be deleted.
-A typical application is:
+W odpowiedzi, najbliższy znacznik dopasowany do "div#b" zostanie usunięty.
+W tym przypadku usunięty zostanie przycisk.
+Typowym zastosowanie to użycie w tablicy:
 
 ``
 {{=A('click me', callback=URL('myaction'), delete='tr")}}
 ``
 
-in a table. Pressing the button will perform the callback and delete the table row.
+Naciśnięcie przycisku wykona wywołanie zwrotne i usunie wiersz tablicy.
 
-``callback`` and ``delete`` can be combined.
+``callback`` i ``delete`` można łączyć.
 
-The A helper takes a special argument called ``cid``. It works as follows:
+Helper A pobiera specjalny argument o nazwie ``cid``. Działa on następująco:
 
 ``
 {{=A('linked page', _href='http://example.com', cid='myid')}}
 <div id="myid"></div>
 ``:code
 
-and a click on the link causes the content to be loaded in the div. This is similar but more powerful than the above syntax since it is designed to refresh page components. We discuss applications of ``cid`` in more detail in [[Chapter 12 ../12#trapped_ajax_links]], in the context of components.
+Kliknięcie na na link spowoduje załadowanie treści w znaczniku div. Jest to podobne,
+ale silniejsze niż powyższa składnia, ponieważ jest zaprojektowane do odświeżania
+treści strony. Omówimy zastosowanie ``cid`` bardziej szczegółowo w
+[[rozdziale 12 ../12#trapped_ajax_links]], w kontekście komponentów.
 
-These ajax features require jQuery and "static/js/web2py_ajax.js", which are automatically included by placing ``{{include 'web2py_ajax.html'}}`` in the layout head. "views/web2py_ajax.html" defines some variables based on ``request`` and includes all necessary js and css files.
-
+Te funkcjonalności ajax wymagają dostępu do jQuery i skryptu "static/js/web2py_ajax.js",
+które są automatycznie dołączane poprzez umiejscowienie w układzie head wyrażenia
+``{{include 'web2py_ajax.html'}}``. Skrypt "views/web2py_ajax.html" definuje kilka
+zmiennych opartych na ``request`` i zawiera wszystkie niezbędne pliki js i css.
 
 #### ``B``
 ``B``:inxx
 
-This helper makes its contents bold.
+Helper ten dokonuje pogrubienia tekstu.
 ``
 >>> print B('<hello>', XML('<i>world</i>'), _class='test', _id=0)
 <b id="0" class="test">&lt;hello&gt;<i>world</i></b>
@@ -452,7 +561,7 @@ This helper makes its contents bold.
 
 #### ``BODY``
 ``BODY``:inxx
-This helper makes the body of a page.
+Helper ten umieszcza ciało strony.
 ``
 >>> print BODY('<hello>', XML('<b>world</b>'), _bgcolor='red')
 <body bgcolor="red">&lt;hello&gt;<b>world</b></body>
@@ -461,13 +570,14 @@ This helper makes the body of a page.
 #### ``BR``
 ``BR``:inxx
 
-This helper creates a line break.
+Helper ten tworzy podział wiersza.
 ``
 >>> print BR()
 <br />
 ``:code
 
-Notice that helpers can be repeated using the multiplication operator:
+Warto pamiętać, że w helperach istnieje możliwość powtarzania wyjścia przy
+wykorzystaniu operatora mnożenie:
 
 ``
 >>> print BR()*5
@@ -477,7 +587,7 @@ Notice that helpers can be repeated using the multiplication operator:
 #### ``CAT``
 ``CAT``:inxx
 
-This helper concatenates other helpers, same as TAG[''].
+Helper ten łączy inne hlpery, takie jak TAG[''].
 ``
 >>> print CAT('Here is a ', A('link',_href=URL()), ', and here is some ', B('bold text'), '.')
 Here is a <a href="/app/default/index">link</a>, and here is some <b>bold text</b>.
@@ -486,7 +596,7 @@ Here is a <a href="/app/default/index">link</a>, and here is some <b>bold text</
 #### ``CENTER``
 ``CENTER``:inxx
 
-This helper centers its content.
+Helper ten powoduje wyśrodkowanie tekstu.
 ``
 >>> print CENTER('<hello>', XML('<b>world</b>'),
 >>>              _class='test', _id=0)
@@ -496,9 +606,11 @@ This helper centers its content.
 #### ``CODE``
 ``CODE``:inxx
 
-This helper performs syntax highlighting for Python, C, C++, HTML and web2py code, and is preferable to ``PRE`` for code listings. ``CODE`` also has the ability to create links to the web2py API documentation.
+Powoduje podświetlanie składni kodu Pythona, C, C++, HTML i web2py, co
+ulepsza kod wykazywany w ``PRE``. Helper ``CODE`` ma również zdolność tworzenia
+odnośników do dokumentacji API web2py.
 
-Here is an example of highlighting sections of Python code.
+Oto przykład z podświetlaniem kodu Pythona:
 ``
 >>> print CODE('print "hello"', language='python').xml()
 <table><tr valign="top"><td style="width:40px; text-align: right;"><pre style="
@@ -523,7 +635,7 @@ Here is an example of highlighting sections of Python code.
 </table>
 ``:code
 
-Here is a similar example for HTML
+Oto podobny przykład z HTML:
 ``
 >>> print CODE(
 >>>   '<html><body>{{=request.env.remote_add}}</body></html>',
@@ -535,24 +647,41 @@ Here is a similar example for HTML
 ...</code>...</table>
 ``:code
 
-These are the default arguments for the ``CODE`` helper:
+Helper ``CODE`` ma domyślne argumenty:
 ``
 CODE("print 'hello world'", language='python', link=None, counter=1, styles={})
 ``:code
 
-Supported values for the ``language`` argument are "python", "html_plain", "c", "cpp", "web2py", and "html". The "html" language interprets {{ and }} tags as "web2py" code, while "html_plain" doesn't.
+Obsługiwanymi wartościami dla argumentu ``language`` są "python", "html_plain",
+"c", "cpp", "web2py" i "html". Język "html" interpretuje znaczniki {{ i }} jako
+kod "web2py", natomiast "html_plain" nie.
 
-If a ``link`` value is specified, for example "/examples/global/vars/", web2py API references in the code are linked to documentation at the link URL. For example "request" would be linked to "/examples/global/vars/request". In the above example, the link URL is handled by the "vars" action in the "global.py" controller that is distributed as part of the web2py "examples" application.
+Jeśli określona jest wartość ``link``, na przykład "/examples/global/vars/", API
+web2py dokona odniesienia w kodzie umieszczając odnośnik URL do dokumentacji.
+Na przykład "request" zostanie zlinkowany z "/examples/global/vars/request".
+W powyższym przykładzie, odnośnik URL jest obsługiwany przez przez akcję "vars"
+w kontrolerze "global.py", który jest rozpowszechniany jako część aplikacji
+"examples" web2py.
 
-The ``counter`` argument is used for line numbering. It can be set to any of three different values. It can be ``None`` for no line numbers, a numerical value specifying the start number, or a string. If the counter is set to a string, it is interpreted as a prompt, and there are no line numbers.
+Argument ``counter`` jest używany dla numerowania linii kodu. Może zostać ustawiony
+na jedną z trzech możliwych wartości. Może to być ``None`` wskazująca na brak numeracji,
+wartość numeryczna wskazująca na numer początkowy oraz ciąg znakowy. Jeśli argument
+ten jest ustawiony na jakiś ciąg znakowy, to jest on traktowany jako znak zachęty
+w kodzie i linie kodu nie są numerowane.
 
-The ``styles`` argument is a bit tricky. If you look at the generated HTML above, it contains a table with two columns, and each column has its own style declared inline using CSS. The ``styles`` attributes allows you to override those two CSS styles. For example:
+Argument ``styles`` jest nieco skomplikowany. Jeśli spojrzy się na powyżej wygenerowany
+kod HTML, to widać, ze zawiera on tabelę z dwoma kolumnami, przy czym każda kolumna ma
+określony wierszowo swój własny  styl CSS. Atrybuty ``styles`` umożliwiają nadpisać
+te dwa domyślne style CSS. Na przykład:
 
 ``
 {{=CODE(...,styles={'CODE':'margin: 0;padding: 5px;border: none;'})}}
 ``:code
 
-The ``styles`` attribute must be a dictionary, and it allows two possible keys: ``CODE`` for the style of the actual code, and ``LINENUMBERS`` for the style of the left column, which contains the line numbers. Mind that these styles completely replace the default styles and are not simply added to them.
+Atrybut ``styles`` musi być słownikiem umożliwiającym określenie dwóch kluczy:
+``CODE`` dla stylu rzeczywistego kodu i ``LINENUMBERS`` dla stylu kolumny z numeracją
+wierszy. Warto pamiętać, że style te całkowicie wymieniają domyślne style a nie
+są dodawane do stylów domyślnych.
 
 #### ``COL``
 ``COL``:inxx
@@ -571,7 +700,8 @@ The ``styles`` attribute must be a dictionary, and it allows two possible keys: 
 ``:code
 
 #### ``DIV``
-All helpers apart from ``XML`` are derived from ``DIV`` and inherit its basic methods.
+Wszystkie helpery, z wyjątkiem ``XML``, pochodzą od ``DIV`` i dziedziczą jego
+podstawowe metody.
 
 ``DIV``:inxx
 ``
@@ -581,7 +711,8 @@ All helpers apart from ``XML`` are derived from ``DIV`` and inherit its basic me
 
 #### ``EM``
 
-Emphasizes its content.
+Uwydatnia treść, zmieniając czcionkę najczęściej na italik (interpretacja znacznika
+em zależy od przeglądarki).
 
 ``EM``:inxx
 ``
@@ -592,7 +723,7 @@ Emphasizes its content.
 #### ``FIELDSET``
 ``FIELDSET``:inxx
 
-This is used to create an input field together with its label.
+Jest używany do tworzenia pola wejściowego wraz z etykietą.
 ``
 >>> print FIELDSET('Height:', INPUT(_name='height'), _class='test')
 <fieldset class="test">Height:<input name="height" /></fieldset>
@@ -601,17 +732,22 @@ This is used to create an input field together with its label.
 #### ``FORM``
 ``FORM``:inxx
 
-This is one of the most important helpers. In its simple form, it just makes a ``<form>...</form>`` tag, but because helpers are objects and have knowledge of what they contain, they can process submitted forms (for example, perform validation of the fields). This will be discussed in detail in Chapter 7.
+Jest to jeden z najważniejszych helperów. W bardzo prosty sposób tworzy znacznik
+``<form>...</form>``, ale ponieważ helper ten jest obiektami i posiada wiedzę o tym
+co zawiera, to może przetwarzać zgłoszone formularze (na przykład, wykonywać
+walidację pól). Jest to szczegółowo omówione w rozdziale 7.
 ``
 >>> print FORM(INPUT(_type='submit'), _action='', _method='post')
 <form enctype="multipart/form-data" action="" method="post">
 <input type="submit" /></form>
 ``:code
 
-The "enctype" is "multipart/form-data" by default.
+Domyślnie "enctype" to "multipart/form-data".
 
 ``hidden``:inxx
-The constructor of a ``FORM``, and of ``SQLFORM``, can also take a special argument called ``hidden``. When a dictionary is passed as ``hidden``, its items are translated into "hidden" INPUT fields. For example:
+Konstruktor ``FORM`` i ``SQLFORM`` mogą pobierać argument o nazwie ``hidden``.
+Gdy słownik jest przekazywany jako ``hidden``, to jego elementy są przekształcane
+do pola INPUT "hidden". Na przykład:
 ``
 >>> print FORM(hidden=dict(a='b'))
 <form enctype="multipart/form-data" action="" method="post">
@@ -621,7 +757,7 @@ The constructor of a ``FORM``, and of ``SQLFORM``, can also take a special argum
 #### ``H1``, ``H2``, ``H3``, ``H4``, ``H5``, ``H6``
 ``H1``:inxx
 
-These helpers are for paragraph headings and subheadings:
+Helpery te są nagłówkami paragrafów i podparagrafów:
 ``
 >>> print H1('<hello>', XML('<b>world</b>'), _class='test', _id=0)
 <h1 id="0" class="test">&lt;hello&gt;<b>world</b></h1>
@@ -629,7 +765,7 @@ These helpers are for paragraph headings and subheadings:
 
 #### ``HEAD``
 
-For tagging the HEAD of an HTML page.
+Do wygenerowania znaczników sekcji HEAD strony HTML.
 
 ``HEAD``:inxx
 ``
@@ -640,8 +776,8 @@ For tagging the HEAD of an HTML page.
 #### ``HTML``
 ``HTML``:inxx ``XHTML``:inxx
 
-This helper is a little different. In addition to making the ``<html>`` tags,
-it prepends the tag with a doctype string``xhtml-w,xhtml-o,xhtml-school``:cite .
+Helper ten jest trochę inny. Oprócz generowania znaczników ``<html>``,
+poprzedza znacznik ciągiem doctype``xhtml-w``:cite ``xhtml-o``:cite ``xhtml-school``:cite .
 ``
 >>> print HTML(BODY('<hello>', XML('<b>world</b>')))
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
@@ -649,27 +785,30 @@ it prepends the tag with a doctype string``xhtml-w,xhtml-o,xhtml-school``:cite .
 <html><body>&lt;hello&gt;<b>world</b></body></html>
 ``:code
 
-The HTML helper also takes some additional optional arguments that have the following default:
+Helper HTML pobiera kilka opcjonalnych argumentów, która mają następujące wartości
+domyślne:
 ``
 HTML(..., lang='en', doctype='transitional')
 ``:code
 
-where doctype can be 'strict', 'transitional', 'frameset', 'html5', or a full doctype string.
+gdzie argument doctype może mieć wartość 'strict', 'transitional', 'frameset',
+'html5' lub jakiś pełny ciąg doctype.
 
 #### ``XHTML``
 ``XHTML``:inxx
 
-XHTML is similar to HTML but it creates an XHTML doctype instead.
+XHTML jest podobny do HTML ale tworzy tworzy doctype XHTML a nie HTML.
 ``
 XHTML(..., lang='en', doctype='transitional', xmlns='http://www.w3.org/1999/xhtml')
 ``:code
 
-where doctype can be 'strict', 'transitional', 'frameset', or a full doctype string.
+gdzie argument doctype może mieć wartość 'strict', 'transitional', 'frameset'
+lub jakiegoś pełnego ciągu doctype.
 
 #### ``HR``
 ``HR``:inxx
 
-This helper creates a horizontal line in an HTML page
+Helper ten tworzy na stronie HTML poziomą linię
 ``
 >>> print HR()
 <hr />
@@ -678,7 +817,7 @@ This helper creates a horizontal line in an HTML page
 #### ``I``
 ``I``:inxx
 
-This helper makes its contents italic.
+Tworzy treść pisaną italikiem.
 ``
 >>> print I('<hello>', XML('<b>world</b>'), _class='test', _id=0)
 <i id="0" class="test">&lt;hello&gt;<b>world</b></i>
@@ -686,7 +825,8 @@ This helper makes its contents italic.
 
 #### ``IFRAME``
 
-This helper includes another web page in the current page. The url of the other page is specified via the "_src" attribute.
+Helper ten zawiera inną stronę internetową w bieżącej stronie. Adres URL innej
+strony jest określany poprzez atrybut "_src".
 
 ``IFRAME``:inxx
 ``
@@ -697,14 +837,14 @@ This helper includes another web page in the current page. The url of the other 
 #### ``IMG``
 ``IMG``:inxx
 
-It can be used to embed images into HTML:
+Używany jest do osadzania obrazów w HTML:
 
 ``
 >>> IMG(_src='http://example.com/image.png',_alt='test')
 <img src="http://example.com/image.ong" alt="rest" />
 ``:code
 
-Here is a combination of A, IMG, and URL helpers for including a static image with a link:
+Oto połączenie helperów A, IMG i URL użyte w celu zawarcia statycznego obrazu z linkiem:
 
 ``
 >>> A(IMG(_src=URL('static','logo.png'), _alt="My Logo"),
@@ -717,19 +857,23 @@ Here is a combination of A, IMG, and URL helpers for including a static image wi
 #### ``INPUT``
 ``INPUT``:inxx
 
-Creates an ``<input.../>`` tag. An input tag may not contain other tags, and is closed by ``/>`` instead of ``>``. The input tag has an optional attribute ``_type`` that can be set to "text" (the default), "submit", "checkbox", or "radio".
+Tworzy znacznik ``<input.../>``. Znacznik input może nie zawierać innych znaczników
+i jest zamykany znakami ``/>`` zamiast ``>``. Znacznik input ma opcjonalny atrybut
+``_type``, który można ustawić na "text" (domyślnie), "submit", "checkbox" lub "radio".
 ``
 >>> print INPUT(_name='test', _value='a')
 <input value="a" name="test" />
 ``:code
 
-It also takes an optional special argument called "value", distinct from "_value". The latter sets the default value for the input field; the former sets its current value. For an input of type "text", the former overrides the latter:
+Helper ten pobiera opcjonalny specjalny argument o nazwie "value", odrębny od argumentu
+"_value". Ten ostatni ustawia domyślną wartość dla pola input. Pierwszy ustawia bieżącą
+wartość. Dla pola input typ "text", pierwszy argument zastępuje drugi:
 ``
 >>> print INPUT(_name='test', _value='a', value='b')
 <input value="b" name="test" />
 ``:code
 
-For radio buttons, ``INPUT`` selectively sets the "checked" attribute:
+Dla przycisków radio ``INPUT`` selektywnie ustawia atrybut "checked":
 
 ``radio``:inxx
 ``
@@ -740,7 +884,7 @@ For radio buttons, ``INPUT`` selectively sets the "checked" attribute:
 <input value="c" type="radio" name="test" /> c
 ``:code
 
-and similarly for checkboxes:
+i podobnie dla pól wyboru:
 
 ``checkbox``:inxx
 ``
@@ -752,7 +896,7 @@ and similarly for checkboxes:
 
 #### ``LABEL``
 
-It is used to create a LABEL tag for an INPUT field.
+Jest używany do tworzenia znacznika <label> dla pól formularza.
 
 ``LABEL``:inxx
 ``
@@ -762,7 +906,7 @@ It is used to create a LABEL tag for an INPUT field.
 
 #### ``LEGEND``
 
-It is used to create a legend tag for a field in a form.
+Jest używany do tworzenia znacznika <legend> dla pól formularza.
 
 ``LEGEND``:inxx
 ``
@@ -772,7 +916,8 @@ It is used to create a legend tag for a field in a form.
 
 #### ``LI``
 
-It makes a list item and should be contained in a ``UL`` or ``OL`` tag.
+Tworzy element listy (znacznik <li>), który powinien być zawarty w znacznikach
+<ul> lub <ol>.
 
 ``LI``:inxx
 ``
@@ -782,7 +927,7 @@ It makes a list item and should be contained in a ``UL`` or ``OL`` tag.
 
 #### ``META``
 
-To be used for building ``META`` tags in the ``HTML`` head. For example:
+Używany do budowania znaczników <meta> w sekcji HEAD. Na przykład:
 
 ``META``:inxx
 ``
@@ -793,7 +938,8 @@ To be used for building ``META`` tags in the ``HTML`` head. For example:
 [[markmin_syntax]]
 #### ``MARKMIN``
 
-Implements the markmin wiki syntax. It converts the input text into output html according to the markmin rules described in the example below:
+Implementuje składnię wiki markmin. Konwertuje tekst wejściowy do wyjścia HTML
+zgodnie z poniższym przykładem:
 
 ``MARKMIN``:inxx
 ``
@@ -802,12 +948,14 @@ Implements the markmin wiki syntax. It converts the input text into output html 
 this <a href="http://web2py.com">a link</a></p>
 ``:code
 
-The markmin syntax is described in this file that ships with web2py:
+Składnia markmin jest opisana w pliku:
 ``
 http://127.0.0.1:8000/examples/static/markmin.html
 ``:code
 
-You can use markmin to generate HTML, LaTeX and PDF documents:
+dostarczanym wraz z web2py.
+
+Markmin można używać do generowania dokumentów HTML, LaTeX i PDF:
 
 ``
 m = "Hello **world** [[link http://web2py.com]]"
@@ -817,20 +965,20 @@ from gluon.contrib.markmin.markmin2latex import markmin2latex
 print markmin2latex(m)
 from gluon.contrib.markmin.markmin2pdf import markmin2pdf
 print markmin2pdf(m) # requires pdflatex
-``
+``:code
 
-(the ``MARKMIN`` helper is a shortcut for ``markmin2html``)
+(helper ``MARKMIN`` jest skrótem dla ``markmin2html``)
 
-Here is a basic syntax primer:
+Oto podstawowa składnia:
 
 --------------------------------------------------
-**SOURCE**                 | **OUTPUT**
-``# title``                | **title**
-``## section``             | **section**
-``### subsection``         | **subsection**
-``**bold**``               | **bold**
-``''italic''``             | ''italic''
-``!`!`verbatim`!`!``       | ``verbatim``
+**ŹRÓDŁO**                 | **WYJŚCIE**
+``# title``                | **tytuł**
+``## section``             | **rozdział**
+``### subsection``         | **podrozdział**
+``**bold**``               | **gruby**
+``''italic''``             | ''italik''
+``!`!`verbatim`!`!``       | ``dosłowny``
 ``http://google.com``      | http://google.com
 ``http://...`` | ``<a href="http://...">http:...</a>``
 ``http://...png`` | ``<img src="http://...png" />``
@@ -838,58 +986,61 @@ Here is a basic syntax primer:
 ``http://...mp4`` | ``<video src="http://...mp4"></video>``
 ``qr:http://...`` | ``<a href="http://..."><img src="qr code"/></a>``
 ``embed:http://...`` | ``<iframe src="http://..."></iframe>``
-``[[click me #myanchor]]`` | [[click me #myanchor]]
-``[[myanchor]]`` | Creating an anchor for a link
+``[[click me #myanchor]]`` | [[kliknij mnie #myanchor]]
+``[[myanchor]]`` | Utworzenie kotwicy dla odnośnika
 ``$````$\int_a^b sin(x)dx$````$``  | $$\int_a^b sin(x)dx$$
 ---------------------------------------------------
 
-##### MARKMIN links
+##### Odnośniki MARKMIN
 
-Links take this form: ``[[link display text <link>]]``
-<link> can be an anchor e.g. ``#myanchor``
-or a URI e.g. ``http://www.web2py.com``
-or a relative reference e.g. ``[[See Chapter 8 ../08]]`` or ``[[See Chapter 8 ../08#myanchor]]``
+Odnośniki mają postać: ``[[wyświetlany tekst odnośnika <link>]]``.
+<link> może być kotwicą np. ``#myanchor``
+lub adresem URI np. ``http://www.web2py.com``
+lub względną referencją np. ``[[patrz rodział 8 ../08]]`` lub ``[[patrz rozdział 8 ../08#myanchor]]``
 
-Simply including a link to an image, a videos or an audio files without markup result in the corresponding image, video or audio file being included automatically (for audio and video it uses html <audio> and <video> tags).
+Wystarczy dołączyć odnośnik do pliku obrazu, wideo lub audio bez wynikowego znacznika
+a zostanie automatycznie dołączony  odpowiedni plik obrazu, wideo lub audio (dla
+pliku audio i video będzie użyty odpowiednio znacznik <audio> i <video>).
 
-Adding a link with the ``qr:`` prefix such as
+Dodanie odnośnika z przedrostkiem ``qr:``, tak jak tu
 
 ``
 qr:http://web2py.com
 ``
 
-results in the corresponding QR code being embedded and linking the said URL.
+spowoduje, że osadzony zostanie odpowiedni kod QR i zlinkowany z określonym adresem URL.
 
-Adding a link with the ``embed:`` prefix such as
+Dodanie odnośnika z przedrostkiem ``embed:``, tak jak tu
 
 ``
 embed:http://www.youtube.com/embed/x1w8hKTJ2Co
 ``
 
-results in the page being embedded, in this case a youtube video is embedded.
+spowoduje, osadzenie określonej strony, w tym przypadku wideo youtube.
 
-Images can also be embedded with the following syntax:
+Obrazy mogą być również osadzane na następującą składnią:
 
 ``
 [[image-description http://.../image.png right 200px]]
 ``
 
-##### MARKMIN lists and tables
-Unordered lists with:
+##### Listy i tabele MARKMIN
+Listy nieuporządkowane tworzy się używajac znak myślnika przed każdym elementem
+listy:
 ``
 - one
 - two
 - three
 ``
 
-Ordered lists with:
+Listy uporządkowane tworzy się stosując znak plus przed każdym elementem listy: 
 ``
 + one
 + two
 + three
 ``
 
-and tables with:
+Natomiast tablice w ten sposób:
 ``
 ----------
  X | 0 | 0
@@ -898,22 +1049,27 @@ and tables with:
 ----------
 ``
 
-##### extending MARKMIN 
-The MARKMIN syntax also supports blockquotes, HTML5 audio and video tags, image alignment, custom css, and it can be extended:
+##### Rozszerzanie MARKMIN 
+Składnia MARKMIN obsługuje również znaczniki bloków cytatów (''ang. blockquotes''),
+znaczniki audio i wideo HTML, wyrównywanie obrazów, własne style CSS i to wszystko
+można rozszerzać:
 
 ``
 MARKMIN("!`!!`!abab!`!!`!:custom", extra=dict(custom=lambda text: text.replace('a','c'))
 ``:code
 
-generates
+generuje
 
 ``'cbcb'``:code
 
-Custom blocks are delimited by ``!`!!`!...!`!!`!:<key>`` and they are rendered by the function passed as value for the corresponding key in the extra dictionary argument of MARKMIN. Mind that the function may need to escape the output to prevent XSS.
+Niestandardowe bloki są ograniczane przez ``!`!!`!...!`!!`!:<key>`` i są renderowane
+przez funkcję przekazywaną jako odpowiedni klucz w słowniku argumentu ``extra``
+MARKMIN. Trzeba pamiętać, aby zabezpieczyć funkcję znakami ucieczki w celu zapobieżenia
+atakom XSS.
 
 #### ``OBJECT``
 
-Used to embed objects (for example, a flash player) in the HTML.
+Używany do osadzania w HTML obiektów (na przykład flash player).
 
 ``OBJECT``:inxx
 ``
@@ -924,7 +1080,9 @@ Used to embed objects (for example, a flash player) in the HTML.
 
 #### ``OL``
 
-It stands for Ordered List. The list should contain LI tags. ``OL`` arguments that are not ``LI`` objects are automatically enclosed in ``<li>...</li>`` tags.
+Wskazuje na listę uporządkowaną. Lista powinna zawierać znaczniki LI. Argumenty
+``OL``, które nie są obiektami ``LI`` są automatycznie otaczane znacznikami
+``<li>...</li>``.
 
 ``OL``:inxx
 ``
@@ -934,7 +1092,9 @@ It stands for Ordered List. The list should contain LI tags. ``OL`` arguments th
 
 #### ``ON``
 
-This is here for backward compatibility and it is simply an alias for ``True``. It is used exclusively for checkboxes and deprecated since ``True`` is more Pythonic.
+Znajduje się tutaj dla zachowania wstecznej kompatybilności i jest po prostu aliasem
+``True``. Jest stosowany wyłącznie dla pól wyboru i jest przestarzały, ponieważ
+``True`` jest bardziej poprawne dla języka Python.
 
 ``ON``:inxx
 ``
@@ -944,7 +1104,8 @@ This is here for backward compatibility and it is simply an alias for ``True``. 
 
 #### ``OPTGROUP``
 
-Allows you to group multiple options in a SELECT and it is useful to customize the fields using CSS.
+Pozwala na grupowanie wielu opcji w bloku SELECT i jest użyteczne dla dostosowywania
+pól z użyciem CSS.
 
 ``OPTGROUP``:inxx
 ``
@@ -960,7 +1121,7 @@ Allows you to group multiple options in a SELECT and it is useful to customize t
 
 #### ``OPTION``
 
-This should only be used as part of a SELECT/OPTION combination.
+Używać się to powinno tylko jako część kombinacji SELECT/OPTION.
 
 ``OPTION``:inxx
 ``
@@ -968,7 +1129,9 @@ This should only be used as part of a SELECT/OPTION combination.
 <option value="a">&lt;hello&gt;<b>world</b></option>
 ``:code
 
-As in the case of ``INPUT``, web2py make a distinction between "_value" (the value of the OPTION), and "value" (the current value of the enclosing select). If they are equal, the option is "selected".
+Tak jak w przypadku ``INPUT``, web2py rozróżnia między atrybutami "_value"
+(wartość OPTION) i "value" (aktualna wartość "select"). Jeśli są równe, opcja
+ma wartość "selected".
 
 ``selected``:inxx
 ``
@@ -982,7 +1145,7 @@ As in the case of ``INPUT``, web2py make a distinction between "_value" (the val
 #### ``P``
 ``P``:inxx
 
-This is for tagging a paragraph.
+Helper ten generuje znacznik początkowy i końcowy akapitu, <p>...</p>.
 ``
 >>> print P('<hello>', XML('<b>world</b>'), _class='test', _id=0)
 <p id="0" class="test">&lt;hello&gt;<b>world</b></p>
@@ -991,7 +1154,8 @@ This is for tagging a paragraph.
 #### ``PRE``
 ``PRE``:inxx
 
-Generates a ``<pre>...</pre>`` tag for displaying pre-formatted text. The ``CODE`` helper is generally preferable for code listings.
+Generuje znacznik ``<pre>...</pre>`` dla wyświetlania tekstu preformatowanego.
+Helper ``CODE`` jest ogólnie korzystniejszy dla wyświetlania kodu.
 ``
 >>> print PRE('<hello>', XML('<b>world</b>'), _class='test', _id=0)
 <pre id="0" class="test">&lt;hello&gt;<b>world</b></pre>
@@ -1000,7 +1164,8 @@ Generates a ``<pre>...</pre>`` tag for displaying pre-formatted text. The ``CODE
 #### ``SCRIPT``
 ``SCRIPT``:inxx
 
-This is include or link a script, such as JavaScript. The content between the tags is rendered as an HTML comment, for the benefit of really old browsers.
+Dołącza albo linkuje skrypt, taki jak JavaScript. Dla bardzo starych przeglądarek
+zawartość pomiędzy znacznikami jest renderowana jako komentarz HTML.
 ``
 >>> print SCRIPT('alert("hello world");', _type='text/javascript')
 <script type="text/javascript"><!--
@@ -1011,7 +1176,9 @@ alert("hello world");
 #### ``SELECT``
 ``SELECT``:inxx
 
-Makes a ``<select>...</select>`` tag. This is used with the ``OPTION`` helper. Those ``SELECT`` arguments that are not ``OPTION`` objects are automatically converted to options.
+Generuje znacznik ``<select>...</select>``. Jest używany razem z helperem``OPTION``.
+Argumenty ``SELECT``, które nie są obiektami ``OPTION`` są automatycznie konwertowane
+do opcji.
 ``
 >>> print SELECT('<hello>', XML('<b>world</b>'), _class='test', _id=0)
 <select id="0" class="test">
@@ -1023,7 +1190,8 @@ Makes a ``<select>...</select>`` tag. This is used with the ``OPTION`` helper. T
 #### ``SPAN``
 ``SPAN``:inxx
 
-Similar to ``DIV`` but used to tag inline (rather than block) content.
+Podobny do ``DIV``, ale używany do wygenerowania wierszowego znacznika treści <span>
+...</span>.
 ``
 >>> print SPAN('<hello>', XML('<b>world</b>'), _class='test', _id=0)
 <span id="0" class="test">&lt;hello&gt;<b>world</b></span>
@@ -1032,8 +1200,8 @@ Similar to ``DIV`` but used to tag inline (rather than block) content.
 #### ``STYLE``
 ``STYLE``:inxx
 
-Similar to script, but used to either include or link CSS code.
-Here the CSS is included:
+Podobny do SCRIPT, ale używany do dołączania albo linkowania kodu CSS.
+Oto jak dołącza się kod CSS:
 ``
 >>> print STYLE(XML('body {color: white}'))
 <style><!--
@@ -1041,7 +1209,7 @@ body { color: white }
 //--></style>
 ``:code
 
-and here it is linked:
+a oto jak jest linkowany plik CSS:
 ``
 >>> print STYLE(_src='style.css')
 <style src="style.css"><!--
@@ -1051,27 +1219,31 @@ and here it is linked:
 #### ``TABLE``, ``TR``, ``TD``
 ``TABLE``:inxx ``TR``:inxx ``TD``:inxx
 
-These tags (along with the optional ``THEAD``, ``TBODY`` and ``TFOOTER`` helpers) are used to build HTML tables.
+Helpery te (wraz z opcjonalnymi ``THEAD``, ``TBODY`` i ``TFOOTER``) są używane do
+tworzenia tabel HTML.
 ``
 >>> print TABLE(TR(TD('a'), TD('b')), TR(TD('c'), TD('d')))
 <table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
 ``:code
-``TR`` expects ``TD`` content; arguments that are not ``TD`` objects are converted automatically.
+``TR`` oczekuje zawartości ``TD``. Argumenty, które nie są obiektami ``TD`` są
+konwertowane automatycznie.
 ``
 >>> print TABLE(TR('a', 'b'), TR('c', 'd'))
 <table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
 ``:code
 
-It is easy to convert a Python array into an HTML table using Python's ``*`` function arguments notation, which maps list elements to positional function arguments.
+Konwersję tablicy Pythona do tabeli HTML można dokonać łatwo przy wykorzystaniu
+notacji z gwiazdka (``*``) argumentów funkcji, która odwzorowuje elementy list
+na argumenty pozycyjne funkcji.
 
-Here, we will do it line by line:
+Tutaj zrobimy to linia za linią:
 ``
 >>> table = [['a', 'b'], ['c', 'd']]
 >>> print TABLE(TR(*table[0]), TR(*table[1]))
 <table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
 ``:code
 
-Here we do all lines at once:
+Tutaj zrobimy wszystkie linie naraz:
 ``
 >>> table = [['a', 'b'], ['c', 'd']]
 >>> print TABLE(*[TR(*rows) for rows in table])
@@ -1081,7 +1253,9 @@ Here we do all lines at once:
 #### ``TBODY``
 ``TBODY``:inxx
 
-This is used to tag rows contained in the table body, as opposed to header or footer rows. It is optional.
+Jest wykorzystywany do wygenerowania znacznika określającego obszar wierszy
+zawartych w ciele tabeli, w odróżnieniu do wierszy nagłówka i stopki. Nie jest
+to element obowiązkowy tabel.
 ``
 >>> print TBODY(TR('<hello>'), _class='test', _id=0)
 <tbody id="0" class="test"><tr><td>&lt;hello&gt;</td></tr></tbody>
@@ -1090,13 +1264,14 @@ This is used to tag rows contained in the table body, as opposed to header or fo
 #### ``TEXTAREA``
 ``TEXTAREA``:inxx
 
-This helper makes a ``<textarea>...</textarea>`` tag.
+Helper ten generuje znacznik ``<textarea>...</textarea>``.
 ``
 >>> print TEXTAREA('<hello>', XML('<b>world</b>'), _class='test')
 <textarea class="test" cols="40" rows="10">&lt;hello&gt;<b>world</b></textarea>
 ``:code
 
-The only caveat is that its optional "value" overrides its content (inner HTML)
+Jedynym ograniczeniem jest to, że jego opcjonalny argument "value" zastępuje treść
+znacznika <textarea> ... </textarea> (wewnątrz HTML)
 ``
 >>> print TEXTAREA(value="<hello world>", _class="test")
 <textarea class="test" cols="40" rows="10">&lt;hello world&gt;</textarea>
@@ -1105,7 +1280,7 @@ The only caveat is that its optional "value" overrides its content (inner HTML)
 #### ``TFOOT``
 ``TFOOT``:inxx
 
-This is used to tag table footer rows.
+Jest stosowany do zaznaczenia obszaru wierszy stopki tabeli.
 ``
 >>> print TFOOT(TR(TD('<hello>')), _class='test', _id=0)
 <tfoot id="0" class="test"><tr><td>&lt;hello&gt;</td></tr></tfoot>
@@ -1114,7 +1289,7 @@ This is used to tag table footer rows.
 #### ``TH``
 ``TH``:inxx
 
-This is used instead of ``TD`` in table headers.
+Jest używany zamiast ``TD`` w nagłówku tabeli.
 ``
 >>> print TH('<hello>', XML('<b>world</b>'), _class='test', _id=0)
 <th id="0" class="test">&lt;hello&gt;<b>world</b></th>
@@ -1123,7 +1298,7 @@ This is used instead of ``TD`` in table headers.
 #### ``THEAD``
 ``THEAD``:inxx
 
-This is used to tag table header rows.
+Jest używany do określenia obszaru wierszy nagłówka tabeli.
 ``
 >>> print THEAD(TR(TH('<hello>')), _class='test', _id=0)
 <thead id="0" class="test"><tr><th>&lt;hello&gt;</th></tr></thead>
@@ -1132,7 +1307,7 @@ This is used to tag table header rows.
 #### ``TITLE``
 ``TITLE``:inxx
 
-This is used to tag the title of a page in an HTML header.
+Jest używany do wygenerowania znacznika <title> w sekcji ''header'' strony HTML.
 ``
 >>> print TITLE('<hello>', XML('<b>world</b>'))
 <title>&lt;hello&gt;<b>world</b></title>
@@ -1141,7 +1316,9 @@ This is used to tag the title of a page in an HTML header.
 #### ``TR``
 ``TR``:inxx
 
-Tags a table row. It should be rendered inside a table and contain ``<td>...</td>`` tags. ``TR`` arguments that are not ``TD`` objects will be automatically converted.
+Generuje znaczniki wierszy tabeli. Należy umieszczać wewnątrz tabeli. Powinny
+zawierać znaczniki ``<td>...</td>``. Argumenty ``TR``, które nie są obiektami
+``TD`` będą automatycznie przekonwertowane.
 ``
 >>> print TR('<hello>', XML('<b>world</b>'), _class='test', _id=0)
 <tr id="0" class="test"><td>&lt;hello&gt;</td><td><b>world</b></td></tr>
@@ -1150,7 +1327,7 @@ Tags a table row. It should be rendered inside a table and contain ``<td>...</td
 #### ``TT``
 ``TT``:inxx
 
-Tags text as typewriter (monospaced) text.
+Generuje znaczniki do wyświetlania tekstu stałej szerokości.
 ``
 >>> print TT('<hello>', XML('<b>world</b>'), _class='test', _id=0)
 <tt id="0" class="test">&lt;hello&gt;<b>world</b></tt>
@@ -1158,7 +1335,8 @@ Tags text as typewriter (monospaced) text.
 
 #### ``UL``
 
-Signifies an Unordered List and should contain LI items. If its content is not tagged as LI, UL does it automatically.
+Generuje znacznik nieuporządkowanej listy i wymaga umieszczenie wewnątrz elementów
+LI. Jeśli jego zawartość nie posiada obiektów LI, UL doda je automatycznie.
 
 ``UL``:inxx
 ``
@@ -1168,21 +1346,22 @@ Signifies an Unordered List and should contain LI items. If its content is not t
 
 
 #### ``URL``
-The URL helper is documented in [[Chapter 4 URL ../04#URL]]
+Helper URL jest udokumentowany w [[rozdziale 4 ../04#URL]]
 
 #### ``embed64``
 
-``embed64(filename=None, file=None, data=None, extension='image/gif')`` encodes the provided (binary) data into base64.
+``embed64(filename=None, file=None, data=None, extension='image/gif')`` koduje
+dostarczone dane (binarne) do base64.
 
-filename: if provided, opens and reads this file in 'rb' mode.
-file: if provided, reads this file.
-data: if provided, uses the provided data.
+filename: jeśli określono, otwiera i odczytuje ten plik w trybie 'rb';
+file: jeśli określono, odczytuje ten plik;
+data: jeśłi określono, używa tych danych.
 
 ``embed64``:inxx
 
 #### ``xmlescape``
 
-``xmlescape(data, quote=True)`` returns an escaped string of the provided data.
+``xmlescape(data, quote=True)`` zwraca ciąg znakowy dostarczonych danych zabezpieczony znakami ucieczki.
 
 ``xmlescape``:inxx
 ``
@@ -1190,43 +1369,52 @@ data: if provided, uses the provided data.
 &lt;hello&gt;
 ``:code
 
-### Custom helpers
+### Własne helpery
 
 #### ``TAG``
 ``TAG``:inxx
 
-Sometimes you need to generate custom XML tags. web2py provides ``TAG``, a universal tag generator.
+Czasem zachodzi potrzeba wygenerowania własnych znaczników XML. W web2py dostarczany
+jest helper ``TAG`` - uniwersalny generator znaczników.
 ``
 {{=TAG.name('a', 'b', _c='d')}}
 ``:code
 
-generates the following XML
+generuje następujący kod XML
 ``
 <name c="d">ab</name>
 ``:code
 
-Arguments "a", "b", and "d" are automatically escaped; use the ``XML`` helper to suppress this behavior. Using ``TAG`` you can generate HTML/XML tags not already provided by the API. TAGs can be nested, and are serialized with ``str().``
-An equivalent syntax is:
+Argumenty "a", "b" i "d" są automatycznie zabezpieczane  znakami ucieczki.
+Do stłumienia tego zachowania użyty zostaje helper ``XML``. Stosując ``TAG`` można
+wygenerować znaczniki HTML/XML nie dostarczane przez API. Helpery TAG być zagnieżdżane
+i serializowane poprzez ``str().`` Równoważna składnia to:
 ``
 {{=TAG['name']('a', 'b', c='d')}}
 ``:code
 
-If the TAG object is created with an empty name, it can be used to concatenate multiple strings and HTML helpers together without inserting them into a surrounding tag, but this use is deprecated. Use the ``CAT`` helper instead.
+Jeśli obiekt TAG zostanie utworzony z pustą nazwą, to może być wykorzystany do łączenia
+wielu ciągów znakowych i helperów HTML, razem z zawarciem ich otaczającym je znaczniku,
+lecz używanie tego jest zdeprecjonowane na rzecz helpera ``CAT``.
 
-Self-closing tags can be generated with the TAG helper. The tag name must end with a "/".
+Za pomocą helpera TAG można generować znaczniki samo zamykające. Ich nazwa musi
+się kończyć znakiem ukośnika ("/").
 ``
 {{=TAG['link/'](_href='http://web2py.com')}}
 ``:code
-generates the following XML:
+generuje nastęþujący kod XML:
 ``
 <link ref="http://web2py.com"/>
 ``:code
-Notice that ``TAG`` is an object, and ``TAG.name`` or ``TAG['name']`` is a function that returns a temporary helper class.
+Proszę zwrócić uwagę, że ``TAG`` jest obiektem a ``TAG.name`` lub ``TAG['name']``
+jest funkcja zwracająca tymczasową klasę helpera.
 
 #### ``MENU``
 ``MENU``:inxx
 
-The MENU helper takes a list of lists or of tuples of the form of ``response.menu`` (as described in Chapter 4) and generates a tree-like structure using unordered lists representing the menu. For example:
+Helper MENU pobiera listę list lub krotkę formularzy ``response.menu`` (tak jak
+opisano to w rozdziale 4) i generuje drzewiastą strukturę używającą nieuporządkowanych
+list reprezentujących menu. Na przykład:
 ``
 >>> print MENU([['One', False, 'link1'], ['Two', False, 'link2']])
 <ul class="web2py-menu web2py-menu-vertical">
@@ -1236,10 +1424,13 @@ The MENU helper takes a list of lists or of tuples of the form of ``response.men
 ``:code
 
 ------
-The third item in each list/tuple can be an HTML helper (which could include nested helpers), and the ``MENU`` helper will simply render that helper rather than creating its own ``<a>`` tag.
+Trzeci element w każdej liście (krotce) może być helperem HTML (który może zawierać
+zagnieżdżone helpery) a wtedy renderowany będzie helper ``MENU``, zamiast tworzenia
+własnego znacznika ``<a>``.
 ------
 
-Each menu item can have a fourth argument that is a nested submenu (and so on recursively):
+Każdy element menu może mieć czwarty argument, który jest zagnieżdżonym podmenu
+(i rekursywnie tak dalej):
 ``
 >>> print MENU([['One', False, 'link1', [['Two', False, 'link2']]]])
 <ul class="web2py-menu web2py-menu-vertical">
@@ -1252,38 +1443,47 @@ Each menu item can have a fourth argument that is a nested submenu (and so on re
 </ul>
 ``:code
 
-A menu item can also have an optional 5th element, which is a boolean. When false, the menu item is ignored by the MENU helper.
+Element menu może mieć również opcjonalny piąty element, który ma wartość logiczną.
+Gdy ta wartość wynosi false, to ten element menu jest ignorowany przez helper MENU.
 
-The MENU helper takes the following optional arguments:
-- ``_class``: defaults to "web2py-menu web2py-menu-vertical" and sets the class of the outer UL elements.
-- ``ul_class``: defaults to "web2py-menu-vertical" and sets the class of the inner UL elements.
-- ``li_class``: defaults to "web2py-menu-expand" and sets the class of the inner LI elements.
-- ``li_first``: allows to add a class to the first list element.
-- ``li_last``: allows to add a class to the last list element.
+Helper MENU pobiera następujące opcjonalne argumenty:
+- ``_class``: ustawia klasę zewnętrznych elementów UL, domyślnie "web2py-menu web2py-menu-vertical";
+- ``ul_class``: ustawia klasę wewnętrznych elementów UL, domyślnie "web2py-menu-vertical";
+- ``li_class``: ustawia klasę wewnętrznych elementów LI, domyślnie "web2py-menu-expand";
+- ``li_first``: pozwala dodać klasę do pierwszego elementu listy;
+- ``li_last``: pozwala dodać klasę do ostatniego elementu listy.
 
-``mobile``:inxx
+``urządzenia mobilne``:inxx
 
-``MENU`` takes an optional argument ``mobile``. When set to ``True`` instead of building a recursive ``UL`` menu structure it returns a ``SELECT`` dropdown with all the menu options and a ``onchange`` attribute that redirects to the page corresponding to the selected option. This is designed an an alternative menu representation that increases usability on small mobile devices such as phones.
+``MENU`` pobiera opcjonalny argument ``mobile``. Gdy zostanie ustawiony na ``True``,
+to zamiast budowania manu o rekursywnej strukturze ``UL``, zwracane jest rozwijane
+menu ``SELECT`` ze wszystkimi opcjami menu i atrybutem ``onchange``, który przekierowuje
+do strony odpowiadającej wybranej opcji. Jest to zaprojektowane jako alternatywne
+reprezentacja menu, która zwiększa użyteczność dla małych urządzeń mobilnych, takich
+jak telefony.
 
-Normally the menu is used in a layout with the following syntax:
+Zwykle menu jest używane w układzie z następującą składnią:
 
 ``
 {{=MENU(response.menu, mobile=request.user_agent().is_mobile)}}
 ``
 
-In this way a mobile device is automatically detected and the menu is rendered accordingly.
+W ten sposób urządzenie mobilne jest automatycznie wykrywane i odpowiednio renderowane
+jest menu.
 
 ### ``BEAUTIFY``
-``BEAUTIFY`` is used to build HTML representations of compound objects, including lists, tuples and dictionaries:
+Helper ``BEAUTIFY`` wykorzystywany jest do budowania reprezentacji HTML złożonych
+obiektów, w tym list, krotek i słowników:
 ``
 {{=BEAUTIFY({"a": ["hello", XML("world")], "b": (1, 2)})}}
 ``:code
-``BEAUTIFY`` returns an XML-like object serializable to XML, with a nice looking representation of its constructor argument. In this case, the XML representation of:
+``BEAUTIFY`` zwraca obiekt podobny do XML serializowalny do XML, z ładnie wyglądającą
+reprezentacją argumentu swojego konstruktora. W tym przypadku reprezentacja XML:
 ``
 {"a": ["hello", XML("world")], "b": (1, 2)}
 ``:code
 
-will render as:
+zostanie zrenderowana tak:
 ``
 <table>
 <tr><td>a</td><td>:</td><td>hello<br />world</td></tr>
@@ -1291,20 +1491,25 @@ will render as:
 </table>
 ``:code
 
-### Server-side ''DOM'' and parsing
+### Model ''DOM'' po stronie serwera a parsowanie
 ``element``:inxx ``elements``:inxx
 
 #### ``elements``
 
-The DIV helper and all derived helpers provide the search methods ``element`` and ``elements``.
+Helper DIV oraz wszystkie helpery pochodne udostępniają metody wyszukujące
+``element`` i ``elements``.
 
-``element`` returns the first child element matching a specified condition (or None if no match).
+Metoda ``element`` zwraca pierwszy element podrzędny dopasowany do określonego
+warunku (lub None jeśli nic nie zostanie dopasowane).
 
-``elements`` returns a list of all matching children.
+Metoda ``elements`` zwraca wszystkie dopasowane elementy podrzędne.
 
-**element** and **elements** use the same syntax to specify the matching condition, which allows for three possibilities that can be mixed and matched: jQuery-like expressions, match by exact attribute value, match using regular expressions.
+Metody **element** i **elements** używają tej samej składni do określenia warunków
+dopasowania, dopuszczającej trzy możliwości, które mogą być mieszane i dopasowywane:
+wyrażenia takie jak jQuery, dopasowanie przez dokładną wartość atrybutu i dopasowanie
+przy użyciu wyrażeń regularnych.
 
-Here is a simple example:
+oto prosty przykład:
 ``
 >>> a = DIV(DIV(DIV('a', _id='target',_class='abc')))
 >>> d = a.elements('div#target')
@@ -1313,9 +1518,11 @@ Here is a simple example:
 <div><div><div id="target" class="abc">changed</div></div></div>
 ``:code
 
-The un-named argument of ``elements`` is a string, which may contain: the name of a tag, the id of a tag preceded by a pound symbol, the class preceded by a dot, the explicit value of an attribute in square brackets.
+Nienazwany argument metody ``elements`` jest ciągiem znakowym, który może zawierać:
+nazwę znacznika, id znacznika poprzedzonego znakiem funta, nazwą klasy poprzedzoną
+kropka, jawną wartością atrybutu w nawiasach kwadratowych.
 
-Here are 4 equivalent ways to search the previous tag by id:
+Oto 4 równoważne sposoby wyszukiwania poprzedniego znacznika poprzez id:
 ``
 >>> d = a.elements('#target')
 >>> d = a.elements('div#target')
@@ -1323,7 +1530,7 @@ Here are 4 equivalent ways to search the previous tag by id:
 >>> d = a.elements('div',_id='target')
 ``:code
 
-Here are 4 equivalent ways to search the previous tag by class:
+Oto 4 równoważne sposoby wyszukiwania poprzedniego znacznika poprzez klasę:
 ``
 >>> d = a.elements('.abc')
 >>> d = a.elements('div.abc')
@@ -1331,27 +1538,33 @@ Here are 4 equivalent ways to search the previous tag by class:
 >>> d = a.elements('div',_class='abc')
 ``:code
 
-Any attribute can be used to locate an element (not just ``id`` and ``class``), including multiple attributes (the function element can take multiple named arguments), but only the first matching element will be returned.
+Do lokalizacji elementu może zostać użyty każdy atrybut (nie tylko ``id`` czy
+``class``), włączając w to wszystkie nazwane atrybuty (element funkcji może pobierać
+wiele argumentów nazwanych), ale tylko pierwszy element zostanie zwrócony.
 
-Using the jQuery syntax "div#target" it is possible to specify multiple search criteria separated by a comma:
+Korzystając ze składni jQuery "div#target" możliwe jest określenie wielu kryteriów
+wyszukiwania rozdzielanych przecinkiem:
 ``
 >>> a = DIV(SPAN('a', _id='t1'), DIV('b', _class='c2'))
 >>> d = a.elements('span#t1, div.c2')
 ``:code
 
-or equivalently
+lub równoważnie:
 ``
 >>> a = DIV(SPAN('a', _id='t1'), DIV('b', _class='c2'))
 >>> d = a.elements('span#t1', 'div.c2')
 ``:code
 
-If the value of an attribute is specified using a name argument, it can be a string or a regular expression:
+Jeśli wartość atrybutu została określona przy użyciu nazwanego argumentu, to może
+być ciągiem znakowym lub wyrażeniem regularnym:
 ``
 >>> a = DIV(SPAN('a', _id='test123'), DIV('b', _class='c2'))
 >>> d = a.elements('span', _id=re.compile('test\d{3}')
 ``:code
 
-A special named argument of the DIV (and derived) helpers is ``find``. It can be used to specify a search value or a search regular expression in the text content of the tag. For example:
+Specjalnym nazwanym argumentem helpera DIV (i helperów pochodnych) jest ``find``.
+Można go stosować do określenia wyszukiwanej wartości lub wyrażenia regularnego
+w treści tekstu znacznika. Na przykład:
 ``
 >>> a = DIV(SPAN('abcde'), DIV('fghij'))
 >>> d = a.elements(find='bcd')
@@ -1359,7 +1572,7 @@ A special named argument of the DIV (and derived) helpers is ``find``. It can be
 <span>abcde</span>
 ``:code
 
-or
+lub
 ``
 >>> a = DIV(SPAN('abcde'), DIV('fghij'))
 >>> d = a.elements(find=re.compile('fg\w{3}'))
@@ -1370,15 +1583,15 @@ or
 ``components``:inxx
 #### ``components`` 
 
-Here's an example of listing all elements in an html string:
+Oto przykład uzyskania wykazu wszystkich elementów w łańcuchu html:
 ``
 html = TAG('<a>xxx</a><b>yyy</b>')
 for item in html.components: print item
 ``:code
 
 ``parent``:inxx ``sibling``:inxx
-#### ``parent`` and ``siblings``
-``parent`` returns the parent of the current element.
+#### ``parent`` i ``siblings``
+``parent`` zwraca element nadrzędny bieżącego elementu.
 ``
 >>> a = DIV(SPAN('a'),DIV('b'))
 >>> s = a.element('span')
@@ -1390,11 +1603,11 @@ for item in html.components: print item
 <div>b</div>
 ``:code
 
-#### Replacing elements
+#### Zastępowanie elementów
 
-Elements that are matched can also be replaced or removed by specifying
-the ``replace`` argument. Notice that a
-list of the original matching elements is still returned as usual.
+Dopasowane elementy można również wymieniać lub usuwać podając argument ``replace``.
+Proszę zwrócić uwagę, ze lista oryginalnie dopasowanych elementów jest zwracana
+nadal jak zwykle.
 
 ``
 >>> a = DIV(SPAN('x'), DIV(SPAN('y'))
@@ -1403,8 +1616,8 @@ list of the original matching elements is still returned as usual.
 <div><p>z</p><div><p>z</p></div>
 ``:code
 
-``replace`` can be a callable. In this case it will be passed
-the original element and it is expected to return the replacement element:
+Argument ``replace`` może być wywoływalny. W takim przypadku przekazuje on
+oryginalny element i oczekiwany jest zwrot zamienionego elementu:
 
 ``
 >>> a = DIV(SPAN('x'), DIV(SPAN('y'))
@@ -1413,7 +1626,7 @@ the original element and it is expected to return the replacement element:
 <div><p>x</p><div><p>y</p></div>
 ``:code
 
-If ``replace=None``, matching elements will be removed completely.
+Jeśli ``replace=None``, to dopasowane elementy zostaną całkowicie usunięte.
 
 ``
 >>> a = DIV(SPAN('x'), DIV(SPAN('y'))
@@ -1425,15 +1638,17 @@ If ``replace=None``, matching elements will be removed completely.
 ``flatten``:inxx
 #### ``flatten`` 
 
-
-The flatten method recursively serializes the content of the children of a given element into regular text (without tags):
+Metoda flatten rekursywnie serializuje zawartość elementów podrzędnych danego
+elementu do zwykłego tekstu (bez znaczników):
 ``
 >>> a = DIV(SPAN('this', DIV('is', B('a'))), SPAN('test'))
 >>> print a.flatten()
 thisisatest
 ``:code
 
-Flatten can be passed an optional argument, ``render``, i.e. a function that renders/flattens the content using a different protocol. Here is an example to serialize some tags into Markmin wiki syntax:
+Metoda flatten może przekazywać opcjonalny argument ``render``, czyli funkcję,
+która renderuje (spłaszcza) zawartość przy użyciu innego protokołu. Oto przykład
+serializacji kilku znaczników do składni wiki Markmin:
 ``
 >>> a = DIV(H1('title'), P('example of a ', A('link', _href='#test')))
 >>> from gluon.html import markmin_serializer
@@ -1443,11 +1658,13 @@ Flatten can be passed an optional argument, ``render``, i.e. a function that ren
 example of [[a link #test]]
 ``:code
 
-At the time of writing we provide ``markmin_serializer`` and ``markdown_serializer``.
+W chwili pisania tego rozdziału udostępniamy ``markmin_serializer`` i ``markdown_serializer``.
 
-#### Parsing
+#### Parsowanie
 
-The TAG object is also an XML/HTML parser. It can read text and convert into a tree structure of helpers. This allows manipulation using the API above:
+Obiekt TAG jest również parserem XML/HTML. Może odczytywać tekst i konwertować
+do struktury drzewiastej helperów. Pozwala to na manipulowanie przy wykorzystaniu
+powyższego API:
 ``
 >>> html = '<h1>Title</h1><p>this is a <span>test</span></p>'
 >>> parsed_html = TAG(html)
@@ -1457,17 +1674,19 @@ The TAG object is also an XML/HTML parser. It can read text and convert into a t
 ``:code
 
 
-``page layout``:inxx ``layout.html``:inxx ``extent``:inxx ``include``:inxx
-### Page layout
+``układ strony``:inxx ``layout.html``:inxx ``extent``:inxx ``include``:inxx
+### Układ strony
 
-Views can extend and include other views in a tree-like structure.
+Widoki można rozszerzać i wstawiać jeden widok w drugi tworząc drzewiastą strukturę.
 
-For example, we can think of a view "index.html" that extends "layout.html" and includes "body.html".
-At the same time,  "layout.html" may include "header.html" and "footer.html".
+Na przykład widok "index.html" rozszerza "layout.html" i wstawiany jest w nim "body.html".
+Równocześnie w "layout.html" wstawiany jest "header.html" i "footer.html".
 
-The root of the tree is what we call a layout view.  Just like any other HTML template file, you can edit it using the web2py administrative interface. The file name "layout.html" is just a convention.
+Korzeniem tego drzewa jest to co nazywamy **układem strony** (''ang. page layout'').
+Można go edytować, jak każdy inny plik szablonowy HTML, wykorzystując interfejs
+administracyjny web2py. Nazwa pliku "layout.html", to tylko konwencja.
 
-Here is a minimalist page that extends the "layout.html" view and includes the "page.html" view:
+Oto minimalna strona rozszerzająca widok "layout.html" i zawierająca widok "page.html":
 
 ``
 {{extend 'layout.html'}}
@@ -1475,7 +1694,7 @@ Here is a minimalist page that extends the "layout.html" view and includes the "
 {{include 'page.html'}}
 ``:code
 
-The extended layout file must contain an ``{{include}}`` directive, something like:
+Plik rozszerzający układ musi zawierać dyrektywę ``{{include}}``, podobnie jak tu:
 ``
 <html>
   <head>
@@ -1487,21 +1706,33 @@ The extended layout file must contain an ``{{include}}`` directive, something li
 </html>
 ``:code
 
-When the view is called, the extended (layout) view is loaded, and the calling view replaces the ``{{include}}`` directive inside the layout. Processing continues recursively until all ``extend`` and ``include`` directives have been processed. The resulting template is then translated into Python code. Note, when an application is bytecode compiled, it is this Python code that is compiled, not the original view files themselves. So, the bytecode compiled version of a given view is a single .pyc file that includes the Python code not just for the original view file, but for its entire tree of extended and included views.
+Podczas wywoływania widoku ładowany jest widok (układ) będący bazą rozszerzenia
+oraz wywoływany jest wewnątrz tego układu widok zamieniający dyrektywę ``{{include}}``.
+Przetwarzanie jest kontynuowane dopóki wszystkie dyrektywy ``extend`` i ``include``
+nie zostaną przetworzone. Wynikowy szablon jest następnie tłumaczony na kod Pythona.
+Proszę mieć na uwadze, że gdy aplikacja jest skompilowana do kodu bajtowego, jest
+to kod Pythona, który został skompilowany, a nie oryginalne pliki widoku. Tak więc
+skompilowana do kodu bajtowego wersja określonego widoku jest pojedynczym plikiem
+.pyc, obejmującym całe drzewo rozszerzonych i wstawianych widoków.
 
 -------
-``extend``, ``include``, ``block`` and ``super`` are special template directives,
-not Python commands.
+Dyrektywy ``extend``, ``include``, ``block`` i ``super`` są specjalnymi dyrektywami
+szablonowymi a nie poleceniami Pythona.
 -------
 
-Any content or code that precedes the ``{{extend ...}}`` directive will be inserted (and therefore executed) before the beginning of the extended view's content/code. Although this is not typically used to insert actual HTML content before the extended view's content, it can be useful as a means to define variables or functions that you want to make available to the extended view. For example, consider a view "index.html":
+Każda treść poprzedzający dyrektywę ``{{extend ...}}`` zostanie wstawiona
+(i przetworzona) przed rozpoczęciem przetwarzania rozszerzonej (bazowej)
+treści widoku. Chociaż nie jest to zwykle używane do wstawiania rzeczywistej
+zawartości HTML, może być użyteczne do określenia zmiennych lub funkcji, które
+chce się uczynić dostępnymi dla rozszerzanego widoku.
+Na przykład, rozważmy widok "index.html":
 ``
 {{sidebar_enabled=True}}
 {{extend 'layout.html'}}
 <h1>Home Page</h1>
 ``:code
 
-and an excerpt from "layout.html":
+i fragment z "layout.html":
 ``
 {{if sidebar_enabled:}}
     <div id="sidebar">
@@ -1510,13 +1741,28 @@ and an excerpt from "layout.html":
 {{pass}}
 ``:code
 
-Because the ``sidebar_enabled`` assignment in "index.html" comes before the ``extend``, that line gets inserted before the beginning of "layout.html", making ``sidebar_enabled`` available anywhere within the "layout.html" code (a somewhat more sophisticated version of this is used in the **welcome** app).
+Ponieważ przypisanie ``sidebar_enabled`` w "index.html" następuje przed ``extend``,
+to linia pobierająca wstawiona będzie przed rozpoczęciem przetwarzania "layout.html"
+czyniąc, że ``sidebar_enabled`` będzie dostępny w całym kodzie "layout.html" (nieco
+bardziej zaawansowaną wersję tego stosuje się w aplikacji **welcome**).
 
-It is also worth pointing out that the variables returned by the controller function are available not only in the function's main view, but in all of its extended and included views as well.
+Warto również mieć na uwadze, że zmienne zwracane przez funkcje kontrolera są
+dostępne nie tylko w głównym widoku funkcji ale również we wszystkich jego widokach
+rozszerzających i wstawianych.
 
-The argument of an ``extend`` or ``include`` (i.e., the extended or included view name) can be a python variable (though not a python expression). However, this imposes a limitation -- views that use variables in ``extend`` or ``include`` statements cannot be bytecode compiled. As noted above, bytecode-compiled views include the entire tree of extended and included views, so the specific extended and included views must be known at compile time, which is not possible if the view names are variables (whose values are not determined until run time). Because bytecode compiling views can provide a significant speed boost, using variables in ``extend`` and ``include`` should generally be avoided if possible.
+Argumentem dyrektyw ``extend`` lub ``include`` (tj. nazwą rozszerzonego lub
+wstawionego widoku) może być zmienna Pythona (lecz nie wyrażenie Pythona). Jednak
+nakłada to ograniczenie – widoki używające zmiennych w wyrażeniach ``extend`` lub
+``include`` nie mogą być kompilowane do kodu bajtowego. Jak wspomniano powyżej,
+widoki skompilowane bajtowo zawierają całe drzewo widoków rozszerzających i wstawianych,
+tak więc określone widoki rozszerzające i wstawiane muszą być znane w czasie kompilacji,
+co nie jest możliwe, jeśli nazwy tych widoków są zmiennymi (ich wartości nie są
+określane w w czasie wykonania). Ponieważ widoki skompilowane bajtowo znacząco
+przyspieszają przetwarzanie, to należy unikać używania zmiennych w argumentach
+dyrektyw ``extend`` i ``include``, jak to tylko możliwe.
 
-In some cases, an alternative to using a variable in an ``include`` is simply to place regular ``{{include ...}}`` directives inside an ``if...else`` block.
+W niektórych przypadkach, alternatywą dla uzywania zmiennej w dyrektywie ``include``
+jest umieszczenie zwyklego wyrażenia ``{{include ...}}`` w bloku ``if...else``.
 
 ``
 {{if some_condition:}}
@@ -1526,13 +1772,21 @@ In some cases, an alternative to using a variable in an ``include`` is simply to
 {{pass}}
 ``:code
 
-The above code does not present any problem for bytecode compilation because no variables are involved. Note, however, that the bytecode compiled view will actually include the Python code for both "this_view.html" and "that_view.html", though only the code for one of those views will be executed, depending on the value of ``some_condition``.
+Powyższy kod nie stanowi żadnego problemu dla kompilacji bajtowej, ponieważ żadne
+zmienne nie są zaangażowane. Należy jednak pamiętać, że skompilowany bajtowo widok
+w rzeczywistości zawiera kod Pythona zarówno dla "this_view.html" jak i "that_view.html",
+choć tylko kod jednego z nich zostanie wykonany, w zależności od wartości ``some_condition``.
 
-Keep in mind, this only works for ``include`` -- you cannot place ``{{extend ...}}`` directives inside ``if...else`` blocks.
+Trzeba pamiętać, że działa to tylko dla dyrektywy ``include`` -- nie można umieścić
+dyrektywy ``{{extend ...}}`` w bloku ``if...else``.
 
 ``response.menu``:inxx ``menu``:inxx ``response.meta``:inxx ``meta``:inxx
 
-Layouts are used to encapsulate page commonality (headers, footers, menus), and though they are not mandatory, they will make your application easier to write and maintain.  In particular, we suggest writing layouts that take advantage of the following variables that can be set in the controller. Using these well known variables will help make your layouts interchangeable:
+Układy są wykorzystywane do hermetyzacji ujednoliconej strony (nagłówków, stopek, menu)
+i choć nie są one obowiązkowe, to ułatwiają pisanie i utrzymanie aplikacji.
+W szczególności sugerujemy pisanie układów korzystających z następujących zmiennych,
+które mogą być ustawione w kontrolerze. Korzystanie z tych powszechnie znanych
+zmiennych pomoże uczynić układy wymienialnymi:
 ``
 response.title
 response.subtitle
@@ -1544,32 +1798,40 @@ response.menu
 response.files
 ``:code
 
-Except for ``menu`` and ``files``, these are all strings and their meaning should be obvious.
+Z wyjątkiem ``menu`` i ``files``, wszystkie te ciągi znakowe i ich znaczenie
+powinny być oczywiste.
 
-``response.menu`` menu is a list of 3-tuples or 4-tuples. The three elements are: the link name, a boolean representing whether the link is active (is the current link), and the URL of the linked page. For example:
+Zmienna ``response.menu`` jest listą trzech lub czterech krotek. Te trzy elementy to:
+nazwa odnośnika, logiczna reprezentacja tego, czy odnośnik jest aktywny (jest bieżącą
+pozycją menu)  i adres URL linkowanej strony. Na przykład:
 ``
 response.menu = [('Google', False, 'http://www.google.com',[]),
                  ('Index',  True,  URL('index'), [])]
 ``:code
 
 ``sub-menu``:inxx
-The fourth tuple element is an optional sub-menu.
+Czwarty element jest opcjonalnym podmenu.
 
-``response.files`` is a list of CSS and JS files that are needed by your page.
+Zmienna ``response.files`` jest listą plików CSS i JS, które są wymagane na stronie.
 
-We also recommend that you use:
+Zalecamy również użycie w sekcji head dokumentu HTML wyrażenie:
 
 ``
 {{include 'web2py_ajax.html'}}
 ``:code
 
-in the HTML head, since this will include the jQuery libraries and define some backward-compatible JavaScript functions for special effects and Ajax. "web2py_ajax.html" includes the ``response.meta`` tags in the view, jQuery base, the calendar datepicker, and all required CSS and JS ``response.files``.
+ponieważ wstawia to biblioteki jQuery i definiuje
+kilka funkcji JavaScript wstecznej kompatybilności dla efektów specjalnych i Ajax.
+Plik "web2py_ajax.html" wstawia w widoku znaczniki ``response.meta``, podstawowy
+kod jQuery, okienko kalendarza (''ang. datepicker'') i wszystkie wymagane w
+``response.files`` pliki CSS i JS.
 
-#### Default page layout
+#### Domyślny układ strony
 
 ``Twitter Bootstrap``:inxx
 
-The "views/layout.html" that ships with the web2py scaffolding application **welcome** (stripped down of some optional parts) is quite complex but it has the following structure:
+Układ "views/layout.html" dostarczany wraz ze szkieletową aplikacją **welcome**
+ma następującą strukturę (okrojoną z niektórych opcjonalnych części):
 
 ``
 <!DOCTYPE html>
@@ -1685,21 +1947,36 @@ The "views/layout.html" that ships with the web2py scaffolding application **wel
 </html>
 ``:code
 
-There are a few features of this default layout that make it very easy to use and customize:
+Istnieje kilka cech tego domyślnego układu, które sprawiają, że jest on bardzo
+łatwy w użyciu i dostosowaniu:
 
-- It is written in HTML5 and uses the "modernizr" ``modernizr``:cite library for backward compatibility. The actual layout include some extra conditional statements required by IE and they are omitted for brevity.
-- It displays both ``response.title`` and ``response.subtitle`` which can be set in a model. If they are not set, it adopts the application name as title
-- It includes the ``web2py_ajax.html`` file in the header which generated all the link and script import statements.
-- It uses a modified version of Twitter Bootstrap for flexible layouts which works on mobile devices and re-arranges columns to fit small screens.
-- It uses "analytics.js" to connect to Google Analytics.
-- The ``{{=auth.navbar(...)}}`` displays a welcome to the current user and links to the auth functions like login, logout, register, change password, etc. depending on context. It is a helper factory and its output can be manipulated as any other helper. It is placed in a ``{{try:}}...{{except:pass}}`` in case auth is undefined.
-- The ``{{=MENU(response.menu)}}`` displays the menu structure as ``<ul>...</ul>``.
-- ``{{include}}`` is replaced by the content of the extending view when the page is rendered.
-- By default it uses a conditional three column (the left and right sidebars can be turned off by the extending views)
-- It uses the following classes: header, main, footer
-- It contains the following blocks: statusbar, left_sidebar, center, right_sidebar, footer.
+- Jest napisany w HTML5 i stosuje bibliotekę "modernizr" ``modernizr``:cite do
+  zapewnienia kompatybilności wstecznej. Rzeczywisty układ zawiera kilka dodatkowych
+  wyrażeń warunkowych wymaganych przez IE i zostały one tutaj pominięte dla uproszczenia.
+- Wyświetla zarówno ``response.title`` jak i ``response.subtitle``, które mogą
+  zostać ustawione w modelu. Jeśli nie zostaną ustawione, przyjmie jako tytuł
+  nazwę aplikacji.
+- Wstawia w sekcji header plik ``web2py_ajax.html``, który generuje wszystkie
+  wyrażenia importu ``link`` i ``script``.
+- Wykorzystuje zmodyfikowaną wersję Twitter Bootstrap dla elastycznych układów
+  strony, które działają na urządzeniach mobilnych i reorganizują kolumny w celu
+  dopasowania strony do małych ekranów.
+- Używa "analytics.js" do łączenia sie z Google Analytics.
+- Wyrażenie ``{{=auth.navbar(...)}}`` wyświetla powitanie dla bieżącego użytkownika
+  i odnośniki do funkcji uwierzytelniających, takich jak login, logout, register,
+  change password itd., w zależności od kontekstu. Jest to helper fabryka i jego
+  wyjściem można manipulować jak w każdym innym helperze. Jest on umieszczany
+  w bloku ``{{try:}}...{{except:pass}}`` na wypadek gdy uwierzytelniania nie zostanie
+  zdefiniowane.
+- Wyrażenie ``{{=MENU(response.menu)}}`` wyświetla strukturę menu jako ``<ul>...</ul>``.
+- Wyrażenie ``{{include}}`` jest zamieniane przez treść rozszerzającego widoku
+  podczas renderowania strony.
+- Domyślnie wykorzystuje warunkowy układ trzykolumnowy (lewy i prawy pasek boczny
+  może zostać wyłączony przez widoki rozszerzające).
+- Używa klas: header, main, footer.
+- Zawiera bloki: statusbar, left_sidebar, center, right_sidebar, footer.
 
-In viewsm, you can turn on and customize sidebars as follows:
+W widokach można włączyć i dostosować paski boczne w sposób następujący:
 
 ``
 {{left_sidebar_enable=True}}
@@ -1712,19 +1989,22 @@ This text goes in sidebar
 {{end}}
 ``:code
 
-#### Customizing the default layout
+#### Dostosowywanie domyślnego układu
 
 ``CSS``:inxx
 
-Customizing the default layout without editing is easy because the welcome application is based on Twitter Bootstrap which is well documented and supports themes. In web2py four static files which are relevant to style:
+Dostosowywanie domyślnego układu bez jego edytowania jest łatwe, ponieważ aplikacja
+''welcome'' jest oparta na Twitter Bootstrap, który jest dobrze udokumentowany i
+obsługuje motywy. W web2py są cztery statyczne pliki istotne dla stylizacji:
 
-- "css/web2py.css" contains web2py specific styles
-- "css/bootstrap.min.css" contains the Twitter Bootstrap CSS style ``bootstrap``:cite ``Bootstrap``:inxx
-- "css/web2py_bootstrap.css" contains with overrides some Bootstrap styles to conform to web2py needs.
-- "js/bootstrap.min.js" which includes the libraries for menu effects, modals, panels.
+- "css/web2py.css" zawiera style specyficzne dla web2py;
+- "css/bootstrap.min.css" zawiera style CSS Twitter Bootstrap ``bootstrap``:cite; ``Bootstrap``:inxx
+- "css/web2py_bootstrap.css" zawiera style nadpisujące kilka stylów Bootstrap w
+  celu dostosowania ich do potrzeb web2py;
+- "js/bootstrap.min.js" który zawiera biblioteki dla efektów menu, okien modalnych i paneli.
 
-To change colors and background images,
-try append the following code to layout.html header:
+Jeśli chce się zmienić kolory i obraz tła, można spróbować dodać następujący kod
+do sekcji ''header'' pliku layout.html:
 
 ``
 <style>
@@ -1738,13 +2018,18 @@ a { color: #349C01; }
 </style>
 ``:code
 
-Of course you can also completely replace the "layout.html" and "web2py.css" files with your own.
+Oczywiście można też całkowicie wymienić pliki "layout.html" i "web2py.css" według
+własnych potrzeb.
 
-#### Mobile development
+#### Układy na urządzenia mobilne
 
-The default layout.html is designed to be friendly to mobile devices but that is not enough. One may need to use different views when a page is visited by a mobile device.
+Domyślnie layout.html jest stworzony tak, aby był przyjazny dla urządzeń mobilnych,
+ale to może nie wystarczyć. Może zachodzić potrzeba użycia specjalnych widoków,
+gdy strona jest odwiedzana z urządzenia mobilnego.
 
-To make developing for desktop and mobile devices easier, web2py includes the ``@mobilize`` decorator. This decorator is applied to actions that should have a normal view and a mobile view. This is demonstrated here:
+W celu wspomożenia pracy nad graficznymi interfejsami dla różnych urządzeń stacjonarnych
+i przenośnych, web2py oferuje dekorator ``@mobilize``. Dekorator ten stosuje się
+do akcji, które mają widok dla urządzeń stacjonarnych i mobilnych. Oto przykład:
 
 ``
 from gluon.contrib.user_agent_parser import mobilize
@@ -1753,21 +2038,28 @@ def index():
    return dict()
 ``
 
-Notice that the decorator must be imported before using it in a controller.
-When the "index" function is called from a regular browser (desktop computer), web2py will render the returned dictionary using the view "[controller]/index.html". However, when it is called by a mobile device, the dictionary will be rendered by "[controller]/index.mobile.html". Notice that mobile views have the "mobile.html" extension.
+Proszę zwrócić uwagę, że dekorator musi być importowany przed wykorzystaniem go w kontrolerze.
+Gdy funkcja "index" jest wywoływana w zwykłej przeglądarce (na komputerze stacjonarnym),
+web2py będzie renderował zwracany słownik przy użyciu widoku "[controller]/index.html".
+Lecz gdy funkcja ta będzie wywoływana w urządzeniu mobilnym, słownik będzie renderowany
+przez widok "[controller]/index.mobile.html". Proszę zauważyć, że mobilny widok
+ma rozszerzenie "mobile.html".
 
-Alternatively you can apply the following logic to make all views mobile friendly:
+Alternatywnie można zastosować następującą logikę do wykonania widoków przyjaznych
+dla urządzeń mobilnych:
 
 ``
 if request.user_agent().is_mobile:
     response.view.replace('.html','.mobile.html')
 ``
 
-The task of creating the "*.mobile.html" views is left to the developer but we strongly suggest using the "jQuery Mobile" plugin which makes the task very easy.
+Wprawdzie zadanie utworzenia widoków "*.mobile.html" leży w gestii programisty,
+ale zalecamy używanie wtyczki "jQuery Mobile", która czyni takie zadanie bardzo
+prostym.
 
-### Functions in views
+### Funkcje w widokach
 
-Consider this "layout.html":
+Rozważmy widok "layout.html":
 
 ``
 <html>
@@ -1782,7 +2074,7 @@ Consider this "layout.html":
 </html>
 ``:code
 
-and this extending view
+i ten widok rozszerzający:
 
 ``
 {{def mysidebar():}}
@@ -1792,9 +2084,13 @@ my new sidebar!!!
 Hello World!!!
 ``:code
 
-Notice the function is defined before the ``{{extend...}}`` statement -- this results in the function being created before the "layout.html" code is executed, so the function can be called anywhere within "layout.html", even before the ``{{include}}``. Also notice the function is included in the extended view without the ``=`` prefix.
+Proszę zauważyć, że  funkcja jest zdefiniowana przed wyrażeniem
+``{{extend...}}`` -- w efekcie funkcja zostaje utworzona zanim wykonany będzie
+kod "layout.html", tak więc funkcja może być wywołana w każdym miejscu "layout.html",
+nawet przed wyrażeniem ``{{include}}``. Proszę też zwrócić uwagę, ze funkcja jest
+wstawiana w rozszerzonym widoku bez przedrostka ``=``.
 
-The code generates the following output:
+Kod ten generuje następujące wyjście:
 
 ``
 <html>
@@ -1807,18 +2103,28 @@ The code generates the following output:
 </html>
 ``:code
 
-Notice that the function is defined in HTML (although it could also contain Python code) so that ``response.write`` is used to write its content (the function does not return the content). This is why the layout calls the view function using ``{{mysidebar()}}`` rather than ``{{=mysidebar()}}``. Functions defined in this way can take arguments.
+Proszę również zauważyć, że funkcja jest zdefiniowana w HTML (choć może też
+zawierać kod Pythona), tak że ``response.write`` jest użyty do zapisu jej treści
+(funkcja nie zwraca treści). Dlatego właśnie układ wywołuje funkcję widoku używając
+``{{mysidebar()}}`` zamiast ``{{=mysidebar()}}``. Funkcje zdefiniowane w ten
+sposób mogą pobierać argumenty.
 
 ``block``:inxx
-### Blocks in views
+### Bloki w widokach
 
-The main way to make a view more modular is by using ``{{block...}}s`` and this mechanism is an alternative to the mechanism discussed in the previous section.
+Podstawowym sposobem ma uczynienie widoków bardziej modularnymi jest użycie wyrażeń
+``{{block...}}``. Mechanizm ten jest alternatywą dla mechanizmu omówionego w poprzednim
+rozdziale.
 
-To understand how this works, consider apps based on the scaffolding app Welcome, which has a view layout.html. This view is included into the view ``default/index.html`` via ``{{extend 'layout.html'}}``. The contents of layout.html predefine certain blocks with certain default content, and these are therefore included into default/index.html.
+Aby zrozumieć jak to działa, rozważmy aplikacje oparte na szkielecie Welcome,
+który ma widok layout.html. Widok ten jest zawarty w widoku ``default/index.html``
+w wyniku wyrażenia ``{{extend 'layout.html'}}``. Treść layout.html definiuje
+wstępnie pewne bloki z jakąś zawartością i dlatego są one zawarte w default/index.html.
 
-You can override these default content blocks by enclosing your new content inside the same block name. The location of the block in the layout.html is not changed, but the contents is. 
+Można zastąpić domyślne treści bloków załączając nowa treść wewnątrz takiego bloku
+o tej samej nazwie. Położenie bloku w layout.html nie ulega zmianie, ale treść bloku tak. 
 
-Here is a simplifed version. Imagine this is  "layout.html":
+Oto wersja uproszczona. Załóżmy, ze mamy taki "layout.html":
 
 ``
 <html>
@@ -1833,7 +2139,7 @@ Here is a simplifed version. Imagine this is  "layout.html":
 </html>
 ``:code
 
-and this is a simple extending view ``default/index.html``:
+oraz takie prosty widok rozszerzający ``default/index.html``:
 
 ``
 {{extend 'layout.html'}}
@@ -1843,7 +2149,9 @@ my new sidebar!!!
 {{end}}
 ``:code
 
-It generates the following output, where the content is provided by the over-riding block in the extending view, yet the enclosing DIV and class comes from layout.html. This allows consistency across views:
+Generuje on następujące wyjście, gdzie treść jest dostarczana przez przesłaniający
+blok w widoku rozszerzającym, ale zakrywany DIV i klasa znajdują się w layout.html.
+Pozwala to na osiągnięcie spójności widoków:
 
 ``
 <html>
@@ -1856,13 +2164,20 @@ It generates the following output, where the content is provided by the over-rid
 </html>
 ``:code
 
-The real layout.html defines a number of useful blocks, and you can easily add more to match the layout your desire. 
+Rzeczywisty layout.html definiuje kilka pożytecznych bloków i można łatwo dopasować
+układ do swojej wizji. 
 
-You can have many blocks, and if a block is present in the extended view but not in the extending view, the content of the extended view is used. Also, notice that unlike with functions, it is not necessary to define blocks before the ``{{extend ...}}`` -- even if defined after the ``extend``, they can be used to make substitutions anywhere in the extended view.
+Można mieć wiele bloków i jeśli blok jest obecny w widoku rozszerzonym ale nie w
+widoku rozszerzającym, użyta zostanie treść z widoku rozszerzanego. Proszę również
+zauważyć, że w przeciwieństwie do funkcji, jest zbytecznym definiowanie bloku przed
+wyrażeniem ``{{extend ...}}`` -- nawet jeśli zdefiniowano bloki po wyrażeniu ``extend``,
+mogą być one użyte do zastąpienia gdziekolwiek w rozszerzanym widoku.
 
 ``super``:inxx
 
-Inside a block, you can use the expression ``{{super}}`` to include the content of the parent. For example, if we replace the above extending view with:
+Wewnątrz bloku można używać wyrażenia ``{{super}}`` w celu wstawienia treści
+widoku nadrzędnego. Na przykład, jeśli wymienimy wyżej omówiony widok rozszerzający
+na:
 
 ``
 {{extend 'layout.html'}}
@@ -1873,7 +2188,7 @@ my new sidebar!!!
 {{end}}
 ``:code
 
-we get:
+otrzymamy:
 
 ``
 <html>
