@@ -97,7 +97,64 @@ myorder = db.mytable.myfield.upper() | db.mytable.id
 db().select(db.table.ALL, orderby=myorder)
 ``:code
 
-### Connection strings
+[[dal_constructor]]
+### DAL constructor
+Basic use:
+``
+>>> db = DAL('sqlite://storage.db')
+``:code
+
+The database is now connected and the connection is stored in the global variable ``db``.
+
+At any time you can retrieve the connection string.
+``_uri``:inxx
+``
+>>> print db._uri
+sqlite://storage.db
+``:code
+
+and the database name
+``_dbname``:inxx
+``
+>>> print db._dbname
+sqlite
+``:code
+
+The connection string is called a ``_uri`` because it is an instance of a Uniform Resource Identifier.
+
+The DAL allows multiple connections with the same database or with different databases, even databases of different types. For now, we will assume the presence of a single database since this is the most common situation.
+
+#### DAL signature
+``
+DAL(
+    uri='sqlite://dummy.db', 
+    pool_size=0, 
+    folder=None, 
+    db_codec='UTF-8', 
+    check_reserved=None,
+    migrate=True,
+    fake_migrate=False,
+    migrate_enabled=True,
+    fake_migrate_all=False,
+    decode_credentials=False, 
+    driver_args=None, 
+    adapter_args=None, 
+    attempts=5, 
+    auto_import=False, 
+    bigint_id=False, 
+    debug=False, 
+    lazy_tables=False, 
+    db_uid=None, 
+    do_connect=True, 
+    after_connection=None, 
+    tables=None, 
+    ignore_field_case=True, 
+    entity_quoting=False, 
+    table_hash=None)
+``:code
+
+[[connection_strings]]
+#### Connection strings (the uri parameter)
 ``connection strings``:inxx
 
 A connection with the database is established by creating an instance of the DAL object:
@@ -144,12 +201,13 @@ Notice that by default web2py uses utf8 character encoding for databases. If you
 db = DAL('...', db_codec='latin1')
 ``:code
 
-otherwise you'll get UnicodeDecodeError tickets.
+Otherwise you'll get UnicodeDecodeError tickets.
+
 
 #### Connection pooling
 ``connection pooling``:inxx
 
-The second argument of the DAL constructor is the ``pool_size``; it defaults to zero.
+A common argument of the DAL constructor is the ``pool_size``; it defaults to zero.
 
 As it is rather slow to establish a new database connection for each request, web2py implements a mechanism for connection pooling. Once a connection is established and the page has been served and the transaction completed, the connection is not closed but goes into a pool. When the next http request arrives, web2py tries to recycle a connection from the pool and use that for the new transaction. If there are no available connections in the pool, a new connection is established.
 
@@ -160,9 +218,13 @@ Connections in the pools are shared sequentially among threads, in the sense tha
 The ``pool_size`` parameter is ignored by SQLite and Google App Engine.
 Connection pooling is ignored for SQLite, since it would not yield any benefit.
 
-#### Connection failures
+#### Connection failures (attempts parameter)
 
-If web2py fails to connect to the database it waits 1 seconds and tries again up to 5 times before declaring a failure. In case of connection pooling it is possible that a pooled connection that stays open but unused for some time is closed by the database end. Thanks to the retry feature web2py tries to re-establish these dropped connections.
+If web2py fails to connect to the database it waits 1 seconds and by default tries again up to 5 times before declaring a failure. In case of connection pooling it is possible that a pooled connection that stays open but unused for some time is closed by the database end. Thanks to the retry feature web2py tries to re-establish these dropped connections.
+The number of attempts is set via the attempts parameter.
+
+#### Lazy Tables
+setting ``lazy_tables = True`` provides a major performance boost. See below: [[lazy tables #lazy_tables]]
 
 #### Replicated databases
 
@@ -177,10 +239,10 @@ will try the second and the third. This can also be used to distribute load
 in a database master-slave configuration. We will talk more about this
 in Chapter 13 in the context of scalability.
 
-### Reserved keywords
+#### Reserved keywords
 ``reserved Keywords``:inxx
 
-``check_reserved`` is yet another argument that can be passed to the DAL constructor. It tells it to check table names and column names against reserved SQL keywords in target back-end databases. ``check_reserved`` defaults to None.
+``check_reserved`` tells the constructor to check table names and column names against reserved SQL keywords in target back-end databases. ``check_reserved`` defaults to None.
 
 This is a list of strings that contain the database back-end adapter names.
 
@@ -208,58 +270,87 @@ The following database backends support reserved words checking.
 **MSSQL** | ``mssql``
 **Oracle** | ``oracle``
 -----
-[[DAL_table_field]]
-### ``DAL``, ``Table``, ``Field``
 
-You can experiment with the DAL API using the web2py shell.
+#### Database quoting and case settings (entity_quoting, ignore_field)
+
+You can also use explicit quoting of SQL entities at DAL level.  It works transparently so you can use the same names in python and in the DB schema.
+
+``ignore_field_case = True``
+``entity_quoting = True``
+Here is an example:
+``
+db = DAL('postgres://...', ...,ignore_field_case=False, entity_quoting=True)
+
+db.define_table('table1', Field('column'), Field('COLUMN'))
+
+print db(db.table1.COLUMN != db.table1.column).select()
+``:code
+
+#### Other DAL constructor parameters
+
+##### Database folder location
+``folder`` – where .table files will be created. Automatically set within web2py. Use an explicit path when using DAL outside web2py
+
+##### Default migration settings
+Migration is detailed below in Tables [[table migrations #table_migrations]]. The DAL constructor migration settings are booleans affecting defaults and global behaviour. 
+
+``migrate = True`` sets default migrate behavior for all tables
+
+``fake_migrate = False`` sets default fake_migrate behavior for all tables
+
+``migrate_enabled = True`` If set to False disables ALL migrations
+
+``fake_migrate_all = False`` If set to True fake migrates ALL tables
+
+
+#### Experiment with the web2py shell
+
+You can experiment with the DAL API using the web2py shell (-S [[command line option ../04#CommandLineOptions]]).
 
 Start by creating a connection. For the sake of example, you can use SQLite. Nothing in this discussion changes when you change the back-end engine.
 
-[[dal_constructor]]
-#### DAL constructor
-``
->>> db = DAL('sqlite://storage.db')
-``:code
-
-The database is now connected and the connection is stored in the global variable ``db``.
-
-At any time you can retrieve the connection string.
-``_uri``:inxx
-``
->>> print db._uri
-sqlite://storage.db
-``:code
-
-and the database name
-``_dbname``:inxx
-``
->>> print db._dbname
-sqlite
-``:code
-
-The connection string is called a ``_uri`` because it is an instance of a Uniform Resource Identifier.
-
-The DAL allows multiple connections with the same database or with different databases, even databases of different types. For now, we will assume the presence of a single database since this is the most common situation.
 
 [[table_constructor]]
-#### Table constructor
-
+### Table constructor
 ``define_table``:inxx ``Field``:inxx
-``type``:inxx ``length``:inxx ``default``:inxx ``requires``:inxx ``required``:inxx ``unique``:inxx
-``notnull``:inxx ``ondelete``:inxx ``uploadfield``:inxx ``uploadseparate``:inxx ``migrate``:inxx ``sql.log``:inxx
 
-The most important method of a DAL is ``define_table``:
+#### define_table signature
+The signature for define_table:
+
+Tables are defined in the DAL via ``define_table``:
 ``
->>> db.define_table('person', Field('name'))
+>>> db.define_table('person', Field('name')
+    rname=None,
+    redefine=True
+    common_filter,
+    fake_migrate,
+    fields,
+    format,
+    migrate,
+    on_define,
+    plural,
+    polymodel,
+    primarykey,
+    redefine,
+    sequence_name,
+    singular,
+    table_class,
+    trigger_name)
 ``:code
 
 It defines, stores and returns a ``Table`` object called "person" containing a field (column) "name". This object can also be accessed via ``db.person``, so you do not need to catch the return value.
 
-Do not declare a field called "id", because one is created by web2py anyway. Every table has a field called "id" by default. It is an auto-increment integer field (starting at 1) used for cross-reference and for making every record unique, so "id" is a primary key. (Note: the id's starting at 1 is back-end specific. For example, this does not apply to the Google App Engine NoSQL.)
+#### ``id``: The primary key ``id`` field
+Do not declare a field called "id", because one is created by web2py anyway. Every table has a field called "id" by default. It is an auto-increment integer field (starting at 1) used for cross-reference and for making every record unique, so "id" is a primary key. (Note: the id counter starting at 1 is back-end specific. For example, this does not apply to the Google App Engine NoSQL.)
 
 ``named id field``:inxx
-Optionally you can define a field of ``type='id'`` and web2py will use this field as auto-increment id field. This is not recommended except when accessing legacy database tables. With some limitation, you can also use different primary keys and this is discussed in the section on "Legacy databases and keyed tables".
+Optionally you can define a Field of ``type='id'`` and web2py will use this field as auto-increment id field. This is not recommended except when accessing legacy database tables. With some limitation, you can also use different primary keys and this is discussed in the section on "Legacy databases and keyed tables".
 
+#### ``plural`` and ``singular``
+Smartgrid objects may need to know the singular and plural name of the table. The defaults are smart but these parameters allow you to be specific. See smartgrid for more information. 
+
+
+#### ``redefine``
 Tables can be defined only once but you can force web2py to redefine an existing table:
 
 ``
@@ -269,24 +360,10 @@ db.define_table('person', Field('name'), redefine=True)
 
 The redefinition may trigger a migration if field content is different.
 
-[[lazy_tables]]
-#### Lazy Tables, a major performance boost
-``lazy tables``:inxx
-web2py models are executed before controllers, so all tables are defined at every request. Not all tables are needed to handle each request, so it is possible that some of the time spent defining tables is wasted. Conditional models ([[conditional models, chapter 4 ../04/#conditional_models]]) can help, but web2py offers a big performance boost via lazy_tables. This feature means that table creation is deferred until the table is actually referenced. Enabling lazy tables requires setting the ``DAL(...,lazy_tables=True)``  parameter. This is one of the most significant response-time performance boosts in web2py.
-
-#### Adding attributes to fields and tables
-If you need to add custom attributes to fields, you can simply do this:
-``db.table.field.extra = {}``:code 
-
-"extra" is not a keyword ; it's a custom attributes now attached to the field object. You can do it with tables too but they must be preceded by an 
-underscore to avoid naming conflicts with fields: 
-
-``db.table._extra = {} ``:code
-
 [[record_representation]]
-#### Record representation
+#### format: Record representation
 
-It is optional but recommended to specify a format representation for records:
+It is optional but recommended to specify a format representation for records with the ``format`` parameter.
 ``
 >>> db.define_table('person', Field('name'), format='%(name)s')
 ``:code
@@ -306,8 +383,53 @@ The format attribute will be used for two purposes:
 - To represent referenced records in select/option drop-downs.
 - To set the ``db.othertable.person.represent`` attribute for all fields referencing this table. This means that SQLTABLE will not show references by id but will use the format preferred representation instead.
 
+#### rname: Record representation
+``rname`` sets a database backend name for the table. This makes the web2py table name an alias, and ``rname`` is the real name used when constructing the query for the backend.
+To illustrate just one use, ``rname`` can be used to provide MSSQL fully qualified table names accessing tables belonging to other databases on the server: ``rname = 'db1.dbo.table1'``:code
+
+#### primarykey: Support for legacy tables
+``primarykey`` helps support legacy tables with existing primary keys, even multi-part.
+See [[Legacy Databases #LegacyDatabases]] below.
+
+#### migrate, fake_migrate
+``migrate`` sets migration options for the table. See [[Table Migrations #table_migrations]] below
+
+#### table_class
+If you define your own Table class as a sub-class of gluon.dal.Table, you can provide it here; this allows you to extend and override methods. Example: ``table_class=MyTable``:code
+
+#### polymodel
+For Google App Engine
+
+#### on_define
+``on_define`` is a callback triggered when a lazy_table is instantiated, although it is called anyway if the table is not lazy. This allows dynamic changes to the table without losing the advantages of delayed instantiation. 
+
+Example:
+``
+ db = DAL(lazy_tables=True) 
+ db.define_table('person',Field('name'),Field('age','integer'), 
+    on_define=lambda table: [ 
+            table.name.set_attributes(requires=IS_NOT_EMPTY(),default=''), 
+            table.age.set_attributes(requires=IS_INT_IN_RANGE(0,120),default=30), 
+``:code
+Note this example shows how to use ``on_define`` but it is not actually necessary. The simple ``requires`` values could be added to the Field definitions and the table would still be lazy. However, ``requires`` which take a Set object as the first argument, such as IS_IN_DB, will make a query like ``db.sometable.somefield == some_value``:code which would cause ``sometable`` to be defined early. This is the situation saved by ``on_define``.
+
+[[lazy_tables]]
+#### Lazy Tables, a major performance boost
+``lazy tables``:inxx
+web2py models are executed before controllers, so all tables are defined at every request. Not all tables are needed to handle each request, so it is possible that some of the time spent defining tables is wasted. Conditional models ([[conditional models, chapter 4 ../04/#conditional_models]]) can help, but web2py offers a big performance boost via lazy_tables. This feature means that table creation is deferred until the table is actually referenced. Enabling lazy tables is made when initialising a database via the DAL constructor. It requires setting the ``DAL(...,lazy_tables=True)``  parameter. This is one of the most significant response-time performance boosts in web2py.
+
+#### Adding attributes to fields and tables
+If you need to add custom attributes to fields, you can simply do this:
+``db.table.field.extra = {}``:code 
+
+"extra" is not a keyword ; it's a custom attributes now attached to the field object. You can do it with tables too but they must be preceded by an 
+underscore to avoid naming conflicts with fields: 
+
+``db.table._extra = {} ``:code
+
+
 [[field_constructor]]
-#### Field constructor
+### Field constructor
 ``Field constructor``:inxx
 These are the default values of a Field constructor:
 ``
@@ -318,7 +440,8 @@ Field(name, 'string', length=None, default=None,
       writable=True, readable=True, update=None, authorize=None,
       autodelete=False, represent=None, compute=None,
       uploadfolder=None,
-      uploadseparate=None,uploadfs=None)
+      uploadseparate=None,uploadfs=None,
+      rname=None)
 ``:code
 
 Not all of them are relevant for every field. "length" is relevant only for fields of type "string". "uploadfield" and "authorize" are relevant only for fields of type "upload". "ondelete" is relevant only for fields of type "reference" and "upload".
@@ -327,6 +450,8 @@ Not all of them are relevant for every field. "length" is relevant only for fiel
 - ``required`` tells the DAL that no insert should be allowed on this table if a value for this field is not explicitly specified.
 - ``requires`` is a validator or a list of validators. This is not used by the DAL, but it is used by SQLFORM. The default validators for the given types are shown in the following table:
 - ``uploadfolder`` while the default is ``None``, most DB adapters will default to uploading files into os.path.join(request.folder, 'uploads'). MongoAdapter does not seem to be doing so at present.
+- ``rname`` provides the field was a "real name", a name for the field known to the database adapter; when the field is used, it is the rname value which is sent to the database. The web2py name for the field is then effectively an alias.
+
 [[field_types]]
 #### Field types
 ``field types``:inxx
@@ -486,7 +611,9 @@ which returns a tuple ``(value, error)``. ``error`` is ``None`` if the input pas
 
 
 
+[[table_migrations]]
 ### Migrations
+
 ``migrations``:inxx
 
 ``define_table`` checks whether or not the corresponding table exists. If it does not, it generates the SQL to create it and executes the SQL. If the table does exist but differs from the one being defined, it generates the SQL to alter the table and executes it. If a field has changed type but not name, it will try to convert the data (If you do not want this, you need to redefine the table twice, the first time, letting web2py drop the field by removing it, and the second time adding the newly defined field so that web2py can create it.). If the table exists and matches the current definition, it will leave it alone. In all cases it will create the ``db.person`` object that represents the table.
@@ -749,6 +876,7 @@ Here is an example of how to [[create an index using SQL in SQLite http://www.sq
 
 Other database dialects have very similar syntaxes but may not support the optional "IF NOT EXISTS" directive.
 
+[[LegacyDatabases]]
 ### Legacy databases and keyed tables
 
 web2py can connect to legacy databases under some conditions.
@@ -2987,7 +3115,7 @@ For every table with a field called ``db._request_tenant``, all records for all 
 db.table.request_tenant == db.table.request_tenant.default
 ``:code
 
-and for every record insert, this field is set to the default value.
+and for every record inserted, this field is set to the default value.
 In the example above we have chosen
 ``
 default = request.env.http_host
@@ -3205,7 +3333,7 @@ python scripts/cpdb.py \
 
 After running the script you can simply switch the connection string in the model and everything should work out of the box. The new data should be there.
 
-This script provides various command line options that allows you to move data from one application to another, move all tables or only some tables, clear the data in the tables. for more info try:
+This script provides various command line options that allows you to move data from one application to another, move all tables or only some tables, clear the data in the tables. For more info try:
 
 ``
 python scripts/cpdb.py -h
