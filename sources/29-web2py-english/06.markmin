@@ -2367,9 +2367,9 @@ For the sake of the example, you can log events with the same event_time but wit
 3
 ``:code
 
-#### ``like``, ``regexp``, ``startswith``, ``endswith``, ``contains``, ``upper``, ``lower``
+#### ``like``, ``ilike``, ``regexp``, ``startswith``, ``endswith``, ``contains``, ``upper``, ``lower``
 
-``like``:inxx ``startswith``:inxx ``endswith``:inxx ``regexp``:inxx
+``like``:inxx ``ilike``:inxx ``startswith``:inxx ``endswith``:inxx ``regexp``:inxx
 ``contains``:inxx ``upper``:inxx ``lower``:inxx
 
 Fields have a like operator that you can use to match strings:
@@ -2382,10 +2382,10 @@ port scan
 
 Here "port%" indicates a string starting with "port". The percent sign character, "%", is a wild-card character that means "any sequence of characters".
 
-The like operator is case-insensitive but it can be made case-sensitive with
+The like operator maps to the LIKE word in ANSI-SQL. LIKE is case-sensitive in most databases, and depends on the collation of the database itself. The ``like`` method is hence case-sensitive but it can be made case-insensitive with
 
 ``
-db.mytable.myfield.like('value',case_sensitive=True)
+db.mytable.myfield.like('value',case_sensitive=False)
 ``:code
 
 
@@ -2397,7 +2397,7 @@ db.mytable.myfield.endswith('value')
 db.mytable.myfield.contains('value')
 ``:code
 
-which are equivalent respectively to
+which are roughly equivalent respectively to
 
 ``
 db.mytable.myfield.like('value%')
@@ -2417,7 +2417,7 @@ or any value from the list
 db.mytable.myfield.contains(['value1','value2'], all=false)
 ``
 
-There is a also a ``regexp`` method that works like the ``like`` method but allows regular expression syntax for the look-up expression. It is only supported by PostgreSQL and SQLite.
+There is a also a ``regexp`` method that works like the ``like`` method but allows regular expression syntax for the look-up expression. It is only supported by PostgreSQL, MySQL, Oracle and SQLite (with different degree of support).
 
 The ``upper`` and ``lower`` methods allow you to convert the value of the field to upper or lower case, and you can also combine them with the like operator:
 
@@ -3415,6 +3415,8 @@ JDBCPostgreSQLAdapter extends PostgreSQLAdapter
 OracleAdapter extends BaseAdapter
 MSSQLAdapter extends BaseAdapter
 MSSQL2Adapter extends MSSQLAdapter
+MSSQL3Adapter extends MSSQLAdapter
+MSSQL4Adapter extends MSSQLAdapter
 FireBirdAdapter extends BaseAdapter
 FireBirdEmbeddedAdapter extends FireBirdAdapter
 InformixAdapter extends BaseAdapter
@@ -3430,6 +3432,8 @@ SAPDBAdapter extends BaseAdapter (experimental)
 CouchDBAdapter extends NoSQLAdapter (experimental)
 IMAPAdapter extends NoSQLAdapter (experimental)
 MongoDBAdapter extends NoSQLAdapter (experimental)
+VerticaAdapter extends MSSQLAdapter (experimental)
+SybaseAdapter extends MSSQLAdapter (experimental)
 ``
 
 which override the behavior of the ``BaseAdapter``.
@@ -3485,15 +3489,26 @@ the prefix in the uri string defines the adapter. The mapping is defined in the 
 ``
 ADAPTERS = {
     'sqlite': SQLiteAdapter,
+    'spatialite': SpatiaLiteAdapter,
     'sqlite:memory': SQLiteAdapter,
+    'spatialite:memory': SpatiaLiteAdapter,
     'mysql': MySQLAdapter,
     'postgres': PostgreSQLAdapter,
+    'postgres:psycopg2': PostgreSQLAdapter,
+    'postgres:pg8000': PostgreSQLAdapter,
+    'postgres2:psycopg2': NewPostgreSQLAdapter,
+    'postgres2:pg8000': NewPostgreSQLAdapter,
     'oracle': OracleAdapter,
     'mssql': MSSQLAdapter,
     'mssql2': MSSQL2Adapter,
+    'mssql3': MSSQL3Adapter,
+    'mssql4' : MSSQL4Adapter,
+    'vertica': VerticaAdapter,
+    'sybase': SybaseAdapter,
     'db2': DB2Adapter,
     'teradata': TeradataAdapter,
     'informix': InformixAdapter,
+    'informix-se': InformixSEAdapter,
     'firebird': FireBirdAdapter,
     'firebird_embedded': FireBirdAdapter,
     'ingres': IngresAdapter,
@@ -3505,6 +3520,7 @@ ADAPTERS = {
     'jdbc:postgres': JDBCPostgreSQLAdapter,
     'gae': GoogleDatastoreAdapter, # discouraged, for backward compatibility
     'google:datastore': GoogleDatastoreAdapter,
+    'google:datastore+ndb': GoogleDatastoreAdapter,
     'google:sql': GoogleSQLAdapter,
     'couchdb': CouchDBAdapter,
     'mongodb': MongoDBAdapter,
@@ -3547,14 +3563,15 @@ Google SQL has the same problems as MySQL and more. In particular table metadata
 
 #### MSSQL (Microsoft SQL Server)
 ``limitby``:inxx
-MSSQL does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
+MSSQL < 2012 does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
+If you're using MSSQL >= 2005, the recommended prefix to use is ``mssql3://`` which provides a method to avoid the issue of fetching the entire non-paginated resultset. If you're on MSSQL >= 2012, use ``mssql4://`` that uses the ``OFFSET ... ROWS ... FETCH NEXT ... ROWS ONLY`` construct to support natively pagination without performance hits like other backends.
 
 #### Oracle
 
 Oracle also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). 
 This works for simple select but may break for complex selects involving aliased fields and or joins.
 
-#### MSSQL 
+#### MSSQL
 
 MSSQL has problems with circular references in tables that have ONDELETE CASCADE. This is an MSSQL bug and you work around it by setting the ondelete attribute for all reference fields to "NO ACTION". 
 You can also do it once and for all before you define tables:
