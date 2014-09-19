@@ -1,0 +1,508 @@
+<h2>Widoki</h2><p><div class="inxx">widoki</div> <div class="inxx">język szablonowania</div> <div class="inxx">HTML</div></p><p>W web2py do tworzenia modeli, kontrolerów i widoków wykorzystuje się Python, chociaż w widokach używa się nieco zmodyfikowaną składnię Pythona, aby umożliwić większą czytelność kodu bez nakładania jakichkolwiek ograniczeń na możliwości tego języka.</p><p>Przeznaczeniem widoku jest osadzenie kodu Pythona w dokumencie HTML. Zasadniczo sprawia to pewne problemy:</p><ul><li>Jak opakowywać osadzany kod Pythona?</li><li>Czy dałoby się uniknąć konieczności stosować w kodzie wcięć, tak jak przewidują to zasady składniowe Pythona lub HTML?</li></ul><p>W web2py używa się znacznik <code>{{ ... }}</code> do opakowanie kodu Pythona osadzanego w HTML. Zaletą używania nawiasów klamrowych zamiast nawiasów ostrych jest to, że są przejrzyste dla większości edytorów HTML. Umożliwia to wykorzystywanie edytorów HTML do tworzenia widoków web2py. Ograniczniki te można zmienić, na przykład tak</p><pre><code class="code">response.delimiters = ('&lt;?','?&gt;')</code></pre><p>Jeśli ta linia zostanie umieszczona w modelu, to kod ten będzie dostępny wszędzie, jeśli w kontrolerze, to tylko w widokach dla akcji tego kontrolera, jeśli w akcji, to tylko w widoku dla tej akcji.</p><p>Ponieważ programista osadza kod Pythona w HTML, dokument powinien dostosowywać się do zasad HTML, a nie Pythona. Dlatego pozwalamy na niestosowanie wcięć wewnątrz znaczników <code>{{ ... }}</code>. Ponieważ Python zwykle używa wcięć do rozdzielenia bloków kodu, potrzebujemy na to inny sposób – to dlatego w szablonach web2py stosuje się słowo kluczowe Pythona <code>pass</code>.</p><blockquote>Blok kodu rozpoczyna się od linii kończącej się znakiem dwukropka a kończy linią
+będącą słowem <code>pass</code>. Słowo kluczowe <code>pass</code> nie jest konieczne, gdy koniec
+bloku jest oczywisty (wynika z kontekstu).</blockquote><p>Oto przykład:</p><pre><code class="code">{{
+if i == 0:
+response.write('i is 0')
+else:
+response.write('i is not 0')
+pass
+}}</code></pre><p>Trzeba mieć na uwadze, że słowo <code>pass</code> jest słowem kluczowym Pythona, a nie słowem kluczowym web2py. Niektóre edytory Pythona, takie jak Emacs, używają słowa kluczowego <code>pass</code> do oznaczania podziału bloków i wykorzystują go do automatycznego odtworzenia wcięć bloków.</p><p>Język szablonowania web2py robi dokładnie to samo. Gdy znajdzie coś takiego:</p><pre><code class="code">&lt;html&gt;&lt;body&gt;
+{{for x in range(10):}}{{=x}}hello&lt;br /&gt;{{pass}}
+&lt;/body&gt;&lt;/html&gt;</code></pre><p>przekształca to do programu:</p><pre><code class="code">response.write("""&lt;html&gt;&lt;body&gt;""", escape=False)
+for x in range(10):
+    response.write(x)
+    response.write("""hello&lt;br /&gt;""", escape=False)
+response.write("""&lt;/body&gt;&lt;/html&gt;""", escape=False)</code></pre><p>Metoda <code>response.write</code> dokonuje zapisu do <code>response.body</code>.</p><p>Gdy w widoku web2py pojawi się błąd, widok generuje raport błędu, a nie rzeczywisty widok zakodowany przez programistę. Pomaga to programiście debugować kod przez podświetlanie rzeczywistego kodu, który jest wykonywany (kodu, który może być debugowany w edytorze HTML lub inspektorze DOM przeglądarki).</p><p>Należy również pamiętać, że:</p><pre><code class="code">{{=x}}</code></pre><p>generuje <div class="inxx">response.write</div> <div class="inxx">zabezpieczanie zmiennych</div></p><pre><code class="code">response.write(x)</code></pre><p>Zmienne wstrzykiwane do HTML w ten sposób są domyślnie zabezpieczane znakami ucieczki. Zabezpieczanie jest ignorowane, jeśli <code>x</code> jest obiektem <code>XML</code>, nawet jeśli parametr escape jest ustawiony na <code>True</code>.</p><p>Oto przykład wprowadzający helper <code>H1</code>:</p><pre><code class="code">{{=H1(i)}}</code></pre><p>który jest łumaczony na:</p><pre><code class="code">response.write(H1(i))</code></pre><p>Po sprawdzeniu, obiekt <code>H1</code> i jego elementy zostają rekursywnie serializowane, zabezpieczane znakami ucieczki i zapisywane do ciała odpowiedzi. Znaczniki generowane przez<code>H1</code> i wewnętrzny kod HTML nie są zabezpieczane znakami ucieczki. Ten mechanizm gwarantuje, że cały tekst (i tylko tekst) wyświetlany na stronie jest zawsze zabezpieczany znakami ucieczki, chroniąc w ten sposób przed atakami XSS. Jednocześnie kod jest prosty i łatwy do debugowania.</p><p>Metoda <code>response.write(obj, escape=True)</code> pobiera dwa argumenty, obiekt do zapisu i argument wskazujący, czy tekst w obiekcie ma być zabezpieczony znakami ucieczki (domyślnie ustawiony na <code>True</code>). Jeśli <code>obj</code> ma metodę <code>.xml()</code>, to jest ona wywoływana a wynik zapisywany do ciała odpowiedzi (argument <code>escape</code> jest ignorowany). W przeciwnym razie wykorzystywana jest metoda <code>__str__</code> tego obiektu w celu jego serializacji i jeśli argument escape jest ustawiony na <code>True</code>, następuje zabezpieczenie tekstu znakami ucieczki. Wszystkie wbudowane helpery HTML (<code>H1</code> w tym przykładzie) są obiektami, które wiedzą jak serializować same siebie poprzez metodę <code>.xml()</code>.</p><p>Wszystko to odbywa się w sposób transparenty. Nigdy nie trzeba (i nie powinno się) wywoływać jawnie metody <code>response.write</code>.</p><h3>Podstawy składni</h3><p>Język szablonowania web2py obsługuje wszystkie instrukcje sterujące języka Python. Podano tutaj kilka przykładów każdej z nich. Mogą być one zagnieżdżane według zwykłej praktyki programowania.</p><h4>Instrukcja <code>for...in</code></h4><div class="inxx">for</div><p>W szablonie można zapętlić każdy iterowalny obiekt:</p><pre><code class="code">{{items = ['a', 'b', 'c']}}
+&lt;ul&gt;
+{{for item in items:}}&lt;li&gt;{{=item}}&lt;/li&gt;{{pass}}
+&lt;/ul&gt;</code></pre><p>co wytworzy:</p><pre><code class="code">&lt;ul&gt;
+&lt;li&gt;a&lt;/li&gt;
+&lt;li&gt;b&lt;/li&gt;
+&lt;li&gt;c&lt;/li&gt;
+&lt;/ul&gt;</code></pre><p>Tutaj <code>item</code> jest dowolnym iterowalnym obiektem, takim jak lista Pythona, krotka Pythona lub obiekt Rows albo każdy inny obiekt, który jest implementowany jako iterator. Wyświetlane elementy są najpierw serializowane a następnie zabezpieczane znakami ucieczki.</p><h4>Instrukcja <code>while</code></h4><div class="inxx">while</div><p>Można utworzyć pętlę wykorzystując słowo kluczowe while:</p><pre><code class="code">{{k = 3}}
+&lt;ul&gt;
+{{while k &gt; 0:}}&lt;li&gt;{{=k}}{{k = k - 1}}&lt;/li&gt;{{pass}}
+&lt;/ul&gt;</code></pre><p>co wyprodukuje:</p><pre><code class="code">&lt;ul&gt;
+&lt;li&gt;3&lt;/li&gt;
+&lt;li&gt;2&lt;/li&gt;
+&lt;li&gt;1&lt;/li&gt;
+&lt;/ul&gt;</code></pre><h4>Instrukcja <code>if...elif...else</code></h4><p><div class="inxx">if</div> <div class="inxx">elif</div> <div class="inxx">else</div></p><p>Można użyć klauzul warunkowych:</p><pre><code class="code">{{
+import random
+k = random.randint(0, 100)
+}}
+&lt;h2&gt;
+{{=k}}
+{{if k % 2:}}is odd{{else:}}is even{{pass}}
+&lt;/h2&gt;</code></pre><p>co wyprodukuje:</p><pre><code class="code">&lt;h2&gt;
+45 is odd
+&lt;/h2&gt;</code></pre><p>Ponieważ oczywistym jest, że <code>else</code> zamyka blok <code>if</code>, to nie ma potrzeby stosować wyrażenie <code>pass</code> i użycie tego byłoby nieprawidłowe. Jednakże trzeba jawnie zamknąć blok <code>else</code> słowem <code>pass</code>.</p><p>Przypominamy, że w Pythonie wyrażenie "else if" jest pisane jako <code>elif</code>, tak jak w następującym przykładzie:</p><pre><code class="code">{{
+import random
+k = random.randint(0, 100)
+}}
+&lt;h2&gt;
+{{=k}}
+{{if k % 4 == 0:}}is divisible by 4
+{{elif k % 2 == 0:}}is even
+{{else:}}is odd
+{{pass}}
+&lt;/h2&gt;</code></pre><p>Wyprodukuje to:</p><pre><code class="code">&lt;h2&gt;
+64 is divisible by 4
+&lt;/h2&gt;</code></pre><h4>Instrukcja <code>try...except...else...finally</code></h4><p><div class="inxx">try</div> <div class="inxx">except</div> <div class="inxx">else</div> <div class="inxx">finally</div></p><p>W widoku można również użyć wyrażenia <code>try...except</code> z jednym zastrzeżeniem. Rozważmy następujący przykład:</p><pre><code class="code">{{try:}}
+Hello {{= 1 / 0}}
+{{except:}}
+division by zero
+{{else:}}
+no division by zero
+{{finally}}
+&lt;br /&gt;
+{{pass}}</code></pre><p>Wyprodukuje do następujące wyjście:</p><pre><code class="code">Hello
+division by zero
+&lt;br /&gt;</code></pre><p>Przykład ten ilustruje, że dane wyjściowe generowane przed zgłoszeniem wyjątku są renderowane (łącznie z danymi przetworzonymi przed zgłoszeniem wyjątku) wewnątrz bloku try. "Hello" zostaje napisane ponieważ poprzedza wyjątek.</p><h4>Instrukcja <code>def...return</code></h4><p><div class="inxx">def</div> <div class="inxx">return</div></p><p>Język szablonowania web2py umożliwia programistom definiowanie i implementowanie funkcji, które mogą zwracać jakikolwiek obiekt Pythona lub łańcuch tekstowy (w tym kod HTML). Przyjrzyjmy się dwóm przykładom:</p><pre><code class="code">{{def itemize1(link): return LI(A(link, _href="http://" + link))}}
+&lt;ul&gt;
+{{=itemize1('www.google.com')}}
+&lt;/ul&gt;</code></pre><p>wytworzy następujące wyjście:</p><pre><code class="code">&lt;ul&gt;
+&lt;li&gt;&lt;a href="http:/www.google.com"&gt;www.google.com&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</code></pre><p>Funkcja <code>itemize1</code> zwraca obiekt helpera, który jest wkładany w kod w miejscu gdzie funkcja została wywołana.</p><p>Rozwazmy poniższy kod:</p><pre><code class="code">{{def itemize2(link):}}
+&lt;li&gt;&lt;a href="http://{{=link}}"&gt;{{=link}}&lt;/a&gt;&lt;/li&gt;
+{{return}}
+&lt;ul&gt;
+{{itemize2('www.google.com')}}
+&lt;/ul&gt;</code></pre><p>Wytworzy on dokładnie takie samo wyjście jak w powyższym przykładzie. W tym przypadku, funkcja <code>itemize2</code> reprezentuje porcję kodu HTML, który ma zastąpić  znacznik web2py w którym funkcja została wywołana. Proszę zwrócić uwagę, że nie ma znaku '=' przed wywołaniem <code>itemize2</code>, ponieważ funkcja ta nie zwraca tekstu, ale zapisuje dane wyjściowe bezpośrednio do odpowiedzi.</p><p>Jest jedno zastrzeżenie: funkcje definiowane wewnątrz widoku muszą kończyć się wyrażeniem return albo automatyczne wcięcie zawiedzie.</p><h3>Helpery HTML</h3><div class="inxx">helpery html</div><p>Rozważmy następujący kod widoku:</p><pre><code class="code">{{=DIV('this', 'is', 'a', 'test', _id='123', _class='myclass')}}</code></pre><p>jest on zwracany jako:</p><pre><code class="code">&lt;div id="123" class="myclass"&gt;thisisatest&lt;/div&gt;</code></pre><p><code>DIV</code> jest klasą helpera HTML,czyli czymś co może zostać zastosowane do programowego zbudowania kodu HTML. Odpowiada on znacznikowi <code>&lt;div&gt;</code> HTML.</p><p>Argumenty pozycyjne są interpretowane jak obiekty zawarte pomiędzy znacznikiem otwierającym a zamykającym HTML. Argumenty nazwane rozpoczynające się znakiem podkreślenia są interpretowane jako atrybuty znacznika HTML (bez znaków podkreślenia). Niektóre helpery maja również nazwane argumenty nie rozpoczynające się znakiem podkreślenia – argumenty te są specyficzne dla znacznika.</p><p>Zamiast ustawienia nienazwanych argumentów, można zrobić tak, że helper pobierze pojedynczą listę lub krotkę jako swój zestaw komponentów, gdy użyje się notacji ze znakiem gwiazdki <code>*</code> oraz tak, że pobierze pojedynczy słownik jako zbiór atrybutów, gdy użyje się dwóch gwiazdek <code>**</code>, na przykład:</p><pre><code class="code">{{
+contents = ['this','is','a','test']
+attributes = {'_id':'123', '_class':'myclass'}
+=DIV(*contents,**attributes)
+}}</code></pre><p>(produces the same output as before).</p><p>Helpery:</p><p><code>A</code>,  <code>B</code>,  <code>BEAUTIFY</code>,  <code>BODY</code>,  <code>BR</code>,  <code>CAT</code>,  <code>CENTER</code>,  <code>CODE</code>, <code>COL</code>, <code>COLGROUP</code>, <code>DIV</code>,  <code>EM</code>,  <code>EMBED</code>,  <code>FIELDSET</code>,  <code>FORM</code>, <code>H1</code>,  <code>H2</code>,  <code>H3</code>,  <code>H4</code>,  <code>H5</code>,  <code>H6</code>,  <code>HEAD</code>,  <code>HR</code>,  <code>HTML</code>, <code>I</code>,  <code>IFRAME</code>,  <code>IMG</code>,  <code>INPUT</code>,  <code>LABEL</code>,  <code>LEGEND</code>,  <code>LI</code>, <code>LINK</code>,  <code>MARKMIN</code>,  <code>MENU</code>,  <code>META</code>,  <code>OBJECT</code>,  <code>ON</code>,  <code>OL</code>, <code>OPTGROUP</code>,  <code>OPTION</code>,  <code>P</code>,  <code>PRE</code>,  <code>SCRIPT</code>,  <code>SELECT</code>,  <code>SPAN</code>, <code>STYLE</code>,  <code>TABLE</code>,  <code>TAG</code>,  <code>TBODY</code>,  <code>TD</code>,  <code>TEXTAREA</code>,  <code>TFOOT</code>, <code>TH</code>,  <code>THEAD</code>,  <code>TITLE</code>,  <code>TR</code>,  <code>TT</code>, <code>UL</code>,   <code>URL</code>,  <code>XHTML</code>, <code>XML</code>,  <code>embed64</code>,  <code>xmlescape</code></p><p>mogą być używane do budowy złożonych wyrażeń, które mogą być serializowane do XML<sup>[<a href="/book/default/reference/42/xml-w" target="_blank">xml-w</a>]</sup> <sup>[<a href="/book/default/reference/42/xml-o" target="_blank">xml-o</a>]</sup>. Na przykład:</p><pre><code class="code">{{=DIV(B(I("hello ", "&lt;world&gt;"))), _class="myclass")}}</code></pre><p>zostanie renderowane tak:</p><pre><code class="code">&lt;div class="myclass"&gt;&lt;b&gt;&lt;i&gt;hello &amp;lt;world&amp;gt;&lt;/i&gt;&lt;/b&gt;&lt;/div&gt;</code></pre><p>Helpery można również serialiować do łańcuchów tekstowych, równoważnie z metodami <code>__str__</code> i <code>xml</code>:</p><pre><code class="code">&gt;&gt;&gt; print str(DIV("hello world"))
+&lt;div&gt;hello world&lt;/div&gt;
+&gt;&gt;&gt; print DIV("hello world").xml()
+&lt;div&gt;hello world&lt;/div&gt;</code></pre><p><div class="inxx">obiektowy model dokumentu</div> <div class="inxx">Document Object Model (DOM)</div> Mechanizm helperów w web2py jest czymś więcej niż tylko systemem do generowania kodu HTML bez łączenia ciągów znakowych. Zapewnia reprezentację obiektowego modelu dokumentu (Document Object Model - DOM) po stronie serwera.</p><p>Komponenty helperów mogą być odnoszone poprzez ich pozycję a helpery działają jak listy w stosunku do ich komponentów:</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('a', 'b'), 'c')
+&gt;&gt;&gt; print a
+&lt;div&gt;&lt;span&gt;ab&lt;/span&gt;c&lt;/div&gt;
+&gt;&gt;&gt; del a[1]
+&gt;&gt;&gt; a.append(B('x'))
+&gt;&gt;&gt; a[0][0] = 'y'
+&gt;&gt;&gt; print a
+&lt;div&gt;&lt;span&gt;yb&lt;/span&gt;&lt;b&gt;x&lt;/b&gt;&lt;/div&gt;</code></pre><p>Atrybuty helperów mogą być odnoszone przez nazwę a helpery działają jak słownik w stosunku do ich atrybutów:</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('a', 'b'), 'c')
+&gt;&gt;&gt; a['_class'] = 's'
+&gt;&gt;&gt; a[0]['_class'] = 't'
+&gt;&gt;&gt; print a
+&lt;div class="s"&gt;&lt;span class="t"&gt;ab&lt;/span&gt;c&lt;/div&gt;</code></pre><p>Uwaga, kompletny zestaw komponentów może być dostępny poprzez listę o nazwie <code>a.components</code> a kompletny zestaw atrybutów poprzez słownik o nazwie <code>a.attributes</code>. Tak więc <code>a[i]</code> jest równoważnikiem <code>a.components[i]</code> gdzie <code>i</code> to liczba całkowita, natomiast <code>a[s]</code> jest równoważnikiem <code>a.attributes[s]</code> gdzie <code>s</code> jest ciągiem znakowym.</p><p>Proszę zwrócić uwagę, że atrybuty helpera są przekazywane do helpera jako argumenty kluczowe. Jednak w niektórych przypadkach nazwy atrybutów zawierają specjalne znaki, które nie są dozwolone w identyfikatorach Pythona (np. myślniki) i dlatego nie mogą być użyte jako nazwy argumentów kluczowych. Na przykład:</p><pre><code class="code">DIV('text', _data-role='collapsible')</code></pre><p>nie będzie działać, ponieważ "_data-role" zawiera myślnik, który będzie powodował błąd składni Pythona.</p><p>W takich przypadkach ma się kilka możliwości. Można zastosować argument <code>data</code> (tym razem bez wiodącego znaku podkreślenia) do przekazania słownika związanych atrybutów bez ich wiodącego myślnika a wyjście będzie miało pożądaną kombinacje danych np.</p><pre><code class="code">&gt;&gt;&gt; print DIV('text', data={'role': 'collapsible'})
+&lt;div data-role="collapsible"&gt;text&lt;/div&gt;</code></pre><p>lub można zamiast tego przekazać atrybuty jako słownik i wykorzystać notację dwóch gwiazdek (<code>**</code>) argumentów funkcji Pythona, co odwzoruje słownik par (klucz:wartość) na zestaw argumentów kluczowych:</p><pre><code class="code">&gt;&gt;&gt; print DIV('text', **{'_data-role': 'collapsible'})
+&lt;div data-role="collapsible"&gt;text&lt;/div&gt;</code></pre><p>Proszę zwrócić uwagę, że bardziej skomplikowane zapisy mogą zawierać znaki, które powinny być w wyjściu zamienione na znaki encji HTML, np.</p><pre><code class="code">&gt;&gt;&gt; print DIV('text', data={'options':'{"mode":"calbox", "useNewStyle":true}'})
+&lt;div data-options="{&amp;quot;mode&amp;quot;:&amp;quot;calbox&amp;quot;, &amp;quot;useNewStyle&amp;quot;:true}"&gt;text&lt;/div&gt;</code></pre><p>Można również dynamicznie utworzyć specjalny TAG:</p><pre><code class="code">&gt;&gt;&gt; print TAG['soap:Body']('whatever',**{'_xmlns:m':'http://www.example.org'})
+&lt;soap:Body xmlns:m="http://www.example.org"&gt;whatever&lt;/soap:Body&gt;</code></pre><h4><code>XML</code></h4><div class="inxx">XML</div><p><code>XML</code> to obiekt stosowany do hermetyzowania tekstu, który nie powinien być zabezpieczany sekwencjami ucieczki. Tekst ten może ale nie musi zawierać prawidłowy kod XML - na przykład, może zawierać kod JavaScript.</p><p>Tekst w tym przykładzie jest zabezpieczany encjami znakowymi XML:</p><pre><code class="code">&gt;&gt;&gt; print DIV("&lt;b&gt;hello&lt;/b&gt;")
+&amp;lt;b&amp;gt;hello&amp;lt;/b&amp;gt;</code></pre><p>stosując <code>XML</code> można się zabezpieczyć przed wstawianiem w tekstu sekwencji ucieczki:</p><pre><code class="code">&gt;&gt;&gt; print DIV(XML("&lt;b&gt;hello&lt;/b&gt;"))
+&lt;b&gt;hello&lt;/b&gt;</code></pre><p>Czasem zachodzi potrzeba renderowania kodu HTML zapisanego w zmiennej, ale kod taki może zawierać niebezpieczne znaczniki, takie jak script:</p><pre><code class="code">&gt;&gt;&gt; print XML('&lt;script&gt;alert("unsafe!")&lt;/script&gt;')
+&lt;script&gt;alert("unsafe!")&lt;/script&gt;</code></pre><p>Nie zabezpieczenie wykonywalnego kodu, taki jak ten (na przykład, wprowadzonego w treści komentarza na blogu) jest niebezpieczne, ponieważ może zostać użyty do wygenerowania ataku Cross Site Scripting (XSS) na strony innych odwiedzających.</p><div class="inxx">sanitize</div><p>Helper <code>XML</code> web2py może zabezpieczyć tekst przed iniekcją poprzez wstawia encji znakowych przy wszystkich znacznikach, z wyjątkiem tych, które wskazało się jawnie. Oto przykład:</p><pre><code class="code">&gt;&gt;&gt; print XML('&lt;script&gt;alert("unsafe!")&lt;/script&gt;', sanitize=True)
+&amp;lt;script&amp;gt;alert(&amp;quot;unsafe!&amp;quot;)&amp;lt;/script&amp;gt;</code></pre><p>Konstruktory <code>XML</code> traktują domyślnie zawartość niektórych znaczników i niektóre z ich atrybutów za bezpieczne. Można zastąpić domyślne ustawienie opcjonalnych argumentów <code>permitted_tags</code> i <code>allowed_attributes</code>. Oto domyślne wartości opcjonalnych argumentów helpera <code>XML</code>.</p><pre><code class="code">XML(text, sanitize=False,
+    permitted_tags=['a', 'b', 'blockquote', 'br/', 'i', 'li',
+       'ol', 'ul', 'p', 'cite', 'code', 'pre', 'img/'],
+    allowed_attributes={'a':['href', 'title'],
+       'img':['src', 'alt'], 'blockquote':['type']})</code></pre><h3>Helpery wbudowane</h3><h4><code>A</code></h4><p>Helper ten jest używany do tworzenia odnośników.</p><div class="inxx">A</div><pre><code class="code">&gt;&gt;&gt; print A('&lt;click&gt;', XML('&lt;b&gt;me&lt;/b&gt;'),
+            _href='http://www.web2py.com')
+&lt;a href='http://www.web2py.com'&gt;&amp;lt;click&amp;gt;&lt;b&gt;me/b&gt;&lt;/a&gt;</code></pre><p>Zamiast <code>_href</code> można przekazać adres URL wykorzystując argument <code>callback</code>. Oto przykład fragmentu widoku:</p><pre><code>{{=A('click me', callback=URL('myaction'))}}</code></pre><p>skutkujący tym, że kliknięcie odnośnika wywołany zostanie kod ajax "myaction" zamiast przekierowania. W tym przypadku, opcjonalnie można podać dwa argumenty: <code>target</code> i <code>delete</code>:</p><pre><code>{{=A('click me', callback=URL('myaction'), target="t")}}
+&lt;div id="t"&gt;&lt;div&gt;</code></pre><p>Odpowiedź wywołania zwrotnego ajax zostanie zapisana w obiekcie DIV z atrybutem id równym "t".</p><pre><code>&lt;div id="b"&gt;{{=A('click me', callback=URL('myaction'), delete='div#b")}}&lt;/div&gt;</code></pre><p>W odpowiedzi, najbliższy znacznik dopasowany do "div#b" zostanie usunięty. W tym przypadku usunięty zostanie przycisk. Typowym zastosowanie to użycie w tablicy:</p><pre><code>{{=A('click me', callback=URL('myaction'), delete='tr")}}</code></pre><p>Naciśnięcie przycisku wykona wywołanie zwrotne i usunie wiersz tablicy.</p><p><code>callback</code> i <code>delete</code> można łączyć.</p><p>Helper A pobiera specjalny argument o nazwie <code>cid</code>. Działa on następująco:</p><pre><code class="code">{{=A('linked page', _href='http://example.com', cid='myid')}}
+&lt;div id="myid"&gt;&lt;/div&gt;</code></pre><p>Kliknięcie na na link spowoduje załadowanie treści w znaczniku div. Jest to podobne, ale silniejsze niż powyższa składnia, ponieważ jest zaprojektowane do odświeżania treści strony. Omówimy zastosowanie <code>cid</code> bardziej szczegółowo w <a href="../12#markmin_trapped_ajax_links">rozdziale 12</a>, w kontekście komponentów.</p><p>Te funkcjonalności ajax wymagają dostępu do jQuery i skryptu "static/js/web2py_ajax.js", które są automatycznie dołączane poprzez umiejscowienie w układzie head wyrażenia <code>{{include 'web2py_ajax.html'}}</code>. Skrypt "views/web2py_ajax.html" definuje kilka zmiennych opartych na <code>request</code> i zawiera wszystkie niezbędne pliki js i css.</p><h4><code>B</code></h4><div class="inxx">B</div><p>Helper ten dokonuje pogrubienia tekstu.</p><pre><code class="code">&gt;&gt;&gt; print B('&lt;hello&gt;', XML('&lt;i&gt;world&lt;/i&gt;'), _class='test', _id=0)
+&lt;b id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;i&gt;world&lt;/i&gt;&lt;/b&gt;</code></pre><h4><code>BODY</code></h4><div class="inxx">BODY</div><p>Helper ten umieszcza ciało strony.</p><pre><code class="code">&gt;&gt;&gt; print BODY('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _bgcolor='red')
+&lt;body bgcolor="red"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/body&gt;</code></pre><h4><code>BR</code></h4><div class="inxx">BR</div><p>Helper ten tworzy podział wiersza.</p><pre><code class="code">&gt;&gt;&gt; print BR()
+&lt;br /&gt;</code></pre><p>Warto pamiętać, że w helperach istnieje możliwość powtarzania wyjścia przy wykorzystaniu operatora mnożenie:</p><pre><code class="code">&gt;&gt;&gt; print BR()*5
+&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;</code></pre><h4><code>CAT</code></h4><div class="inxx">CAT</div><p>Helper ten łączy inne hlpery, takie jak TAG[''].</p><pre><code class="code">&gt;&gt;&gt; print CAT('Here is a ', A('link',_href=URL()), ', and here is some ', B('bold text'), '.')
+Here is a &lt;a href="/app/default/index"&gt;link&lt;/a&gt;, and here is some &lt;b&gt;bold text&lt;/b&gt;.</code></pre><h4><code>CENTER</code></h4><div class="inxx">CENTER</div><p>Helper ten powoduje wyśrodkowanie tekstu.</p><pre><code class="code">&gt;&gt;&gt; print CENTER('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'),
+&gt;&gt;&gt;              _class='test', _id=0)
+&lt;center id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/center&gt;</code></pre><h4><code>CODE</code></h4><div class="inxx">CODE</div><p>Powoduje podświetlanie składni kodu Pythona, C, C++, HTML i web2py, co ulepsza kod wykazywany w <code>PRE</code>. Helper <code>CODE</code> ma również zdolność tworzenia odnośników do dokumentacji API web2py.</p><p>Oto przykład z podświetlaniem kodu Pythona:</p><pre><code class="code">&gt;&gt;&gt; print CODE('print "hello"', language='python').xml()
+&lt;table&gt;&lt;tr valign="top"&gt;&lt;td style="width:40px; text-align: right;"&gt;&lt;pre style="
+        font-size: 11px;
+        font-family: Bitstream Vera Sans Mono,monospace;
+        background-color: transparent;
+            margin: 0;
+            padding: 5px;
+            border: none;
+        background-color: #E0E0E0;
+        color: #A0A0A0;
+    "&gt;1.&lt;/pre&gt;&lt;/td&gt;&lt;td&gt;&lt;pre style="
+        font-size: 11px;
+        font-family: Bitstream Vera Sans Mono,monospace;
+        background-color: transparent;
+            margin: 0;
+            padding: 5px;
+            border: none;
+            overflow: auto;
+    "&gt;&lt;span style="color:#185369; font-weight: bold"&gt;print &lt;/span&gt;
+    &lt;span style="color: #FF9966"&gt;"hello"&lt;/span&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;</code></pre><p>Oto podobny przykład z HTML:</p><pre><code class="code">&gt;&gt;&gt; print CODE(
+&gt;&gt;&gt;   '&lt;html&gt;&lt;body&gt;{{=request.env.remote_add}}&lt;/body&gt;&lt;/html&gt;',
+&gt;&gt;&gt;   language='html')</code></pre><pre><code class="code">&lt;table&gt;...&lt;code&gt;...
+&lt;html&gt;&lt;body&gt;{{=request.env.remote_add}}&lt;/body&gt;&lt;/html&gt;
+...&lt;/code&gt;...&lt;/table&gt;</code></pre><p>Helper <code>CODE</code> ma domyślne argumenty:</p><pre><code class="code">CODE("print 'hello world'", language='python', link=None, counter=1, styles={})</code></pre><p>Obsługiwanymi wartościami dla argumentu <code>language</code> są "python", "html_plain", "c", "cpp", "web2py" i "html". Język "html" interpretuje znaczniki {{ i }} jako kod "web2py", natomiast "html_plain" nie.</p><p>Jeśli określona jest wartość <code>link</code>, na przykład "/examples/global/vars/", API web2py dokona odniesienia w kodzie umieszczając odnośnik URL do dokumentacji. Na przykład "request" zostanie zlinkowany z "/examples/global/vars/request". W powyższym przykładzie, odnośnik URL jest obsługiwany przez przez akcję "vars" w kontrolerze "global.py", który jest rozpowszechniany jako część aplikacji "examples" web2py.</p><p>Argument <code>counter</code> jest używany dla numerowania linii kodu. Może zostać ustawiony na jedną z trzech możliwych wartości. Może to być <code>None</code> wskazująca na brak numeracji, wartość numeryczna wskazująca na numer początkowy oraz ciąg znakowy. Jeśli argument ten jest ustawiony na jakiś ciąg znakowy, to jest on traktowany jako znak zachęty w kodzie i linie kodu nie są numerowane.</p><p>Argument <code>styles</code> jest nieco skomplikowany. Jeśli spojrzy się na powyżej wygenerowany kod HTML, to widać, ze zawiera on tabelę z dwoma kolumnami, przy czym każda kolumna ma określony wierszowo swój własny  styl CSS. Atrybuty <code>styles</code> umożliwiają nadpisać te dwa domyślne style CSS. Na przykład:</p><pre><code class="code">{{=CODE(...,styles={'CODE':'margin: 0;padding: 5px;border: none;'})}}</code></pre><p>Atrybut <code>styles</code> musi być słownikiem umożliwiającym określenie dwóch kluczy: <code>CODE</code> dla stylu rzeczywistego kodu i <code>LINENUMBERS</code> dla stylu kolumny z numeracją wierszy. Warto pamiętać, że style te całkowicie wymieniają domyślne style a nie są dodawane do stylów domyślnych.</p><h4><code>COL</code></h4><div class="inxx">COL</div><pre><code class="code">&gt;&gt;&gt; print COL('a','b')
+&lt;col&gt;ab&lt;/col&gt;</code></pre><h4><code>COLGROUP</code></h4><div class="inxx">COLGROUP</div><pre><code class="code">&gt;&gt;&gt; print COLGROUP('a','b')
+&lt;colgroup&gt;ab&lt;/colgroup&gt;</code></pre><h4><code>DIV</code></h4><p>Wszystkie helpery, z wyjątkiem <code>XML</code>, pochodzą od <code>DIV</code> i dziedziczą jego podstawowe metody.</p><div class="inxx">DIV</div><pre><code class="code">&gt;&gt;&gt; print DIV('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;div id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/div&gt;</code></pre><h4><code>EM</code></h4><p>Uwydatnia treść, zmieniając czcionkę najczęściej na italik (interpretacja znacznika em zależy od przeglądarki).</p><div class="inxx">EM</div><pre><code class="code">&gt;&gt;&gt; print EM('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;em id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/em&gt;</code></pre><h4><code>FIELDSET</code></h4><div class="inxx">FIELDSET</div><p>Jest używany do tworzenia pola wejściowego wraz z etykietą.</p><pre><code class="code">&gt;&gt;&gt; print FIELDSET('Height:', INPUT(_name='height'), _class='test')
+&lt;fieldset class="test"&gt;Height:&lt;input name="height" /&gt;&lt;/fieldset&gt;</code></pre><h4><code>FORM</code></h4><div class="inxx">FORM</div><p>Jest to jeden z najważniejszych helperów. W bardzo prosty sposób tworzy znacznik <code>&lt;form&gt;...&lt;/form&gt;</code>, ale ponieważ helper ten jest obiektami i posiada wiedzę o tym co zawiera, to może przetwarzać zgłoszone formularze (na przykład, wykonywać walidację pól). Jest to szczegółowo omówione w rozdziale 7.</p><pre><code class="code">&gt;&gt;&gt; print FORM(INPUT(_type='submit'), _action='', _method='post')
+&lt;form enctype="multipart/form-data" action="" method="post"&gt;
+&lt;input type="submit" /&gt;&lt;/form&gt;</code></pre><p>Domyślnie "enctype" to "multipart/form-data".</p><div class="inxx">hidden</div><p>Konstruktor <code>FORM</code> i <code>SQLFORM</code> mogą pobierać argument o nazwie <code>hidden</code>. Gdy słownik jest przekazywany jako <code>hidden</code>, to jego elementy są przekształcane do pola INPUT "hidden". Na przykład:</p><pre><code class="code">&gt;&gt;&gt; print FORM(hidden=dict(a='b'))
+&lt;form enctype="multipart/form-data" action="" method="post"&gt;
+&lt;input value="b" type="hidden" name="a" /&gt;&lt;/form&gt;</code></pre><h4><code>H1</code>, <code>H2</code>, <code>H3</code>, <code>H4</code>, <code>H5</code>, <code>H6</code></h4><div class="inxx">H1</div><p>Helpery te są nagłówkami paragrafów i podparagrafów:</p><pre><code class="code">&gt;&gt;&gt; print H1('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;h1 id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/h1&gt;</code></pre><h4><code>HEAD</code></h4><p>Do wygenerowania znaczników sekcji HEAD strony HTML.</p><div class="inxx">HEAD</div><pre><code class="code">&gt;&gt;&gt; print HEAD(TITLE('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;')))
+&lt;head&gt;&lt;title&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/title&gt;&lt;/head&gt;</code></pre><h4><code>HTML</code></h4><p><div class="inxx">HTML</div> <div class="inxx">XHTML</div></p><p>Helper ten jest trochę inny. Oprócz generowania znaczników <code>&lt;html&gt;</code>, poprzedza znacznik ciągiem doctype<sup>[<a href="/book/default/reference/42/xhtml-w" target="_blank">xhtml-w</a>]</sup> <sup>[<a href="/book/default/reference/42/xhtml-o" target="_blank">xhtml-o</a>]</sup> <sup>[<a href="/book/default/reference/42/xhtml-school" target="_blank">xhtml-school</a>]</sup> .</p><pre><code class="code">&gt;&gt;&gt; print HTML(BODY('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;')))
+&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                      "http://www.w3.org/TR/html4/loose.dtd"&gt;
+&lt;html&gt;&lt;body&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/body&gt;&lt;/html&gt;</code></pre><p>Helper HTML pobiera kilka opcjonalnych argumentów, która mają następujące wartości domyślne:</p><pre><code class="code">HTML(..., lang='en', doctype='transitional')</code></pre><p>gdzie argument doctype może mieć wartość 'strict', 'transitional', 'frameset', 'html5' lub jakiś pełny ciąg doctype.</p><h4><code>XHTML</code></h4><div class="inxx">XHTML</div><p>XHTML jest podobny do HTML ale tworzy tworzy doctype XHTML a nie HTML.</p><pre><code class="code">XHTML(..., lang='en', doctype='transitional', xmlns='http://www.w3.org/1999/xhtml')</code></pre><p>gdzie argument doctype może mieć wartość 'strict', 'transitional', 'frameset' lub jakiegoś pełnego ciągu doctype.</p><h4><code>HR</code></h4><div class="inxx">HR</div><p>Helper ten tworzy na stronie HTML poziomą linię</p><pre><code class="code">&gt;&gt;&gt; print HR()
+&lt;hr /&gt;</code></pre><h4><code>I</code></h4><div class="inxx">I</div><p>Tworzy treść pisaną italikiem.</p><pre><code class="code">&gt;&gt;&gt; print I('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;i id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/i&gt;</code></pre><h4><code>IFRAME</code></h4><p>Helper ten zawiera inną stronę internetową w bieżącej stronie. Adres URL innej strony jest określany poprzez atrybut "_src".</p><div class="inxx">IFRAME</div><pre><code class="code">&gt;&gt;&gt; print IFRAME(_src='http://www.web2py.com')
+&lt;iframe src="http://www.web2py.com"&gt;&lt;/iframe&gt;</code></pre><h4><code>IMG</code></h4><div class="inxx">IMG</div><p>Używany jest do osadzania obrazów w HTML:</p><pre><code class="code">&gt;&gt;&gt; IMG(_src='http://example.com/image.png',_alt='test')
+&lt;img src="http://example.com/image.ong" alt="rest" /&gt;</code></pre><p>Oto połączenie helperów A, IMG i URL użyte w celu zawarcia statycznego obrazu z linkiem:</p><pre><code class="code">&gt;&gt;&gt; A(IMG(_src=URL('static','logo.png'), _alt="My Logo"),
+      _href=URL('default','index'))
+&lt;a href="/myapp/default/index"&gt;
+  &lt;img src="/myapp/static/logo.png" alt="My Logo" /&gt;
+&lt;/a&gt;</code></pre><h4><code>INPUT</code></h4><div class="inxx">INPUT</div><p>Tworzy znacznik <code>&lt;input.../&gt;</code>. Znacznik input może nie zawierać innych znaczników i jest zamykany znakami <code>/&gt;</code> zamiast <code>&gt;</code>. Znacznik input ma opcjonalny atrybut <code>_type</code>, który można ustawić na "text" (domyślnie), "submit", "checkbox" lub "radio".</p><pre><code class="code">&gt;&gt;&gt; print INPUT(_name='test', _value='a')
+&lt;input value="a" name="test" /&gt;</code></pre><p>Helper ten pobiera opcjonalny specjalny argument o nazwie "value", odrębny od argumentu "_value". Ten ostatni ustawia domyślną wartość dla pola input. Pierwszy ustawia bieżącą wartość. Dla pola input typ "text", pierwszy argument zastępuje drugi:</p><pre><code class="code">&gt;&gt;&gt; print INPUT(_name='test', _value='a', value='b')
+&lt;input value="b" name="test" /&gt;</code></pre><p>Dla przycisków radio <code>INPUT</code> selektywnie ustawia atrybut "checked":</p><div class="inxx">radio</div><pre><code class="code">&gt;&gt;&gt; for v in ['a', 'b', 'c']:
+&gt;&gt;&gt;     print INPUT(_type='radio', _name='test', _value=v, value='b'), v
+&lt;input value="a" type="radio" name="test" /&gt; a
+&lt;input value="b" type="radio" checked="checked" name="test" /&gt; b
+&lt;input value="c" type="radio" name="test" /&gt; c</code></pre><p>i podobnie dla pól wyboru:</p><div class="inxx">checkbox</div><pre><code class="code">&gt;&gt;&gt; print INPUT(_type='checkbox', _name='test', _value='a', value=True)
+&lt;input value="a" type="checkbox" checked="checked" name="test" /&gt;
+&gt;&gt;&gt; print INPUT(_type='checkbox', _name='test', _value='a', value=False)
+&lt;input value="a" type="checkbox" name="test" /&gt;</code></pre><h4><code>LABEL</code></h4><p>Jest używany do tworzenia znacznika &lt;label&gt; dla pól formularza.</p><div class="inxx">LABEL</div><pre><code class="code">&gt;&gt;&gt; print LABEL('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;label id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/label&gt;</code></pre><h4><code>LEGEND</code></h4><p>Jest używany do tworzenia znacznika &lt;legend&gt; dla pól formularza.</p><div class="inxx">LEGEND</div><pre><code class="code">&gt;&gt;&gt; print LEGEND('Name', _for='myfield')
+&lt;legend for="myfield"&gt;Name&lt;/legend&gt;</code></pre><h4><code>LI</code></h4><p>Tworzy element listy (znacznik &lt;li&gt;), który powinien być zawarty w znacznikach &lt;ul&gt; lub &lt;ol&gt;.</p><div class="inxx">LI</div><pre><code class="code">&gt;&gt;&gt; print LI('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;li id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/li&gt;</code></pre><h4><code>META</code></h4><p>Używany do budowania znaczników &lt;meta&gt; w sekcji HEAD. Na przykład:</p><div class="inxx">META</div><pre><code class="code">&gt;&gt;&gt; print META(_name='security', _content='high')
+&lt;meta name="security" content="high" /&gt;</code></pre><p><span class="anchor" id="markmin_markmin_syntax"></span></p><h4><code>MARKMIN</code></h4><p>Implementuje składnię wiki markmin. Konwertuje tekst wejściowy do wyjścia HTML zgodnie z poniższym przykładem:</p><div class="inxx">MARKMIN</div><pre><code class="code">&gt;&gt;&gt; print MARKMIN("this is **bold** or ''italic'' and this [[a link http://web2py.com]]")
+&lt;p&gt;this is &lt;b&gt;bold&lt;/b&gt; or &lt;i&gt;italic&lt;/i&gt; and
+this &lt;a href="http://web2py.com"&gt;a link&lt;/a&gt;&lt;/p&gt;</code></pre><p>Składnia markmin jest opisana w pliku:</p><pre><code class="code">http://127.0.0.1:8000/examples/static/markmin.html</code></pre><p>dostarczanym wraz z web2py.</p><p>Markmin można używać do generowania dokumentów HTML, LaTeX i PDF:</p><pre><code class="code">m = "Hello **world** [[link http://web2py.com]]"
+from gluon.contrib.markmin.markmin2html import markmin2html
+print markmin2html(m)
+from gluon.contrib.markmin.markmin2latex import markmin2latex
+print markmin2latex(m)
+from gluon.contrib.markmin.markmin2pdf import markmin2pdf
+print markmin2pdf(m) # requires pdflatex</code></pre><p>(helper <code>MARKMIN</code> jest skrótem dla <code>markmin2html</code>)</p><p>Oto podstawowa składnia:</p><table><tbody><tr class="first"><td><strong>ŹRÓDŁO</strong></td><td><strong>WYJŚCIE</strong></td></tr><tr class="even"><td><code># title</code></td><td><strong>tytuł</strong></td></tr><tr><td><code>## section</code></td><td><strong>rozdział</strong></td></tr><tr class="even"><td><code>### subsection</code></td><td><strong>podrozdział</strong></td></tr><tr><td><code>**bold**</code></td><td><strong>gruby</strong></td></tr><tr class="even"><td><code>''italic''</code></td><td><em>italik</em></td></tr><tr><td><code>``verbatim``</code></td><td><code>dosłowny</code></td></tr><tr class="even"><td><code>http://google.com</code></td><td><a href="http://google.com">http://google.com</a></td></tr><tr><td><code>http://...</code></td><td><code>&lt;a href="http://..."&gt;http:...&lt;/a&gt;</code></td></tr><tr class="even"><td><code>http://...png</code></td><td><code>&lt;img src="http://...png" /&gt;</code></td></tr><tr><td><code>http://...mp3</code></td><td><code>&lt;audio src="http://...mp3"&gt;&lt;/audio&gt;</code></td></tr><tr class="even"><td><code>http://...mp4</code></td><td><code>&lt;video src="http://...mp4"&gt;&lt;/video&gt;</code></td></tr><tr><td><code>qr:http://...</code></td><td><code>&lt;a href="http://..."&gt;&lt;img src="qr code"/&gt;&lt;/a&gt;</code></td></tr><tr class="even"><td><code>embed:http://...</code></td><td><code>&lt;iframe src="http://..."&gt;&lt;/iframe&gt;</code></td></tr><tr><td><code>[[click me #myanchor]]</code></td><td><a href="#markmin_myanchor">kliknij mnie</a></td></tr><tr class="even"><td><code>[[myanchor]]</code></td><td>Utworzenie kotwicy dla odnośnika</td></tr><tr><td><code>$</code><code>$\int_a^b sin(x)dx$</code><code>$</code></td><td><img src="http://chart.apis.google.com/chart?cht=tx&chl=%5Cint_a%5Eb%20sin%28x%29dx" /></td></tr></tbody></table><h5>Odnośniki MARKMIN</h5><p>Odnośniki mają postać: <code>[[wyświetlany tekst odnośnika &lt;link&gt;]]</code>. &lt;link&gt; może być kotwicą np. <code>#myanchor</code> lub adresem URI np. <code>http://www.web2py.com</code> lub względną referencją np. <code>[[patrz rodział 8 ../08]]</code> lub <code>[[patrz rozdział 8 ../08#myanchor]]</code></p><p>Wystarczy dołączyć odnośnik do pliku obrazu, wideo lub audio bez wynikowego znacznika a zostanie automatycznie dołączony  odpowiedni plik obrazu, wideo lub audio (dla pliku audio i video będzie użyty odpowiednio znacznik &lt;audio&gt; i &lt;video&gt;).</p><p>Dodanie odnośnika z przedrostkiem <code>qr:</code>, tak jak tu</p><pre><code>qr:http://web2py.com</code></pre><p>spowoduje, że osadzony zostanie odpowiedni kod QR i zlinkowany z określonym adresem URL.</p><p>Dodanie odnośnika z przedrostkiem <code>embed:</code>, tak jak tu</p><pre><code>embed:http://www.youtube.com/embed/x1w8hKTJ2Co</code></pre><p>spowoduje, osadzenie określonej strony, w tym przypadku wideo youtube.</p><p>Obrazy mogą być również osadzane na następującą składnią:</p><pre><code>[[image-description http://.../image.png right 200px]]</code></pre><h5>Listy i tabele MARKMIN</h5><p>Listy nieuporządkowane tworzy się używajac znak myślnika przed każdym elementem listy:</p><pre><code>- one
+- two
+- three</code></pre><p>Listy uporządkowane tworzy się stosując znak plus przed każdym elementem listy:</p><pre><code>+ one
++ two
++ three</code></pre><p>Natomiast tablice w ten sposób:</p><pre><code>----------
+ X | 0 | 0
+ 0 | X | 0
+ 0 | 0 | 1
+----------</code></pre><h5>Rozszerzanie MARKMIN</h5><p>Składnia MARKMIN obsługuje również znaczniki bloków cytatów (<em>ang. blockquotes</em>), znaczniki audio i wideo HTML, wyrównywanie obrazów, własne style CSS i to wszystko można rozszerzać:</p><pre><code class="code">MARKMIN("``abab``:custom", extra=dict(custom=lambda text: text.replace('a','c'))</code></pre><p>generuje</p><code class="code">'cbcb'</code><p>Niestandardowe bloki są ograniczane przez <code>``...``:&lt;key&gt;</code> i są renderowane przez funkcję przekazywaną jako odpowiedni klucz w słowniku argumentu <code>extra</code> MARKMIN. Trzeba pamiętać, aby zabezpieczyć funkcję znakami ucieczki w celu zapobieżenia atakom XSS.</p><h4><code>OBJECT</code></h4><p>Używany do osadzania w HTML obiektów (na przykład flash player).</p><div class="inxx">OBJECT</div><pre><code class="code">&gt;&gt;&gt; print OBJECT('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'),
+&gt;&gt;&gt;              _src='http://www.web2py.com')
+&lt;object src="http://www.web2py.com"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/object&gt;</code></pre><h4><code>OL</code></h4><p>Wskazuje na listę uporządkowaną. Lista powinna zawierać znaczniki LI. Argumenty <code>OL</code>, które nie są obiektami <code>LI</code> są automatycznie otaczane znacznikami <code>&lt;li&gt;...&lt;/li&gt;</code>.</p><div class="inxx">OL</div><pre><code class="code">&gt;&gt;&gt; print OL('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;ol id="0" class="test"&gt;&lt;li&gt;&amp;lt;hello&amp;gt;&lt;/li&gt;&lt;li&gt;&lt;b&gt;world&lt;/b&gt;&lt;/li&gt;&lt;/ol&gt;</code></pre><h4><code>ON</code></h4><p>Znajduje się tutaj dla zachowania wstecznej kompatybilności i jest po prostu aliasem <code>True</code>. Jest stosowany wyłącznie dla pól wyboru i jest przestarzały, ponieważ <code>True</code> jest bardziej poprawne dla języka Python.</p><div class="inxx">ON</div><pre><code class="code">&gt;&gt;&gt; print INPUT(_type='checkbox', _name='test', _checked=ON)
+&lt;input checked="checked" type="checkbox" name="test" /&gt;</code></pre><h4><code>OPTGROUP</code></h4><p>Pozwala na grupowanie wielu opcji w bloku SELECT i jest użyteczne dla dostosowywania pól z użyciem CSS.</p><div class="inxx">OPTGROUP</div><pre><code class="code">&gt;&gt;&gt; print SELECT('a', OPTGROUP('b', 'c'))
+&lt;select&gt;
+  &lt;option value="a"&gt;a&lt;/option&gt;
+  &lt;optgroup&gt;
+    &lt;option value="b"&gt;b&lt;/option&gt;
+    &lt;option value="c"&gt;c&lt;/option&gt;
+  &lt;/optgroup&gt;
+&lt;/select&gt;</code></pre><h4><code>OPTION</code></h4><p>Używać się to powinno tylko jako część kombinacji SELECT/OPTION.</p><div class="inxx">OPTION</div><pre><code class="code">&gt;&gt;&gt; print OPTION('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _value='a')
+&lt;option value="a"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/option&gt;</code></pre><p>Tak jak w przypadku <code>INPUT</code>, web2py rozróżnia między atrybutami "_value" (wartość OPTION) i "value" (aktualna wartość "select"). Jeśli są równe, opcja ma wartość "selected".</p><div class="inxx">selected</div><pre><code class="code">&gt;&gt;&gt; print SELECT('a', 'b', value='b'):
+&lt;select&gt;
+&lt;option value="a"&gt;a&lt;/option&gt;
+&lt;option value="b" selected="selected"&gt;b&lt;/option&gt;
+&lt;/select&gt;</code></pre><h4><code>P</code></h4><div class="inxx">P</div><p>Helper ten generuje znacznik początkowy i końcowy akapitu, &lt;p&gt;...&lt;/p&gt;.</p><pre><code class="code">&gt;&gt;&gt; print P('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;p id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/p&gt;</code></pre><h4><code>PRE</code></h4><div class="inxx">PRE</div><p>Generuje znacznik <code>&lt;pre&gt;...&lt;/pre&gt;</code> dla wyświetlania tekstu preformatowanego. Helper <code>CODE</code> jest ogólnie korzystniejszy dla wyświetlania kodu.</p><pre><code class="code">&gt;&gt;&gt; print PRE('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;pre id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/pre&gt;</code></pre><h4><code>SCRIPT</code></h4><div class="inxx">SCRIPT</div><p>Dołącza albo linkuje skrypt, taki jak JavaScript. Dla bardzo starych przeglądarek zawartość pomiędzy znacznikami jest renderowana jako komentarz HTML.</p><pre><code class="code">&gt;&gt;&gt; print SCRIPT('alert("hello world");', _type='text/javascript')
+&lt;script type="text/javascript"&gt;&lt;!--
+alert("hello world");
+//--&gt;&lt;/script&gt;</code></pre><h4><code>SELECT</code></h4><div class="inxx">SELECT</div><p>Generuje znacznik <code>&lt;select&gt;...&lt;/select&gt;</code>. Jest używany razem z helperem<code>OPTION</code>. Argumenty <code>SELECT</code>, które nie są obiektami <code>OPTION</code> są automatycznie konwertowane do opcji.</p><pre><code class="code">&gt;&gt;&gt; print SELECT('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;select id="0" class="test"&gt;
+   &lt;option value="&amp;lt;hello&amp;gt;"&gt;&amp;lt;hello&amp;gt;&lt;/option&gt;
+   &lt;option value="&amp;lt;b&amp;gt;world&amp;lt;/b&amp;gt;"&gt;&lt;b&gt;world&lt;/b&gt;&lt;/option&gt;
+&lt;/select&gt;</code></pre><h4><code>SPAN</code></h4><div class="inxx">SPAN</div><p>Podobny do <code>DIV</code>, ale używany do wygenerowania wierszowego znacznika treści &lt;span&gt; ...&lt;/span&gt;.</p><pre><code class="code">&gt;&gt;&gt; print SPAN('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;span id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/span&gt;</code></pre><h4><code>STYLE</code></h4><div class="inxx">STYLE</div><p>Podobny do SCRIPT, ale używany do dołączania albo linkowania kodu CSS. Oto jak dołącza się kod CSS:</p><pre><code class="code">&gt;&gt;&gt; print STYLE(XML('body {color: white}'))
+&lt;style&gt;&lt;!--
+body { color: white }
+//--&gt;&lt;/style&gt;</code></pre><p>a oto jak jest linkowany plik CSS:</p><pre><code class="code">&gt;&gt;&gt; print STYLE(_src='style.css')
+&lt;style src="style.css"&gt;&lt;!--
+//--&gt;&lt;/style&gt;</code></pre><h4><code>TABLE</code>, <code>TR</code>, <code>TD</code></h4><p><div class="inxx">TABLE</div> <div class="inxx">TR</div> <div class="inxx">TD</div></p><p>Helpery te (wraz z opcjonalnymi <code>THEAD</code>, <code>TBODY</code> i <code>TFOOTER</code>) są używane do tworzenia tabel HTML.</p><pre><code class="code">&gt;&gt;&gt; print TABLE(TR(TD('a'), TD('b')), TR(TD('c'), TD('d')))
+&lt;table&gt;&lt;tr&gt;&lt;td&gt;a&lt;/td&gt;&lt;td&gt;b&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;c&lt;/td&gt;&lt;td&gt;d&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</code></pre><p><code>TR</code> oczekuje zawartości <code>TD</code>. Argumenty, które nie są obiektami <code>TD</code> są konwertowane automatycznie.</p><pre><code class="code">&gt;&gt;&gt; print TABLE(TR('a', 'b'), TR('c', 'd'))
+&lt;table&gt;&lt;tr&gt;&lt;td&gt;a&lt;/td&gt;&lt;td&gt;b&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;c&lt;/td&gt;&lt;td&gt;d&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</code></pre><p>Konwersję tablicy Pythona do tabeli HTML można dokonać łatwo przy wykorzystaniu notacji z gwiazdka (<code>*</code>) argumentów funkcji, która odwzorowuje elementy list na argumenty pozycyjne funkcji.</p><p>Tutaj zrobimy to linia za linią:</p><pre><code class="code">&gt;&gt;&gt; table = [['a', 'b'], ['c', 'd']]
+&gt;&gt;&gt; print TABLE(TR(*table[0]), TR(*table[1]))
+&lt;table&gt;&lt;tr&gt;&lt;td&gt;a&lt;/td&gt;&lt;td&gt;b&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;c&lt;/td&gt;&lt;td&gt;d&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</code></pre><p>Tutaj zrobimy wszystkie linie naraz:</p><pre><code class="code">&gt;&gt;&gt; table = [['a', 'b'], ['c', 'd']]
+&gt;&gt;&gt; print TABLE(*[TR(*rows) for rows in table])
+&lt;table&gt;&lt;tr&gt;&lt;td&gt;a&lt;/td&gt;&lt;td&gt;b&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;c&lt;/td&gt;&lt;td&gt;d&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</code></pre><h4><code>TBODY</code></h4><div class="inxx">TBODY</div><p>Jest wykorzystywany do wygenerowania znacznika określającego obszar wierszy zawartych w ciele tabeli, w odróżnieniu do wierszy nagłówka i stopki. Nie jest to element obowiązkowy tabel.</p><pre><code class="code">&gt;&gt;&gt; print TBODY(TR('&lt;hello&gt;'), _class='test', _id=0)
+&lt;tbody id="0" class="test"&gt;&lt;tr&gt;&lt;td&gt;&amp;lt;hello&amp;gt;&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;</code></pre><h4><code>TEXTAREA</code></h4><div class="inxx">TEXTAREA</div><p>Helper ten generuje znacznik <code>&lt;textarea&gt;...&lt;/textarea&gt;</code>.</p><pre><code class="code">&gt;&gt;&gt; print TEXTAREA('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test')
+&lt;textarea class="test" cols="40" rows="10"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/textarea&gt;</code></pre><p>Jedynym ograniczeniem jest to, że jego opcjonalny argument "value" zastępuje treść znacznika &lt;textarea&gt; ... &lt;/textarea&gt; (wewnątrz HTML)</p><pre><code class="code">&gt;&gt;&gt; print TEXTAREA(value="&lt;hello world&gt;", _class="test")
+&lt;textarea class="test" cols="40" rows="10"&gt;&amp;lt;hello world&amp;gt;&lt;/textarea&gt;</code></pre><h4><code>TFOOT</code></h4><div class="inxx">TFOOT</div><p>Jest stosowany do zaznaczenia obszaru wierszy stopki tabeli.</p><pre><code class="code">&gt;&gt;&gt; print TFOOT(TR(TD('&lt;hello&gt;')), _class='test', _id=0)
+&lt;tfoot id="0" class="test"&gt;&lt;tr&gt;&lt;td&gt;&amp;lt;hello&amp;gt;&lt;/td&gt;&lt;/tr&gt;&lt;/tfoot&gt;</code></pre><h4><code>TH</code></h4><div class="inxx">TH</div><p>Jest używany zamiast <code>TD</code> w nagłówku tabeli.</p><pre><code class="code">&gt;&gt;&gt; print TH('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;th id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/th&gt;</code></pre><h4><code>THEAD</code></h4><div class="inxx">THEAD</div><p>Jest używany do określenia obszaru wierszy nagłówka tabeli.</p><pre><code class="code">&gt;&gt;&gt; print THEAD(TR(TH('&lt;hello&gt;')), _class='test', _id=0)
+&lt;thead id="0" class="test"&gt;&lt;tr&gt;&lt;th&gt;&amp;lt;hello&amp;gt;&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;</code></pre><h4><code>TITLE</code></h4><div class="inxx">TITLE</div><p>Jest używany do wygenerowania znacznika &lt;title&gt; w sekcji <em>header</em> strony HTML.</p><pre><code class="code">&gt;&gt;&gt; print TITLE('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'))
+&lt;title&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/title&gt;</code></pre><h4><code>TR</code></h4><div class="inxx">TR</div><p>Generuje znaczniki wierszy tabeli. Należy umieszczać wewnątrz tabeli. Powinny zawierać znaczniki <code>&lt;td&gt;...&lt;/td&gt;</code>. Argumenty <code>TR</code>, które nie są obiektami <code>TD</code> będą automatycznie przekonwertowane.</p><pre><code class="code">&gt;&gt;&gt; print TR('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;tr id="0" class="test"&gt;&lt;td&gt;&amp;lt;hello&amp;gt;&lt;/td&gt;&lt;td&gt;&lt;b&gt;world&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;</code></pre><h4><code>TT</code></h4><div class="inxx">TT</div><p>Generuje znaczniki do wyświetlania tekstu stałej szerokości.</p><pre><code class="code">&gt;&gt;&gt; print TT('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;tt id="0" class="test"&gt;&amp;lt;hello&amp;gt;&lt;b&gt;world&lt;/b&gt;&lt;/tt&gt;</code></pre><h4><code>UL</code></h4><p>Generuje znacznik nieuporządkowanej listy i wymaga umieszczenie wewnątrz elementów LI. Jeśli jego zawartość nie posiada obiektów LI, UL doda je automatycznie.</p><div class="inxx">UL</div><pre><code class="code">&gt;&gt;&gt; print UL('&lt;hello&gt;', XML('&lt;b&gt;world&lt;/b&gt;'), _class='test', _id=0)
+&lt;ul id="0" class="test"&gt;&lt;li&gt;&amp;lt;hello&amp;gt;&lt;/li&gt;&lt;li&gt;&lt;b&gt;world&lt;/b&gt;&lt;/li&gt;&lt;/ul&gt;</code></pre><h4><code>URL</code></h4><p>Helper URL jest udokumentowany w <a href="../04#markmin_URL">rozdziale 4</a></p><h4><code>embed64</code></h4><p><code>embed64(filename=None, file=None, data=None, extension='image/gif')</code> koduje dostarczone dane (binarne) do base64.</p><p>filename: jeśli określono, otwiera i odczytuje ten plik w trybie 'rb'; file: jeśli określono, odczytuje ten plik; data: jeśłi określono, używa tych danych.</p><div class="inxx">embed64</div><h4><code>xmlescape</code></h4><p><code>xmlescape(data, quote=True)</code> zwraca ciąg znakowy dostarczonych danych zabezpieczony znakami ucieczki.</p><div class="inxx">xmlescape</div><pre><code class="code">&gt;&gt;&gt; print xmlescape('&lt;hello&gt;')
+&amp;lt;hello&amp;gt;</code></pre><h3>Własne helpery</h3><h4><code>TAG</code></h4><div class="inxx">TAG</div><p>Czasem zachodzi potrzeba wygenerowania własnych znaczników XML. W web2py dostarczany jest helper <code>TAG</code> - uniwersalny generator znaczników.</p><pre><code class="code">{{=TAG.name('a', 'b', _c='d')}}</code></pre><p>generuje następujący kod XML</p><pre><code class="code">&lt;name c="d"&gt;ab&lt;/name&gt;</code></pre><p>Argumenty "a", "b" i "d" są automatycznie zabezpieczane  znakami ucieczki. Do stłumienia tego zachowania użyty zostaje helper <code>XML</code>. Stosując <code>TAG</code> można wygenerować znaczniki HTML/XML nie dostarczane przez API. Helpery TAG być zagnieżdżane i serializowane poprzez <code>str().</code> Równoważna składnia to:</p><pre><code class="code">{{=TAG['name']('a', 'b', c='d')}}</code></pre><p>Jeśli obiekt TAG zostanie utworzony z pustą nazwą, to może być wykorzystany do łączenia wielu ciągów znakowych i helperów HTML, razem z zawarciem ich otaczającym je znaczniku, lecz używanie tego jest zdeprecjonowane na rzecz helpera <code>CAT</code>.</p><p>Za pomocą helpera TAG można generować znaczniki samo zamykające. Ich nazwa musi się kończyć znakiem ukośnika ("/").</p><pre><code class="code">{{=TAG['link/'](_href='http://web2py.com')}}</code></pre><p>generuje nastęþujący kod XML:</p><pre><code class="code">&lt;link ref="http://web2py.com"/&gt;</code></pre><p>Proszę zwrócić uwagę, że <code>TAG</code> jest obiektem a <code>TAG.name</code> lub <code>TAG['name']</code> jest funkcja zwracająca tymczasową klasę helpera.</p><h4><code>MENU</code></h4><div class="inxx">MENU</div><p>Helper MENU pobiera listę list lub krotkę formularzy <code>response.menu</code> (tak jak opisano to w rozdziale 4) i generuje drzewiastą strukturę używającą nieuporządkowanych list reprezentujących menu. Na przykład:</p><pre><code class="code">&gt;&gt;&gt; print MENU([['One', False, 'link1'], ['Two', False, 'link2']])
+&lt;ul class="web2py-menu web2py-menu-vertical"&gt;
+  &lt;li&gt;&lt;a href="link1"&gt;One&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="link2"&gt;Two&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;</code></pre><blockquote>Trzeci element w każdej liście (krotce) może być helperem HTML (który może zawierać
+zagnieżdżone helpery) a wtedy renderowany będzie helper <code>MENU</code>, zamiast tworzenia
+własnego znacznika <code>&lt;a&gt;</code>.</blockquote><p>Każdy element menu może mieć czwarty argument, który jest zagnieżdżonym podmenu (i rekursywnie tak dalej):</p><pre><code class="code">&gt;&gt;&gt; print MENU([['One', False, 'link1', [['Two', False, 'link2']]]])
+&lt;ul class="web2py-menu web2py-menu-vertical"&gt;
+  &lt;li class="web2py-menu-expand"&gt;
+     &lt;a href="link1"&gt;One&lt;/a&gt;
+     &lt;ul class="web2py-menu-vertical"&gt;
+        &lt;li&gt;&lt;a href="link2"&gt;Two&lt;/a&gt;&lt;/li&gt;
+     &lt;/ul&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;</code></pre><p>Element menu może mieć również opcjonalny piąty element, który ma wartość logiczną. Gdy ta wartość wynosi false, to ten element menu jest ignorowany przez helper MENU.</p><p>Helper MENU pobiera następujące opcjonalne argumenty:</p><ul><li><code>_class</code>: ustawia klasę zewnętrznych elementów UL, domyślnie "web2py-menu web2py-menu-vertical";</li><li><code>ul_class</code>: ustawia klasę wewnętrznych elementów UL, domyślnie "web2py-menu-vertical";</li><li><code>li_class</code>: ustawia klasę wewnętrznych elementów LI, domyślnie "web2py-menu-expand";</li><li><code>li_first</code>: pozwala dodać klasę do pierwszego elementu listy;</li><li><code>li_last</code>: pozwala dodać klasę do ostatniego elementu listy.</li></ul><div class="inxx">urządzenia mobilne</div><p><code>MENU</code> pobiera opcjonalny argument <code>mobile</code>. Gdy zostanie ustawiony na <code>True</code>, to zamiast budowania manu o rekursywnej strukturze <code>UL</code>, zwracane jest rozwijane menu <code>SELECT</code> ze wszystkimi opcjami menu i atrybutem <code>onchange</code>, który przekierowuje do strony odpowiadającej wybranej opcji. Jest to zaprojektowane jako alternatywne reprezentacja menu, która zwiększa użyteczność dla małych urządzeń mobilnych, takich jak telefony.</p><p>Zwykle menu jest używane w układzie z następującą składnią:</p><pre><code>{{=MENU(response.menu, mobile=request.user_agent().is_mobile)}}</code></pre><p>W ten sposób urządzenie mobilne jest automatycznie wykrywane i odpowiednio renderowane jest menu.</p><h3><code>BEAUTIFY</code></h3><p>Helper <code>BEAUTIFY</code> wykorzystywany jest do budowania reprezentacji HTML złożonych obiektów, w tym list, krotek i słowników:</p><pre><code class="code">{{=BEAUTIFY({"a": ["hello", XML("world")], "b": (1, 2)})}}</code></pre><p><code>BEAUTIFY</code> zwraca obiekt podobny do XML serializowalny do XML, z ładnie wyglądającą reprezentacją argumentu swojego konstruktora. W tym przypadku reprezentacja XML:</p><pre><code class="code">{"a": ["hello", XML("world")], "b": (1, 2)}</code></pre><p>zostanie zrenderowana tak:</p><pre><code class="code">&lt;table&gt;
+&lt;tr&gt;&lt;td&gt;a&lt;/td&gt;&lt;td&gt;:&lt;/td&gt;&lt;td&gt;hello&lt;br /&gt;world&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;b&lt;/td&gt;&lt;td&gt;:&lt;/td&gt;&lt;td&gt;1&lt;br /&gt;2&lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;</code></pre><h3>Model <em>DOM</em> po stronie serwera a parsowanie</h3><p><div class="inxx">element</div> <div class="inxx">elements</div></p><h4><code>elements</code></h4><p>Helper DIV oraz wszystkie helpery pochodne udostępniają metody wyszukujące <code>element</code> i <code>elements</code>.</p><p>Metoda <code>element</code> zwraca pierwszy element podrzędny dopasowany do określonego warunku (lub None jeśli nic nie zostanie dopasowane).</p><p>Metoda <code>elements</code> zwraca wszystkie dopasowane elementy podrzędne.</p><p>Metody <strong>element</strong> i <strong>elements</strong> używają tej samej składni do określenia warunków dopasowania, dopuszczającej trzy możliwości, które mogą być mieszane i dopasowywane: wyrażenia takie jak jQuery, dopasowanie przez dokładną wartość atrybutu i dopasowanie przy użyciu wyrażeń regularnych.</p><p>oto prosty przykład:</p><pre><code class="code">&gt;&gt;&gt; a = DIV(DIV(DIV('a', _id='target',_class='abc')))
+&gt;&gt;&gt; d = a.elements('div#target')
+&gt;&gt;&gt; d[0][0] = 'changed'
+&gt;&gt;&gt; print a
+&lt;div&gt;&lt;div&gt;&lt;div id="target" class="abc"&gt;changed&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;</code></pre><p>Nienazwany argument metody <code>elements</code> jest ciągiem znakowym, który może zawierać: nazwę znacznika, id znacznika poprzedzonego znakiem funta, nazwą klasy poprzedzoną kropka, jawną wartością atrybutu w nawiasach kwadratowych.</p><p>Oto 4 równoważne sposoby wyszukiwania poprzedniego znacznika poprzez id:</p><pre><code class="code">&gt;&gt;&gt; d = a.elements('#target')
+&gt;&gt;&gt; d = a.elements('div#target')
+&gt;&gt;&gt; d = a.elements('div[id=target]')
+&gt;&gt;&gt; d = a.elements('div',_id='target')</code></pre><p>Oto 4 równoważne sposoby wyszukiwania poprzedniego znacznika poprzez klasę:</p><pre><code class="code">&gt;&gt;&gt; d = a.elements('.abc')
+&gt;&gt;&gt; d = a.elements('div.abc')
+&gt;&gt;&gt; d = a.elements('div[class=abc]')
+&gt;&gt;&gt; d = a.elements('div',_class='abc')</code></pre><p>Do lokalizacji elementu może zostać użyty każdy atrybut (nie tylko <code>id</code> czy <code>class</code>), włączając w to wszystkie nazwane atrybuty (element funkcji może pobierać wiele argumentów nazwanych), ale tylko pierwszy element zostanie zwrócony.</p><p>Korzystając ze składni jQuery "div#target" możliwe jest określenie wielu kryteriów wyszukiwania rozdzielanych przecinkiem:</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('a', _id='t1'), DIV('b', _class='c2'))
+&gt;&gt;&gt; d = a.elements('span#t1, div.c2')</code></pre><p>lub równoważnie:</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('a', _id='t1'), DIV('b', _class='c2'))
+&gt;&gt;&gt; d = a.elements('span#t1', 'div.c2')</code></pre><p>Jeśli wartość atrybutu została określona przy użyciu nazwanego argumentu, to może być ciągiem znakowym lub wyrażeniem regularnym:</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('a', _id='test123'), DIV('b', _class='c2'))
+&gt;&gt;&gt; d = a.elements('span', _id=re.compile('test\d{3}')</code></pre><p>Specjalnym nazwanym argumentem helpera DIV (i helperów pochodnych) jest <code>find</code>. Można go stosować do określenia wyszukiwanej wartości lub wyrażenia regularnego w treści tekstu znacznika. Na przykład:</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('abcde'), DIV('fghij'))
+&gt;&gt;&gt; d = a.elements(find='bcd')
+&gt;&gt;&gt; print d[0]
+&lt;span&gt;abcde&lt;/span&gt;</code></pre><p>lub</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('abcde'), DIV('fghij'))
+&gt;&gt;&gt; d = a.elements(find=re.compile('fg\w{3}'))
+&gt;&gt;&gt; print d[0]
+&lt;div&gt;fghij&lt;/div&gt;</code></pre><div class="inxx">components</div><h4><code>components</code></h4><p>Oto przykład uzyskania wykazu wszystkich elementów w łańcuchu html:</p><pre><code class="code">html = TAG('&lt;a&gt;xxx&lt;/a&gt;&lt;b&gt;yyy&lt;/b&gt;')
+for item in html.components: print item</code></pre><p><div class="inxx">parent</div> <div class="inxx">sibling</div></p><h4><code>parent</code> i <code>siblings</code></h4><p><code>parent</code> zwraca element nadrzędny bieżącego elementu.</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('a'),DIV('b'))
+&gt;&gt;&gt; s = a.element('span')
+&gt;&gt;&gt; d = s.parent
+&gt;&gt;&gt; d['_class']='abc'
+&gt;&gt;&gt; print a
+&lt;div class="abc"&gt;&lt;span&gt;a&lt;/span&gt;&lt;div&gt;b&lt;/div&gt;&lt;/div&gt;
+&gt;&gt;&gt; for e in s.siblings(): print e
+&lt;div&gt;b&lt;/div&gt;</code></pre><h4>Zastępowanie elementów</h4><p>Dopasowane elementy można również wymieniać lub usuwać podając argument <code>replace</code>. Proszę zwrócić uwagę, ze lista oryginalnie dopasowanych elementów jest zwracana nadal jak zwykle.</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('x'), DIV(SPAN('y'))
+&gt;&gt;&gt; b = a.elements('span', replace=P('z')
+&gt;&gt;&gt; print a
+&lt;div&gt;&lt;p&gt;z&lt;/p&gt;&lt;div&gt;&lt;p&gt;z&lt;/p&gt;&lt;/div&gt;</code></pre><p>Argument <code>replace</code> może być wywoływalny. W takim przypadku przekazuje on oryginalny element i oczekiwany jest zwrot zamienionego elementu:</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('x'), DIV(SPAN('y'))
+&gt;&gt;&gt; b = a.elements('span', replace=lambda t: P(t[0])
+&gt;&gt;&gt; print a
+&lt;div&gt;&lt;p&gt;x&lt;/p&gt;&lt;div&gt;&lt;p&gt;y&lt;/p&gt;&lt;/div&gt;</code></pre><p>Jeśli <code>replace=None</code>, to dopasowane elementy zostaną całkowicie usunięte.</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('x'), DIV(SPAN('y'))
+&gt;&gt;&gt; b = a.elements('span', replace=None)
+&gt;&gt;&gt; print a
+&lt;div&gt;&lt;/div&gt;</code></pre><div class="inxx">flatten</div><h4><code>flatten</code></h4><p>Metoda flatten rekursywnie serializuje zawartość elementów podrzędnych danego elementu do zwykłego tekstu (bez znaczników):</p><pre><code class="code">&gt;&gt;&gt; a = DIV(SPAN('this', DIV('is', B('a'))), SPAN('test'))
+&gt;&gt;&gt; print a.flatten()
+thisisatest</code></pre><p>Metoda flatten może przekazywać opcjonalny argument <code>render</code>, czyli funkcję, która renderuje (spłaszcza) zawartość przy użyciu innego protokołu. Oto przykład serializacji kilku znaczników do składni wiki Markmin:</p><pre><code class="code">&gt;&gt;&gt; a = DIV(H1('title'), P('example of a ', A('link', _href='#test')))
+&gt;&gt;&gt; from gluon.html import markmin_serializer
+&gt;&gt;&gt; print a.flatten(render=markmin_serializer)
+# titles
+
+example of [[a link #test]]</code></pre><p>W chwili pisania tego rozdziału udostępniamy <code>markmin_serializer</code> i <code>markdown_serializer</code>.</p><h4>Parsowanie</h4><p>Obiekt TAG jest również parserem XML/HTML. Może odczytywać tekst i konwertować do struktury drzewiastej helperów. Pozwala to na manipulowanie przy wykorzystaniu powyższego API:</p><pre><code class="code">&gt;&gt;&gt; html = '&lt;h1&gt;Title&lt;/h1&gt;&lt;p&gt;this is a &lt;span&gt;test&lt;/span&gt;&lt;/p&gt;'
+&gt;&gt;&gt; parsed_html = TAG(html)
+&gt;&gt;&gt; parsed_html.element('span')[0]='TEST'
+&gt;&gt;&gt; print parsed_html
+&lt;h1&gt;Title&lt;/h1&gt;&lt;p&gt;this is a &lt;span&gt;TEST&lt;/span&gt;&lt;/p&gt;</code></pre><p><div class="inxx">układ strony</div> <div class="inxx">layout.html</div> <div class="inxx">extent</div> <div class="inxx">include</div></p><h3>Układ strony</h3><p>Widoki można rozszerzać i wstawiać jeden widok w drugi tworząc drzewiastą strukturę.</p><p>Na przykład widok "index.html" rozszerza "layout.html" i wstawiany jest w nim "body.html". Równocześnie w "layout.html" wstawiany jest "header.html" i "footer.html".</p><p>Korzeniem tego drzewa jest to co nazywamy <strong>układem strony</strong> (<em>ang. page layout</em>). Można go edytować, jak każdy inny plik szablonowy HTML, wykorzystując interfejs administracyjny web2py. Nazwa pliku "layout.html", to tylko konwencja.</p><p>Oto minimalna strona rozszerzająca widok "layout.html" i zawierająca widok "page.html":</p><pre><code class="code">{{extend 'layout.html'}}
+&lt;h1&gt;Hello World&lt;/h1&gt;
+{{include 'page.html'}}</code></pre><p>Plik rozszerzający układ musi zawierać dyrektywę <code>{{include}}</code>, podobnie jak tu:</p><pre><code class="code">&lt;html&gt;
+  &lt;head&gt;
+    &lt;title&gt;Page Title&lt;/title&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+    {{include}}
+  &lt;/body&gt;
+&lt;/html&gt;</code></pre><p>Podczas wywoływania widoku ładowany jest widok (układ) będący bazą rozszerzenia oraz wywoływany jest wewnątrz tego układu widok zamieniający dyrektywę <code>{{include}}</code>. Przetwarzanie jest kontynuowane dopóki wszystkie dyrektywy <code>extend</code> i <code>include</code> nie zostaną przetworzone. Wynikowy szablon jest następnie tłumaczony na kod Pythona. Proszę mieć na uwadze, że gdy aplikacja jest skompilowana do kodu bajtowego, jest to kod Pythona, który został skompilowany, a nie oryginalne pliki widoku. Tak więc skompilowana do kodu bajtowego wersja określonego widoku jest pojedynczym plikiem .pyc, obejmującym całe drzewo rozszerzonych i wstawianych widoków.</p><blockquote>Dyrektywy <code>extend</code>, <code>include</code>, <code>block</code> i <code>super</code> są specjalnymi dyrektywami
+szablonowymi a nie poleceniami Pythona.</blockquote><p>Każda treść poprzedzający dyrektywę <code>{{extend ...}}</code> zostanie wstawiona (i przetworzona) przed rozpoczęciem przetwarzania rozszerzonej (bazowej) treści widoku. Chociaż nie jest to zwykle używane do wstawiania rzeczywistej zawartości HTML, może być użyteczne do określenia zmiennych lub funkcji, które chce się uczynić dostępnymi dla rozszerzanego widoku. Na przykład, rozważmy widok "index.html":</p><pre><code class="code">{{sidebar_enabled=True}}
+{{extend 'layout.html'}}
+&lt;h1&gt;Home Page&lt;/h1&gt;</code></pre><p>i fragment z "layout.html":</p><pre><code class="code">{{if sidebar_enabled:}}
+    &lt;div id="sidebar"&gt;
+        Sidebar Content
+    &lt;/div&gt;
+{{pass}}</code></pre><p>Ponieważ przypisanie <code>sidebar_enabled</code> w "index.html" następuje przed <code>extend</code>, to linia pobierająca wstawiona będzie przed rozpoczęciem przetwarzania "layout.html" czyniąc, że <code>sidebar_enabled</code> będzie dostępny w całym kodzie "layout.html" (nieco bardziej zaawansowaną wersję tego stosuje się w aplikacji <strong>welcome</strong>).</p><p>Warto również mieć na uwadze, że zmienne zwracane przez funkcje kontrolera są dostępne nie tylko w głównym widoku funkcji ale również we wszystkich jego widokach rozszerzających i wstawianych.</p><p>Argumentem dyrektyw <code>extend</code> lub <code>include</code> (tj. nazwą rozszerzonego lub wstawionego widoku) może być zmienna Pythona (lecz nie wyrażenie Pythona). Jednak nakłada to ograniczenie – widoki używające zmiennych w wyrażeniach <code>extend</code> lub <code>include</code> nie mogą być kompilowane do kodu bajtowego. Jak wspomniano powyżej, widoki skompilowane bajtowo zawierają całe drzewo widoków rozszerzających i wstawianych, tak więc określone widoki rozszerzające i wstawiane muszą być znane w czasie kompilacji, co nie jest możliwe, jeśli nazwy tych widoków są zmiennymi (ich wartości nie są określane w w czasie wykonania). Ponieważ widoki skompilowane bajtowo znacząco przyspieszają przetwarzanie, to należy unikać używania zmiennych w argumentach dyrektyw <code>extend</code> i <code>include</code>, jak to tylko możliwe.</p><p>W niektórych przypadkach, alternatywą dla uzywania zmiennej w dyrektywie <code>include</code> jest umieszczenie zwyklego wyrażenia <code>{{include ...}}</code> w bloku <code>if...else</code>.</p><pre><code class="code">{{if some_condition:}}
+{{include 'this_view.html'}}
+{{else:}}
+{{include 'that_view.html'}}
+{{pass}}</code></pre><p>Powyższy kod nie stanowi żadnego problemu dla kompilacji bajtowej, ponieważ żadne zmienne nie są zaangażowane. Należy jednak pamiętać, że skompilowany bajtowo widok w rzeczywistości zawiera kod Pythona zarówno dla "this_view.html" jak i "that_view.html", choć tylko kod jednego z nich zostanie wykonany, w zależności od wartości <code>some_condition</code>.</p><p>Trzeba pamiętać, że działa to tylko dla dyrektywy <code>include</code> -- nie można umieścić dyrektywy <code>{{extend ...}}</code> w bloku <code>if...else</code>.</p><p><div class="inxx">response.menu</div> <div class="inxx">menu</div> <div class="inxx">response.meta</div> <div class="inxx">meta</div></p><p>Układy są wykorzystywane do hermetyzacji ujednoliconej strony (nagłówków, stopek, menu) i choć nie są one obowiązkowe, to ułatwiają pisanie i utrzymanie aplikacji. W szczególności sugerujemy pisanie układów korzystających z następujących zmiennych, które mogą być ustawione w kontrolerze. Korzystanie z tych powszechnie znanych zmiennych pomoże uczynić układy wymienialnymi:</p><pre><code class="code">response.title
+response.subtitle
+response.meta.author
+response.meta.keywords
+response.meta.description
+response.flash
+response.menu
+response.files</code></pre><p>Z wyjątkiem <code>menu</code> i <code>files</code>, wszystkie te ciągi znakowe i ich znaczenie powinny być oczywiste.</p><p>Zmienna <code>response.menu</code> jest listą trzech lub czterech krotek. Te trzy elementy to: nazwa odnośnika, logiczna reprezentacja tego, czy odnośnik jest aktywny (jest bieżącą pozycją menu)  i adres URL linkowanej strony. Na przykład:</p><pre><code class="code">response.menu = [('Google', False, 'http://www.google.com',[]),
+                 ('Index',  True,  URL('index'), [])]</code></pre><div class="inxx">sub-menu</div><p>Czwarty element jest opcjonalnym podmenu.</p><p>Zmienna <code>response.files</code> jest listą plików CSS i JS, które są wymagane na stronie.</p><p>Zalecamy również użycie w sekcji head dokumentu HTML wyrażenie:</p><pre><code class="code">{{include 'web2py_ajax.html'}}</code></pre><p>ponieważ wstawia to biblioteki jQuery i definiuje kilka funkcji JavaScript wstecznej kompatybilności dla efektów specjalnych i Ajax. Plik "web2py_ajax.html" wstawia w widoku znaczniki <code>response.meta</code>, podstawowy kod jQuery, okienko kalendarza (<em>ang. datepicker</em>) i wszystkie wymagane w <code>response.files</code> pliki CSS i JS.</p><h4>Domyślny układ strony</h4><div class="inxx">Twitter Bootstrap</div><p>Układ "views/layout.html" dostarczany wraz ze szkieletową aplikacją <strong>welcome</strong> ma następującą strukturę (okrojoną z niektórych opcjonalnych części):</p><pre><code class="code">&lt;!DOCTYPE html&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8" /&gt;
+  &lt;title&gt;{{=response.title or request.application}}&lt;/title&gt;
+  ...
+  &lt;script src="{{=URL('static','js/modernizr.custom.js')}}"&gt;&lt;/script&gt;
+
+  {{
+  response.files.append(URL('static','css/web2py.css'))
+  response.files.append(URL('static','css/bootstrap.min.css'))
+  response.files.append(URL('static','css/bootstrap-responsive.min.css'))
+  response.files.append(URL('static','css/web2py_bootstrap.css'))
+  }}
+
+  {{include 'web2py_ajax.html'}}
+
+  {{
+  # using sidebars need to know what sidebar you want to use
+  left_sidebar_enabled = globals().get('left_sidebar_enabled',False)
+  right_sidebar_enabled = globals().get('right_sidebar_enabled',False)
+  middle_columns = {0:'span12',1:'span9',2:'span6'}[
+    (left_sidebar_enabled and 1 or 0)+(right_sidebar_enabled and 1 or 0)]
+  }}
+
+  {{block head}}{{end}}
+&lt;/head&gt;
+
+&lt;body&gt;
+  &lt;!-- Navbar ================================================== --&gt;
+  &lt;div class="navbar navbar-inverse navbar-fixed-top"&gt;
+    &lt;div class="flash"&gt;{{=response.flash or ''}}&lt;/div&gt;
+    &lt;div class="navbar-inner"&gt;
+      &lt;div class="container"&gt;
+        {{=response.logo or ''}}
+        &lt;ul id="navbar" class="nav pull-right"&gt;
+          {{='auth' in globals() and auth.navbar(mode="dropdown") or ''}}
+        &lt;/ul&gt;
+        &lt;div class="nav-collapse"&gt;
+          {{if response.menu:}}
+          {{=MENU(response.menu)}}
+          {{pass}}
+        &lt;/div&gt;&lt;!--/.nav-collapse --&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;&lt;!--/top navbar --&gt;
+
+  &lt;div class="container"&gt;
+    &lt;!-- Masthead ================================================== --&gt;
+    &lt;header class="mastheader row" id="header"&gt;
+        &lt;div class="span12"&gt;
+            &lt;div class="page-header"&gt;
+                &lt;h1&gt;
+                    {{=response.title or request.application}}
+                    &lt;small&gt;{{=response.subtitle or ''}}&lt;/small&gt;
+                &lt;/h1&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/header&gt;
+
+    &lt;section id="main" class="main row"&gt;
+        {{if left_sidebar_enabled:}}
+        &lt;div class="span3 left-sidebar"&gt;
+            {{block left_sidebar}}
+            &lt;h3&gt;Left Sidebar&lt;/h3&gt;
+            &lt;p&gt;&lt;/p&gt;
+            {{end}}
+        &lt;/div&gt;
+        {{pass}}
+
+        &lt;div class="{{=middle_columns}}"&gt;
+            {{block center}}
+            {{include}}
+            {{end}}
+        &lt;/div&gt;
+
+        {{if right_sidebar_enabled:}}
+        &lt;div class="span3"&gt;
+            {{block right_sidebar}}
+            &lt;h3&gt;Right Sidebar&lt;/h3&gt;
+            &lt;p&gt;&lt;/p&gt;
+            {{end}}
+        &lt;/div&gt;
+        {{pass}}
+    &lt;/section&gt;&lt;!--/main--&gt;
+
+    &lt;!-- Footer ================================================== --&gt;
+    &lt;div class="row"&gt;
+        &lt;footer class="footer span12" id="footer"&gt;
+            &lt;div class="footer-content"&gt;
+                {{block footer}} &lt;!-- this is default footer --&gt;
+                ...
+                {{end}}
+            &lt;/div&gt;
+        &lt;/footer&gt;
+    &lt;/div&gt;
+
+  &lt;/div&gt; &lt;!-- /container --&gt;
+
+  &lt;!-- The javascript =============================================
+       (Placed at the end of the document so the pages load faster) --&gt;
+  &lt;script src="{{=URL('static','js/bootstrap.min.js')}}"&gt;&lt;/script&gt;
+  &lt;script src="{{=URL('static','js/web2py_bootstrap.js')}}"&gt;&lt;/script&gt;
+  {{if response.google_analytics_id:}}
+    &lt;script src="{{=URL('static','js/analytics.js')}}"&gt;&lt;/script&gt;
+    &lt;script type="text/javascript"&gt;
+    analytics.initialize({
+      'Google Analytics':{trackingId:'{{=response.google_analytics_id}}'}
+    });&lt;/script&gt;
+  {{pass}}
+&lt;/body&gt;
+&lt;/html&gt;</code></pre><p>Istnieje kilka cech tego domyślnego układu, które sprawiają, że jest on bardzo łatwy w użyciu i dostosowaniu:</p><ul><li>Jest napisany w HTML5 i stosuje bibliotekę "modernizr" <sup>[<a href="/book/default/reference/42/modernizr" target="_blank">modernizr</a>]</sup> do zapewnienia kompatybilności wstecznej. Rzeczywisty układ zawiera kilka dodatkowych wyrażeń warunkowych wymaganych przez IE i zostały one tutaj pominięte dla uproszczenia.</li><li>Wyświetla zarówno <code>response.title</code> jak i <code>response.subtitle</code>, które mogą zostać ustawione w modelu. Jeśli nie zostaną ustawione, przyjmie jako tytuł nazwę aplikacji.</li><li>Wstawia w sekcji header plik <code>web2py_ajax.html</code>, który generuje wszystkie wyrażenia importu <code>link</code> i <code>script</code>.</li><li>Wykorzystuje zmodyfikowaną wersję Twitter Bootstrap dla elastycznych układów strony, które działają na urządzeniach mobilnych i reorganizują kolumny w celu dopasowania strony do małych ekranów.</li><li>Używa "analytics.js" do łączenia sie z Google Analytics.</li><li>Wyrażenie <code>{{=auth.navbar(...)}}</code> wyświetla powitanie dla bieżącego użytkownika i odnośniki do funkcji uwierzytelniających, takich jak login, logout, register, change password itd., w zależności od kontekstu. Jest to helper fabryka i jego wyjściem można manipulować jak w każdym innym helperze. Jest on umieszczany w bloku <code>{{try:}}...{{except:pass}}</code> na wypadek gdy uwierzytelniania nie zostanie zdefiniowane.</li><li>Wyrażenie <code>{{=MENU(response.menu)}}</code> wyświetla strukturę menu jako <code>&lt;ul&gt;...&lt;/ul&gt;</code>.</li><li>Wyrażenie <code>{{include}}</code> jest zamieniane przez treść rozszerzającego widoku podczas renderowania strony.</li><li>Domyślnie wykorzystuje warunkowy układ trzykolumnowy (lewy i prawy pasek boczny może zostać wyłączony przez widoki rozszerzające).</li><li>Używa klas: header, main, footer.</li><li>Zawiera bloki: statusbar, left_sidebar, center, right_sidebar, footer.</li></ul><p>W widokach można włączyć i dostosować paski boczne w sposób następujący:</p><pre><code class="code">{{left_sidebar_enable=True}}
+{{extend 'layout.html'}}
+
+This text goes in center
+
+{{block left_sidebar}}
+This text goes in sidebar
+{{end}}</code></pre><h4>Dostosowywanie domyślnego układu</h4><div class="inxx">CSS</div><p>Dostosowywanie domyślnego układu bez jego edytowania jest łatwe, ponieważ aplikacja <em>welcome</em> jest oparta na Twitter Bootstrap, który jest dobrze udokumentowany i obsługuje motywy. W web2py są cztery statyczne pliki istotne dla stylizacji:</p><ul><li>"css/web2py.css" zawiera style specyficzne dla web2py;</li><li>"css/bootstrap.min.css" zawiera style CSS Twitter Bootstrap <sup>[<a href="/book/default/reference/42/bootstrap" target="_blank">bootstrap</a>]</sup>; <div class="inxx">Bootstrap</div></li><li>"css/web2py_bootstrap.css" zawiera style nadpisujące kilka stylów Bootstrap w celu dostosowania ich do potrzeb web2py;</li><li>"js/bootstrap.min.js" który zawiera biblioteki dla efektów menu, okien modalnych i paneli.</li></ul><p>Jeśli chce się zmienić kolory i obraz tła, można spróbować dodać następujący kod do sekcji <em>header</em> pliku layout.html:</p><pre><code class="code">&lt;style&gt;
+body { background: url('images/background.png') repeat-x #3A3A3A; }
+a { color: #349C01; }
+.header h1 { color: #349C01; }
+.header h2 { color: white; font-style: italic; font-size: 14px;}
+.statusbar { background: #333333; border-bottom: 5px #349C01 solid; }
+.statusbar a { color: white; }
+.footer { border-top: 5px #349C01 solid; }
+&lt;/style&gt;</code></pre><p>Oczywiście można też całkowicie wymienić pliki "layout.html" i "web2py.css" według własnych potrzeb.</p><h4>Układy na urządzenia mobilne</h4><p>Domyślnie layout.html jest stworzony tak, aby był przyjazny dla urządzeń mobilnych, ale to może nie wystarczyć. Może zachodzić potrzeba użycia specjalnych widoków, gdy strona jest odwiedzana z urządzenia mobilnego.</p><p>W celu wspomożenia pracy nad graficznymi interfejsami dla różnych urządzeń stacjonarnych i przenośnych, web2py oferuje dekorator <code>@mobilize</code>. Dekorator ten stosuje się do akcji, które mają widok dla urządzeń stacjonarnych i mobilnych. Oto przykład:</p><pre><code>from gluon.contrib.user_agent_parser import mobilize
+@mobilize
+def index():
+   return dict()</code></pre><p>Proszę zwrócić uwagę, że dekorator musi być importowany przed wykorzystaniem go w kontrolerze. Gdy funkcja "index" jest wywoływana w zwykłej przeglądarce (na komputerze stacjonarnym), web2py będzie renderował zwracany słownik przy użyciu widoku "[controller]/index.html". Lecz gdy funkcja ta będzie wywoływana w urządzeniu mobilnym, słownik będzie renderowany przez widok "[controller]/index.mobile.html". Proszę zauważyć, że mobilny widok ma rozszerzenie "mobile.html".</p><p>Alternatywnie można zastosować następującą logikę do wykonania widoków przyjaznych dla urządzeń mobilnych:</p><pre><code>if request.user_agent().is_mobile:
+    response.view.replace('.html','.mobile.html')</code></pre><p>Wprawdzie zadanie utworzenia widoków "*.mobile.html" leży w gestii programisty, ale zalecamy używanie wtyczki "jQuery Mobile", która czyni takie zadanie bardzo prostym.</p><h3>Funkcje w widokach</h3><p>Rozważmy widok "layout.html":</p><pre><code class="code">&lt;html&gt;
+  &lt;body&gt;
+    {{include}}
+    &lt;div class="sidebar"&gt;
+      {{if 'mysidebar' in globals():}}{{mysidebar()}}{{else:}}
+        my default sidebar
+      {{pass}}
+    &lt;/div&gt;
+  &lt;/body&gt;
+&lt;/html&gt;</code></pre><p>i ten widok rozszerzający:</p><pre><code class="code">{{def mysidebar():}}
+my new sidebar!!!
+{{return}}
+{{extend 'layout.html'}}
+Hello World!!!</code></pre><p>Proszę zauważyć, że  funkcja jest zdefiniowana przed wyrażeniem <code>{{extend...}}</code> -- w efekcie funkcja zostaje utworzona zanim wykonany będzie kod "layout.html", tak więc funkcja może być wywołana w każdym miejscu "layout.html", nawet przed wyrażeniem <code>{{include}}</code>. Proszę też zwrócić uwagę, ze funkcja jest wstawiana w rozszerzonym widoku bez przedrostka <code>=</code>.</p><p>Kod ten generuje następujące wyjście:</p><pre><code class="code">&lt;html&gt;
+  &lt;body&gt;
+    Hello World!!!
+    &lt;div class="sidebar"&gt;
+        my new sidebar!!!
+    &lt;/div&gt;
+  &lt;/body&gt;
+&lt;/html&gt;</code></pre><p>Proszę również zauważyć, że funkcja jest zdefiniowana w HTML (choć może też zawierać kod Pythona), tak że <code>response.write</code> jest użyty do zapisu jej treści (funkcja nie zwraca treści). Dlatego właśnie układ wywołuje funkcję widoku używając <code>{{mysidebar()}}</code> zamiast <code>{{=mysidebar()}}</code>. Funkcje zdefiniowane w ten sposób mogą pobierać argumenty.</p><div class="inxx">block</div><h3>Bloki w widokach</h3><p>Podstawowym sposobem ma uczynienie widoków bardziej modularnymi jest użycie wyrażeń <code>{{block...}}</code>. Mechanizm ten jest alternatywą dla mechanizmu omówionego w poprzednim rozdziale.</p><p>Aby zrozumieć jak to działa, rozważmy aplikacje oparte na szkielecie Welcome, który ma widok layout.html. Widok ten jest zawarty w widoku <code>default/index.html</code> w wyniku wyrażenia <code>{{extend 'layout.html'}}</code>. Treść layout.html definiuje wstępnie pewne bloki z jakąś zawartością i dlatego są one zawarte w default/index.html.</p><p>Można zastąpić domyślne treści bloków załączając nowa treść wewnątrz takiego bloku o tej samej nazwie. Położenie bloku w layout.html nie ulega zmianie, ale treść bloku tak.</p><p>Oto wersja uproszczona. Załóżmy, ze mamy taki "layout.html":</p><pre><code class="code">&lt;html&gt;
+  &lt;body&gt;
+    {{include}}
+    &lt;div class="sidebar"&gt;
+      {{block mysidebar}}
+        my default sidebar (this content to be replaced)
+      {{end}}
+    &lt;/div&gt;
+  &lt;/body&gt;
+&lt;/html&gt;</code></pre><p>oraz takie prosty widok rozszerzający <code>default/index.html</code>:</p><pre><code class="code">{{extend 'layout.html'}}
+Hello World!!!
+{{block mysidebar}}
+my new sidebar!!!
+{{end}}</code></pre><p>Generuje on następujące wyjście, gdzie treść jest dostarczana przez przesłaniający blok w widoku rozszerzającym, ale zakrywany DIV i klasa znajdują się w layout.html. Pozwala to na osiągnięcie spójności widoków:</p><pre><code class="code">&lt;html&gt;
+  &lt;body&gt;
+    Hello World!!!
+    &lt;div class="sidebar"&gt;
+        my new sidebar!!!
+    &lt;/div&gt;
+  &lt;/body&gt;
+&lt;/html&gt;</code></pre><p>Rzeczywisty layout.html definiuje kilka pożytecznych bloków i można łatwo dopasować układ do swojej wizji.</p><p>Można mieć wiele bloków i jeśli blok jest obecny w widoku rozszerzonym ale nie w widoku rozszerzającym, użyta zostanie treść z widoku rozszerzanego. Proszę również zauważyć, że w przeciwieństwie do funkcji, jest zbytecznym definiowanie bloku przed wyrażeniem <code>{{extend ...}}</code> -- nawet jeśli zdefiniowano bloki po wyrażeniu <code>extend</code>, mogą być one użyte do zastąpienia gdziekolwiek w rozszerzanym widoku.</p><div class="inxx">super</div><p>Wewnątrz bloku można używać wyrażenia <code>{{super}}</code> w celu wstawienia treści widoku nadrzędnego. Na przykład, jeśli wymienimy wyżej omówiony widok rozszerzający na:</p><pre><code class="code">{{extend 'layout.html'}}
+Hello World!!!
+{{block mysidebar}}
+{{super}}
+my new sidebar!!!
+{{end}}</code></pre><p>otrzymamy:</p><pre><code class="code">&lt;html&gt;
+  &lt;body&gt;
+    Hello World!!!
+    &lt;div class="sidebar"&gt;
+        my default sidebar
+        my new sidebar!!!
+    &lt;/div&gt;
+  &lt;/body&gt;
+&lt;/html&gt;</code></pre>

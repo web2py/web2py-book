@@ -1,5 +1,6 @@
 ## The core
 
+[[CommandLineOptions]]
 ### Command line options
 
 It is possible to skip the GUI and start web2py directly from the command line by typing something like:
@@ -111,10 +112,6 @@ Options:
   -T TEST_PATH, --test=TEST_PATH
                         run doctests in web2py environment; TEST_PATH like
                         a/c/f (c,f optional)
-  -W WINSERVICE, --winservice=WINSERVICE 
-                        -W install|start|stop as Windows service. 
-                        However, this is deprecated. Please see 
-                        use of nssm in the Deployment Recipes chapter
   -C, --cron            trigger a cron run manually; usually invoked from a
                         system crontab
   --softcron            triggers the use of softcron
@@ -122,8 +119,8 @@ Options:
   -J, --cronjob         identify cron-initiated command
   -L CONFIG, --config=CONFIG
                         config file
-  -F PROFILER_FILENAME, --profiler=PROFILER_FILENAME
-                        profiler filename
+  -F PROFILER_DIR, --profiler=PROFILER_DIR
+                        profiler dir
   -t, --taskbar         use web2py gui and run in taskbar (system tray)
   --nogui               text-only, no GUI
   -A ARGS, --args=ARGS  should be followed by a list of arguments to be passed
@@ -138,40 +135,16 @@ Options:
   --run_system_tests    runs web2py tests
 ``:code
 
-Lower-case options are used to configure the web server. The ``-L`` option tells web2py to read configuration options from a file, ``-W`` installs web2py as a windows service, while ``-S``, ``-P`` and ``-M`` options start an interactive Python shell. The ``-T`` option finds and runs controller doctests in a web2py execution environment. For example, the following example runs doctests from all controllers in the "welcome" application:
+------
+Please note:
+- The option ``-W``, used to install a Windows service, has been removed. Please see [[nssm in the Deployment Recipes chapter ../13/#nssm]]
+- Profiler output can be analyzed using ``runsnakerun`` tool
+------
+
+Lower-case options are used to configure the web server. The ``-L`` option tells web2py to read configuration options from a file, while ``-S``, ``-P`` and ``-M`` options start an interactive Python shell. The ``-T`` option finds and runs controller doctests in a web2py execution environment. For example, the following example runs doctests from all controllers in the "welcome" application:
 ``
 python web2py.py -vT welcome
 ``:code
-
-if you run web2py as a Windows Service, ``-W``,  it is not convenient to pass the configuration using command line arguments. For this reason, in the web2py folder there is a sample "options_std.py" configuration file for the internal web server:
-
-``
-import socket
-import os
-
-ip = '0.0.0.0'
-port = 80
-interfaces = [('0.0.0.0', 80)]
-               #,('0.0.0.0',443,'ssl_private_key.pem','ssl_certificate.pem')]
-password = '<recycle>'  # ## <recycle> means use the previous password
-pid_filename = 'httpserver.pid'
-log_filename = 'httpserver.log'
-profiler_filename = None
-ssl_certificate = None  # 'ssl_certificate.pem'  # ## path to certificate file
-ssl_private_key = None  # 'ssl_private_key.pem'  # ## path to private key file
-#numthreads = 50 # ## deprecated; remove
-minthreads = None
-maxthreads = None
-server_name = socket.gethostname()
-request_queue_size = 5
-timeout = 30
-shutdown_timeout = 5
-folder = os.getcwd()
-extcron = None
-nocron = None
-``:code
-
-This file contains the web2py defaults. If you edit this file, you need to import it explicitly with the ``-L`` command-line option. It only works if you run web2py as a Windows Service.
 
 ### Workflow
 
@@ -194,6 +167,8 @@ There are some caveats to keep in mind:
 - Models in the same folder/subfolder are executed in alphabetical order.
 - Any variable defined in a model will be visible to other models following alphabetically, to the controllers, and to the views.
 ``models_to_run``:inxx
+``conditional models``:inxx
+[[conditional_models]]
 - Models in subfolders are executed conditionally. For example, if the user has requested "/a/c/f" where "a" is the application, "c" is the controller, and "f" is the function (action), then the following models are executed:
 
 ``
@@ -449,8 +424,8 @@ which is a script to interface with many different web servers, described in Cha
 There are three example files in the "examples" directory:
 ``
 options_std.py
-routes.example.py
-router.example.py
+routes.parametric.example.py
+routes.patterns.example.py
 ``:code
 
 They are all meant to be copied to the root dir (where web2py.py or web2py.exe is) and edited according to your own preferences.
@@ -482,6 +457,7 @@ gluon/contrib/markdown/markdown2.py
 ``
 gluon/contrib/markmin
 ``:code
+(see [[MARKMIN syntax ../05/#markmin_syntax]] for more)
 
 **fpdf** created my Mariano Reingart for generating PDF documents:
 ``
@@ -768,7 +744,7 @@ from gluon import *
 
 In fact, any Python module, even if not imported by a web2py application, can import the web2py API as long as web2py is in the ``sys.path``.
 
-There is one caveat, though. Web2py defines some global objects (request, response, session, cache, T) that can only exist when an HTTP request is present (or is faked). Therefore, modules can access them only if they are called from an application. For this reasons they are placed into a container caller ``current``, which is a thread local object. Here is an example.
+There is one caveat, though. Web2py defines some global objects (request, response, session, cache, T) that can only exist when an HTTP request is present (or is faked). Therefore, modules can access them only if they are called from an application. For this reasons they are placed into a container called ``current``, which is a thread local object. Here is an example.
 
 Create a module "/myapp/modules/test.py" that contains:
 ``
@@ -826,7 +802,7 @@ Beware! Given ``from gluon import current``, it is correct to use ``current.requ
 ``
 request = current.request # WRONG! DANGER!
 ``
-nor one should use it assign class attributes
+nor should one use current to assign class attributes:
 ``
 class MyClass:
     request = current.request # WRONG! DANGER!
@@ -839,7 +815,7 @@ Another caveat has to do with cache. You cannot use the ``cache`` object to deco
 ``
 from gluon.cache import lazy_cache
 
-lazy_cache('key', time_expire=60, cache_model='ram')
+@lazy_cache('key', time_expire=60, cache_model='ram')
 def f(a,b,c,): ....
 ``:code
 
@@ -1013,7 +989,7 @@ Also notice the ``request.env.wsgi_*`` variables. They are specific to the wsgi 
 - ``response.session_id_name``: the name of the session cookie for this application. NEVER CHANGE THIS VARIABLE.
 - ``response.static_version``: a version number for the static asset management.  
 - ``response.status``: the HTTP status code integer to be passed to the response. Default is 200 (OK).
-- ``response.stream(file, chunk_size, request=request, attachment=False, filename=None, headers=None)``: when a controller returns it, web2py streams the file content back to the client in blocks of size ``chunk_size``. The ``request`` parameter is required to use the chunk start in the HTTP header. ``file`` should be a file path (for backward compatibility, it can also be an open file object, but this is not recommended). As noted above, ``response.download`` should be used to retrieve files stored via an upload field. ``response.stream`` can be used in other cases, such as returning a temporary file or StringIO object created by the controller. If ``attachment`` is True, the Content-Disposition header will be set to "attachment", and if ``filename`` is also provided, it will be added to the Content-Disposition header as well (but only when ``attachment`` is True). If not already included in ``response.headers``, the following response headers will be set automatically: Content-Type, Content-Length, Cache-Control, Pragma, and Last-Modified (the latter three are set to allow browser caching of the file). To override any of these automatic header settings, simply set them in ``response.headers`` before calling ``response.stream``.
+- ``response.stream(file, chunk_size, request=request, attachment=False, filename=None)``: when a controller returns it, web2py streams the file content back to the client in blocks of size ``chunk_size``. The ``request`` parameter is required to use the chunk start in the HTTP header. ``file`` should be a file path (for backward compatibility, it can also be an open file object, but this is not recommended). As noted above, ``response.download`` should be used to retrieve files stored via an upload field. ``response.stream`` can be used in other cases, such as returning a temporary file or StringIO object created by the controller. If ``attachment`` is True, the Content-Disposition header will be set to "attachment", and if ``filename`` is also provided, it will be added to the Content-Disposition header as well (but only when ``attachment`` is True). If not already included in ``response.headers``, the following response headers will be set automatically: Content-Type, Content-Length, Cache-Control, Pragma, and Last-Modified (the latter three are set to allow browser caching of the file). To override any of these automatic header settings, simply set them in ``response.headers`` before calling ``response.stream``.
 - ``response.subtitle``: optional parameter that may be included in the views. It should contain the subtitle of the page.
 - ``response.title``: optional parameter that may be included in the views. It should contain the title of the page and should be rendered inside the html title tag in the header.
 - ``response.toolbar``: a function that allows you to embed a toolbar into page for debugging purposes ``{{=response.toolbar()}}``. The toolbar displays request, response, session variables and database access time for each query.
@@ -1238,7 +1214,7 @@ def cache_controller_and_view():
 ``:code
 ``response.render(d)`` returns the rendered view as a string, which is now cached for 5 seconds. This is the best and fastest way of caching.
 ------
-We recommend to use @cache.action starting from web2py > 2.4.6 
+We recommend [[@cache.action #cache_action]] starting from web2py > 2.4.6 
 ------
 
 Note, ``time_expire`` is used to compare the current time with the time the requested object was last saved in the cache. It does not affect future requests. This enables ``time_expire`` to be set dynamically when an object is requested rather than being fixed when the object is saved. For example:
@@ -1272,9 +1248,14 @@ where ``key`` is the key of the cached item.
 It is also possible to define other caching mechanisms such as memcache. Memcache is available via ``gluon.contrib.memcache`` and is discussed in more detail in Chapter 14.
 
 ------
-Be careful when caching to remeber that caching is usually at the app-level not at the user level. If you need, for example, to cache user specific content, choose a key that includes the user id.
+Be careful when caching to remember that caching is usually at the app-level not at the user level. If you need, for example, to cache user specific content, choose a key that includes the user id.
 ------
 
+------
+The admin app for an application lets you view cache keys (and clear the cache). Access it from the database management screen of admin.
+------
+
+[[cache_action]]
 #### ``cache.action``
 Web2py by default assumes that the returned content is not going to be cached, as this reduces the shortcomings of an improper caching of the page client-side.
 
@@ -1338,6 +1319,7 @@ so  ''/app/default/index?**search=foo**'' will not be the same one for ''/app/de
 Some settings override others, so, e.g., if you set ``session=True, public=True`` the latter will be discarded.
 Use them wisely!
 
+[[URL]]
 ### ``URL``
 ``URL``:inxx
 The ``URL`` function is one of the most important functions in web2py. It generates internal URL paths for the actions and the static files.
@@ -1732,7 +1714,7 @@ a book (x==1)
 5 books (x==5)
 ``
 
-English has one singular form and one plural form. The plural form is constructed by adding a "-s" or "-es" or using an exceptional form. web2py provides a way to define pluralization rules for each languages, as well as exceptions to the default rules. In fact web2py already knows pluralization rules for many languages. It knows, for example, that Slovenian has one singular form and 3 plural forms (for x==1, x==3 or x==4 and x>4). These rules are encoded in "gluon/contrib/plural_rules/*.py" files and new files can be created. Explicit pluralizations for words are created by editing pluralization files using the administrative interface.
+English has one singular form and one plural form. The plural form is constructed by adding a "-s" or "-es" or using an exceptional form. web2py provides a way to define pluralization rules for each language, as well as exceptions to the default rules. In fact web2py already knows pluralization rules for many languages. It knows, for example, that Slovenian has one singular form and 3 plural forms (for x==1, x==3 or x==4 and x>4). These rules are encoded in "gluon/contrib/plural_rules/*.py" files and new files can be created. Explicit pluralizations for words are created by editing pluralization files using the administrative interface.
 
 By default the PS is not activated. It is triggered by the ``symbol`` argument of the ``T`` function. For example:
 
@@ -1850,7 +1832,7 @@ with
 T.M("hello world")
 ``
 
-Now the string accepts MARKMIN markup as described later in the book. You can also use the pluralization system inside MARKMIN.
+Now the string accepts MARKMIN markup as described in [[Chapter 5 ../05#markmin_syntax]]
 
 ### Cookies
 
@@ -2028,7 +2010,7 @@ routers = dict(
 ``:code
 maps ``http://domain.com`` accesses to the controller named ``insecure``, while ``HTTPS`` accesses go to the ``secure`` controller. Alternatively, you can map different ports to different apps, in the obvious way.
 
-For further information, please consult the file [["router.example.py" https://github.com/web2py/web2py/blob/master/examples/router.example.py]] provided in the "examples" folder of the standard web2py distribution.
+For further information, please consult the file [["routes.parametric.example.py" https://github.com/web2py/web2py/blob/master/examples/routes.parametric.example.py]] provided in the "examples" folder of the standard web2py distribution.
 
 Note: The ''parameter-based'' system first appeared in web2py version 1.92.1.
 
@@ -2216,7 +2198,7 @@ For each tuple, the first string is matched against "[app name]/[error code]". I
 
 These variables will be accessible to the error handling action via ``request.vars`` and can be used in generating the error response. In particular, it is a good idea for the error action to return the original HTTP error code instead of the default 200 (OK) status code. This can be done by setting ``response.status = request.vars.code``. It is also possible to have the error action send (or queue) an email to an administrator, including a link to the ticket in ``admin``.
 
-Unmatched errors display a default error page. This default error page can also be customized here (see "router.example.py" and "routes.example.py" in the "examples" folder):
+Unmatched errors display a default error page. This default error page can also be customized here (see "routes.parametric.example.py" and "routes.patterns.example.py" in the "examples" folder):
 ``
 error_message = '<html><body><h1>%s</h1></body></html>'
 error_message_ticket = '''<html><body><h1>Internal error</h1>
@@ -2416,9 +2398,11 @@ This type of background process should not be executed via cron (except perhaps 
 In chapter 8, we will provide an example of how to use the above method to send emails.
 
 
-#### Scheduler 
+[[scheduler]]
+### web2py Scheduler 
 
-Prior to version 2.6.0 the scheduler was considered experimental. From v2.6.0 the documented API is stable.
+The mainstream web2py solution for running tasks in the background (and therefore away from the webserver process) is the built-in scheduler.
+
 The stable API consists of these functions:
 - disable()
 - resume()
@@ -2470,7 +2454,7 @@ scheduler.queue_task(task_add,pvars=dict(a=1,b=2))
 ``:code
 
 
-##### Parameters
+#### Parameters
 
 The first argument of the ``Scheduler`` class must be the database to be used by the scheduler to communicate with the workers. This can be the ``db`` of the app or another dedicated ``db``, perhaps one shared by multiple apps. If you use SQLite it's recommended to use a separate db from the one used by your app in order to keep the app responsive.
 Once the tasks are defined and the ``Scheduler`` is instantiated, all that is needed to do is to start the workers. You can do that in several ways:
@@ -2486,7 +2470,7 @@ python web2py.py -K myapp:group1:group2,myotherapp:group1
 
 If you have a model called ``scheduler.py`` you can start/stop the workers from web2py's default window (the one you use to set the ip address and the port).
 
-##### Scheduler Deployment
+#### Scheduler Deployment
 One last nice addition: if you use the embedded webserver, you can start the webserver and the scheduler with just one line of code (this assumes you don't want the web2py window popping up, else you can use the "Schedulers" menu instead)
 
 ``
@@ -2497,7 +2481,8 @@ You can pass the usual parameters (-i, -p, here -a prevents the window from show
 Windows users looking to create a service should see the Deployment Recipes chapter.
 
 
-##### Complete Scheduler signature
+[[scheduler_signature]]
+#### Complete Scheduler signature
 Scheduler's complete signature is:
 
 ``
@@ -2540,7 +2525,7 @@ NB: scheduler_run records will be created as before for **FAILED**, **TIMEOUT** 
 Now we have the infrastructure in place: defined the tasks, told the scheduler about them, started the worker(s). What remains is to actually schedule the tasks
 
 
-##### Tasks
+#### Tasks
 Tasks can be scheduled programmatically or via appadmin. In fact, a task is scheduled simply by adding an entry in the table "scheduler_task", which you can access via appadmin:
 
 ``
@@ -2563,7 +2548,16 @@ vars = {'a':3, 'b':4}
 
 The ``scheduler_task`` table is the one where tasks are organized.
 
+To add tasks via the API, use
+``
+scheduler.queue_task('mytask',...)
+``
+which is documented [[below #queue_task_sig]] .
+
+
+#### Task Lifecycle
 All tasks follow a lifecycle
+
 
 [[scheduler tasks @///image/ce8edcc3.png center]]
 
@@ -2593,7 +2587,9 @@ Additionally, you can control how many times a task should be repeated (i.e. you
 parameter (default = 1 time only, 0 = unlimited). You can influence how many seconds should pass between executions with the ``period`` parameter (default = 60 seconds).
 
 ------
-The time period is not calculated between the END of the first round and the START of the next, but from the START time of the first round to the START time of the next cycle)
+Default behavior: The time period is not calculated between the END of the first round and the START of the next, but from the START time of the first round to the START time of the next cycle). 
+This can cause accumulating 'drift' in the start time of a job.
+After v 2.8.2, a new parameter ``prevent_drift`` was added, defaulting to False. If set to True when queing a task, the start_time parameter will take precedence over the period, preventing drift.
 ------
 
 You can also set how many times the function can raise an exception (i.e. requesting data from a slow web service) and be queued again instead of stopping in **FAILED**  status using the parameter ``retry_failed`` (default = 0, -1 = unlimited).
@@ -2606,18 +2602,30 @@ Summary: you have
 - ``retry_failed`` to control how many times the task can "fail"
 - ``start_time`` and ``stop_time`` to schedule a function in a restricted timeframe
 
-##### ``queue_task`` and ``task_status``
+#### ``queue_task`` [[queue_task_sig]]
 
 The method:
 ``
-scheduler.queue_task(function, pargs=[], pvars={}, **kwargs)
+scheduler.queue_task(
+    function,
+    pargs=[],
+    pvars={},
+    start_time=now, 		#datetime
+    stop_time = None,		#datetime
+    timeout = 60,               #seconds
+    prevent_drift=False,
+    period=60,                  #seconds
+    immediate=False,
+    repeats = 1
+)
 ``:code
-allows you to queue tasks to be executed by workers. It takes the following parameters:
+allows you to queue tasks to be executed by workers. 
+It returns a row (see [[here #queue_task_return]]), and it takes the following parameters:
 
 - ``function`` (required): It can be a task name or a reference to an actual function.
 - ``pargs``: are the arguments to be passed to the task, stored as a Python list.
 - ``pvars`` : are the named arguments to be passed to the task, stored as a Python dictionary.
-- ``kwargs`` : all other scheduler_task columns can be passed as keywords arguments (for example repeats, period, timeout).
+- all other scheduler_task columns can be passed as keyword arguments; the most important are shown.
 
 For example:
 
@@ -2656,7 +2664,7 @@ scheduler.queue_task('demo1', pvars=dict(a=1,b=2),
 
 Since version 2.4.1 if you pass an additional parameter ``immediate=True`` it will force the main worker to reassign tasks. Until 2.4.1, the worker checks for new tasks every 5 cycles (so, ``5*heartbeats`` seconds). If you had an app that needed to check frequently for new tasks, to get a ''snappy'' behaviour you were forced to lower the ``heartbeat`` parameter, putting the db under pressure for no reason. With ``immediate=True`` you can force the check for new tasks: it will happen at most as ``heartbeat`` seconds are passed   
 
-A call to ``scheduler.queue_task`` returns the task ``id`` and ``uuid`` of the task you queued (can be the one you passed or the auto-generated one), and possible ``errors``:
+A call to ``scheduler.queue_task`` returns the task ``id`` and ``uuid`` of the task you queued (can be the one you passed or the auto-generated one), and possible ``errors``: [[queue_task_return]]
 
 ``
 <Row {'errors': {}, 'id': 1, 'uuid': '08e6433a-cf07-4cea-a4cb-01f16ae5f414'}>
@@ -2669,7 +2677,36 @@ you get the result of the validation, and id and uuid will be None
 <Row {'errors': {'period': 'enter an integer greater than or equal to 0'}, 'id': None, 'uuid': None}>
 ``
 
-##### Results and output
+#### ``task_status`` [[task_status]]
+
+To query the scheduler about tasks, use ``task_status``
+``
+scheduler.task_status(ref, output=False)
+``:code
+
+The argument ``ref`` can be
+- integer --> lookup will be done by scheduler_task.id
+- string --> lookup will be done by scheduler_task.uuid
+- query --> lookup as you wish (as in db.scheduler_task.task_name == 'test1')
+``output=True`` fetches the scheduler_run record
+
+It returns a single Row object, for the most recent queued task matching the criteria.
+
+scheduler_run record is fetched by a left join, so it can
+have all fields == None
+
+##### Example: retrieving scheduler task status, results and tracebacks
+Here the scheduler instance is ``mysched``
+
+``
+task = mysched.queue_task(f, ....)
+task_status = mysched.task_status(task.id, output=True)
+traceback = task_status.scheduler_run.traceback
+result = task_status.scheduler_run.run_result #or
+result = task_status.result
+``:code
+
+#### Results and output
 
 The table "scheduler_run" stores the status of all running tasks. Each record references a task that has been picked up by a worker.  One task can have multiple runs. For example, a task scheduled to repeat 10 times an hour will probably have 10 runs (unless one fails or they take longer than 1 hour). Beware that if the task has no return values, it is removed from the scheduler_run table as soon as it is finished.
 
@@ -2691,7 +2728,7 @@ Using appadmin, one can check all ``RUNNING`` tasks, the output of ``COMPLETED``
 
 The scheduler also creates one more table called "scheduler_worker", which stores the workers' heartbeat and their status.
 
-##### Managing processes
+#### Managing processes
 
 Worker fine management is hard. This module tries not to leave behind any platform (Mac, Win, Linux) .
 
@@ -2757,7 +2794,7 @@ completed_runs = db(db.scheduler_run.run_status='COMPLETED').select()
 The scheduler is considered experimental because it needs more extensive testing and because the table structure may change as more features are added.
 ------
 
-##### Reporting percentages
+#### Reporting progress percentages
 
 A special "word" encountered in the print statements of your functions clear all
 the previous output. That word is ``!clear!``.
@@ -2784,6 +2821,7 @@ scheduler.queue_task(reporting_percentages,
 ``:code
 
 
+[[modules]]
 ### Third party modules
 ``import``:inxx
 

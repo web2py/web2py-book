@@ -52,8 +52,12 @@ To start using ``Auth``, you need at least this code in a model file, which is a
 ``
 from gluon.tools import Auth
 auth = Auth(db)
-auth.define_tables()
+auth.define_tables(username=False,signature=False)
 ``:code
+
+By default, web2py uses email for login. If instead you want to log in using username set ``auth.define_tables(username=True)``
+
+Setting ``signature=True`` adds user and date stamping to auth tables, to track modifications.
 
 Auth has an optional ``secure=True`` argument, which will force authenticated pages to go over HTTPS. ``https``:inxx
 
@@ -61,10 +65,9 @@ By default, Auth protects logins against cross-site request forgeries (CSRF). Th
 ``Auth = Auth(..., csrf_prevention = False)``:code 
 Note that doing this purely to avoid session overload on a busy site is not recommended because of the introduced security risk. Instead, see the Deployment chapter for advice on reducing session overheads.
 -------
-The ``password`` field of the ``db.auth_user`` table defaults to a ``CRYPT`` validator, which needs and ``hmac_key``. On legacy web2py applications you may see an extra argument passed to the Auth constructor: ``hmac_key = Auth.get_or_create_key()``. The latter is a function that read the HMAC key from a file "private/auth.key" within the application folder. If the file does not exist it creates a random ``hmac_key``. If multiple apps share the same auth database, make sure they also use the same ``hmac_key``. This is no longer necessary for new applications since passwords are salted with an individual random salt.
+The ``password`` field of the ``db.auth_user`` table defaults to a ``CRYPT`` validator, which needs an ``hmac_key``. On legacy web2py applications you may see an extra argument passed to the Auth constructor: ``hmac_key = Auth.get_or_create_key()``. The latter is a function that read the HMAC key from a file "private/auth.key" within the application folder. If the file does not exist it creates a random ``hmac_key``. If multiple apps share the same auth database, make sure they also use the same ``hmac_key``. This is no longer necessary for new applications since passwords are salted with an individual random salt.
 -------
 
-By default, web2py uses email for login. If instead you want to log in using username set ``auth.define_tables(username=True)``
 
 If multiple apps share the same auth database you may want to disable migrations: ``auth.define_tables(migrate=False)``.
 
@@ -183,7 +186,7 @@ auth.settings.actions_disabled.append('register')
 If you want to allow people to register and automatically log them in after registration but still want to send an email for verification so that they cannot login again after logout, unless they completed the instructions in the email, you can accomplish it as follows:
 
 ``
-auth.settings.registration_requires_approval = True
+auth.settings.registration_requires_verification = True
 auth.settings.login_after_registration = True
 ``:code
 
@@ -261,8 +264,10 @@ reCAPTCHA may not work if you access the web site as 'localhost' or '127.0.0.1',
 
 The ``Recaptcha`` constructor takes some optional arguments:
 ``
-Recaptcha(..., use_ssl=True, error_message='invalid', label='Verify:', options='')
+Recaptcha(..., use_ssl=False, error_message='invalid', label='Verify:', options='')
 ``:code
+
+There is an experimental argument, ``ajax=True``, which uses the ajax API to recaptcha. It can be used with any recaptcha, but it was specifically added to allow recpatcha fields to work in LOAD forms (see Chapter 12 for more about LOAD, which allows web2py to 'plugin' components of a page with ajax ). It's experimental because it may be replaced with automatic detection of when ajax is required.
 
 Notice that ``use_ssl=False`` by default.
 
@@ -357,7 +362,11 @@ If you add a field called "username", it will be used in place of "email" for lo
 auth_table.username.requires = IS_NOT_IN_DB(db, auth_table.username)
 ``:code
 
+Note that Auth caches the logged in user in the session and that's what you get in ``auth.user``, so you need to clear the sessions for the extra fields changes to be reflected in it.
+
+
 #### Renaming ``Auth`` tables
+[renaming_auth_tables]
 
 The actual names of the ``Auth`` tables are stored in
 ``
@@ -385,7 +394,17 @@ auth.settings.table_permission
 auth.settings.table_event
 ``:code
 
+Note: auth.signature gets defined when Auth is initialized, which is before you have set the custom table names. To avoid this do:
+
+``
+auth = Auth(db, signature=False)
+``
+
+In that case, auth.signature will instead be defined when you call auth.define_tables(), by which point the custom tables names will already be set.
+
+
 #### Other login methods and login forms
+
 ``LDAP``:inxx ``PAM``:inxx
 
 Auth provides multiple login methods and hooks to create new login methods. Each supported login method corresponds to a file in the folder
@@ -714,7 +733,7 @@ Otherwise it will render the normal login form together with the ``other_form``.
 You can use Auth to enable full record versioning:
 
 ``
-db.enable_record_versioning(db,
+auth.enable_record_versioning(db,
     archive_db=None,
     archive_names='%(tablename)s_archive',
     current_record='current_record'):
@@ -744,9 +763,12 @@ Those functions do explicitly what ``enable_record_versioning`` does automatical
 they will be deprecated.
 
 
+[[mail_and_auth]]
 #### ``Mail`` and ``Auth``
 
-One can define a mailer with
+You can read more about web2py API for emails and email configuration in [[Chapter 8 ../08 ]]. Here we limit the discussion to the interaction between ``Mail`` and ``Auth``.
+
+Define a mailer with
 
 ``
 from gluon.tools import Mail
@@ -768,7 +790,6 @@ mail.settings.login = 'username:password'
 
 You need to replace the mail.settings with the proper parameters for your SMTP server. Set ``mail.settings.login = None`` if the SMTP server does not require authentication. If you don't want to use TLS, set ``mail.settings.tls = False``
 
-You can read more about web2py API for emails and email configuration in Chapter 8. Here we limit the discussion to the interaction between ``Mail`` and ``Auth``.
 
 In ``Auth``, by default, email verification is disabled.
 To enable email, append the following lines in the model where ``auth`` is defined:
@@ -788,6 +809,23 @@ auth.messages.reset_password = 'Click on the link http://' + \
 ``:code
 
 In the two ``auth.messages`` above, you may need to replace the URL portion of the string with the proper complete URL of the action. This is necessary because web2py may be installed behind a proxy, and it cannot determine its own public URLs with absolute certainty. The above examples (which are the default values) should, however, work in most cases.
+
+[[two_step_verification]]
+#### Two-step verification
+
+Two-step verification (or Two-factor authentication) is a way of improving
+authentication security. The setting adds an extra step in the login process.
+In the first step, users are shown the standard username/password form. If they
+successfully pass this challenge by submitting the correct username and password,
+and two-factor authentication is enabled for the user, the server will present
+a second form before logging them in. This form will ask users for a six-digit code
+that has been emailed to their accounts (the server emails the code if the username
+and password was correct). The user gets four attempts to enter this code correctly.
+If the code is incorrect, the second verification step is treated as having failed
+and the user must complete the first challenge (username/password) again.
+
+This functionality can be enabled on a per-user basis by defining a group
+with role 'web2py Two-Step Authentication' and adding users to that group.
 
 ### Authorization
 
@@ -1050,14 +1088,15 @@ db.define_table('dog',
    Field('small_image', 'upload'),
    Field('large_image', 'upload'))
 
-db.dog.large_image.authorization = lambda record: \
+db.dog.large_image.authorize = lambda record: \
    auth.is_logged_in() and \
    auth.has_permission('read', db.dog, record.id, auth.user.id)
 ``:code
 
-The attribute ``authorization`` of upload field can be None (the default) or a function that decides whether the user is logged in and has permission to 'read' the current record. In this example, there is no restriction on downloading images linked by the "small_image" field, but we require access control on images linked by the "large_image" field.
+The attribute ``authorize`` of upload field can be None (the default) or a function that decides whether the user is logged in and has permission to 'read' the current record. In this example, there is no restriction on downloading images linked by the "small_image" field, but we require access control on images linked by the "large_image" field.
 
 
+[[basic_authentication]]
 #### Access Control and Basic Authentication
 
 Occasionally, it may be necessary to expose actions that have decorators that require access control as services; i.e., to call them from a program or script and still be able to use authentication to check for authorization.
@@ -1159,7 +1198,7 @@ user = auth.login_bare(username,password)
 
 ``login_bare`` returns user if the user exists and the password is valid, else it returns False. ``username`` is the email if the "auth_user" table does not have a "username" field.
 
-#### Settings and messages
+#### Auth Settings and messages
 
 Here is a list of all parameters that can be customized for **Auth**
 
@@ -1169,19 +1208,21 @@ The following must point to a ``gluon.tools.Mail`` object to allow ``auth`` to s
 auth.settings.mailer = None
 ``:code
 
+Read more about setting up mail here: [[Mail and Auth #mail_and_auth]]
+
 The following must be the name of the controller that defined the ``user`` action:
 
 ``
 auth.settings.controller = 'default'
 ``:code
 
-The following is a very important setting:
+The following was a very important setting in older web2py versions:
 
 ``
 auth.settings.hmac_key = None
 ``:code
 
-It must be set to something like "sha512:a-pass-phrase" and it will be passed to the CRYPT validator for the "password" field of the ``auth_user`` table. It will be the algorithm and a-pass-phrase used to hash the passwords.
+Where it was set to something like "sha512:a-pass-phrase" and passed to the CRYPT validator for the "password" field of the ``auth_user`` table, providing the algorithm and a-pass-phrase used to hash the passwords. However, web2py no longers needs this setting because it handles this automatically.
 
 By default, auth also requires a minimum password length of 4. This can be changed:
 ``
@@ -1260,6 +1301,19 @@ auth.settings.download_url = URL('download')
 ``:code
 
 These must point to the URL you want to redirect your users to after the various possible ``auth`` actions (in case there is no referrer):
+
+Note: If your app is based on the standard scaffold app Welcome, you use the auth.navbar. 
+To get the settings below to take effect, you need to edit layout.html and set argument referrer_actions = None. 
+auth.navbar(mode='dropdown',referrer_actions=None)
+
+It is also possible to keep referrer_actions for some auth events. 
+For example
+``
+auth.navbar(referrer_actions=['login', 'profile'])
+``:code
+
+If the default behavior is left unchanged, auth.navbar uses the _next URL parameter, and uses that to send the user back to the referring page.
+However, if navbar's default auto-referring behavior is changed, the settings below will take effect.
 
 ``
 auth.settings.login_next = URL('index')
