@@ -7,11 +7,11 @@ web2py comes with a Database Abstraction Layer (DAL), an API that maps Python ob
 
 The Gotchas section at the end of this chapter has some more information about specific databases.
 
-The Windows binary distribution works out of the box with SQLite and MySQL. The Mac binary distribution works out of the box with SQLite.
+The Windows binary distribution works out of the box with SQLite, MSSQL, Postgresql and MySQL. The Mac binary distribution works out of the box with SQLite.
 To use any other database back-end, run from the source distribution and install the appropriate driver for the required back end.
 ``database drivers``:inxx
 
-Once the proper driver is installed, start web2py from source, and it will find the driver. Here is a list of drivers:
+Once the proper driver is installed, start web2py from source, and it will find the driver. Here is a list of the drivers web2py can use:
 
 ``DAL``:inxx ``SQLite``:inxx ``MySQL``:inxx ``PostgresSQL``:inxx ``Oracle``:inxx ``MSSQL``:inxx ``FireBird``:inxx ``DB2``:inxx ``Informix``:inxx ``Sybase``:inxx ``Teradata``:inxx ``MongoDB``:inxx ``CouchDB``:inxx ``SAPDB``:inxx ``Cubrid``:inxx
 
@@ -21,7 +21,7 @@ SQLite | sqlite3 or pysqlite2 or zxJDBC ``zxjdbc``:cite  (on Jython)
 PostgreSQL | psycopg2 ``psycopg2``:cite  or pg8000 ``pg8000``:cite or zxJDBC ``zxjdbc``:cite  (on Jython)
 MySQL | pymysql ``pymysql``:cite or MySQLdb ``mysqldb``:cite
 Oracle | cx_Oracle ``cxoracle``:cite
-MSSQL | pyodbc ``pyodbc``:cite
+MSSQL | pyodbc ``pyodbc``:cite or pypyodbc``pypyodbc``:cite
 FireBird | kinterbasdb ``kinterbasdb``:cite or fdb or pyodbc
 DB2 | pyodbc ``pyodbc``:cite
 Informix | informixdb ``informixdb``:cite
@@ -103,7 +103,7 @@ The web2py DAL can be used in a non-web2py environment via
 ``
 from gluon import DAL, Field
 # also consider: from gluon.validators import *
-``:code 
+``:code
 
 [[dal_constructor]]
 ### DAL constructor
@@ -135,29 +135,29 @@ The DAL allows multiple connections with the same database or with different dat
 #### DAL signature
 ``
 DAL(
-    uri='sqlite://dummy.db', 
-    pool_size=0, 
-    folder=None, 
-    db_codec='UTF-8', 
+    uri='sqlite://dummy.db',
+    pool_size=0,
+    folder=None,
+    db_codec='UTF-8',
     check_reserved=None,
     migrate=True,
     fake_migrate=False,
     migrate_enabled=True,
     fake_migrate_all=False,
-    decode_credentials=False, 
-    driver_args=None, 
-    adapter_args=None, 
-    attempts=5, 
-    auto_import=False, 
-    bigint_id=False, 
-    debug=False, 
-    lazy_tables=False, 
-    db_uid=None, 
-    do_connect=True, 
-    after_connection=None, 
-    tables=None, 
-    ignore_field_case=True, 
-    entity_quoting=False, 
+    decode_credentials=False,
+    driver_args=None,
+    adapter_args=None,
+    attempts=5,
+    auto_import=False,
+    bigint_id=False,
+    debug=False,
+    lazy_tables=False,
+    db_uid=None,
+    do_connect=True,
+    after_connection=None,
+    tables=None,
+    ignore_field_case=True,
+    entity_quoting=False,
     table_hash=None)
 ``:code
 
@@ -177,7 +177,9 @@ A connection with the database is established by creating an instance of the DAL
 **SQLite**     | ``sqlite://storage.db``
 **MySQL**      | ``mysql://username:password@localhost/test``
 **PostgreSQL** | ``postgres://username:password@localhost/test``
-**MSSQL**      | ``mssql://username:password@localhost/test``
+**MSSQL (legacy)**      | ``mssql://username:password@localhost/test``
+**MSSQL (>=2005)**      | ``mssql3://username:password@localhost/test``
+**MSSQL (>=2012)**      | ``mssql4://username:password@localhost/test``
 **FireBird**   | ``firebird://username:password@localhost/test``
 **Oracle**     | ``oracle://username/password@test``
 **DB2**        | ``db2://username:password@test``
@@ -3559,7 +3561,7 @@ db =DAL(..., driver_args={}, adapter_args={})
 #### SQLite
 SQLite does not support dropping and altering columns. That means that web2py migrations will work up to a point. If you delete a field from a table, the column will remain in the database but will be invisible to web2py. If you decide to reinstate the column, web2py will try re-create it and fail. In this case you must set ``fake_migrate=True`` so that metadata is rebuilt without attempting to add the column again. Also, for the same reason, **SQLite** is not aware of any change of column type. If you insert a number in a string field, it will be stored as string. If you later change the model and replace the type "string" with type "integer", SQLite will continue to keep the number as a string and this may cause problem when you try to extract the data.
 
-SQLite doesn't have a boolean type. web2py internally maps booleans to a 1 character string, with 'T' and 'F' representing True and False. The DAL handles this completely; the abstraction of a true boolean value works well. 
+SQLite doesn't have a boolean type. web2py internally maps booleans to a 1 character string, with 'T' and 'F' representing True and False. The DAL handles this completely; the abstraction of a true boolean value works well.
 But if you are updating the SQLite table with SQL directly, be aware of the web2py implementation, and avoid using 0 and 1 values.
 
 #### MySQL
@@ -3574,13 +3576,7 @@ Google SQL has the same problems as MySQL and more. In particular table metadata
 ``limitby``:inxx
 MSSQL < 2012 does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
 If you're using MSSQL >= 2005, the recommended prefix to use is ``mssql3://`` which provides a method to avoid the issue of fetching the entire non-paginated resultset. If you're on MSSQL >= 2012, use ``mssql4://`` that uses the ``OFFSET ... ROWS ... FETCH NEXT ... ROWS ONLY`` construct to support natively pagination without performance hits like other backends.
-
-#### Oracle
-
-Oracle also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). 
-This works for simple select but may break for complex selects involving aliased fields and or joins.
-
-#### MSSQL
+The ``mssql://`` uri also enforces (for historical reasons) the use of ``text`` columns, that are superseeded in more recent versions (from 2005 onwards) by ``varchar(max)``. ``mssql3://`` and ``mssql4://`` should be used if you don't want to face some limitations of the - officially deprecated - ``text`` columns
 
 MSSQL has problems with circular references in tables that have ONDELETE CASCADE. This is an MSSQL bug and you work around it by setting the ondelete attribute for all reference fields to "NO ACTION". 
 You can also do it once and for all before you define tables:
@@ -3604,6 +3600,11 @@ this does not
 ``
 db(query).select(distinct=db.mytable.myfield)
 ``
+
+#### Oracle
+
+Oracle also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). 
+This works for simple select but may break for complex selects involving aliased fields and or joins.
 
 #### Google NoSQL (Datastore)
 Google NoSQL (Datastore) does not allow joins, left joins, aggregates, expression, OR involving more than one table, the ‘like’ operator searches in "text" fields. 
