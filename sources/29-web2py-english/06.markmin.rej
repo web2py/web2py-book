@@ -1,0 +1,112 @@
+***************
+*** 469,476 ****
+  - ``length`` sets the maximum length of a "string", "password" or "upload" field.  If ``length`` is not specified a default value is used but the default value is not guaranteed to be backward compatible. ''To avoid unwanted migrations on upgrades, we recommend that you always specify the length for string, password and upload fields.''
+  - ``default`` sets the default value for the field. The default value is used when performing an insert if a value is not explicitly specified. It is also used to pre-populate forms built from the table using SQLFORM. Note, rather than being a fixed value, the default can instead be a function (including a lambda function) that returns a value of the appropriate type for the field. In that case, the function is called once for each record inserted, even when multiple records are inserted in a single transaction.
+  - ``required`` tells the DAL that no insert should be allowed on this table if a value for this field is not explicitly specified.
+- - ``requires`` is a validator or a list of validators. This is not used by the DAL, but it is used by SQLFORM. The default validators for the given types are shown in the following table:
+  
+  ----------
+  **field type** | **default field validators**
+  ``string`` | ``IS_LENGTH(length)`` default length is 512
+--- 469,506 ----
+  - ``length`` sets the maximum length of a "string", "password" or "upload" field.  If ``length`` is not specified a default value is used but the default value is not guaranteed to be backward compatible. ''To avoid unwanted migrations on upgrades, we recommend that you always specify the length for string, password and upload fields.''
+  - ``default`` sets the default value for the field. The default value is used when performing an insert if a value is not explicitly specified. It is also used to pre-populate forms built from the table using SQLFORM. Note, rather than being a fixed value, the default can instead be a function (including a lambda function) that returns a value of the appropriate type for the field. In that case, the function is called once for each record inserted, even when multiple records are inserted in a single transaction.
+  - ``required`` tells the DAL that no insert should be allowed on this table if a value for this field is not explicitly specified.
++ - ``requires`` is a validator or a list of validators. This is not used by the DAL, but it is used by SQLFORM. The default validators for the given types are shown in the table in the next section. 
++ ``ondelete``:inxx
++ - ``ondelete`` translates into the "ON DELETE" SQL statement. By default it is set to "CASCADE". This tells the database that when it deletes a record, it should also delete all records that refer to it. To disable this feature, set ``ondelete`` to "NO ACTION" or "SET NULL".
++ - ``notnull=True`` translates into the "NOT NULL" SQL statement. It prevents the database from inserting null values for the field.
++ - ``unique=True`` translates into the "UNIQUE" SQL statement and it makes sure that values of this field are unique within the table. It is enforced at the database level.
++ - ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set to True, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
++ - ``uploadfolder`` defaults to the application's "uploads/" folder. If set to a different path, files will uploaded to a different folder. For example,
++ ``
++ Field(...,uploadfolder=os.path.join(request.folder,'static/temp'))
++ ``:code
++ will upload files to the "web2py/applications/myapp/static/temp" folder.
++ - ``uploadseparate`` if set to True will upload files under different subfolders of the ''uploadfolder'' folder. This is optimized to avoid too many files under the same folder/subfolder. ATTENTION: You cannot change the value of ``uploadseparate`` from True to False without breaking links to existing uploads. web2py either uses the separate subfolders or it does not. Changing the behavior after files have been uploaded will prevent web2py from being able to retrieve those files. If this happens it is possible to move files and fix the problem but this is not described here.
++ - ``uploadfs`` allows you specify a different file system where to upload files, including an Amazon S3 storage or a remote SFTP storage. This option requires PyFileSystem installed. ``uploadfs`` must point to ``PyFileSystem``. ``PyFileSystem``:inxx ``uploadfs``:idxx
++ - ``widget`` must be one of the available widget objects, including custom widgets, for example: ``SQLFORM.widgets.string.widget``. A list of available widgets will be discussed later. Each field type has a default widget.
++ - ``label`` is a string (or a helper or something that can be serialized to a string) that contains the label to be used for this field in auto-generated forms.
++ - ``comment``  is a string (or a helper or something that can be serialized to a string) that contains a comment associated with this field, and will be displayed to the right of the input field in the autogenerated forms.
++ - ``writable`` declares whether a field is writable in forms.
++ - ``readable`` declares whether a field is readable in forms. If a field is neither readable nor writable, it will not be displayed in create and update forms.
++ - ``update`` contains the default value for this field when the record is updated.
++ - ``compute`` is an optional function. If a record is inserted or updated, the compute function will be executed and the field will be populated with the function result. The record is passed to the compute function as a ``dict``, and the dict will not include the current value of that, or any other compute field.
++ - ``authorize`` can be used to require access control on the corresponding field, for "upload" fields only. It will be discussed more in detail in the context of Authentication and Authorization.
++ - ``autodelete`` determines if the corresponding uploaded file should be deleted when the record referencing the file is deleted. For "upload" fields only.
++ - ``represent`` can be ``None`` or can point to a function that takes a field value and a row and returns an alternate representation for the field value. Examples:
++ ``
++ db.mytable.name.represent = lambda name,row: name.capitalize()
++ db.mytable.other_id.represent = lambda id,row: row.myfield
++ db.mytable.some_uploadfield.represent = lambda value,row: \
++     A('get it', _href=URL('download', args=value))
++ ``:code
+  
++ ``default validators``:inxx
++ #### Default validators
+  ----------
+  **field type** | **default field validators**
+  ``string`` | ``IS_LENGTH(length)`` default length is 512
+***************
+*** 503,545 ****
+  
+  The ``json`` field type is pretty much explanatory. It can store any json serializable object. It is designed to work specifically for MongoDB and backported to the other database adapters for portability.
+  
+- -------
+- Notice that ``requires=...`` is enforced at the level of forms, ``required=True`` is enforced at the level of the DAL (insert), while ``notnull``, ``unique`` and ``ondelete`` are enforced at the level of the database. While they sometimes may seem redundant, it is important to maintain the distinction when programming with the DAL.
+- -------
+- 
+- ``ondelete``:inxx
+  
+- - ``ondelete`` translates into the "ON DELETE" SQL statement. By default it is set to "CASCADE". This tells the database that when it deletes a record, it should also delete all records that refer to it. To disable this feature, set ``ondelete`` to "NO ACTION" or "SET NULL".
+- - ``notnull=True`` translates into the "NOT NULL" SQL statement. It prevents the database from inserting null values for the field.
+- - ``unique=True`` translates into the "UNIQUE" SQL statement and it makes sure that values of this field are unique within the table. It is enforced at the database level.
+- - ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set to True, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
+- - ``uploadfolder`` defaults to the application's "uploads/" folder. If set to a different path, files will uploaded to a different folder. For example,
+- ``
+- Field(...,uploadfolder=os.path.join(request.folder,'static/temp'))
+- ``:code
+- will upload files to the "web2py/applications/myapp/static/temp" folder.
+- - ``uploadseparate`` if set to True will upload files under different subfolders of the ''uploadfolder'' folder. This is optimized to avoid too many files under the same folder/subfolder. ATTENTION: You cannot change the value of ``uploadseparate`` from True to False without breaking links to existing uploads. web2py either uses the separate subfolders or it does not. Changing the behavior after files have been uploaded will prevent web2py from being able to retrieve those files. If this happens it is possible to move files and fix the problem but this is not described here.
+- - ``uploadfs`` allows you specify a different file system where to upload files, including an Amazon S3 storage or a remote SFTP storage. This option requires PyFileSystem installed. ``uploadfs`` must point to ``PyFileSystem``. ``PyFileSystem``:inxx ``uploadfs``:idxx
+- - ``widget`` must be one of the available widget objects, including custom widgets, for example: ``SQLFORM.widgets.string.widget``. A list of available widgets will be discussed later. Each field type has a default widget.
+- - ``label`` is a string (or a helper or something that can be serialized to a string) that contains the label to be used for this field in auto-generated forms.
+- - ``comment``  is a string (or a helper or something that can be serialized to a string) that contains a comment associated with this field, and will be displayed to the right of the input field in the autogenerated forms.
+- - ``writable`` declares whether a field is writable in forms.
+- - ``readable`` declares whether a field is readable in forms. If a field is neither readable nor writable, it will not be displayed in create and update forms.
+- - ``update`` contains the default value for this field when the record is updated.
+- - ``compute`` is an optional function. If a record is inserted or updated, the compute function will be executed and the field will be populated with the function result. The record is passed to the compute function as a ``dict``, and the dict will not include the current value of that, or any other compute field.
+- - ``authorize`` can be used to require access control on the corresponding field, for "upload" fields only. It will be discussed more in detail in the context of Authentication and Authorization.
+- - ``autodelete`` determines if the corresponding uploaded file should be deleted when the record referencing the file is deleted. For "upload" fields only.
+- - ``represent`` can be None or can point to a function that takes a field value and returns an alternate representation for the field value. Examples:
+- ``
+- db.mytable.name.represent = lambda name,row: name.capitalize()
+- db.mytable.other_id.represent = lambda id,row: row.myfield
+- db.mytable.some_uploadfield.represent = lambda value,row: \
+-     A('get it', _href=URL('download', args=value))
+- ``:code
+  
+- ``blob``:inxx
+- "blob" fields are also special. By default, binary data is encoded in base64 before being stored into the actual database field, and it is decoded when extracted. This has the negative effect of using 25% more storage space than necessary in blob fields, but has two advantages. On average it reduces the amount of data communicated between web2py and the database server, and it makes the communication independent of back-end-specific escaping conventions.
+  
+  Most attributes of fields and tables can be modified after they are defined:
+  
+  ``
+--- 533,549 ----
+  
+  The ``json`` field type is pretty much explanatory. It can store any json serializable object. It is designed to work specifically for MongoDB and backported to the other database adapters for portability.
+  
++ ``blob``:inxx
++ ``blob`` fields are also special. By default, binary data is encoded in base64 before being stored into the actual database field, and it is decoded when extracted. This has the negative effect of using 25% more storage space than necessary in blob fields, but has two advantages. On average it reduces the amount of data communicated between web2py and the database server, and it makes the communication independent of back-end-specific escaping conventions.
+  
++ ``requires``:inxx
++ ``required``:inxx
++ ``notnull``:inxx
++ Notice that ``requires=...`` is enforced at the level of forms, ``required=True`` is enforced at the level of the DAL (insert), while ``notnull``, ``unique`` and ``ondelete`` are enforced at the level of the database. While they sometimes may seem redundant, it is important to maintain the distinction when programming with the DAL.
+  
+  
++ ``modify fileds and tables``:inxx
++ #### Modify fields and tables
+  Most attributes of fields and tables can be modified after they are defined:
+  
+  ``
