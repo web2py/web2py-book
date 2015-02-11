@@ -169,7 +169,8 @@ There are some caveats to keep in mind:
 ``models_to_run``:inxx
 ``conditional models``:inxx
 [[conditional_models]]
-- Models in subfolders are executed conditionally. For example, if the user has requested "/a/c/f" where "a" is the application, "c" is the controller, and "f" is the function (action), then the following models are executed:
+#### Conditional models
+- Models in subfolders are executed conditionally based on the controller in use. This avoids processing all table definitions at each request. For example, if the user has requested "/a/c/f" where "a" is the application, "c" is the controller, and "f" is the function (action), then the following models are executed:
 
 ``
 applications/a/models/*.py
@@ -734,9 +735,9 @@ from gluon.tools import Auth, Crud, Service
 ``:code
 They are imported in ``db.py`` in the scaffolding application.
 
-#### Accessing the API from Python modules
+### Accessing the API from Python modules
 
-Your models or controller may import python modules, and these may need to use some of the web2py API. The way to do it is by importing them:
+Your models or controller may import python modules. These are usually python files you store in the modules directory of your app. They may need to use some of the web2py API. The way to do it is by importing them:
 
 ``
 from gluon import *
@@ -744,6 +745,8 @@ from gluon import *
 
 In fact, any Python module, even if not imported by a web2py application, can import the web2py API as long as web2py is in the ``sys.path``.
 
+[[current_object]]
+#### Sharing the global scope with modules using the current object
 There is one caveat, though. Web2py defines some global objects (request, response, session, cache, T) that can only exist when an HTTP request is present (or is faked). Therefore, modules can access them only if they are called from an application. For this reasons they are placed into a container called ``current``, which is a thread local object. Here is an example.
 
 Create a module "/myapp/modules/test.py" that contains:
@@ -791,13 +794,14 @@ and any other variable your application chooses to store in current. For example
 auth = Auth(db)
 from gluon import current
 current.auth = auth
+current.db = db #not needed in this case but useful
 ``
 
 and now all modules imported can access ``current.auth``.
 
 ``current`` and ``import`` create a powerful mechanism to build extensible and reusable modules for your applications.
 
--------
+#### Warning! Do not use the current object in global scope in a module
 Beware! Given ``from gluon import current``, it is correct to use ``current.request`` and any of the other thread local objects but one should never assign them to global variables in the module, such as in
 ``
 request = current.request # WRONG! DANGER!
@@ -808,7 +812,16 @@ class MyClass:
     request = current.request # WRONG! DANGER!
 ``
 This is because the thread local object must be extracted at runtime. Global variables instead are defined only once when the model is imported for the first time.
--------
+
+Instead, assign inside a function. 
+
+``
+import * from gluon
+...
+def a_module_function():
+   db = current.db  #assuming you assigned current.db = db in the model db.py 
+   ...
+``:code
 
 Another caveat has to do with cache. You cannot use the ``cache`` object to decorate functions in modules, that is because it would not behave as expected. In order to cache a function ``f`` in a module you must use ``lazy_cache``:
 
