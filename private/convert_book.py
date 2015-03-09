@@ -83,10 +83,10 @@ make no representations or warranties with respect to the accuracy
 or completeness of the contents of this book and specifically
 disclaim any implied warranties of merchantability or fitness for a
 particular purpose.  No warranty may be created ore extended by
-sales representatives or written sales materials. 
+sales representatives or written sales materials.
 The advice and strategies contained herein may not be
 suitable for your situation. You should consult with a professional
-where appropriate.  Neither the publisher nor author shall be liable 
+where appropriate.  Neither the publisher nor author shall be liable
 for any loss of profit or any other commercial damages, including
 but not limited to special, incidental, consequential, or other damages. \\ \\
 
@@ -160,7 +160,7 @@ def assemble(path):
     path1 = os.path.join(path,'??.markmin')
     text = '\n\n'.join(open(f,'r').read() for f in glob.glob(path1))
     text = text.replace('@///image',os.path.join(path,'images'))
-    
+
     body, title, authors = render(text)
     body = body.replace('\\section{','\\chapter{'
                         ).replace('subsection{','section{')
@@ -171,7 +171,7 @@ def assemble(path):
     bibliography = []
     for item in bibitems:
         reference = getreference(os.path.join(path,'references',item))
-        bibliography.append((item,reference['source_url'])) 
+        bibliography.append((item,reference['source_url']))
     txtitems = '\n'.join('\\bibitem{%s} \\url{%s}' % item for item in bibliography)
     body = body.replace('\@/','@/')
     body = body.replace('{\\textbackslash}@/','@/')
