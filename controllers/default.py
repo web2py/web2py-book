@@ -149,7 +149,7 @@ def search():
         chapter_id = int(chapter[0])
         filename = os.path.join(FOLDER,subfolder,'%.2i.markmin' % chapter_id)
         data = open(filename).read().replace('\r','')
-        k = data.find(search)
+        k = data.lower().find(search.lower())
         if k>=0:
             snippet = data[data.rfind('\n\n',0,k)+1:data.find('\n\n',k)].strip()
             snippet = relative_link_re.sub(fix_relative_link,snippet)
