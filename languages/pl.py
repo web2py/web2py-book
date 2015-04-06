@@ -75,7 +75,7 @@
 'Groups': 'Groupy',
 'Hello World': 'Witaj Świecie',
 'Home': 'Start',
-'How did you get here?': 'Jak sie tu dostałeś?',
+'How did you get here?': 'Co się stało, że tutaj jesteś?',
 'import': 'Import',
 'Import/Export': 'Import/Eksport',
 'Index': 'Indeks',

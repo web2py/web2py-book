@@ -7,11 +7,11 @@ web2py comes with a Database Abstraction Layer (DAL), an API that maps Python ob
 
 The Gotchas section at the end of this chapter has some more information about specific databases.
 
-The Windows binary distribution works out of the box with SQLite and MySQL. The Mac binary distribution works out of the box with SQLite.
+The Windows binary distribution works out of the box with SQLite, MSSQL, Postgresql and MySQL. The Mac binary distribution works out of the box with SQLite.
 To use any other database back-end, run from the source distribution and install the appropriate driver for the required back end.
 ``database drivers``:inxx
 
-Once the proper driver is installed, start web2py from source, and it will find the driver. Here is a list of drivers:
+Once the proper driver is installed, start web2py from source, and it will find the driver. Here is a list of the drivers web2py can use:
 
 ``DAL``:inxx ``SQLite``:inxx ``MySQL``:inxx ``PostgresSQL``:inxx ``Oracle``:inxx ``MSSQL``:inxx ``FireBird``:inxx ``DB2``:inxx ``Informix``:inxx ``Sybase``:inxx ``Teradata``:inxx ``MongoDB``:inxx ``CouchDB``:inxx ``SAPDB``:inxx ``Cubrid``:inxx
 
@@ -21,7 +21,7 @@ SQLite | sqlite3 or pysqlite2 or zxJDBC ``zxjdbc``:cite  (on Jython)
 PostgreSQL | psycopg2 ``psycopg2``:cite  or pg8000 ``pg8000``:cite or zxJDBC ``zxjdbc``:cite  (on Jython)
 MySQL | pymysql ``pymysql``:cite or MySQLdb ``mysqldb``:cite
 Oracle | cx_Oracle ``cxoracle``:cite
-MSSQL | pyodbc ``pyodbc``:cite
+MSSQL | pyodbc ``pyodbc``:cite or pypyodbc``pypyodbc``:cite
 FireBird | kinterbasdb ``kinterbasdb``:cite or fdb or pyodbc
 DB2 | pyodbc ``pyodbc``:cite
 Informix | informixdb ``informixdb``:cite
@@ -36,6 +36,7 @@ IMAP | imaplib ``IMAP``:cite
 
 ``sqlite3``, ``pymysql``, ``pg8000``, and ``imaplib`` ship with web2py. Support of MongoDB is experimental. The IMAP option allows to use DAL to access IMAP.
 
+### The DAL: A quick tour
 web2py defines the following classes that make up the DAL:
 
 The **DAL** object represents a database connection. For example:
@@ -97,7 +98,71 @@ myorder = db.mytable.myfield.upper() | db.mytable.id
 db().select(db.table.ALL, orderby=myorder)
 ``:code
 
-### Connection strings
+### Using the DAL "stand-alone"
+The web2py DAL can be used in a non-web2py environment via
+``
+from gluon import DAL, Field
+# also consider: from gluon.validators import *
+``:code
+
+[[dal_constructor]]
+### DAL constructor
+Basic use:
+``
+>>> db = DAL('sqlite://storage.db')
+``:code
+
+The database is now connected and the connection is stored in the global variable ``db``.
+
+At any time you can retrieve the connection string.
+``_uri``:inxx
+``
+>>> print db._uri
+sqlite://storage.db
+``:code
+
+and the database name
+``_dbname``:inxx
+``
+>>> print db._dbname
+sqlite
+``:code
+
+The connection string is called a ``_uri`` because it is an instance of a Uniform Resource Identifier.
+
+The DAL allows multiple connections with the same database or with different databases, even databases of different types. For now, we will assume the presence of a single database since this is the most common situation.
+
+#### DAL signature
+``
+DAL(
+    uri='sqlite://dummy.db',
+    pool_size=0,
+    folder=None,
+    db_codec='UTF-8',
+    check_reserved=None,
+    migrate=True,
+    fake_migrate=False,
+    migrate_enabled=True,
+    fake_migrate_all=False,
+    decode_credentials=False,
+    driver_args=None,
+    adapter_args=None,
+    attempts=5,
+    auto_import=False,
+    bigint_id=False,
+    debug=False,
+    lazy_tables=False,
+    db_uid=None,
+    do_connect=True,
+    after_connection=None,
+    tables=None,
+    ignore_field_case=True,
+    entity_quoting=False,
+    table_hash=None)
+``:code
+
+[[connection_strings]]
+#### Connection strings (the uri parameter)
 ``connection strings``:inxx
 
 A connection with the database is established by creating an instance of the DAL object:
@@ -106,11 +171,15 @@ A connection with the database is established by creating an instance of the DAL
 ``:code
 ``db`` is not a keyword; it is a local variable that stores the connection object ``DAL``. You are free to give it a different name. The constructor of ``DAL`` requires a single argument, the connection string. The connection string is the only web2py code that depends on a specific back-end database. Here are examples of connection strings for specific types of supported back-end databases (in all cases, we assume the database is running from localhost on its default port and is named "test"):
 
+``ndb``:index
+
 -------------
 **SQLite**     | ``sqlite://storage.db``
 **MySQL**      | ``mysql://username:password@localhost/test``
 **PostgreSQL** | ``postgres://username:password@localhost/test``
-**MSSQL**      | ``mssql://username:password@localhost/test``
+**MSSQL (legacy)**      | ``mssql://username:password@localhost/test``
+**MSSQL (>=2005)**      | ``mssql3://username:password@localhost/test``
+**MSSQL (>=2012)**      | ``mssql4://username:password@localhost/test``
 **FireBird**   | ``firebird://username:password@localhost/test``
 **Oracle**     | ``oracle://username/password@test``
 **DB2**        | ``db2://username:password@test``
@@ -124,9 +193,12 @@ A connection with the database is established by creating an instance of the DAL
 **MongoDB**    | ``mongodb://username:password@localhost/test``
 **Google/SQL** | ``google:sql://project:instance/database``
 **Google/NoSQL** | ``google:datastore``
+**Google/NoSQL/NDB** | ``google:datastore+ndb``
 -------------
 
-Notice that in SQLite the database consists of a single file. If it does not exist, it is created. This file is locked every time it is accessed. In the case of MySQL, PostgreSQL, MSSQL, FireBird, Oracle, DB2, Ingres and Informix the database "test" must be created outside web2py. Once the connection is established, web2py will create, alter, and drop tables appropriately.
+Notice that in SQLite the database consists of a single file. If it does not exist, it is created. This file is locked every time it is accessed. In the case of MySQL, PostgreSQL, MSSQL, FireBird, Oracle, DB2, Ingres and Informix the database "test" must be created outside web2py. Once the connection is established, web2py will create, alter, and drop tables appropriately. 
+
+In the Google/NoSQL case the ``+ndb`` option turns on NDB. NDB uses a Memcache buffer to read data that is accessed often. This is completely automatic and done at the datastore level, not at the web2py level.
 
 It is also possible to set the connection string to ``None``. In this case DAL will not connect to any back-end database, but the API can still be accessed for testing. Examples of this will be discussed in Chapter 7.
 
@@ -144,12 +216,13 @@ Notice that by default web2py uses utf8 character encoding for databases. If you
 db = DAL('...', db_codec='latin1')
 ``:code
 
-otherwise you'll get UnicodeDecodeError tickets.
+Otherwise you'll get UnicodeDecodeError tickets.
+
 
 #### Connection pooling
 ``connection pooling``:inxx
 
-The second argument of the DAL constructor is the ``pool_size``; it defaults to zero.
+A common argument of the DAL constructor is the ``pool_size``; it defaults to zero.
 
 As it is rather slow to establish a new database connection for each request, web2py implements a mechanism for connection pooling. Once a connection is established and the page has been served and the transaction completed, the connection is not closed but goes into a pool. When the next http request arrives, web2py tries to recycle a connection from the pool and use that for the new transaction. If there are no available connections in the pool, a new connection is established.
 
@@ -160,9 +233,13 @@ Connections in the pools are shared sequentially among threads, in the sense tha
 The ``pool_size`` parameter is ignored by SQLite and Google App Engine.
 Connection pooling is ignored for SQLite, since it would not yield any benefit.
 
-#### Connection failures
+#### Connection failures (attempts parameter)
 
-If web2py fails to connect to the database it waits 1 seconds and tries again up to 5 times before declaring a failure. In case of connection pooling it is possible that a pooled connection that stays open but unused for some time is closed by the database end. Thanks to the retry feature web2py tries to re-establish these dropped connections.
+If web2py fails to connect to the database it waits 1 seconds and by default tries again up to 5 times before declaring a failure. In case of connection pooling it is possible that a pooled connection that stays open but unused for some time is closed by the database end. Thanks to the retry feature web2py tries to re-establish these dropped connections.
+The number of attempts is set via the attempts parameter.
+
+#### Lazy Tables
+setting ``lazy_tables = True`` provides a major performance boost. See below: [[lazy tables #lazy_tables]]
 
 #### Replicated databases
 
@@ -177,10 +254,10 @@ will try the second and the third. This can also be used to distribute load
 in a database master-slave configuration. We will talk more about this
 in Chapter 13 in the context of scalability.
 
-### Reserved keywords
+#### Reserved keywords
 ``reserved Keywords``:inxx
 
-``check_reserved`` is yet another argument that can be passed to the DAL constructor. It tells it to check table names and column names against reserved SQL keywords in target back-end databases. ``check_reserved`` defaults to None.
+``check_reserved`` tells the constructor to check table names and column names against reserved SQL keywords in target back-end databases. ``check_reserved`` defaults to None.
 
 This is a list of strings that contain the database back-end adapter names.
 
@@ -208,58 +285,87 @@ The following database backends support reserved words checking.
 **MSSQL** | ``mssql``
 **Oracle** | ``oracle``
 -----
-[[DAL_table_field]]
-### ``DAL``, ``Table``, ``Field``
 
-You can experiment with the DAL API using the web2py shell.
+#### Database quoting and case settings (entity_quoting, ignore_field)
+
+You can also use explicit quoting of SQL entities at DAL level.  It works transparently so you can use the same names in python and in the DB schema.
+
+``ignore_field_case = True``
+``entity_quoting = True``
+Here is an example:
+``
+db = DAL('postgres://...', ...,ignore_field_case=False, entity_quoting=True)
+
+db.define_table('table1', Field('column'), Field('COLUMN'))
+
+print db(db.table1.COLUMN != db.table1.column).select()
+``:code
+
+#### Other DAL constructor parameters
+
+##### Database folder location
+``folder`` – where .table files will be created. Automatically set within web2py. Use an explicit path when using DAL outside web2py
+
+##### Default migration settings
+Migration is detailed below in Tables [[table migrations #table_migrations]]. The DAL constructor migration settings are booleans affecting defaults and global behaviour. 
+
+``migrate = True`` sets default migrate behavior for all tables
+
+``fake_migrate = False`` sets default fake_migrate behavior for all tables
+
+``migrate_enabled = True`` If set to False disables ALL migrations
+
+``fake_migrate_all = False`` If set to True fake migrates ALL tables
+
+
+#### Experiment with the web2py shell
+
+You can experiment with the DAL API using the web2py shell (-S [[command line option ../04#CommandLineOptions]]).
 
 Start by creating a connection. For the sake of example, you can use SQLite. Nothing in this discussion changes when you change the back-end engine.
 
-[[dal_constructor]]
-#### DAL constructor
-``
->>> db = DAL('sqlite://storage.db')
-``:code
-
-The database is now connected and the connection is stored in the global variable ``db``.
-
-At any time you can retrieve the connection string.
-``_uri``:inxx
-``
->>> print db._uri
-sqlite://storage.db
-``:code
-
-and the database name
-``_dbname``:inxx
-``
->>> print db._dbname
-sqlite
-``:code
-
-The connection string is called a ``_uri`` because it is an instance of a Uniform Resource Identifier.
-
-The DAL allows multiple connections with the same database or with different databases, even databases of different types. For now, we will assume the presence of a single database since this is the most common situation.
 
 [[table_constructor]]
-#### Table constructor
-
+### Table constructor
 ``define_table``:inxx ``Field``:inxx
-``type``:inxx ``length``:inxx ``default``:inxx ``requires``:inxx ``required``:inxx ``unique``:inxx
-``notnull``:inxx ``ondelete``:inxx ``uploadfield``:inxx ``uploadseparate``:inxx ``migrate``:inxx ``sql.log``:inxx
 
-The most important method of a DAL is ``define_table``:
+#### define_table signature
+The signature for define_table:
+
+Tables are defined in the DAL via ``define_table``:
 ``
->>> db.define_table('person', Field('name'))
+>>> db.define_table('person', Field('name'),
+    id=id,
+    rname=None,
+    redefine=True
+    common_filter,
+    fake_migrate,
+    fields,
+    format,
+    migrate,
+    on_define,
+    plural,
+    polymodel,
+    primarykey,
+    redefine,
+    sequence_name,
+    singular,
+    table_class,
+    trigger_name)
 ``:code
 
 It defines, stores and returns a ``Table`` object called "person" containing a field (column) "name". This object can also be accessed via ``db.person``, so you do not need to catch the return value.
 
-Do not declare a field called "id", because one is created by web2py anyway. Every table has a field called "id" by default. It is an auto-increment integer field (starting at 1) used for cross-reference and for making every record unique, so "id" is a primary key. (Note: the id's starting at 1 is back-end specific. For example, this does not apply to the Google App Engine NoSQL.)
+#### ``id``: Notes about the primary key 
+Do not declare a field called "id", because one is created by web2py anyway. Every table has a field called "id" by default. It is an auto-increment integer field (starting at 1) used for cross-reference and for making every record unique, so "id" is a primary key. (Note: the id counter starting at 1 is back-end specific. For example, this does not apply to the Google App Engine NoSQL.)
 
 ``named id field``:inxx
-Optionally you can define a field of ``type='id'`` and web2py will use this field as auto-increment id field. This is not recommended except when accessing legacy database tables. With some limitation, you can also use different primary keys and this is discussed in the section on "Legacy databases and keyed tables".
+Optionally you can define a Field of ``type='id'`` and web2py will use this field as auto-increment id field. This is not recommended except when accessing legacy database tables which have a primary key under a different name. 
+With some limitation, you can also use different primary keys using the ``primarykey`` parameter. [[primarykey #primarykey]] is explained shortly below.
 
+#### ``plural`` and ``singular``
+Smartgrid objects may need to know the singular and plural name of the table. The defaults are smart but these parameters allow you to be specific. See smartgrid for more information. 
+#### ``redefine``
 Tables can be defined only once but you can force web2py to redefine an existing table:
 
 ``
@@ -269,24 +375,10 @@ db.define_table('person', Field('name'), redefine=True)
 
 The redefinition may trigger a migration if field content is different.
 
-[[lazy_tables]]
-#### Lazy Tables, a major performance boost
-``lazy tables``:inxx
-web2py models are executed before controllers, so all tables are defined at every request. Not all tables are needed to handle each request, so it is possible that some of the time spent defining tables is wasted. Conditional models ([[conditional models, chapter 4 ../04/#conditional_models]]) can help, but web2py offers a big performance boost via lazy_tables. This feature means that table creation is deferred until the table is actually referenced. Enabling lazy tables requires setting the ``DAL(...,lazy_tables=True)``  parameter. This is one of the most significant response-time performance boosts in web2py.
-
-#### Adding attributes to fields and tables
-If you need to add custom attributes to fields, you can simply do this:
-``db.table.field.extra = {}``:code 
-
-"extra" is not a keyword ; it's a custom attributes now attached to the field object. You can do it with tables too but they must be preceded by an 
-underscore to avoid naming conflicts with fields: 
-
-``db.table._extra = {} ``:code
-
 [[record_representation]]
-#### Record representation
+#### ``format``: Record representation
 
-It is optional but recommended to specify a format representation for records:
+It is optional but recommended to specify a format representation for records with the ``format`` parameter.
 ``
 >>> db.define_table('person', Field('name'), format='%(name)s')
 ``:code
@@ -306,27 +398,120 @@ The format attribute will be used for two purposes:
 - To represent referenced records in select/option drop-downs.
 - To set the ``db.othertable.person.represent`` attribute for all fields referencing this table. This means that SQLTABLE will not show references by id but will use the format preferred representation instead.
 
+#### ``rname``: Record representation
+``rname`` sets a database backend name for the table. This makes the web2py table name an alias, and ``rname`` is the real name used when constructing the query for the backend.
+To illustrate just one use, ``rname`` can be used to provide MSSQL fully qualified table names accessing tables belonging to other databases on the server: ``rname = 'db1.dbo.table1'``:code
+
+[[primarykey]]
+#### ``primarykey``: Support for legacy tables
+``primarykey`` helps support legacy tables with existing primary keys, even multi-part.
+See [[Legacy Databases #LegacyDatabases]] below.
+
+#### ``migrate``, ``fake_migrate``
+``migrate`` sets migration options for the table. See [[Table Migrations #table_migrations]] below
+
+#### ``table_class``
+If you define your own Table class as a sub-class of gluon.dal.Table, you can provide it here; this allows you to extend and override methods. Example: ``table_class=MyTable``:code
+
+#### ``sequence_name``
+(Optional) The name of a custom table sequence (if supported by the database). Can create a SEQUENCE (starting at 1 and incrementing by 1) or use this for legacy tables with custom sequences. Note that when necessary, web2py will create sequences automatically by default (starting at 1). 
+
+#### ``trigger_name``
+(optional) Relates to ``sequence_name``. Relevant for some backends which do not support auto-increment numeric fields. 
+
+#### ``polymodel``
+For Google App Engine
+
+#### ``on_define``
+``on_define`` is a callback triggered when a lazy_table is instantiated, although it is called anyway if the table is not lazy. This allows dynamic changes to the table without losing the advantages of delayed instantiation. 
+
+Example:
+``
+ db = DAL(lazy_tables=True) 
+ db.define_table('person',Field('name'),Field('age','integer'), 
+    on_define=lambda table: [ 
+            table.name.set_attributes(requires=IS_NOT_EMPTY(),default=''), 
+            table.age.set_attributes(requires=IS_INT_IN_RANGE(0,120),default=30), 
+``:code
+Note this example shows how to use ``on_define`` but it is not actually necessary. The simple ``requires`` values could be added to the Field definitions and the table would still be lazy. However, ``requires`` which take a Set object as the first argument, such as IS_IN_DB, will make a query like ``db.sometable.somefield == some_value``:code which would cause ``sometable`` to be defined early. This is the situation saved by ``on_define``.
+
+[[lazy_tables]]
+#### Lazy Tables, a major performance boost
+``lazy tables``:inxx
+web2py models are executed before controllers, so all tables are defined at every request. Not all tables are needed to handle each request, so it is possible that some of the time spent defining tables is wasted. Conditional models ([[conditional models, chapter 4 ../04#conditional_models]]) can help, but web2py offers a big performance boost via lazy_tables. This feature means that table creation is deferred until the table is actually referenced. Enabling lazy tables is made when initialising a database via the DAL constructor. It requires setting the ``DAL(...,lazy_tables=True)``  parameter. This is one of the most significant response-time performance boosts in web2py.
+
+#### Adding attributes to fields and tables
+If you need to add custom attributes to fields, you can simply do this:
+``db.table.field.extra = {}``:code 
+
+"extra" is not a keyword ; it's a custom attributes now attached to the field object. You can do it with tables too but they must be preceded by an 
+underscore to avoid naming conflicts with fields: 
+
+``db.table._extra = {} ``:code
+
+
 [[field_constructor]]
-#### Field constructor
+### Field constructor
 ``Field constructor``:inxx
 These are the default values of a Field constructor:
 ``
-Field(name, 'string', length=None, default=None,
+Field(fieldname, type='string', length=None, default=None,
       required=False, requires='<default>',
       ondelete='CASCADE', notnull=False, unique=False,
       uploadfield=True, widget=None, label=None, comment=None,
       writable=True, readable=True, update=None, authorize=None,
       autodelete=False, represent=None, compute=None,
       uploadfolder=None,
-      uploadseparate=None,uploadfs=None)
+      uploadseparate=None,uploadfs=None,
+      rname=None)
 ``:code
 
 Not all of them are relevant for every field. "length" is relevant only for fields of type "string". "uploadfield" and "authorize" are relevant only for fields of type "upload". "ondelete" is relevant only for fields of type "reference" and "upload".
 - ``length`` sets the maximum length of a "string", "password" or "upload" field.  If ``length`` is not specified a default value is used but the default value is not guaranteed to be backward compatible. ''To avoid unwanted migrations on upgrades, we recommend that you always specify the length for string, password and upload fields.''
 - ``default`` sets the default value for the field. The default value is used when performing an insert if a value is not explicitly specified. It is also used to pre-populate forms built from the table using SQLFORM. Note, rather than being a fixed value, the default can instead be a function (including a lambda function) that returns a value of the appropriate type for the field. In that case, the function is called once for each record inserted, even when multiple records are inserted in a single transaction.
 - ``required`` tells the DAL that no insert should be allowed on this table if a value for this field is not explicitly specified.
-- ``requires`` is a validator or a list of validators. This is not used by the DAL, but it is used by SQLFORM. The default validators for the given types are shown in the following table:
+- ``requires`` is a validator or a list of validators. This is not used by the DAL, but it is used by SQLFORM. The default validators for the given types are shown in the next section.
+-------
+Notice that ``requires=...`` is enforced at the level of forms, ``required=True`` is enforced at the level of the DAL (insert), while ``notnull``, ``unique`` and ``ondelete`` are enforced at the level of the database. While they sometimes may seem redundant, it is important to maintain the distinction when programming with the DAL.
+-------
 - ``uploadfolder`` while the default is ``None``, most DB adapters will default to uploading files into os.path.join(request.folder, 'uploads'). MongoAdapter does not seem to be doing so at present.
+- ``rname`` provides the field was a "real name", a name for the field known to the database adapter; when the field is used, it is the rname value which is sent to the database. The web2py name for the field is then effectively an alias.
+``ondelete``:inxx
+- ``ondelete`` translates into the "ON DELETE" SQL statement. By default it is set to "CASCADE". This tells the database that when it deletes a record, it should also delete all records that refer to it. To disable this feature, set ``ondelete`` to "NO ACTION" or "SET NULL".
+- ``notnull=True`` translates into the "NOT NULL" SQL statement. It prevents the database from inserting null values for the field.
+- ``unique=True`` translates into the "UNIQUE" SQL statement and it makes sure that values of this field are unique within the table. It is enforced at the database level.
+- ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set to True, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
+- ``uploadfolder`` defaults to the application's "uploads/" folder. If set to a different path, files will uploaded to a different folder. 
+-------
+For example,
+``
+Field(...,uploadfolder=os.path.join(request.folder,'static/temp'))
+``:code
+will upload files to the "web2py/applications/myapp/static/temp" folder.
+-------
+- ``uploadseparate`` if set to True will upload files under different subfolders of the ''uploadfolder'' folder. This is optimized to avoid too many files under the same folder/subfolder. ATTENTION: You cannot change the value of ``uploadseparate`` from True to False without breaking links to existing uploads. web2py either uses the separate subfolders or it does not. Changing the behavior after files have been uploaded will prevent web2py from being able to retrieve those files. If this happens it is possible to move files and fix the problem but this is not described here.
+- ``uploadfs`` allows you specify a different file system where to upload files, including an Amazon S3 storage or a remote SFTP storage. This option requires PyFileSystem installed. ``uploadfs`` must point to ``PyFileSystem``. ``PyFileSystem``:inxx ``uploadfs``:idxx
+- ``widget`` must be one of the available widget objects, including custom widgets, for example: ``SQLFORM.widgets.string.widget``. A list of available widgets will be discussed later. Each field type has a default widget.
+- ``label`` is a string (or a helper or something that can be serialized to a string) that contains the label to be used for this field in auto-generated forms.
+- ``comment``  is a string (or a helper or something that can be serialized to a string) that contains a comment associated with this field, and will be displayed to the right of the input field in the autogenerated forms.
+- ``writable`` declares whether a field is writable in forms.
+- ``readable`` declares whether a field is readable in forms. If a field is neither readable nor writable, it will not be displayed in create and update forms.
+- ``update`` contains the default value for this field when the record is updated.
+- ``compute`` is an optional function. If a record is inserted or updated, the compute function will be executed and the field will be populated with the function result. The record is passed to the compute function as a ``dict``, and the dict will not include the current value of that, or any other compute field.
+- ``authorize`` can be used to require access control on the corresponding field, for "upload" fields only. It will be discussed more in detail in the context of Authentication and Authorization.
+- ``autodelete`` determines if the corresponding uploaded file should be deleted when the record referencing the file is deleted. For "upload" fields only. However, records deleted by the database itself due to a CASCADE operation will not trigger web2py's autodelete. The web2py Google group has workaround discussions.
+- ``represent`` can be None or can point to a function that takes a field value and returns an alternate representation for the field value. 
+-------
+Examples:
+``
+db.mytable.name.represent = lambda name,row: name.capitalize()
+db.mytable.other_id.represent = lambda id,row: row.myfield
+db.mytable.some_uploadfield.represent = lambda value,row: \
+    A('get it', _href=URL('download', args=value))
+``:code
+-------
+
+
 [[field_types]]
 #### Field types
 ``field types``:inxx
@@ -363,43 +548,9 @@ The ``list:<type>`` fields are special because they are designed to take advanta
 
 The ``json`` field type is pretty much explanatory. It can store any json serializable object. It is designed to work specifically for MongoDB and backported to the other database adapters for portability.
 
--------
-Notice that ``requires=...`` is enforced at the level of forms, ``required=True`` is enforced at the level of the DAL (insert), while ``notnull``, ``unique`` and ``ondelete`` are enforced at the level of the database. While they sometimes may seem redundant, it is important to maintain the distinction when programming with the DAL.
--------
-
-``ondelete``:inxx
-
-- ``ondelete`` translates into the "ON DELETE" SQL statement. By default it is set to "CASCADE". This tells the database that when it deletes a record, it should also delete all records that refer to it. To disable this feature, set ``ondelete`` to "NO ACTION" or "SET NULL".
-- ``notnull=True`` translates into the "NOT NULL" SQL statement. It prevents the database from inserting null values for the field.
-- ``unique=True`` translates into the "UNIQUE" SQL statement and it makes sure that values of this field are unique within the table. It is enforced at the database level.
-- ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set to True, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
-- ``uploadfolder`` defaults to the application's "uploads/" folder. If set to a different path, files will uploaded to a different folder. For example,
-``
-Field(...,uploadfolder=os.path.join(request.folder,'static/temp'))
-``:code
-will upload files to the "web2py/applications/myapp/static/temp" folder.
-- ``uploadseparate`` if set to True will upload files under different subfolders of the ''uploadfolder'' folder. This is optimized to avoid too many files under the same folder/subfolder. ATTENTION: You cannot change the value of ``uploadseparate`` from True to False without breaking links to existing uploads. web2py either uses the separate subfolders or it does not. Changing the behavior after files have been uploaded will prevent web2py from being able to retrieve those files. If this happens it is possible to move files and fix the problem but this is not described here.
-- ``uploadfs`` allows you specify a different file system where to upload files, including an Amazon S3 storage or a remote SFTP storage. This option requires PyFileSystem installed. ``uploadfs`` must point to ``PyFileSystem``. ``PyFileSystem``:inxx ``uploadfs``:idxx
-- ``widget`` must be one of the available widget objects, including custom widgets, for example: ``SQLFORM.widgets.string.widget``. A list of available widgets will be discussed later. Each field type has a default widget.
-- ``label`` is a string (or a helper or something that can be serialized to a string) that contains the label to be used for this field in auto-generated forms.
-- ``comment``  is a string (or a helper or something that can be serialized to a string) that contains a comment associated with this field, and will be displayed to the right of the input field in the autogenerated forms.
-- ``writable`` declares whether a field is writable in forms.
-- ``readable`` declares whether a field is readable in forms. If a field is neither readable nor writable, it will not be displayed in create and update forms.
-- ``update`` contains the default value for this field when the record is updated.
-- ``compute`` is an optional function. If a record is inserted or updated, the compute function will be executed and the field will be populated with the function result. The record is passed to the compute function as a ``dict``, and the dict will not include the current value of that, or any other compute field.
-- ``authorize`` can be used to require access control on the corresponding field, for "upload" fields only. It will be discussed more in detail in the context of Authentication and Authorization.
-- ``autodelete`` determines if the corresponding uploaded file should be deleted when the record referencing the file is deleted. For "upload" fields only.
-- ``represent`` can be None or can point to a function that takes a field value and returns an alternate representation for the field value. Examples:
-``
-db.mytable.name.represent = lambda name,row: name.capitalize()
-db.mytable.other_id.represent = lambda id,row: row.myfield
-db.mytable.some_uploadfield.represent = lambda value,row: \
-    A('get it', _href=URL('download', args=value))
-``:code
 
 ``blob``:inxx
-"blob" fields are also special. By default, binary data is encoded in base64 before being stored into the actual database field, and it is decoded when extracted. This has the negative effect of using 25% more storage space than necessary in blob fields, but has two advantages. On average it reduces the amount of data communicated between web2py and the database server, and it makes the communication independent of back-end-specific escaping conventions.
-
+``blob`` fields are also special. By default, binary data is encoded in base64 before being stored into the actual database field, and it is decoded when extracted. This has the negative effect of using 25% more storage space than necessary in blob fields, but has two advantages. On average it reduces the amount of data communicated between web2py and the database server, and it makes the communication independent of back-end-specific escaping conventions.
 
 #### Run-time field and table modification
 
@@ -486,7 +637,9 @@ which returns a tuple ``(value, error)``. ``error`` is ``None`` if the input pas
 
 
 
+[[table_migrations]]
 ### Migrations
+
 ``migrations``:inxx
 
 ``define_table`` checks whether or not the corresponding table exists. If it does not, it generates the SQL to create it and executes the SQL. If the table does exist but differs from the one being defined, it generates the SQL to alter the table and executes it. If a field has changed type but not name, it will try to convert the data (If you do not want this, you need to redefine the table twice, the first time, letting web2py drop the field by removing it, and the second time adding the newly defined field so that web2py can create it.). If the table exists and matches the current definition, it will leave it alone. In all cases it will create the ``db.person`` object that represents the table.
@@ -611,7 +764,7 @@ It takes a list of dictionaries of fields to be inserted and performs multiple i
 
 ### ``commit`` and ``rollback``
 
-No create, drop, insert, truncate, delete, or update operation is actually committed until you issue the commit command
+No create, drop, insert, truncate, delete, or update operation is actually committed until web2py issues the commit command. In models, views and controllers, web2py does this for you, but in modules you are required to do the commit.
 
 ``commit``:inxx
 ``
@@ -650,8 +803,8 @@ else:
      save cookies, sessions and return the page
 ``:code
 
-There is no need to ever call ``commit``  or ``rollback`` explicitly in web2py unless one needs more granular control.
-
+So in models, views and controllers there is no need to ever call ``commit``  or ``rollback`` explicitly in web2py unless you need more granular control.
+However, in modules you will need to use ``commit()``.
 ### Raw SQL
 
 #### Timing queries
@@ -749,6 +902,7 @@ Here is an example of how to [[create an index using SQL in SQLite http://www.sq
 
 Other database dialects have very similar syntaxes but may not support the optional "IF NOT EXISTS" directive.
 
+[[LegacyDatabases]]
 ### Legacy databases and keyed tables
 
 web2py can connect to legacy databases under some conditions.
@@ -996,22 +1150,30 @@ Yes this is unusual and rarely needed.
 #### Rendering rows using represent
 You may wish to rewrite rows returned by select to take advantage of formatting information contained in the represents setting of the fields. 
 
-``rows = db(query).select()
-repr_row = rows.render(0)``:code
+``
+rows = db(query).select()  
+repr_row = rows.render(0)
+``:code
 
 If you don't specify an index, you get a generator to iterate over all the rows:
 
-``for row in rows.render():
-    print row.myfield``:code
+``
+for row in rows.render():
+    print row.myfield
+``:code
 
 Can also be applied to slices:
 
-``for row in rows[0:10].render():
-    print row.myfield``:code
+``
+for row in rows[0:10].render():
+    print row.myfield
+``:code
 
 If you only want to transform selected fields via their "represent" attribute, you can list them in the "fields" argument:
 
-``repr_row = row.render(0, fields=[db.mytable.myfield])``:code
+``
+repr_row = row.render(0, fields=[db.mytable.myfield])
+``:code
 
 Note, it returns a transformed copy of the original Row, so there's no update_record (which you wouldn't want anyway) or delete_record.
 
@@ -1142,7 +1304,7 @@ Given the following action containing a query
 ``SQLTABLE``:inxx
 
 ``
-def index()
+def index():
     return dict(rows = db(query).select())
 ``:code
 
@@ -1215,6 +1377,7 @@ and the corresponding view:
 
 For working with multiple rows, ``SQLFORM.grid`` and ``SQLFORM.smartgrid`` are preferred to ``SQLTABLE`` because they are more powerful. Please see chapter 7.
 
+[[orderby]] [[limitby]] [[distinct]]
 #### ``orderby``, ``groupby``, ``limitby``, ``distinct``, ``having``,``orderby_on_limitby``,``left``,``cache``
 
 The ``select`` command takes a number of optional arguments.
@@ -1580,7 +1743,7 @@ John
 #### ``find``, ``exclude``, ``sort``
 ``find``:inxx ``exclude``:inxx ``sort``:inxx
 
-Some times you need to perform two selects and one contains a subset of a previous select. In this case it is pointless to access the database again. The ``find``, ``exclude`` and ``sort`` objects allow you to manipulate a Rows objects and generate another one without accessing the database. More specifically:
+Some times you need to perform two selects and one contains a subset of a previous select. In this case it is pointless to access the database again. The ``find``, ``exclude`` and ``sort`` objects allow you to manipulate a Rows object and generate another one without accessing the database. More specifically:
 - ``find`` returns a new set of Rows filtered by a condition and leaves the original unchanged.
 - ``exclude`` returns a new set of Rows filtered by a condition and removes them from the original Rows.
 - ``sort`` returns a new set of Rows sorted by a condition and leaves the original unchanged.
@@ -1674,7 +1837,7 @@ works very much like
 id = db.mytable.insert(field='value')
 ``:code
 
-except that it calls the validators for the fields before performing the insert and bails out if the validation does not pass. If validation does not pass the errors can be found in ``ret.error``. If it passes, the id of the new record is in ``ret.id``. Mind that normally validation is done by the form processing logic so this function is rarely needed.
+except that it calls the validators for the fields before performing the insert and bails out if the validation does not pass. If validation does not pass the errors can be found in ``ret.errors``. ``ret.errors`` holds a key-value mapping where each key is the field name whose validation failed, and the value of the key is the result from the validation error (much like ``form.errors``). If it passes, the id of the new record is in ``ret.id``. Mind that normally validation is done by the form processing logic so this function is rarely needed.
 
 Similarly
 
@@ -2225,9 +2388,9 @@ For the sake of the example, you can log events with the same event_time but wit
 3
 ``:code
 
-#### ``like``, ``regexp``, ``startswith``, ``endswith``, ``contains``, ``upper``, ``lower``
+#### ``like``, ``ilike``, ``regexp``, ``startswith``, ``endswith``, ``contains``, ``upper``, ``lower``
 
-``like``:inxx ``startswith``:inxx ``endswith``:inxx ``regexp``:inxx
+``like``:inxx ``ilike``:inxx ``startswith``:inxx ``endswith``:inxx ``regexp``:inxx
 ``contains``:inxx ``upper``:inxx ``lower``:inxx
 
 Fields have a like operator that you can use to match strings:
@@ -2240,10 +2403,10 @@ port scan
 
 Here "port%" indicates a string starting with "port". The percent sign character, "%", is a wild-card character that means "any sequence of characters".
 
-The like operator is case-insensitive but it can be made case-sensitive with
+The like operator maps to the LIKE word in ANSI-SQL. LIKE is case-sensitive in most databases, and depends on the collation of the database itself. The ``like`` method is hence case-sensitive but it can be made case-insensitive with
 
 ``
-db.mytable.myfield.like('value',case_sensitive=True)
+db.mytable.myfield.like('value',case_sensitive=False)
 ``:code
 
 
@@ -2255,7 +2418,7 @@ db.mytable.myfield.endswith('value')
 db.mytable.myfield.contains('value')
 ``:code
 
-which are equivalent respectively to
+which are roughly equivalent respectively to
 
 ``
 db.mytable.myfield.like('value%')
@@ -2272,10 +2435,10 @@ db.mytable.myfield.contains(['value1','value2'], all=True)
 ``
 or any value from the list
 ``
-db.mytable.myfield.contains(['value1','value2'], all=false)
+db.mytable.myfield.contains(['value1','value2'], all=False)
 ``
 
-There is a also a ``regexp`` method that works like the ``like`` method but allows regular expression syntax for the look-up expression. It is only supported by PostgreSQL and SQLite.
+There is a also a ``regexp`` method that works like the ``like`` method but allows regular expression syntax for the look-up expression. It is only supported by PostgreSQL, MySQL, Oracle and SQLite (with different degree of support).
 
 The ``upper`` and ``lower`` methods allow you to convert the value of the field to upper or lower case, and you can also combine them with the like operator:
 
@@ -2855,7 +3018,7 @@ Imagine for example that you want to store a serializable Python data structure 
 
 Another way to accomplish the same is by using a Field of type ``SQLCustomType``, as discussed later.
 
-#### before and after callbacks
+#### callbacks on record insert, delete and update
 
 ``_before_insert``:inxx
 ``_after_insert``:inxx
@@ -2913,6 +3076,9 @@ The return values of these callback should be ``None`` or ``False``. If any of t
 Some times a callback may need to perform an update in the same or a different table and one wants to avoid callbacks calling themselves recursively.
 
 For this purpose there the Set objects have an ``update_naive`` method that works like ``update`` but ignores before and after callbacks.
+
+##### Database cascades
+Database schema can define relationships which trigger deletions of related records, known as cascading. The DAL is not informed when a record is deleted due to a cascade. So an ``on_delete`` trigger will not be called due a cascade-deletion. 
 
 [[versioning]]
 #### Record versioning
@@ -2987,7 +3153,7 @@ For every table with a field called ``db._request_tenant``, all records for all 
 db.table.request_tenant == db.table.request_tenant.default
 ``:code
 
-and for every record insert, this field is set to the default value.
+and for every record inserted, this field is set to the default value.
 In the example above we have chosen
 ``
 default = request.env.http_host
@@ -3197,15 +3363,16 @@ Web2py provides a script that does this work for you:
 
 ``
 cd web2py
-python scripts/cpdb.py \
-   -f applications/app/databases \
-   -y 'sqlite://storage.sqlite' \
-   -Y 'postgres://username:password@localhost/mydb'
+python scripts/cpdb.py \\
+   -f applications/app/databases \\
+   -y 'sqlite://storage.sqlite' \\
+   -Y 'postgres://username:password@localhost/mydb' \\
+   -d ../gluon
 ``
 
 After running the script you can simply switch the connection string in the model and everything should work out of the box. The new data should be there.
 
-This script provides various command line options that allows you to move data from one application to another, move all tables or only some tables, clear the data in the tables. for more info try:
+This script provides various command line options that allows you to move data from one application to another, move all tables or only some tables, clear the data in the tables. For more info try:
 
 ``
 python scripts/cpdb.py -h
@@ -3273,6 +3440,8 @@ JDBCPostgreSQLAdapter extends PostgreSQLAdapter
 OracleAdapter extends BaseAdapter
 MSSQLAdapter extends BaseAdapter
 MSSQL2Adapter extends MSSQLAdapter
+MSSQL3Adapter extends MSSQLAdapter
+MSSQL4Adapter extends MSSQLAdapter
 FireBirdAdapter extends BaseAdapter
 FireBirdEmbeddedAdapter extends FireBirdAdapter
 InformixAdapter extends BaseAdapter
@@ -3288,6 +3457,8 @@ SAPDBAdapter extends BaseAdapter (experimental)
 CouchDBAdapter extends NoSQLAdapter (experimental)
 IMAPAdapter extends NoSQLAdapter (experimental)
 MongoDBAdapter extends NoSQLAdapter (experimental)
+VerticaAdapter extends MSSQLAdapter (experimental)
+SybaseAdapter extends MSSQLAdapter (experimental)
 ``
 
 which override the behavior of the ``BaseAdapter``.
@@ -3343,15 +3514,26 @@ the prefix in the uri string defines the adapter. The mapping is defined in the 
 ``
 ADAPTERS = {
     'sqlite': SQLiteAdapter,
+    'spatialite': SpatiaLiteAdapter,
     'sqlite:memory': SQLiteAdapter,
+    'spatialite:memory': SpatiaLiteAdapter,
     'mysql': MySQLAdapter,
     'postgres': PostgreSQLAdapter,
+    'postgres:psycopg2': PostgreSQLAdapter,
+    'postgres:pg8000': PostgreSQLAdapter,
+    'postgres2:psycopg2': NewPostgreSQLAdapter,
+    'postgres2:pg8000': NewPostgreSQLAdapter,
     'oracle': OracleAdapter,
     'mssql': MSSQLAdapter,
     'mssql2': MSSQL2Adapter,
+    'mssql3': MSSQL3Adapter,
+    'mssql4' : MSSQL4Adapter,
+    'vertica': VerticaAdapter,
+    'sybase': SybaseAdapter,
     'db2': DB2Adapter,
     'teradata': TeradataAdapter,
     'informix': InformixAdapter,
+    'informix-se': InformixSEAdapter,
     'firebird': FireBirdAdapter,
     'firebird_embedded': FireBirdAdapter,
     'ingres': IngresAdapter,
@@ -3363,6 +3545,7 @@ ADAPTERS = {
     'jdbc:postgres': JDBCPostgreSQLAdapter,
     'gae': GoogleDatastoreAdapter, # discouraged, for backward compatibility
     'google:datastore': GoogleDatastoreAdapter,
+    'google:datastore+ndb': GoogleDatastoreAdapter,
     'google:sql': GoogleSQLAdapter,
     'couchdb': CouchDBAdapter,
     'mongodb': MongoDBAdapter,
@@ -3392,7 +3575,7 @@ db =DAL(..., driver_args={}, adapter_args={})
 #### SQLite
 SQLite does not support dropping and altering columns. That means that web2py migrations will work up to a point. If you delete a field from a table, the column will remain in the database but will be invisible to web2py. If you decide to reinstate the column, web2py will try re-create it and fail. In this case you must set ``fake_migrate=True`` so that metadata is rebuilt without attempting to add the column again. Also, for the same reason, **SQLite** is not aware of any change of column type. If you insert a number in a string field, it will be stored as string. If you later change the model and replace the type "string" with type "integer", SQLite will continue to keep the number as a string and this may cause problem when you try to extract the data.
 
-SQLite doesn't have a boolean type. web2py internally maps booleans to a 1 character string, with 'T' and 'F' representing True and False. The DAL handles this completely; the abstraction of a true boolean value works well. 
+SQLite doesn't have a boolean type. web2py internally maps booleans to a 1 character string, with 'T' and 'F' representing True and False. The DAL handles this completely; the abstraction of a true boolean value works well.
 But if you are updating the SQLite table with SQL directly, be aware of the web2py implementation, and avoid using 0 and 1 values.
 
 #### MySQL
@@ -3405,14 +3588,9 @@ Google SQL has the same problems as MySQL and more. In particular table metadata
 
 #### MSSQL (Microsoft SQL Server)
 ``limitby``:inxx
-MSSQL does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
-
-#### Oracle
-
-Oracle also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). 
-This works for simple select but may break for complex selects involving aliased fields and or joins.
-
-#### MSSQL 
+MSSQL < 2012 does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
+If you're using MSSQL >= 2005, the recommended prefix to use is ``mssql3://`` which provides a method to avoid the issue of fetching the entire non-paginated resultset. If you're on MSSQL >= 2012, use ``mssql4://`` that uses the ``OFFSET ... ROWS ... FETCH NEXT ... ROWS ONLY`` construct to support natively pagination without performance hits like other backends.
+The ``mssql://`` uri also enforces (for historical reasons) the use of ``text`` columns, that are superseeded in more recent versions (from 2005 onwards) by ``varchar(max)``. ``mssql3://`` and ``mssql4://`` should be used if you don't want to face some limitations of the - officially deprecated - ``text`` columns
 
 MSSQL has problems with circular references in tables that have ONDELETE CASCADE. This is an MSSQL bug and you work around it by setting the ondelete attribute for all reference fields to "NO ACTION". 
 You can also do it once and for all before you define tables:
@@ -3436,6 +3614,11 @@ this does not
 ``
 db(query).select(distinct=db.mytable.myfield)
 ``
+
+#### Oracle
+
+Oracle also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). 
+This works for simple select but may break for complex selects involving aliased fields and or joins.
 
 #### Google NoSQL (Datastore)
 Google NoSQL (Datastore) does not allow joins, left joins, aggregates, expression, OR involving more than one table, the ‘like’ operator searches in "text" fields. 
