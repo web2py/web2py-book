@@ -184,7 +184,7 @@ and include the following code:
     </Files>
   </Directory>
 
-  AliasMatch ^/([^/]+)/static/(.*) \
+  AliasMatch ^/([^/]+)/static/(?:_[\d]+.[\d]+.[\d]+/)?(.*) \
            /users/www-data/web2py/applications/$1/static/$2
   <Directory /users/www-data/web2py/applications/*/static/>
     Order Allow,Deny
@@ -336,7 +336,7 @@ and edit the Apache configuration file ``web2py.conf`` and append:
     </Files>
   </Directory>
 
-  AliasMatch ^/([^/]+)/static/(.*) \
+  AliasMatch ^/([^/]+)/static/(?:_[\d]+.[\d]+.[\d]+/)?(.*) \
         /users/www-data/web2py/applications/$1/static/$2
 
   <Directory /users/www-data/web2py/applications/*/static/>
@@ -905,6 +905,43 @@ sudo status web2py-scheduler
 ``:code
 
 ### Windows
+
+#### IIS
+If you don't need to run Apache for some other application on the server, on modern Windows Servers installing web2py behind IIS is easier (and more performant). The following steps explain how to setup IIS in order to serve web2py: Windows Server 2008R2 or higher is needed.
+
+We'll start from the assumption that you're running 2012R2. The terms used for 2008R2 are slightly different but it shouldn't be a problem to reconcile the instructions.
+Of course the requirements are a Python installed on the server and you being able to run web2py with something like 
+
+``
+python web2py.py -a 'yourpassword'
+``
+This means that nothing is broken in your installation and that you can host successfully web2py behind IIS.
+
+In order to run Python, IIS needs the **CGI** feature installed.
+In order to serve static files with IIS, we need also the **Url Rewrite** module that you can install from [[here http://www.iis.net/downloads/microsoft/url-rewrite]]
+
+To let IIS "speak" with python, we need to install the wfastcgi module from [[here http://pytools.codeplex.com/releases]] . This will install a little script, wfasctgi.py, that is the handler the IIS will use to communicate with Python.
+
+Now, open the **Internet Information Services (IIS) Manager** and click on the node representing the server. 
+
+We need to create a **FastCGI** process that will be mapped to the handler running web2py.
+
+Click on the **FastCGI Settings** box, and then to "Add Application": the "full path" needs to point to the python executable (something like "C:\Python27\python.exe") while the "Arguments" needs to point to the wfastcgi.py path (usually C:\Python27\Scripts\wfastcgi.py").
+
+From 2.10.4, web2py ships with a configuration file (web.config, inside the examples directory) that overrides the default handlers in order to work. The IIS configuration prohibits altering the handlers from a configuration file, but it's easy to disable the check: go to "Feature Delegation", find "Handler Mappings" and set it to Read/Write.
+Web2py needs also to be able to write files in his directory, so please make sure that the **IIS_IUSRS** group has read/write access to the folder where web2py is.
+
+If you want to use web2py under the root of IIS, copy the source code under the root of IIS (that is usually C:\inetpub\wwwroot). Now, copy the web.config out of the examples directory and put it on the root folder, alongside web2py.py. You only need to replace **SCRIPT_PROCESSOR** (near the end of the file) to match the FastCGI application we created earlier: it has a funny syntax, but it needs to match the format **Full Path|Arguments** of the FastCGI application. 
+
+If you have everything installed in the default paths, it needs to be something like **C:\Python27\python.exe|C:\Python27\Scripts\wfastcgi.py**
+
+This is sufficient to use web2py as the "root" application of a site. If instead you need to run web2py under a subfolder (let's say, "web2pyapps", so you can reach the welcome app at http://hostname/web2pyapps/welcome/ instead of the default http://hostname/welcome/), two additional steps are needed:
+  - move the code to a subfolder named web2pyapps
+  - create a routes.py file with 
+  ``
+routers = dict(BASE=dict(path_prefix = "web2pyapps"))
+  `` in it
+  - inside the IIS Manager, locate the web2pyapps folder, right click on it and select "Convert to Application"
 
 #### Apache and mod_wsgi
 
