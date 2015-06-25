@@ -1,38 +1,58 @@
-# Components and plugins
-``component``:inxx
-``plugin``:inxx
+# Komponenty i wtyczki
+``komponent``:inxx
+``wtyczka``:inxx
 
-Components and plugins are relatively new features of web2py, and there is some disagreement between developers about what they are and what they should be. Most of the confusion stems from the different uses of these terms in other software projects and from the fact that developers are still working to finalize the specifications.
+Komponenty i wtyczki są stosunkowo nową funkcjonalnością web2py i istnieje pewna
+różnica zdań między programistami, co do tego czym są te elementy i czym powinny
+być. Większość nieporozumień bieże się z różnych zastosowań komponentów i wtyczek
+w innych systemach oraz z faktu, że programiści ciągle jeszcze pracuja nad
+specyfikacjami.
 
-However, plugin support is an important feature and we need to provide some definitions. These definitions are not meant to be final, just consistent with the programming patterns we want to discuss in this chapter.
+Jednakże, wsparcie wtyczek jest ważną funkcjonalnością i musimy podać kilka definicji.
+Definicje te nie są ostateczne, po prostu zgodne są one ze wzorcami programowania
+i omówimy je w tym rozdziale.
 
-We will try to address two issues here:
+Postaramy się rozwiązać tutaj dwa problemy:
 
-- How can we build modular applications that minimize server load and maximize code reuse?
-- How can we distribute pieces of code in a more or less plugin-and-play fashion?
+- Jak można budować mudułowe aplikacje, które minimalizują obciążenie serwera
+  i maksymalizują ponowne wykorzystanie kodu?
+- Jak można dystrybuować fragmenty kodu w stylu bardziej lub mniej zbliżonym do
+  "plugin-and-play"?
 
-''Components'' address the first issue; ''plugins'' address the second.
+''Komponenty'' rozwiązują pierwszy problem, ''wtyczki'' drugi.
 
-## Components, LOAD and Ajax
+## Komponety LOAD i Ajax
 
 ``load``:inxx
 ``LOAD``:inxx
 ``Ajax``:inxx
 
 ------
-A **component** is a functionally autonomous part of a web page.
+**Komponent** jest funkcjonalnie autonomiczną częścią strony internetowej.
 ------
 
-A component may be composed of modules, controllers and views, but there is no strict requirement other than, when embedded in a web page, it must be localized within an html tag (for example a DIV, a SPAN, or an IFRAME) and it must perform its task independently of the rest of the page. We are specifically interested in components that are loaded in the page and communicate with the component controller function via Ajax.
+Komponet może składać się z modułów, kontrolerów i widoków, ale nie ma ścisłego
+wymogu w tym zakresie. Podczas osadzania na stronie internetowej musi być zlokalizowany
+między znacznikami html (na przykład w DIV, SPAN lub IFRAME) i musi wykonywać swoje
+zadanie niezależnie od reszty kodu strony. Jesteśmy szczególnie zainteresowani
+komponentami, które są ładowane na stronie i komunikują się z funkcją kontrolera
+komponentu poprzez Ajax.
 
-An example of a component is a "comments component" that is contained into a DIV and shows users' comments and a post-new-comment form. When the form is submitted, it is sent to the server via Ajax, the list is updated, and the comment is stored server-side in the database. The DIV content is refreshed without reloading the rest of the page.
+Przykładem komponentu jest "komponent komentarzy", który jest zawarty w DIV
+i pokazuje komantarze użytkowników oraz formularz tworzenia nowego komentarza.
+Gdy formularz jest zgłaszany, jest wysyłany na serwer poprzez Ajax, lista jest
+aktualizowana i komentarz zostaje zapisany po stronie serwera w bazie danych.
+Zawartość DIV jest odświeżana bez przeładowywania postałej części strony.
 
 ### LOAD
-The web2py LOAD function makes this easy to do without explicit JavaScript/Ajax knowledge or programming.
+Funkcja LOAD web2py wykonuje to łatwo bez konieczności jawnego tworzenia kodu
+JavaScript i Ajax lub programowania.
 
-Our goal is to be able to develop web applications by assembling components into page layouts.
+Naszym celem jest umożliwienie tworzenia aplikacji internetowej przez montaż
+komponentów na układach stron.
 
-Consider a simple web2py app "test" that extends the default scaffolding app with a custom model in file "models/db_comments.py":
+Rozpatrzmy prostą aplikację "test" rozszerzającą szkieletową aplikację z indywidualnym
+modelem w pliku "models/db_comments.py":
 
 ``
 db.define_table('comment_post',
@@ -40,7 +60,7 @@ db.define_table('comment_post',
    auth.signature)
 ``:code
 
-one action in "controllers/comments.py"
+jedną akcją w "controllers/comments.py"
 
 ``
 @auth.requires_login()
@@ -49,7 +69,7 @@ def post():
                 comments=db(db.comment_post).select())
 ``:code
 
-and the corresponding "views/comments/post.html"
+i odpowiednim widokiem "views/comments/post.html"
 
 ``
 {{extend 'layout.html'}}
@@ -62,15 +82,17 @@ and the corresponding "views/comments/post.html"
 {{=form}}
 ``:code
 
-You can access it as usual at:
+Dostęp do niej można uzyskać z adresu:
 
 ``
 http://127.0.0.1:8000/test/comments/post
 ``:code
 
-So far there is nothing special in this action, but we can turn it into a component by defining a new view with extension ".load" that does not extend the layout.
+Jak na razie nie ma nic szczególnego w tej akcji, ale możemy przekształcić ją
+w komponent przez zdefiniowanie nowego widoku z rozszerzeniem ".load", który nie
+rozszerza układu.
 
-Hence we create a "views/comments/post.load":
+Dlatego tworzymy "views/comments/post.load":
 
 ``
 {{for post in comments:}}
@@ -82,43 +104,44 @@ Hence we create a "views/comments/post.load":
 {{=form}}
 ``:code
 
-We can access it at the URL
+Możemy uzyskać dostęp do tego widoku z adresu:
 
 ``
 http://127.0.0.1:8000/test/comments/post.load
 ``:code
 
-This is a component that we can embed into any other page by simply doing
+Jest to komponent, który mozemy umieścić na każdej innej stronie, robiąc po prostu
+tak:
 
 ``
 {{=LOAD('comments','post.load',ajax=True)}}
 ``:code
 
-For example in "controllers/default.py" we can edit
+Na przykład, w "controllers/default.py" możemy edytować
 
 ``
 def index():
     return dict()
 ``:code
 
-and in the corresponding view add the component:
+i w odpowiednim widoku dodać ten komponent:
 
 ``
 {{extend 'layout.html'}}
 {{=LOAD('comments','post.load',ajax=True)}}
 ``:code
 
-Visiting the page
+Odwiedzając stronę
 
 ``
 http://127.0.0.1:8000/test/default/index
 ``:code
 
-will show the normal content and the comments component:
+zwykłą jej zwartość oraz dodany komponent komentarzy:
 
-[[image @///image/en8100.png center 480px]]
+[[image @///image/pl8100.png center 480px]]
 
-The ``{{=LOAD(...)}}`` component is rendered as follows:
+Komponent ``{{=LOAD(...)}}`` jest renderowany następująco:
 
 ``
 <script type="text/javascript"><!--
@@ -126,12 +149,15 @@ web2py_component("/test/comment/post.load","c282718984176")
 //--></script><div id="c282718984176">loading...</div>
 ``:code
 
-(the actual generated code depends on the options passed to the LOAD function).
+Faktycznie wygenerowany kod zależy od opcji przekazanych do funkcji LOAD.
 
-The ``web2py_component(url,id)`` function is defined in "web2py_ajax.html" and it performs all the magic: it calls the ``url`` via Ajax and embeds the response into the DIV with corresponding ``id``; it traps every form submission into the DIV and submits those forms via Ajax. The Ajax target is always the DIV itself.
+Funkcja ``web2py_component(url,id)`` jest zdefiniowana w "web2py_ajax.html"
+i wykonuje całą magię: wywołuje ``url`` poprzez Ajax i osadza odpowiedź w DIV
+o odpowiednim ``id``. Wychwytuje to każdy formularz przesłany do DIV i składa
+te formularze poprzez Ajax. Celem Ajax jest zawsze sam DIV.
 
-#### LOAD signature
-The full signature of the LOAD helper is the following:
+#### Sygnatura LOAD
+Pełna sygnatura helpera LOAD jest następująca:
 
 ``
 LOAD(c=None, f='index', args=[], vars={},
@@ -142,58 +168,97 @@ LOAD(c=None, f='index', args=[], vars={},
      content='loading...',**attr):
 ``:code
 
-Here:
-- the first two arguments ``c`` and ``f`` are the controller and the function that we want to call respectively.
-- ``args`` and ``vars`` are the arguments and variables that we want to pass to the function. The former is a list, the latter is a dictionary.
-- ``extension`` is an optional extension. Notice that the extension can also be passed as part of the function as in ``f='index.load'``.
-- ``target`` is the ``id`` of the target DIV. If it is not specified a random target ``id`` is generated.
-- ``ajax`` should be set to ``True`` if the DIV has to be filled via Ajax and to ``False`` if the DIV has to be filled before the current page is returned (thus avoiding the Ajax call).
-- ``ajax_trap=True`` means that any form submission in the DIV must be captured and submitted via Ajax, and the response must be rendered inside the DIV. ``ajax_trap=False`` indicates that forms must be submitted normally, thus reloading the entire page. ``ajax_trap`` is ignored and assumed to be ``True`` if ``ajax=True``.
-- ``url``, if specified, overrides the values of ``c``, ``f``, ``args``, ``vars``, and ``extension`` and loads the component at the ``url``. It is used to load as components pages served by other applications (which may or may not be created with web2py).
-- ``user_signature`` defaults to False but, if you are logged in, it should be set to True. This will make sure the ajax callback is digitally signed. This is documented in chapter 4.
-- ``times`` specifies how many times the component is to be requested. Use "infinity" to keep loading the component continuously. This option is useful for triggering regular routines for a given document request.
-- ``timeout`` sets the time to wait in milliseconds before starting the request or the frequency if ``times`` is greater than 1.
-- ``content`` is the content to be displayed while performing the ajax call. It can be a helper as in ``content=IMG(..)``.
-- optional ``**attr`` (attributes) can be passed to the contained ``DIV``.
+Tutaj:
+- pierwsze dwa argumenty ``c`` i ``f`` są odpowiednio kontrolerem i funkcją,
+  którą chce się wywołać;
+- ``args`` i ``vars`` to argumenty i zmienne, które chce się przekazać do funkcji;
+  pierwsze jest listą a drugie słownikiem;
+- ``extension`` to ewentualne rozszerzenie, rozszerzenie moze być również przekazane
+  jako część argumentu ``f`` (funkcja), tak jak ``f='index.load'``;
+- ``target`` to ``id`` docelowego DIV; jeśli nie zostanie określony, to wygenerowany
+  zostanie losowy identyfikator celu;
+- ``ajax`` powinien zostać ustawiony na ``True``, jeśli DIV ma być wypełniany przez
+  Ajax a na ``False``, jeśli DIV ma być wypełniony przed tym, gdy zwrócona zostaje
+  bieżąca strona (unikając w ten sposób wywołania Ajax);
+- ``ajax_trap=True`` oznacza, że musi zostać przechwycone każde złożenie formularza
+  w DIV i przesłane za pośrednictwem Ajax a odpowiedź musi być renderowana wewnątrz
+  DIV; ``ajax_trap=False`` wskazuje, że formularze muszą być zgłaszane w sposób zwykły,
+  więc przeładowywana będzie cała strona; jeśli ``ajax=True``, to ``ajax_trap``
+  jest ignorowane i przyjmuje się, że ma wartość ``True``;
+- ``url``, jeśli jest określony, nadpisuje wartości ``c``, ``f``, ``args``, ``vars``
+  i ``extension`` oraz ładuje komponent z adresu ``url``; jest używany do ładowania
+  stron komponentów serwowanych przez inne aplikacje (które mogły być utworzone
+  w web2py lub nie);
+- ``user_signature`` ma domyślną wartość False, ale jeśli uzytkownik jest zalogowany,
+  to powinien być ustawiony na True; pozwala to upewnić się, że wywołanie zwrotne
+  Ajax jest podpisane cyfrowo; jest to udokumentowane w rozdziale 4;
+- ``times`` określa, ile razy komponet może być żądany; użycie "infinity" wskazuje,
+  że ładowanie komponentu jest utrzymywane ciagle; opcja ta jest przydatna przy
+  wyzwalaniu zwykłych procedur dla żądania określonego dokumentu;
+- ``timeout`` ustawia czas oczekiwania w millisekundach przed rozpoczęciem żądania
+  lub częstotliwość, jeśli ``times`` ma wartość większą niż 1;
+- ``content`` to zawartość, jak ma być wyświetlana podczas wykonywania wywołań Ajax;
+  może to być helper, jak w ``content=IMG(..)``;
+- ewenytulny ``**attr`` (atrybuty), który może być przekazany do zawartego ``DIV``.
 
-If no ``.load`` view is specified, there is a ``generic.load`` that renders the dictionary returned by the action without layout. It works best if the dictionary contains a single item.
+Jeśli nie jest określony żaden widok ``.load``, wykotrzystywany jest ``generic.load``,
+który renderuje słownik zwracany przez akcję poza układem. Działa to najlepiej,
+gdy słownik zawiera pojedynczy element.
 
-If you LOAD a component having the ``.load`` extension and the corresponding controller function redirects to another action (for example a login form), the ``.load`` extension propagates and the new url (the one to redirect too) is also loaded with a ``.load`` extension.
+Jeśli ładuje się (przy użyciu LOAD) komponent mający rozszerzenie ``.load``
+i odpowiednią funkcję kontrolera, przekierowującą do innej akcji  (na przykład
+do formularza logowania), propagowane jest rozszerzenie ``.load`` a nowy adres
+URL (także ten przekierowujący) jest również ładowany z rozszerzeniem ``.load``.
 
-#### Redirect from a component
-To redirect from a component, use this:
+#### Przekierowanie z komponentu
+Przekierownie z poziomu komponentu można wykonać stosując:
 ``
 redirect(URL(...),client_side=True)
 ``:code
-but note that the redirected URL will default to the extension of the component. See notes about the argument ``extension`` in [[the URL function in Chapter 4 ../04/the-core#URL]]
+należy jednak pamiętać, że adres URL przekierowania jest domyślnie pobierany z
+argumentu ``extension``. Zapoznaj się z uwagami na temat argumentu ``extension``
+w [[funkcji URL w rozdziale 4 ../04/the-core#URL]]
 
-#### Reload page via redirect after component submission
-If you call an action via Ajax and you want the action to force a redirect of the parent page you can do it with a redirect from the LOADed controller function. 
-If you want to reload the parent page, you can redirect to it. The parent URL is known (see [[Client-Server component communications #client_server_coms]] )
-
-so after processing the form submit, the controller function reloads the parent page via redirect:
+#### Odświeżenie strony poprzez przekierowanie po złożeniu komponentu
+Jeśli wywołuje się akcję poprzez Ajax i chce się wymusić przekierowanie strony
+nadrzędnej, można to zrobić przez przekierowanie z poziomy funkcji kontrolera LOAD. 
+Jeśli chce się przeładować stronę nadrzędną, można wykonać przekierowanie do niej.
+Adres URL strony nadrzędnej jest znany (zobacz [["Komunikacja klient-server w komponentach" #client_server_coms]] ),
+więc po przetworzeniu zgłoszenia formularza, funkcja kontrolera odświeża stronę
+nadrzędną poprzez przekierowanie:
 ``
 if form.process().accepted: 
     ...
     redirect( request.env.http_web2py_component_location,client_side=True)
 ``:code
 
-Note that the section below, [[Client-Server component communications #client_server_coms]], describes how the component can return javascript, which could be used for more sophisticated actions when the component is submitted. The specific case of reloading another component is described next.
+Proszę mieć na uwadze, że w rozdziale [["Komunikacja klient-server w komponentach" #client_server_coms]]
+opisuje, jak komponent może zwracać kod JavaScript, który mógłby być wykorzystany
+do bardziej zaawansowanych działań gdy komponent jest składany. Szczególnym przypadkiem
+przeładowania jest inny komponent, opisany dalej.
 
+#### Przeładowanie innego komponentu 
+Jeśli korzysta się na stronie z wielu komponentów, można złożyć jeden z nich,
+aby przeładować inny. Robi się to przez złożenie komponentu w zwracanym kodzie
+JavaScript.
 
-#### Reload another component 
-If you use multiple components on a page, you may want the submission of one component to reload another.
-You do this by getting the submitted component to return some javascript.
+Jest to możliwe przez wykonanie sztywnego kodu w docelowym DIV, ale w tej recepcie
+użyjemy zmienną łańcucha zapytania dla poinformowania kontrolera składającego, który
+komponent chcemy przeładować. Zostaje on zidentyfikowany przez identyfikator
+elementu DIV, który zawiera docelowy komponent. W tym przypadku element DIV ma
+identyfikator 'map'. Należy pamiętać, że niezbędne jest zastosowanie ``target='map'``
+w LOAD celu. Bez tego identyfikator celu jest obliczany losowo i reload() nie
+bedzie działać. Zobacz powyższą sygnaturę LOAD.
 
-It's possible to hard-code the target DIV, but in this recipe we use a query-string variable to inform the submitting-controller which component we want to reload. It's identified by the id of the DIV containing the target component. In this case, the DIV has id 'map'. Note that it is necessary to use ``target='map'`` in the LOAD of the target; without this, the target id is randomised and reload() won't work. See LOAD signature above.
-
-In the view, do this:
+W widoku wykonaj to:
 ``
 {{=LOAD('default','submitting_component.load',ajax=True,vars={'reload_div':'map'})}}
 
 ``:code
 
-The controller belonging to the submitting component needs to send javascript back, so just add this to the existing controller code when processing the submit:
+Kontroler przynależny do składanego komponentu wymaga odesłania z powrotem kodu
+JavaScript, więć wystarczy dodać poniższe wyrażenie do kodu kontrolera, gdzie
+przetwarzane jest zgłoszenie:
 ``
 if form.process().accepted:
 ...
@@ -201,70 +266,84 @@ if form.process().accepted:
         response.js =  "jQuery('#%s').get(0).reload()" % request.vars.reload_div
 ``:code
 
-(Of course, remove the redirect if you were using the approach of the previous section.)
+Oczywiście należy usunąć to przekierowanie, jeśli używa się rozwiązania omówionego
+w poprzednim rozdziale.
  
-That's it. web2py's javascript libraries look after the reload. This could be generalised to handle multiple components with javascript looking like:
+To jest to. Biblioteki JavaScript pilnują przeładowania. Można to uogólnić do
+obsługi wielu komponentów przy użyciu kodu wyglądającego tak:
 ``
 jQuery('#div1,#div2,#div3').get(0).reload()
 ``:code
 
-For more information about response.js see [[Client-Server component communications #client_server_coms]] (below).
+Więcej informacji o response.js można znaleźć w rozdziale
+[["Komunikacja klient-server w komponentach" #client_server_coms]] (poniżej).
 
-#### Ajax post does not support multipart forms
+#### Przesyłka Ajax nie obsługuje wiele formularzy
 
-Because Ajax post does not support multipart forms, i.e. file uploads, upload fields will not work with the LOAD component. You could be fooled into thinking it would work because upload fields will function normally if POST is done from the individual component's .load view. Instead, uploads are done with ajax-compatible 3rd-party widgets and web2py manual upload store commands.
+Ponieważ przesyłka Ajax nie obsługuje wiele formularzy, czyli przesyłania plików,
+przesyłane pola nie będa działać z komponentem LOAD. Można dać się zwieść, że to
+działa, ponieważ wysłane pola będą działać normalnie, jeśli żądanie POST zostało
+wykonane z indywidualnego widoku ''.load'' komponentu. Zamiast tego, przesyłanie
+jest realizowane za pomocą zewnętrznych widżetów zgodnych z Ajax oraz ręcznych
+poleceń przechowujących web2py.
 
 [[client_server_coms]]
-### LOAD and Client-Server component communications 
+### LOAD a komunikacja klient-server w komponentach 
 
-When the action of a component is called via Ajax, web2py passes two HTTP headers with the request:
+Gdy akcja komponentu jest wywoływana poprzez Ajax, web2py przekazuje w żądaniu
+dwa nagłówki HTTP:
 
 ``
 web2py-component-location
 web2py-component-element
 ``:code
 
-which can be accessed by the action via the variables:
+które można pozyskać w akcji poprzez zmienne:
 
 ``
 request.env.http_web2py_component_location
 request.env.http_web2py_component_element
 ``:code
 
-The latter is also accessible via: ``request.cid``:inxx
+Ten drugi jest też dostępny poprzez: ``request.cid``:inxx
 
 ``
 request.cid
 ``:code
 
-The former contains the URL of the page that called the component action.
-The latter contains the ``id`` of the DIV that will contain the response.
+Pierwszy nagłówek zawiera adres URL strony, która wywołuje akcję komponentu.
+Drugi zawiera ``id`` elementu DIV, który zawiera odpowiedź.
 
-The component action can also store data in two special HTTP response headers that will be interpreted by the full page upon response. They are:
+Akcja komponentu może również przechowywać dane w dwóch specjalnych nagłówkach
+odpowiedzi HTTP, które są interpretowane przez całą stronę odpowiedzi. Są to:
 
 ``
 web2py-component-flash
 web2py-component-command
 ``:code
 
-and they can be set via:
+Mogą być one ustawione przez:
 
 ``
 response.headers['web2py-component-flash']='....'
 response.headers['web2py-component-command']='...'
 ``:code
 
-or (if the action is called by a component) automatically via:
+lub (jeśli akcja jest wywoływana przez komponent) automatycznie poprzez:
 
 ``
 response.flash='...'
 response.js='...'
 ``:code
 
-The former contains text that you want to be flashed upon response.
-The latter contains JavaScript code that you want to be executed upon response. It cannot contain newlines.
+Pierwszy zawiera tekst, który ma być wyświetlony w odpowiedzi.
+Ten drugi zawiera kod JavaScript, który ma być wykonany w odpowiedzi. Nie może
+zawierać znaków nowej linii.
 
-As an example, let's define a contact form component in "controllers/contact/ask.py" that allows the user to ask a question. The component will email the question to the system administrator, flash a "thank you" message, and remove the component from the page:
+Dla przykładu, zdefiniujmy komponent formularza kontaktowego w "controllers/contact/ask.py",
+który umożliwia użytkownikowi zadanie pytania. Komponent będzie wysyłał wiadomość
+email z tym pytaniem do administratora systmeu, wyświetlał komunikat fleszowy
+"thank you" i usuwał komponent ze strony:
 
 ``
 def ask():
@@ -282,25 +361,34 @@ def ask():
     return dict(form=form)
 ``:code
 
-The first four lines define the form and accept it. The mail object used for sending is defined in the default scaffolding application. The last four lines implement all the component-specific logic by getting data from the HTTP request headers and setting the HTTP response headers.
+Pierwsze cztery linie tego kodu definiują formularz i zatwierdzają go. Obiekt
+``mail``, używany do wysyłania wiadomości, jest zdefiniowany w domyślnej aplikacji
+szkieletowej. Ostatnie cztery linie implementują całą logike specyficzną dla
+komponentu przez pobranie danych z nagłówka żądania HTTP i ustawiają nagłówki
+odpowiedzi HTTP.
 
-Now you can embed this contact form in any page via
+Teraz można osadzić formularz kontaktowy na jakiejś stronie poprzez:
 
 ``
 {{=LOAD('contact','ask.load',ajax=True)}}
 ``:code
 
-Notice that we did not define a ``.load`` view for our ``ask`` component. We do not have to because it returns a single object (form) and therefore the "generic.load" will do just fine. Remember that generic views are a development tool. In production you should copy "views/generic.load" into "views/contact/ask.load".
+Proszę zwrócić uwagę, że nie definiujemy tu widoku ``.load`` dla komponentu ``ask``.
+Nie musimy tego robić, ponieważ zwracany jest pojedynczy obiekt (form) i dlatego
+wykorzystany będzie widok generyczny "generic.load". Trzeba pamiętać, że widoki
+generyczne są narzędziem programistycznym. W środowisku produkcyjnym należy skopiować
+"views/generic.load" do "views/contact/ask.load".
 
 ``user_signature``:inxx ``requires_signature``:inxx
-We can block access to a function called via Ajax by digitally signing the URL using the ``user_signature`` argument:
+Można zablokować dostęp do funkcji wywoływanych poprzez Ajax przez cyfrowy podpis
+adresu URL, używając argument ``user_signature``:
 
 ``
 {{=LOAD('contact','ask.load',ajax=True,user_signature=True)}}
 ``:code
 
-which add a digital signature to the URL.
-The digital signature must then be validated using a decorator in the callback function:
+który dodaje podpis cyfrowy do adresu URL.
+Podpis cyfrowy musi być sprawdzony przez dekorator w funkcji wywołania zwrotnego:
 
 ``
 @auth.requires_signature()
@@ -309,121 +397,168 @@ def ask(): ...
 
 
 [[trapped_ajax_links]]
-#### Trapped Ajax links and the A Helper
+#### Przechwycone odnośniki Ajax a helper
 ``A``:inxx
-``Ajax links``:inxx
+``odnośniki Ajax``:inxx
 
-Normally a link is not trapped, and by clicking in a link inside a component, the entire linked page is loaded. Sometimes you want the linked page to be loaded inside the component. This can be achieved using the ``A`` helper:
+Zwykle odnośnik nie jest przechwytywany a przez klikniecie na odnośnik w komponencie
+ładowana jest cała zlinkowana strona. Czasem zachodzi potrzeba zlinkowania strony,
+tak aby ładowana ona była w komponencie. Można to osiągnąć przy użyciu funkcji
+pomocniczej ``A``:
 
 ``
 {{=A('linked page',_href='http://example.com',cid=request.cid)}}
 ``:code
 
-If ``cid`` is specified, the linked page is loaded via Ajax.
-The ``cid`` is the ``id`` of the html element where to place the loaded page content.
-In this case we set it to ``request.cid``, i.e. the ``id`` of the component that generates the link. The linked page can be and usually is an internal URL generated using the [[URL helper ../04#URL]] .
+Jeśli określi się ``cid``, to zlinkowana strona zostanie załadowana poprzez Ajax.
+Atrybut ``cid`` jest identyfikatorem (``id``) elemntu html, w którym ładowana jest
+zawartość strony.
+W naszym przypadku ustawiliśmy to na ``request.cid``, czyli ``id`` komponentu,
+w którym generowany jest odnośnik. Linkowana strona może być i zazwyczaj jest
+wewnętrznym lokalizatorem URL generowanym przy użyciu [[funkcji pomocniczej URL ../04#URL]] .
 
-## Plugins
+## Wtyczki
 
 -------
-A **plugin** is any subset of the files of an application.
+**Wtyczka** jest to każdy podzbiór plików aplikacji.
 -------
 
-and we really mean ''any'':
+i naprawdę znaczy ''każdy'':
 
-- A plugin is not a module, is not a model, it is not a controller, is not a view, yet it may contain modules, models, controllers and/or views.
-- A plugin does not need to be functionally autonomous and it may depend on other plugins or specific user code.
-- A ''plugin'' is not a ''plugins system'' and therefore has no concept of registration nor isolation, although we will give rules to try to achieve some isolation.
-- We are talking about a plugin for your app, not a plugin for web2py.
+- Wtyczka nie jest modułem, nie jest modelem, nie jest kontrolerem, nie jest widokiem,
+  ale może zawierać moduły, modele, kontrolery lub widoki.
+- Wtyczka nie musi być funkcjonalnie niezależna ale może zależeć od kodu innych
+  wtyczek lub komponentów.
+- Wtyczka nie jest ''systemem wtyczek'' i dlatego nie ma koncepcji ich rejestracji
+  ani izolacji, choć dostarczane są zasady nazewnicze pozwalające osiągnąć jakąś
+  izolację.
+- Mówimy o wtyczce do określonej aplikacji a nie o wtyczce do web2py.
 
-So why is it called a ''plugin''? Because it provides a mechanism for packing a subset of an app and unpacking it over another app (i.e. ''plug-in''). Under this definition, any file in your app can be treated as a plugin.
+Więc dlaczego nazywamy to ''wtyczką''? Dlatego że, zapewniony jest mechanizm pakowania
+podzbiorów kodu aplikacji i rozpakowywania ich w innych aplikacjach (czyli są ''wtykowe'').
+Zgodnie z tą definicją za wtyczkę można uznać każdy plik aplikacji.
 
-When the app is distributed, its plugins are packed and distributed with it.
+Podczas dystrybuowania aplikacji jej wtyczki są pakowane i dystrybuowane razem z nią.
 
-In practice, the **admin** provides an interface for packing and unpacking plugins separately from your app. Files and folder of your application that have names with the prefix ``plugin_``''name'' can be packed together into a file called:
+W praktyce, aplikacja **admin** dostarcza interfejs do pakowania i rozpakowywania
+wtyczek, oddzielnie dla każdej aplikacji. Pliki i foldery aplikacji, które mają
+przedrostek ``plugin_``''name'' można pakować do pliku o nazwie:
 
 ``web2py.plugin.``''name''``.w2p``
 
-and distributed together.
+i dystrybuowane razem.
 
-[[image @///image/en8200.png center 480px]]
+[[image @///image/pl8200.png center 480px]]
 
-The files that compose a plugin are not treated by web2py any differently than other files except that **admin** understands from their names that they are meant to be distributed together, and it displays them in a separate page:
+Pliki, które tworzą wtyczkę nie są traktowane przez web2py w inny sposób, niż pozostałe
+pliki, z tym wyjątkiem, że aplikacja **admin** rozróżnia ich nazwy, które są przeznaczone
+razem do dystrybucji i wyświetla je na oddzielnej stronie:
 
-[[image @///image/en8300.png center 480px]]
+[[image @///image/pl8300.png center 480px]]
 
-Yet as a matter of fact, by the definition above, these plugins are more general than those recognized as such by **admin**.
+Jednak w rzeczywistości według powyższej definicji, wtyczki te są bardziej ogólne,
+niż te uznawane za takie przez aplikację **admin**.
 
-In practice we will only be concerned with two types of plugins:
+W praktyce będziemy mieć do czynienia tylko z dwoma rodzajami wtyczek:
 
-- ''Component Plugins''. These are plugins that contain components as defined in the previous section. A component plugin can contain one or more components. We can think for example of a ``plugin_comments`` that contains the ''comments'' component proposed above. Another example could be ``plugin_tagging`` that contains a ''tagging'' component and a ''tag-cloud'' component that share some database tables also defined by the plugin.
-- ''Layout Plugins''. These are plugins that contain a layout view and the static files required by such layout. When the plugin is applied it gives the app a new look and feel.
+- ''Wtyczki komponentowe''. Są to wtyczki, które zawieraja kod komponentów, tak jak
+  zdefiniowano to w poprzednim rozdziale. Wtyczka komponentu może zawierać jeden
+  lub więcej komponentów. Można mieć na przykład wtyczkę ``plugin_comments``,
+  która zawiera komponent ''comments'' zaproponowany powyżej. Innym przykładem
+  może być wtyczka ``plugin_tagging``, która zawiera komponent ''tagging'' oraz
+  wtyczke ''tag-cloud'' zawierającą komponent, który udostępnia jakieś tabele bazy
+  danych, tez zdefiniowanych jako wtyczka.
+- ''Wtyczki z układem''. Sa to wtyczki zawierające widok układu i pliki statyczne
+  wymagane przez układ. Zastosowanie takiej wtyczki nadaje aplikacji nowy wygląd.
 
-By the above definitions, the components created in the previous section, for example "controllers/contact.py", are already plugins. We can move them from one app to another and use the components they define. Yet they are not recognized as such by **admin** because there is nothing that labels them as plugins. So there are two problems we need to solve:
+Zgodnie z powyższymi definicjami, komponenty tworzone w poprzednim rozdziale,
+na przykład "controllers/contact.py", są też wtyczkami. Możemy przenieść je
+z jednej aplikacji do innej i użyć te komponenty zgodnie z ich definicją.
+Jednak nie sa one uznawane za takie przez aplikację **admin**, bo nie ma nic,
+co oznacza je jako wtyczki. Związane są z tym dwa problemy:
 
-- Name the plugin files using a convention, so that **admin** can recognize them as belonging to the same plugin
-- If the plugin has model files, establish a convention so that the objects it defines do not pollute the namespace and do not conflict with each other.
+- W nazewnictwie plików wtyczek trzeba stosować pewną konwencję, tak aby aplikacja
+  **admin** mogła rozpoznawać te pliki jako należące do tej samej wtyczki.
+- Jeśli wtyczka zawiera pliki modelu, trzeba ustalić konwencję tak, aby obiekty
+  w nich zdefiniowane nie zanieczyszczały przestrzeni nazw i niekolidowały z sobą.
 
-Let's assume a plugin is called ''name''. Here are the rules that should be followed:
+Załóżmy, że wtyczka nazywa się ''name''. Oto zasady, które powinny być stosowane:
 
-**Rule 1**:
-Plugin models and controllers should be called, respectively
+**Zasada 1**
+
+Wtyczki modeli i kontrolerów powinny być nazywane w ten sposób:
 
 - ``models/plugin_``''name''``.py``
 - ``controllers/plugin_``''name''``.py``
 
-and plugin views, modules, static, and private files should be in folders called, respectively:
+a wtyczki widoków, modułów oraz statycznych i prywatnych plików powinny się znajdować
+w folderach o nazwach:
 
 - ``views/plugin_``''name''``/``
 - ``modules/plugin_``''name''``/``
 - ``static/plugin_``''name''``/``
 - ``private/plugin_``''name''``/``
 
-**Rule 2**:
-Plugin models can only define objects with names that start with
+**Zasada 2**
+
+W modelach wtyczek można definiować tylko obiekty z nazwą rozpoczynającą się od:
+
 - ``plugin_``''name''
 - ``Plugin``''Name''
 - ``_``
 
-**Rule 3**:
-Plugin models can only define session variables with names that start with
+**Zasada 3**
+
+Modele wtyczek mogą definiować tylko zmienne sesji z nazwami rozpoczynającymi się od:
+
 - ``session.plugin_``''name''
 - ``session.Plugin``''Name''
 
-**Rule 4**:
-Plugins should include license and documentation. These should be placed in:
+**Zasada 4**
+
+Wtyczki powinny zawierać licencję i dokumentację. Powinny być one umieszczone w plikach:
+
 - ``static/plugin_``''name''``/license.html``
 - ``static/plugin_``''name''``/about.html``
 
-**Rule 5**:
-The plugin can only rely on the existence of the global objects defined in scaffolding "db.py", i.e.
+**Zasad 5**
 
-- a database connection called ``db``
-- an ``Auth`` instance called ``auth``
-- a ``Crud`` instance called ``crud``
-- a ``Service`` instance called ``service``
+Wtyczka może polegać tylko na istnieniu obiektów globalnych zdefiniowanych
+w szkielecie "db.py", czyli:
 
-Some plugins may be more sophisticated and have a configuration parameter in case more than one db instance exists.
+- połączeni z bazż danych o nazwie ``db``,
+- instancji klasy ``Auth`` o nazwie ``auth``,
+- instancji klasy ``Crud`` o nazwie ``crud``,
+- instancji klasy ``Service`` o nazwie ``service``
 
-**Rule 6**:
-If a plugin needs configuration parameters, these should be set via a PluginManager as described below.
+Niektóre wtyczki są bardziej skomplikowane i mają parametr konfiguracyjny w przypadku
+istnienia więcej instancji niż jedna.
+
+**Zasada 6**
+
+Jeśli wtyczka potrzebuje parametrów konfiguracyjnych, należy ustawic je poprzez
+PluginManager, tak jak opisano niżej.
 ``PluginManager``:inxx
 
-By following the above rules we can make sure that:
-- **admin** recognizes all the ``plugin_``''name'' files and folder as part of a single entity.
-- plugins do not interfere with each other.
+Stosując się do powyższych zasad można mieć pewność, że:
+- Aplikacja **admin** rozpozna wszystkie pliki i foldery o nazwach ``plugin_``''name''
+  jako część jednej encji.
+- Wtyczki nie kolidują z sobą.
 
-The rules above do not solve the problem of plugin versions and dependencies. That is beyond our scope.
+Powyższe zasady nie rozwiązują problemu wersjonowania i zależności wtyczek.
+Jest to poza zakresem tego podręcznika.
 
+### Wtyczki komponentowe
+``wtyczka komponentowa``:inxx
 
-### Component plugins
-``component plugin``:inxx
+Wtyczki komponentowe są wtyczkami definiujacymi komponenty. Zwykle, komponenty
+mają dostęp do bazy danych i definiuja swoje własne modele.
 
-Component plugins are plugins that define components. Components usually access the database and define with their own models.
+W tym miejscu włączymy poprzedni komponent ``comments`` do wtyczki ``comments_plugin``
+wykorzystując ten sam kod o którym pisaliśmy wcześniej, ale postępując zgodnie
+z wyżej podanymi zasadami.
 
-Here we turn the previous ``comments`` component into a ``comments_plugin`` by using the same code we wrote before, but following all of the previous rules.
-
-First, we create a model called "models/plugin_comments.py":
+Po pierwsze, utworzymy model o nazwie "models/plugin_comments.py":
 
 ``
 db.define_table('plugin_comments_comment',
@@ -433,9 +568,11 @@ db.define_table('plugin_comments_comment',
 def plugin_comments():
     return LOAD('plugin_comments','post',ajax=True)
 ``:code
-(notice the last two lines define a function that will simplify the embedding of the plugin)
 
-Second, we define a "controllers/plugin_comments.py"
+Proszę zwrócić uwagę, że ostatnie dwie linie definiują funkcję, która upraszcza
+osadzanie wtyczki.
+
+Po drugie, definiujemy "controllers/plugin_comments.py"
 
 ``
 def post():
@@ -446,7 +583,7 @@ def post():
                 comments=db(comment).select())
 ``:code
 
-Third, we create a view called "views/plugin_comments/post.load":
+Po trzecie, tworzymy widok o nazwie "views/plugin_comments/post.load":
 
 ``
 {{for comment in comments:}}
@@ -458,35 +595,42 @@ Third, we create a view called "views/plugin_comments/post.load":
 {{=form}}
 ``:code
 
-Now we can use **admin** to pack the plugin for distribution. Admin will save this plugin as:
+Teraz możemy użyć interfejsu **admin** do spakowania wtyczki dla celów dystrubucyjnych.
+Wtyczka zostanie zapisana jako:
 
 ``
 web2py.plugin.comments.w2p
 ``:code
 
-We can use the plugin in any view by simply installing the plugin via the **edit** page in **admin** and adding this to our own views
+Spakowaną wtyczkę możemy uzyć w dowolnym widoku, instalując ją poprzez stronę **edit**
+w aplikacji **admin** i następnie dodając ją do widoku wyrażeniem:
 
 ``
 {{=plugin_comments()}}
 ``:code
 
-Of course we can make the plugin more sophisticated by having components that take parameters and configuration options. The more complex the components, the more difficult it becomes to avoid name collisions. The Plugin Manager described below is designed to avoid this problem.
+Oczywiście można wykonać wtyczkę bardziej skomplikowaną, w której komponety pobierają
+parametry i mają opcje konfiguracyjne. Im bardziej skomplikowane komponenty, tym
+większe prawdopodobieństwo kolizji nazewniczych. Poniżej opisana klasa Plugin Manager
+została stworzona, aby unikać tego problemu.
 
 ### Plugin manager
 
-The ``PluginManager`` is a class defined in ``gluon.tools``. Before we explain how it works inside, we will explain how to use it.
+"PluginManager" to klasa zdefiniowana w ``gluon.tools``. Zanim omówimy jej działanie,
+wyjaśnimy jak ją stosować.
 
-Here we consider the previous ``plugin_comments`` and we make it better. We want to be able to customize:
+Tutaj rozważymy poprzednią wtyczkę ``plugin_comments`` i zrobimy ja lepiej.
+Chcemy uzyskać możliwość jej dostosowywania:
 
 ``
 db.plugin_comments_comment.body.label
 ``:code
 
-without having to edit the plugin code itself.
+bez konieczności edytowania samego kodu wtyczki.
 
-Here is how we can do it:
+Oto jak możemy to zrobić.
 
-First, rewrite the plugin "models/plugin_comments.py" in this way:
+Po pierwsze, przepisujemy wtyczkę "models/plugin_comments.py" w ten sposób:
 
 ``
 def _():
@@ -500,9 +644,12 @@ def _():
 plugin_comments = _()
 ``:code
 
-Notice how all the code except the table definition is encapsulated in a single function called ``_`` so that it does not pollute the global namespace. Also notice how the function creates an instance of a ``PluginManager``.
+Proszę zwrócić uwagę jak cały kod jest zamknięty w pojedynczej funkcji o nazwie ``_``,
+tak że nie zanieczyszcza on globalnej przestrzeni nazw. Proszę też zauważyć, jak
+ta funkcja tworzy instancję PluginManager.
 
-Now in any other model in your app, for example in "models/db.py", you can configure this plugin as follows:
+Teraz w każdym innym modelu aplikacji, na przykład w "models/db.py", można
+skonfigurować tą wtyczkę następująco:
 
 ``
 from gluon.tools import PluginManager
@@ -511,25 +658,30 @@ plugins.comments.body_label = T('Post a comment')
 ``:code
 
 -----
-The ``plugins`` object is already instantiated in the default scaffolding app in "models/db.py"
+Obiekt ``plugins`` istnieje już w domyślnej aplikacji szkieletowej w "models/db.py".
 -----
 
-The PluginManager object is a thread-level singleton Storage object of Storage objects. That means you can instantiate as many as you like within the same application but (whether they have the same name or not) they act as if there were a single PluginManager instance.
+Obiekt klasy PluginManager jest obiektem pojedynczego składowania na poziomie
+wątku obiektów ``Storage``. Oznacza to, że mozna tworzyć instancje tego obiektu
+tyle razy, ile się chce w tej samej aplikacji, ale (niezależnie od tego, czy mają
+one taka samą nazwę, czy nie) działaja one tak jakby to była jedna instancja
+PluginManager.
 
-In particular each plugin file can make its own PluginManager object and register itself and its default parameters with it:
+W szczególności w każdym pliku wtyczki można utworzyć jej własny obiekt PluginManager
+i go zarejestrować wraz z własnymi parametrami:
 
 ``
 plugins = PluginManager('name', param1='value', param2='value')
 ``:code
 
-You can override these parameters elsewhere (for example in "models/db.py") with the code:
+Można zastąpić te parametry gdziekolwiek (na przykład w "models/db.py") z kodem:
 
 ``
 plugins = PluginManager()
 plugins.name.param1 = 'other value'
 ``:code
 
-You can configure multiple plugins in one place.
+W jednym miejscu można skonfigurować więcej wtyczek:
 
 ``
 plugins = PluginManager()
@@ -541,43 +693,58 @@ plugins.name3.param5 = '...'
 ``:code
 
 -----
-When the plugin is defined, the PluginManager must take arguments: the plugin name and optional named arguments which are default parameters. However, when the plugins are configured, the PluginManager constructor must take no arguments. The configuration must precede the definition of the plugin (i.e. it must be in a model file that comes first alphabetically).
+Podczas definiowania wtyczki, PluginManager musi pobrać argumenty: nazwę wtyczki
+i opcjonalne argumenty nazwane, które są prametrami domyślnymi. Jednak, podczas
+konfigurowania wtyczki, konstruktor PluginManager nie musi pobierać argumentów.
+Konfiguracja musi poprzedzać definicję wtyczki (czyli musi znajdować się w pliku
+modelu, który dostarczany jest alfabetycznie jako pierwszy).
 -----
 
-### Layout plugins
-``layout plugin``:inxx
+### Wtyczki układu
+``wtyczka układu``:inxx
 
-Layout plugins are simpler than component plugins because usually they do not contain code, but only views and static files. Yet you should still follow  good practice:
+Wtyczki układu sa prostsze niż wtyczki komponentowe, ponieważ zazwyczaj nie zawierają
+kodu Pythona, ale tylko widoki i pliki statyczne. Jednak należy tu też przestrzegać
+dobrych praktyk.
 
-First, create a folder called "static/plugin_layout_''name''/" (where name is the name of your layout) and place all your static files there.
+Po pierwsze, utwórz folder o nazwie "static/plugin_layout_''name''/" (gdzie ''name''
+to nazwa układu) i umieść tam wszystkie statyczne pliki.
 
-Second, create a layout file called "views/plugin_layout_''name''/layout.html" that contains your layout and links the images, CSS and JavaScript files in "static/plugin_layout_''name''/"
+Po drugie, utwórz plik układu o nazwie "views/plugin_layout_''name''/layout.html",
+który zawiera układ i odnosniki do plików obrazów, CSS i JavaScript w
+"static/plugin_layout_''name''/".
 
-Third, modify the "views/layout.html" so that it simply reads:
+Po trzecie, zmodyfikuje plik "views/layout.html", tak aby był prosty w odczycie:
 
 ``
 {{extend 'plugin_layout_name/layout.html'}}
 {{include}}
 ``:code
 
-The benefit of this design is that users of this plugin can install multiple layouts and choose which one to apply simply by editing "views/layout.html". Moreover, "views/layout.html" will not be packed by **admin** together with the plugin, so there is no risk that the plugin will override the user's code in the previously installed layout.
+Zaletą tego rozwiązania jest to, że użytkownicy mogą instalować wiele układów
+i wybierać ten, który ma być zastosowany, przez prostą edycję "views/layout.html".
+Co więcej, "views/layout.html" nie zostanie spakowany z wtyczka przez **admin**,
+więc nie ma ryzyka, że wtyczka nadpisze kod użytkownika, w przypadku poprzednio
+zainstalowanego układu.
 
-### Plugin repositories, plugin install via admin
+### Repozytoria wtyczek, instalowanie wtyczek poprzez interfejs administracyjny
 
-While there is no single repository of web2py plugins you can find many of them at one of the following URLs:
+Choć nie ma jednego repozytorium wtyczek web2py, można znaleźć wiele z nich pod
+następujacymi adresami URL:
 
-``
-http://web2pyslices.com (this is the leading repository and is integrated to the web2py admin application for one-click installs)
+- http://web2pyslices.com (jest to wiodące repozytorium, zintegowane z aplikacją
+  admin web2py admin dla instalacji przez jedno kliknięcie),
+- http://web2py.com/plugins,
+- http://web2py.com/layouts.
 
-http://web2py.com/plugins
-http://web2py.com/layouts
-``:code
+Najnowsze wersje aplikacji admin web2py pozwalają automatycznie pobrać i zainstalować
+wtyczki ze strony web2pyslices. W celu dodania wtyczki do aplikacji, trzeba
+edytować aplikację admin application i wybrać opcję Download Plugins, obecnie
+umieszczoną na dole ekranu. 
 
-Recent versions of web2py admin allow automatic fetch and install of plugins from web2pyslices. To add a plugin to an app, edit it via the admin application, and choose Download Plugins, currently at the bottom of the screen. 
+Jeśli chce się publikować własne wtyczki, trzeba założyć konto na web2pyslices.
 
-To publish your own plugins, make an account at web2pyslices.
-
-Here is a screenshot showing some of the auto-installable plugins:
+Oto zrzut ekranu pokazujący kilka samo instalujacych się wtyczek:
 
 [[image @///image/web2py_slices_plugins.png center 480px]]
 
