@@ -25,6 +25,13 @@ The web2py class that implements RBAC is called **Auth**.
 - ``auth_membership`` links users and groups in a many-to-many structure.
 - ``auth_permission`` links groups and permissions. A permission is identified by a name and, optionally, a table and a record. For example, members of a certain group can have "update" permissions on a specific record of a specific table.
 - ``auth_event`` logs changes in the other tables and successful access via CRUD to objects controlled by the RBAC.
+- ``auth_cas`` is used for Central Authentication Service (CAS). Every web2py application is a CAS provider and can optionally be a CAS consumer.
+
+The schema is reproduced graphically in the image below:
+
+[[image @///image/schema_auth.png center 300px]]
+
+
 
 In principle, there is no restriction on the names of the roles and the names of the permissions; the developer can create them to fix the roles and permissions in the organization. Once they have been created, web2py provides an API to check if a user is logged in, if a user is a member of a given group, and/or if the user is a member of any group that has a given required permission.
 
@@ -48,8 +55,10 @@ auth = Auth(db)
 auth.define_tables()
 ``:code
 
+Auth has an optional ``secure=True`` argument, which will force authenticated pages to go over HTTPS. ``https``:inxx
+
 -------
-The ``password`` field of the ``db.auth_user`` table defaults to a ``CRYPT`` validator, which needs and ``hmac_key``. On legacy web2py applications you may see an extra argument passed to the Auth constructor: ``hmac_key = Auth.get_or_create_key()``. The latter is a function that read the hmac kay from a file "private/auth.key" within the application folder. If the file does not exist it creates a random ``hmac_key``. If multiple apps share the same auth database, make sure they also use the same ``hmac_key``. This is no loger necessary for new applications since passwords are salted with an individual random salt.
+The ``password`` field of the ``db.auth_user`` table defaults to a ``CRYPT`` validator, which needs and ``hmac_key``. On legacy web2py applications you may see an extra argument passed to the Auth constructor: ``hmac_key = Auth.get_or_create_key()``. The latter is a function that read the HMAC key from a file "private/auth.key" within the application folder. If the file does not exist it creates a random ``hmac_key``. If multiple apps share the same auth database, make sure they also use the same ``hmac_key``. This is no longer necessary for new applications since passwords are salted with an individual random salt.
 -------
 
 By default, web2py uses email for login. If instead you want to log in using username set ``auth.define_tables(username=True)``
@@ -89,6 +98,8 @@ Notice that this function simply displays a ``form`` and therefore it can be cus
 {{if request.args(0)=='login':}}...custom login form...{{pass}}
 ``:code
 
+``auth.impersonate``:inxx ``auth.is_impersonating``:inxx
+
 The controller above exposes multiple actions:
 ``
 http://.../[app]/default/user/register
@@ -104,7 +115,7 @@ http://.../[app]/default/user/impersonate
 http://.../[app]/default/user/groups
 http://.../[app]/default/user/not_authorized
 ``:code
-- **register** allows users to register. It is integrated with CAPTCHA, although this is disabled by default.
+- **register** allows users to register. It is integrated with CAPTCHA, although this is disabled by default. This is also integrated with a client-side entropy calculator defined in "web2py.js". The calculator indicates the strength of the new password. You can use the ``IS_STRONG`` validator to prevent web2py from accepting weak passwords.
 - **login** allows users who are registered to log in (if the registration is verified or does not require verification, if it has been approved or does not require approval, and if it has not been blocked).
 - **logout** does what you would expect but also, as the other methods, logs the event and can be used to trigger some event.
 - **profile** allows users to edit their profile, i.e. the content of the ``auth_user`` table. Notice that this table does not have a fixed structure and can be customized.
@@ -112,7 +123,7 @@ http://.../[app]/default/user/not_authorized
 - **verify_email**. If email verification is turned on, then visitors, upon registration, receive an email with a link to verify their email information. The link points to this action.
 - **retrieve_username**. By default, **Auth** uses email and password for login, but it can, optionally, use username instead of email. In this latter case, if a user forgets his/her username, the ``retrieve_username`` method allows the user to type the email address and retrieve the username by email.
 - **request_reset_password**. Allows users who forgot their password to request a new password. They will get a confirmation email pointing to **reset_password**.
-- **impersonate** allows a user to "impersonate" another user. This is important for debugging and for support purposes. ``request.args[0]`` is the id of the user to be impersonated. This is only allowed if the logged in user ``has_permission('impersonate', db.auth_user, user_id)``.
+- **impersonate** allows a user to "impersonate" another user. This is important for debugging and for support purposes. ``request.args[0]`` is the id of the user to be impersonated. This is only allowed if the logged in user ``has_permission('impersonate', db.auth_user, user_id)``. You can use ``auth.is_impersonating()`` to check is the current user is impersonating somebody else.
 - **groups** lists the groups of which the current logged in user is a member.
 - **not_authorized** displays an error message when the visitor tried to do something that he/she is not authorized to do
 - **navbar** is a helper that generates a bar with login/register/etc. links.
@@ -140,10 +151,10 @@ def hello():
 ``:code
 
 Any function can be decorated, not just exposed actions. Of course this is still only a very simple example of access control. More complex examples will be discussed later.
-``auth.user``:inxx ``auth.user_id``:inxx
+``auth.user``:inxx ``auth.user_id``:inxx ``auth.user_groups``.
 
 -----
-``auth.user`` contains a copy of the ``db.auth_user`` records for the current logged in user or ``None`` otherwise. There is also a ``auth.user_id`` which is the same as ``auth.user.id`` (i.e. the id of the current logger in user) or ``None``.
+``auth.user`` contains a copy of the ``db.auth_user`` records for the current logged in user or ``None`` otherwise. There is also a ``auth.user_id`` which is the same as ``auth.user.id`` (i.e. the id of the current logger in user) or ``None``. Similarly, ``auth.user_groups`` contains a dictionary where each key is the id of a group of with the current logged in user is member of, the value is the corresponding group role.
 -----
 
 ``otherwise``:inxx
@@ -194,10 +205,14 @@ auth.settings.actions_disabled=['register','change_password','request_reset_pass
 auth.settings.login_form = RPXAccount(request,
     api_key='...',
     domain='...',
-    url = "http://localhost:8000/%s/default/user/login" % request.application)
+    url = "http://your-external-address/%s/default/user/login" % request.application)
 ``:code
 
-The first line imports the new login method, the second line disables local registration, and the third line asks web2py to use the RPX login method. You must insert your own ``api_key`` provided by Janrain.com, the domain you choose upon registration and the external ``url`` of your login page.
+The first line imports the new login method, the second line disables local registration, and the third line asks web2py to use the RPX login method. You must insert your own ``api_key`` provided by Janrain.com, the domain you choose upon registration and the external ``url`` of your login page. To obtain then login at janrain.com, then go to [Deployment][Application Settings]. On the right side there is the "Application Info", The api_key  is called "API Key (Secret)".
+
+The domain is the "Application Domain" without leading "https://" and without the trailing ".rpxnow.com/"
+For example: if you have registered a website as "secure.mywebsite.org", Janrain turns it to the Application Domain "https://secure-mywebsite.rpxnow.com". 
+
 
 [[image @///image/en6900.png center 300px]]
 
@@ -291,7 +306,7 @@ auth.settings.extra_fields['auth_user']= [
 You can declare extra fields not just for table "auth_user" but also for other "auth_" tables.
 Using ``extra_fields`` is the recommended way as it will not break any internal mechanism.
 
-Another way to do this (for experts!) consists of defining your auth tables yourself. If a table is declared before ``auth.define_tables()`` it is used instead of the default one. Here is how to do it:
+Another way to do this, although not really recommended, consists of defining your auth tables yourself. If a table is declared before ``auth.define_tables()`` it is used instead of the default one. Here is how to do it:
 
 ``
 ## after auth = Auth(db)
@@ -532,7 +547,7 @@ auth.settings.login_form=OAuthAccount(YOUR_CLIENT_ID,YOUR_CLIENT_SECRET)
 
 Things get a little more complex if you want to use Facebook OAuth2.0 to login into a specific Facebook app to access its API, instead of your own app. Here is an example for accessing the Facebook Graph API.
 
-First of all you must install the [[Facebook Python SDK https://github.com/facebook/python-sdk]].
+First of all you must install the [[Facebook Python SDK https://github.com/pythonforfacebook/facebook-sdk/]].
 
 Second, you need the following code in your model:
 
@@ -628,7 +643,42 @@ multiple steps of OpenID login inside ``other_form.login_form``.
 
 Otherwise it will render the normal login form together with the ``other_form``.
 
-### ``Mail`` and ``Auth``
+#### Record versioning
+
+You can use Auth to enable full record versioning:
+
+``
+db.enable_record_versioning(db,
+    archive_db=None,
+    archive_names='%(tablename)s_archive',
+    current_record='current_record'):
+``:code
+
+This tells web2py to create an archive table for each of the tables in ``db`` and store a copy of each record when modified. The old copy is stored. The new copy is not.
+
+The last three parameters are optional:
+
+- ``archive_db`` allows to specify another database where the archive tables are to be stored. Setting it to ``None`` is the same as setting it to ``db``.
+- ``archive_names`` provides a pattern for naming each archive table.
+- ``current_record`` specified the name of the reference field to be used in the archive table to refer to the original, unmodified, record. Notice that ``archive_db!=db`` then the reference field is just an integer field since cross database references are not possible.
+
+
+Only tables with ``modified_by`` and ``modified_on`` fields (as created
+for example by auth.signature) will be archived.
+
+When you ``enable_record_versioning``, if records have an
+``is_active`` field (also created by auth.signature),
+records will never be deleted but they will be marked with ``is_active=False``.
+In fact, ``enable_record_versioning`` adds a ``common_filter`` to
+every versioned table that filters out records with ``is_active=False`` so they essentially become invisible.
+
+If you ``enable_record_versioning``, you should not use
+``auth.archive`` or ``crud.archive`` else you will end up with duplicate records.
+Those functions do explicitly what ``enable_record_versioning`` does automatically and
+they will be deprecated.
+
+
+#### ``Mail`` and ``Auth``
 
 One can define a mailer with
 
@@ -650,7 +700,7 @@ mail.settings.sender = 'you@example.com'
 mail.settings.login = 'username:password'
 ``
 
-You need to replace the mail.settings with the proper parameters for your SMTP server. Set ``mail.settings.login = None`` if the SMTP server does not require authentication.
+You need to replace the mail.settings with the proper parameters for your SMTP server. Set ``mail.settings.login = None`` if the SMTP server does not require authentication. If you don't want to use TLS, set ``mail.settings.tls = False``
 
 You can read more about web2py API for emails and email configuration in Chapter 8. Here we limit the discussion to the interaction between ``Mail`` and ``Auth``.
 
@@ -677,12 +727,25 @@ In the two ``auth.messages`` above, you may need to replace the URL portion of t
 
 Once a new user is registered, a new group is created to contain the user. The role of the new user is conventionally "user_[id]" where [id] is the id of the newly created user. The creation of the group can be disabled with
 ``
-auth.settings.create_user_groups = False
+auth.settings.create_user_groups = None
 ``:code
 
-although we do not suggest doing so.
+although we do not suggest doing so. Notice that ``create_user_groups`` is not a boolean (although it can be ``False``) but it defaults to:
 
-Users have membership in groups. Each group is identified by a name/role. Groups have permissions. Users have permissions because of the groups they belong to.
+``
+auth.settings.create_user_groups="user_%(id)s"
+``:code
+
+It store a template for the name of the group created for user ``id``.
+
+Users have membership in groups. Each group is identified by a name/role. Groups have permissions. Users have permissions because of the groups they belong to. By default each user is made member of their own group.
+
+You can also do
+``
+auth.settings.everybody_group_id = 5
+``:code
+
+to make any new user automatically member of group number 5. Here 5 is used as an example and we assume the group was created already.
 
 You can create groups, give membership and permissions via **appadmin**
 or programmatically using the following methods:
@@ -734,7 +797,7 @@ checks whether ``user_id`` has membership of the group ``group_id`` or the group
 auth.add_permission(group_id, 'name', 'object', record_id)
 ``:code
 
-gives permission "name" (user defined) on the object "object" (also user defined) to members of the group ``group_id``. If "object" is a tablename then the permission can refer to the entire table by setting ``record_id`` to a value of zero, or the permission can refer to a specific record by specifying a ``record_id`` value greater than zero. When giving permissions on tables, it is common to use a permission name in the set ('create', 'read', 'update', 'delete', 'select') since these permissions are understood and can be enforced by CRUD.
+gives permission "name" (user defined) on the object "object" (also user defined) to members of the group ``group_id``. If "object" is a tablename then the permission can refer to the entire table by setting ``record_id`` to a value of zero, or the permission can refer to a specific record by specifying a ``record_id`` value greater than zero. When giving permissions on tables, it is common to use a permission name in the set ('create', 'read', 'update', 'delete', 'select') since these permissions are understood and can be enforced by the CRUD APIs.
 
 If ``group_id`` is zero, web2py uses the group uniquely associated to the current logged-in user.
 
@@ -822,7 +885,15 @@ def function_seven():
     return add(3, 4)
 ``:code
 
-The condition argument of ``@auth.requires(condition)`` can be a callable. ``@auth.requires`` also takes an optional argument ``requires_login`` which defaults to ``True``. If set to False, it does not require login before evaluating the condition as true/false. The condition can be a boolean value or a function evaluating to boolean.
+The condition argument of ``@auth.requires(condition)`` can be a callable and unless the condition is simple, it better to pass a callable than a condition since this will be faster, as the condition will only be evaluated if needed. For example
+
+``
+@auth.requires(lambda: check_condition())
+def action():
+    ....
+``:code
+
+``@auth.requires`` also takes an optional argument ``requires_login`` which defaults to ``True``. If set to False, it does not require login before evaluating the condition as true/false. The condition can be a boolean value or a function evaluating to boolean.
 
 Note that access to all functions apart from the first one is restricted based on permissions that the visitor may or may not have.
 
@@ -832,7 +903,7 @@ If the visitor is not logged in, then the permission cannot be checked; the visi
 
 Occasionally, it is necessary to combine requirements. This can be done via a generic ``requires`` decorator which takes a single argument, a true or false condition. For example, to give access to agents, but only on Tuesday:
 ``
-@auth.requires(auth.has_membership(group_id=agents) \
+@auth.requires(auth.has_membership(group_id='agents' \
                and request.now.weekday()==1)
 def function_seven():
     return 'Hello agent, it must be Tuesday!'
@@ -956,6 +1027,25 @@ def give_me_time():
 ``:code
 
 Basic login is often the only option for services (described in the next chapter), but it is disabled by default.
+
+#### User Management via privileged users (Experimental)
+Normally users and groups are managed by the server administrator. However, you may want a group of privileged users that can manage users and groups just for one application.
+Starting from web2py 2.5, you can do this.
+First, create a group (also known as a role) for your privileged users. In this example, it will be called admin.
+Give a user membership of this role.
+
+Add the following setting in the model where you created and configured your auth object (probably in the model db):
+``
+auth.settings.manager_group_role = 'admin'
+``:code
+
+The user and groups administration menu has this URL (for adding to a menu)
+``
+URL('appadmin','auth_manage')
+``:code
+
+Upgrading an existing application requires a new appadmin controller (copied from the welcome app) and the new appadmin.html view.
+
 
 #### Manual Authentication
 
@@ -1189,7 +1279,7 @@ auth.settings.formstyle = 'table3cols'
 And you can set the separator for auth-generated forms:
 
 ``
-auth.settings.label_separator =	':'
+auth.settings.label_separator =        ':'
 ``:code
 
 
@@ -1333,7 +1423,7 @@ auth.settings.cas_actions['validate']='validate'
 auth.settings.cas_actions['logout']='logout'
 ``
 
-If you want to connect to a web2py CAS provider from a different domain, you must enable them by attending to the list of allowed domain:
+If you want to connect to a web2py CAS provider from a different domain, you must enable them by appending to the list of allowed domains:
 
 ``
 ## in provider app
