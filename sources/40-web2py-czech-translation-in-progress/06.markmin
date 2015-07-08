@@ -134,70 +134,68 @@ Někdy také může být potřeba sestavovat SQL příkazy jako kdybyste připoj
 db = DAL('...', do_connect=False)
 ``:code
 
-In this case you will be able to call ``_select``, ``_insert``, ``_update``, and ``_delete`` to generate SQL but not call ``select``, ``insert``, ``update``, and ``delete``. In most of the cases you can use ``do_connect=False`` even without having the required database drivers.
+Pak můžete volat ``_select``, ``_insert``, ``_update`` nebo ``_delete`` a tím sestavit SQL příkaz, ale nelze volat ``select``, ``insert``, ``update`` nebo ``delete``. Ve většině případů lze použít ``do_connect=False`` dokonce bez požadovaného databázového ovladače.
 
-Notice that by default web2py uses utf8 character encoding for databases. If you work with existing databases that behave differently, you have to change it with the optional parameter ``db_codec`` like
+Web2py defaultně používá kódování znaků utf8. Pokud byste pracovali s databází, která ukládá v jiném kódování, použijte volitelný parametr ``db_codec``:
 
 ``
 db = DAL('...', db_codec='latin1')
 ``:code
 
-otherwise you'll get UnicodeDecodeError tickets.
+Jinak dostanete chyby UnicodeDecodeError.
 
-#### Connection pooling
+#### Sdílení připojení (Connection pooling)
 ``connection pooling``:inxx
 
-The second argument of the DAL constructor is the ``pool_size``; it defaults to zero.
+DAL konstructor má druhý parametr ``pool_size`` s defaultní hodnotou: nula.
 
-As it is rather slow to establish a new database connection for each request, web2py implements a mechanism for connection pooling. Once a connection is established and the page has been served and the transaction completed, the connection is not closed but goes into a pool. When the next http request arrives, web2py tries to recycle a connection from the pool and use that for the new transaction. If there are no available connections in the pool, a new connection is established.
+Vzhledem k tomu, že docela dlouho trvá vytvořit připojení pro každý request (přístup na server), Web2py implementuje mechanismus Sdílení připojení. Poté, co je připojení vytvořeno, stránka je sestavena a předána, a transakce je potvrzena, tak se připojení, místo aby bylo uzavřeno, ponechá v poolu (v zásobě otevřených připojení). Jakmile přijde následující http request, Web2py zkusí vzít volné připojení z poolu a použít jej pro novou transakci. Teprve není-li v zásobě žádné volné připojení, vytvoří se připojení nové.
 
-When web2py starts, the pool is always empty. The pool grows up to the minimum between the value of ``pool_size`` and the max number of concurrent requests. This means that if ``pool_size=10`` but our server never receives more than 5 concurrent requests, then the actual pool size will only grow to 5. If ``pool_size=0`` then connection pooling is not used.
+Po startu serveru je zásobník (pool) prázdný. Pool za provozu roste až na minimum z hodnoty ``pool_size`` a ze skutečného nejvyššího počtu souběžných přístupů. Dejme tomu, že ``pool_size=10``, ale na náš server nikdy nepřišlo více než 5 souběžných požadavků - pool poté bude obsahovat 5 připojení. Při nastavení ``pool_size=0`` se sdílení připojení nepoužije.
 
-Connections in the pools are shared sequentially among threads, in the sense that they may be used by two different but not simultaneous threads. There is only one pool for each web2py process.
+Připojení v poolu mohou být využita z různých vláken (threads), přesněji řečeno z různých, ale nikoli současně běžících vláken. Jeden Web2py proces má jen jeden zásobník připojení (pokud se používá).
 
-The ``pool_size`` parameter is ignored by SQLite and Google App Engine.
-Connection pooling is ignored for SQLite, since it would not yield any benefit.
+Parametr ``pool_size`` je ignorován, pokud pracujeme s SQLite nebo s Google App Engine.
+V případě SQLite je tomu tak proto, že by uvedený postup neznamenal žádný přínos (úsporu času).
 
-#### Connection failures
+#### Chyby připojení
 
-If web2py fails to connect to the database it waits 1 seconds and tries again up to 5 times before declaring a failure. In case of connection pooling it is possible that a pooled connection that stays open but unused for some time is closed by the database end. Thanks to the retry feature web2py tries to re-establish these dropped connections.
+Jestliže se Web2py nepodaří připojit k databázi, počká 1 vteřinu a zkusí to znova, postupně pětkrát, než ohlásí chybu. Při sdílení připojení (connection pooling) se může stát, že otevřené, ale nějakou dobu nepoužívané připojení uzavře databázový stroj. Tato situace je opakovanými pokusy o připojení rovněž řešena.
 
-#### Replicated databases
+#### Replikované databáze
 
-The first argument of ``DAL(...)`` can be a list of URIs. In this case web2py tries to connect to each of them. The main purpose for this is to deal with multiple database servers and distribute the workload among them). Here is a typical use case:
+Jako první argument ``DAL(...)`` lze uvést i seznam URI (adres). V takovém případě se Web2py pokusí připojit ke každé z nich. Obvyklým účelem je možnost použití více databázových serverů a rozložení zátěže mezi ně. Typický use case (scénář použití) je zde:
 
 ``
 db = DAL(['mysql://...1','mysql://...2','mysql://...3'])
 ``:code
 
-In this case the DAL tries to connect to the first and, on failure, it
-will try the second and the third. This can also be used to distribute load
-in a database master-slave configuration. We will talk more about this
-in Chapter 13 in the context of scalability.
 
-### Reserved keywords
+V tom případě se DAL pokusí připojit k první databázi, když se to nepovede, tak ke druhé, a nakonec ke třetí databázi. To lze použít k distribuci zátěže v master-slave konfiguraci. Povíme si o tom více v Kapitole 13 při probírání otázek škálovatelnosti (scalability).
+
+### Vyhrazená slova
 ``reserved Keywords``:inxx
 
-``check_reserved`` is yet another argument that can be passed to the DAL constructor. It tells it to check table names and column names against reserved SQL keywords in target back-end databases. ``check_reserved`` defaults to None.
+``check_reserved`` je další argument, který můžeme předat DAL konstruktoru. Tím požadujeme, aby se zkontrolovalo, že názvy tabulek a sloupců nekolidují s vyhrazenými SQL jmény v cílových databázových strojích. Defaultní hodnota je None.
 
-This is a list of strings that contain the database back-end adapter names.
+Možná hodnota parametru je seznam (list) jmen databázových adaptérů.
 
-The adapter name is the same as used in the DAL connection string. So if you want to check against PostgreSQL and MSSQL then your connection string would look as follows:
+Jméno adaptéru je totéž jako řetězec, který se používá v DAL řetězci připojení (connection stringu). Takže chcete-li zkontrolovat kolize vůči vyhraženým jménům PostgreSQL a MSSQL databází, zadáte řetězec takto:
 ``
 db = DAL('sqlite://storage.db',
          check_reserved=['postgres', 'mssql'])
 ``:code
 
-The DAL will scan the keywords in the same order as of the list.
+DAL pak jména zkontroluje v zadaném pořadí.
 
-There are two extra options "all" and "common". If you specify all, it will check against all known SQL keywords. If you specify common, it will only check against common SQL keywords such as ``SELECT``, ``INSERT``, ``UPDATE``, etc.
+Navíc jsou k dispozici volby "all" nebo "common". Zadáte-li "all", kontrola se provede proti všem známým rezervovaným jménům všech SQL strojů. Zadáte-li "common", zkontrolují se jen hlavní klíčová slova jako ``SELECT``, ``INSERT``, ``UPDATE``, apod.
 
-For supported back-ends you may also specify if you would like to check against the non-reserved SQL keywords as well. In this case you would append ``_nonreserved`` to the name. For example:
+Můžete také zkontrolovat kolize nevyhražených jmen. V takovém případě přidejte ``_nonreserved`` ke jménu adaptéru. Např.:
 ``
 check_reserved=['postgres', 'postgres_nonreserved']
 ``:code
 
-The following database backends support reserved words checking.
+Dále uvedené adaptéry podporují kontrolu vyhrazených jmen:
 
 -----
 **PostgreSQL** | ``postgres(_nonreserved)``
@@ -209,89 +207,89 @@ The following database backends support reserved words checking.
 
 ### ``DAL``, ``Table``, ``Field``
 
-You can experiment with the DAL API using the web2py shell.
+S DAL API (s rozhraním databázové vrstvy) můžete experimentovat pomocí Web2py shellu. Příklad: python web2py.py -a "<heslo>" -M -S "<aplikace>"
 
-Start by creating a connection. For the sake of example, you can use SQLite. Nothing in this discussion changes when you change the back-end engine.
+Zápisem "db<enter>" zjistěte, zda je vytvořeno spojení, a/nebo jej vytvořte znova, např. do SQLite:
 
 ``
 >>> db = DAL('sqlite://storage.db')
 ``:code
 
-The database is now connected and the connection is stored in the global variable ``db``.
+Nyní je připojení vytvořeno a uloženo v proměnné ``db``.
 
-At any time you can retrieve the connection string.
+Kdykoli můžete zjistit řetězec připojení (connection string):
 ``_uri``:inxx
 ``
 >>> print db._uri
 sqlite://storage.db
 ``:code
 
-and the database name
+a jméno databáze:
 ``_dbname``:inxx
 ``
 >>> print db._dbname
 sqlite
 ``:code
 
-The connection string is called a ``_uri`` because it is an instance of a Uniform Resource Identifier.
+Connection string je pojmenován ``_uri``, protože se jedná o instanci Uniform Resource Identifier.
 
-The DAL allows multiple connections with the same database or with different databases, even databases of different types. For now, we will assume the presence of a single database since this is the most common situation.
+DAL umožňuje současná připojení do stejné databáze nebo do více různých databází, dokonce i do databází různých typů. Ale nyní uvažujme jediné připojení, protože to je obvyklý případ.
 
 ``define_table``:inxx ``Field``:inxx
 ``type``:inxx ``length``:inxx ``default``:inxx ``requires``:inxx ``required``:inxx ``unique``:inxx
 ``notnull``:inxx ``ondelete``:inxx ``uploadfield``:inxx ``uploadseparate``:inxx ``migrate``:inxx ``sql.log``:inxx
 
-The most important method of a DAL is ``define_table``:
+Nejdůležitější metoda DAL je ``define_table``:
 ``
->>> db.define_table('person', Field('name'))
+>>> db.define_table('osoba', Field('jmeno'))
 ``:code
 
-It defines, stores and returns a ``Table`` object called "person" containing a field (column) "name". This object can also be accessed via ``db.person``, so you do not need to catch the return value.
+Ta definuje, ukládá a vrací objekt třídy ``Table`` (Tabulka), v tomto případě zvaný "osoba", což je tabulka s polem (sloupcem) "jmeno". Tento objekt je nadále dostupný i jako ``db.person``, takže obvykle není potřeba si návratovou hodnotu uložit.
 
-Do not declare a field called "id", because one is created by web2py anyway. Every table has a field called "id" by default. It is an auto-increment integer field (starting at 1) used for cross-reference and for making every record unique, so "id" is a primary key. (Note: the id's starting at 1 is back-end specific. For example, this does not apply to the Google App Engine NoSQL.)
+V seznamu polí neuvádějte "id", protože Web2py vytvoří toto pole vždy automaticky. Každá tabulka bude mít pole "id" defaultně. Je to integer auto-inkrementované pole (obvykle počínaje od 1) pro unikátní identifikaci každého záznamu a pro reference (odkazy) mezi tabulkami datového modelu. Neboli "id" je primární klíč tabulky. (Poznámka: číslování id od 1 závisí na databázovém stroji. Např. tomu tak není na Google App Engine NoSQL.)
 
 ``named id field``:inxx
-Optionally you can define a field of ``type='id'`` and web2py will use this field as auto-increment id field. This is not recommended except when accessing legacy database tables. With some limitation, you can also use different primary keys and this is discussed in the section on "Legacy databases and keyed tables".
+Lze také definovat jinak pojmenované pole typu ``type='id'`` a Web2py takové pole použije stejně jako auto-increment id. To se nedoporučuje používat, ale můžete to potřebovat, pokud se budete připojovat k tabulkám jiné (ne Web2py) aplikace (legacy tables). S nějakými omezeními je možné použít i jiné primární klíče, což bude probráno v oddíle o použití tabulek jiných aplikací.
 
-Tables can be defined only once but you can force web2py to redefine an existing table:
+Tabulky lze definovat jen jednou, avšak je možné re-definovat existující tabulku:
 
 ``
-db.define_table('person', Field('name'))
-db.define_table('person', Field('name'), redefine=True)
+db.define_table('osoba', Field('jmeno'))
+db.define_table('osoba', Field('jmeno'), redefine=True)
 ``:code
 
-The redefinition may trigger a migration if field content is different.
+To může spustit mograci (automatický převod struktury tabulky), pokud se seznam polí proti původnímu změnil.
 
 ----------
-Because usually in web2py models are executed before controllers, it is possible that some table are defined even if not needed. It is therefore necessary to speed up the code by making table definitions lazy. This is done by setting the ``DAL(...,lazy_tables=True)`` attribute. Tables will be actually created only when accessed.
+Protože tabulky obvykle definujeme v modelu a modely se vykonávají dříve než controller, je časté, že některá tabulka je definována, aniž bude při konkrétním přístupu potřeba. Proto je potřeba zrychlit zpracování odloženým definováním tabulky. Tomu se říká lazy definice (doslova: líné). Vytvoříme je nastavením ``DAL(...,lazy_tables=True)``. Tabulky (jim odpovídající datové struktury) se skutečně vytvoří jen tehdy a až tehdy, když se do nich bude přistupovat.
 ----------
 
 
-### Record representation
+### Reprezentace záznamu
 
-It is optional but recommended to specify a format representation for records:
+Je nepovinné, ale doporučuje se zadat výraz pro reprezentaci jednotlivého záznamu (tedy určit, jak má být zobrazen uživateli):
 ``
->>> db.define_table('person', Field('name'), format='%(name)s')
+>>> db.define_table('osoba', Field('jmeno'), format='%(jmeno)s')
 ``:code
 
 or
 ``
->>> db.define_table('person', Field('name'), format='%(name)s %(id)s')
+>>> db.define_table('osoba', Field('jmeno'), format='%(jmeno)s %(id)s')
 ``:code
 
-or even more complex ones using a function:
+nebo i složitěji pomocí funkce:
 ``
->>> db.define_table('person', Field('name'),
-       format=lambda r: r.name or 'anonymous')
+>>> db.define_table('osoba', Field('jmeno'),
+       format=lambda r: r.jmeno or 'anonymní uživatel')
 ``:code
 
-The format attribute will be used for two purposes:
-- To represent referenced records in select/option drop-downs.
-- To set the ``db.othertable.person.represent`` attribute for all fields referencing this table. This means that SQLTABLE will not show references by id but will use the format preferred representation instead.
+Atribut format se používá ze dvou důvodů:
+- Aby reprezentoval odkazované záznamy ve výběrových drop-down prvcích.
+- Aby inicioval atribut ``db.jinatabulka.osoba.represent`` pro všechny tabulky, které jsou pomocí cizího klíče na tuto tabulku vázány. To znamená, že v tabulkovém zobrazení (např. pomocí SQLTABLE) se nezobrazí odkazovaná id, ale záznam tak, jak jej chcete (nastavením: format=) vidět.
 
 
 ``Field constructor``:inxx
-These are the default values of a Field constructor:
+Zde jsou defaultní hodnoty parametrů konstruktoru třídy Field:
 ``
 Field(name, 'string', length=None, default=None,
       required=False, requires='<default>',
@@ -303,15 +301,16 @@ Field(name, 'string', length=None, default=None,
       uploadseparate=None,uploadfs=None)
 ``:code
 
-Not all of them are relevant for every field. "length" is relevant only for fields of type "string". "uploadfield" and "authorize" are relevant only for fields of type "upload". "ondelete" is relevant only for fields of type "reference" and "upload".
-- ``length`` sets the maximum length of a "string", "password" or "upload" field.  If ``length`` is not specified a default value is used but the default value is not guaranteed to be backward compatible. ''To avoid unwanted migrations on upgrades, we recommend that you always specify the length for string, password and upload fields.''
-- ``default`` sets the default value for the field. The default value is used when performing an insert if a value is not explicitly specified. It is also used to pre-populate forms built from the table using SQLFORM. Note, rather than being a fixed value, the default can instead be a function (including a lambda function) that returns a value of the appropriate type for the field. In that case, the function is called once for each record inserted, even when multiple records are inserted in a single transaction.
-- ``required`` tells the DAL that no insert should be allowed on this table if a value for this field is not explicitly specified.
-- ``requires`` is a validator or a list of validators. This is not used by the DAL, but it is used by SQLFORM. The default validators for the given types are shown in the following table:
+Ne všechny argumenty jsou relevantní pro kterýkoli typ pole.
+Např. "uploadfield" a "authorize" zase jen k polím typu "upload". "ondelete" má význam jen pro pole typů "reference" nebo "upload".
+- ``length`` určuje maximální délku (počet znaků) "string", "password" nebo "upload" pole.  Jestliže ``length`` není zadáno, použije se defaultní hodnota, jenže pro ni není zaručována zpětná kompatibilita. ''Abyste zabránili nechtěným migracím při upgradu verze, doporučujeme zadat length vždy explicitně.''
+- ``default`` nastavuje defaultní hodnotu pole. Ta se použije při INSERTu, jestliže hodnota pole není v příkazu určena explicitně. Také se použije pro předvyplnění formulářů, vytvořených podle tabulky pomocí SQLFORM. Nemusí to být jen pevná hodnota, ale také to může být funkce (typicky lambda funkce), která vrátí hodnotu potřebného typu. V takovém případě se funkce zavolá pro každý jednotlivý záznam, i když je vkládáno více záznamů v jediné transakci.
+- ``required`` říká DAL vrstvě, že není dovolen INSERT do tabulky, dokud hodnota pole není explicitně určena.
+- ``requires`` určuje validátor nebo seznam validátorů. Nepoužívá jej DAL, ale používá jej formulář: SQLFORM. Defaultní validátory podle typu pole uvádí následující tabulka:
 
 ----------
-**field type** | **default field validators**
-``string`` | ``IS_LENGTH(length)`` default length is 512
+**typ pole** | **defaultní validátor**
+``string`` | ``IS_LENGTH(length)`` default length je 512
 ``text`` | ``IS_LENGTH(65536)``
 ``blob`` | ``None``
 ``boolean`` | ``None``
@@ -323,88 +322,90 @@ Not all of them are relevant for every field. "length" is relevant only for fiel
 ``datetime`` | ``IS_DATETIME()``
 ``password`` | ``None``
 ``upload`` | ``None``
-``reference <table>``  | ``IS_IN_DB(db,table.field,format)``
+``reference <tabulka>``  | ``IS_IN_DB(db, tabulka.pole, format)``
 ``list:string`` | ``None``
 ``list:integer`` | ``None``
-``list:reference <table>`` | ``IS_IN_DB(db,table.field,format,multiple=True)``
+``list:reference <tabulka>`` | ``IS_IN_DB(db, tabulka.pole, format, multiple=True)``
 ``json`` | ``IS_JSON()``
 ``bigint`` | ``None``
 ``big-id`` | ``None``
 ``big-reference`` | ``None``
 ---------
 
-Decimal requires and returns values as ``Decimal`` objects, as defined in the Python ``decimal`` module. SQLite does not handle the ``decimal`` type so internally we treat it as a ``double``. The (n,m) are the number of digits in total and the number of digits after the decimal point respectively.
+Decimal vyžaduje a vrací hodnoty stejně jako ``Decimal`` objekty z Python modulu ``decimal``. SQLite s nimi neumí pracovat, proto interně je typ ``decimal`` zpracován jako ``double``. (n,m) udávají počet číslic celkem a počet číslic za desetinnou tečkou.
 
-The ``big-id`` and, ``big-reference`` are only supported by some of the database engines and are experimental. They are not normally used as field types unless for legacy tables, however, the DAL constructor has a ``bigint_id`` argument that when set to ``True`` makes the ``id`` fields and ``reference`` fields ``big-id`` and ``big-reference`` respectively.
+``big-id`` a ``big-reference`` podporují jen některé databázové stroje a jsou experimentální. Není důvod je normálně použít, vyjma legacy tables (práce s tabulkami jiných aplikací). DAL konstruktor má parametr ``bigint_id`` a jestliže mu předáme ``True``, změní pole typů ``id`` a ``reference`` na ``big-id`` a ``big-reference``.
 
-The ``list:<type>`` fields are special because they are designed to take advantage of certain denormalization features on NoSQL (in the case of Google App Engine NoSQL, the field types ``ListProperty`` and ``StringListProperty``) and back-port them all the other supported relational databases. On relational databases lists are stored as a ``text`` field. The items are separated by a ``|`` and each ``|`` in string item is escaped as a ``||``. They are discussed in their own section.
+``list:<type>`` pole jsou zvláštní případ. Jsou určena k využití jistých výhod denormalizačních vlastností NoSQL (v případě Google App Engine NoSQL polí typu ``ListProperty`` a ``StringListProperty``) a tyto vlastnosti dávají k dispozici i podporovaným relačním databázím. V relačních databázích jsou "list" pole uložena jako pole typu ``text``. Položky v nich jsou odděleny pomocí ``|`` s tím, že případný znak ``|`` uvnitř položky je escapován na ``||``. O těchto typech polí pojednáme ve zvláštním oddíle.
 
-The ``json`` field type is pretty much explanatory. It can store any json serializable object. It is designed to work specifically for MongoDB and backported to the other database adapters for portability.
+``json`` pole může ukládat jakýkoli json serializovatelný objekt. Je speciálně vytvořeno kvůli práci s MongoDB a v rámci přenositelnosti jej mají k dispozici i ostatní databázové adaptéry.
 
 -------
-Notice that ``requires=...`` is enforced at the level of forms, ``required=True`` is enforced at the level of the DAL (insert), while ``notnull``, ``unique`` and ``ondelete`` are enforced at the level of the database. While they sometimes may seem redundant, it is important to maintain the distinction when programming with the DAL.
+``requires=...`` je použit na úrovni formulářů, ``required=True`` na úrovni DAL (pro insert), kdežto ``notnull``, ``unique`` a ``ondelete`` na úrovni databáze. Mohou se někdy zdát redundantní, ale je potřeba pamatovat na uvedený rozdíl.
 -------
 
 ``ondelete``:inxx
 
-- ``ondelete`` translates into the "ON DELETE" SQL statement. By default it is set to "CASCADE". This tells the database that when it deletes a record, it should also delete all records that refer to it. To disable this feature, set ``ondelete`` to "NO ACTION" or "SET NULL".
-- ``notnull=True`` translates into the "NOT NULL" SQL statement. It prevents the database from inserting null values for the field.
-- ``unique=True`` translates into the "UNIQUE" SQL statement and it makes sure that values of this field are unique within the table. It is enforced at the database level.
-- ``uploadfield`` applies only to fields of type "upload". A field of type "upload" stores the name of a file saved somewhere else, by default on the filesystem under the application "uploads/" folder. If ``uploadfield`` is set, then the file is stored in a blob field within the same table and the value of ``uploadfield`` is the name of the blob field. This will be discussed in more detail later in the context of SQLFORM.
-- ``uploadfolder`` defaults to the application's "uploads/" folder. If set to a different path, files will uploaded to a different folder. For example,
+- ``ondelete`` se přeloží do SQL příkazu na klauzuli "ON DELETE". Defaultně je nastaven na "CASCADE". Tím je databázi řečeno, aby, když maže záznam, prošla a zrušila i záznamy jiných tabulek, jejichž cizí klíč na rušený záznam odkazuje. Takové chování potlačíme nastavením ``ondelete`` na "NO ACTION" nebo "SET NULL".
+- ``notnull=True`` přidá do SQL příkazu klauzuli "NOT NULL". Blokuje přidávání null hodnot do příslušného pole databáze.
+- ``unique=True`` se přeloží v SQL příkazu na klauzuli "UNIQUE" a tím způsobí kontrolu, že hodnoty v tomto poli (sloupci) tabulky jsou unikátní. To je rovněž zajištěno na úrovni databáze.
+
+- ``uploadfield`` má význam jen pro pole typu "upload". Pole typu "upload" ukládá normálně jen jméno souboru, zatímco samotný soubor ukládá jinam, defaultně do adresáře "uploads/" souborového systému. Jestliže je nastaveno ``uploadfield``, pak je soubor uložen do blob pole té samé tabulky a hodnota ``uploadfield`` určuje jméno tohoto blob pole. Probereme to podrobněji v souvislosti s SQLFORM.
+- ``uploadfolder`` je defaultně "uploads/" adresář aplikace. Pokud se uploadované soubory ukládají jako samostatné soubory (tedy nikoli do blob pole), můžete určit odlišnou cestu, kam soubory ukládat. Například:
 ``
 Field(...,uploadfolder=os.path.join(request.folder,'static/temp'))
 ``:code
-will upload files to the "web2py/applications/myapp/static/temp" folder.
-- ``uploadseparate`` if set to True will upload files under different subfolders of the ''uploadfolder'' folder. This is optimized to avoid too many files under the same folder/subfolder. ATTENTION: You cannot change the value of ``uploadseparate`` from True to False without breaking links to existing uploads. web2py either uses the separate subfolders or it does not. Changing the behavior after files have been uploaded will prevent web2py from being able to retrieve those files. If this happens it is possible to move files and fix the problem but this is not described here.
-- ``uploadfs`` allows you specify a different file system where to upload files, including an Amazon S3 storage or a remote SFTP storage. This option requires PyFileSystem installed. ``uploadfs`` must point to ``PyFileSystem``. ``PyFileSystem``:inxx ``uploadfs``:idxx
-- ``widget`` must be one of the available widget objects, including custom widgets, for example: ``SQLFORM.widgets.string.widget``. A list of available widgets will be discussed later. Each field type has a default widget.
-- ``label`` is a string (or a helper or something that can be serialized to a string) that contains the label to be used for this field in auto-generated forms.
-- ``comment``  is a string (or a helper or something that can be serialized to a string) that contains a comment associated with this field, and will be displayed to the right of the input field in the autogenerated forms.
-- ``writable`` declares whether a field is writable in forms.
-- ``readable`` declares whether a field is readable in forms. If a field is neither readable nor writable, it will not be displayed in create and update forms.
-- ``update`` contains the default value for this field when the record is updated.
-- ``compute`` is an optional function. If a record is inserted or updated, the compute function will be executed and the field will be populated with the function result. The record is passed to the compute function as a ``dict``, and the dict will not include the current value of that, or any other compute field.
-- ``authorize`` can be used to require access control on the corresponding field, for "upload" fields only. It will be discussed more in detail in the context of Authentication and Authorization.
-- ``autodelete`` determines if the corresponding uploaded file should be deleted when the record referencing the file is deleted. For "upload" fields only.
-- ``represent`` can be None or can point to a function that takes a field value and returns an alternate representation for the field value. Examples:
+bude soubory ukládat do "web2py/applications/mojeaplikace/static/temp".
+- ``uploadseparate``, pokud bude nastaveno na True, způsobí ukládání souborů do separátních podadresářů adresáře pro upload. Tím je optimalizováno ukládání velkého množství souborů. POZOR: Není dovoleno hodnotu ``uploadseparate`` změnit dodatečně: rozbili byste tím odkazy na existující uploadované soubory. Pokud by se to stalo, je možné soubory přesunout a tím problém opravit, ale tento postup zde neuvádíme.
+- ``uploadfs`` umožňuje uvést jiný souborový systém pro ukládání souborů, včetně Amazon S3 úložiště (storage) nebo vzdáleného (remote) SFTP úložiště. K tomu musí být instalován PyFileSystem. ``uploadfs`` musí odkazovat na ``PyFileSystem``. ``PyFileSystem``:inxx ``uploadfs``:idxx
+
+- ``widget`` musí být některý z dostupných widget objektů, včetně uživatelsky přidaných widgetů, například: ``SQLFORM.widgets.string.widget``. Seznam widgetů, které jsou k dispozici, bude probrán později. Každý typ pole má přiřazen svůj defaultní widget.
+- ``label`` je řetězec (nebo něco, co může být na řetězec serializováno, např. HTML helper), který se použije pro pojmenování pole v automaticky generovaných formulářích.
+- ``comment``  je řetězec (nebo opět to, co může být na řetězec serializováno, např. HTML helper) s poznámkou nebo komentářem pro toto pole, což se zobrazí v automaticky generovaných formulářích typicky napravo od input prvku.
+- ``writable`` říká, zda je prvek, zobrazený ve formulářích, přístupný pro změny (zápis).
+- ``readable`` určuje zobrazení prvku ve formulářích. Pole, které není readable ani writable, se nezobrazí ve formulářích pro přidání záznamu a editaci.
+- ``update`` znamená defaultní hodnotu, která přepíše obsah pole při ukládání záznamu.
+- ``compute`` je volitelná funkce, která se vykoná při ukládání (insert nebo update) do záznamu - do pole se uloží výsledek této funkce. Jako argument je funkci předán slovník (dictionary) aktuálního záznamu. V něm ovšem chybí položky s aktuálními hodnotami "compute" polí.
+- ``authorize`` lze použít k vynucení kontroly přístupu pro jednotlivé pole, a sice pouze u "upload" polí. Podrobněji to probereme u Autentikace a Autorizace.
+- ``autodelete`` určuje, zda bude při mazání záznamu automaticky smazán i separátně uložený soubor. Vztahuje se pouze k "upload" polím.
+- ``represent`` může být None nebo to může být funkce, která hodnotu pole převede na jinou reprezentaci pro uživatele. Příklady:
 ``
-db.mytable.name.represent = lambda name,row: name.capitalize()
-db.mytable.other_id.represent = lambda id,row: row.myfield
-db.mytable.some_uploadfield.represent = lambda value,row: \
-    A('get it', _href=URL('download', args=value))
+db.mojetabulka.jmeno.represent = lambda jmeno, row: jmeno.capitalize()
+db.mojetabulka.jine_id.represent = lambda id, row: row.myfield
+db.mojetabulka.nejake_uploadpole.represent = lambda value, row: \
+    A('stáhnout', _href=URL('download', args=value))
 ``:code
 
 ``blob``:inxx
-"blob" fields are also special. By default, binary data is encoded in base64 before being stored into the actual database field, and it is decoded when extracted. This has the negative effect of using 25% more storage space than necessary in blob fields, but has two advantages. On average it reduces the amount of data communicated between web2py and the database server, and it makes the communication independent of back-end-specific escaping conventions.
+"blob" pole jsou rovněž speciální. Defaultně jsou binární data zakódována do base64 a pak teprve uložena do pole v databázi, a obdobně jsou dekódována při čtení z databáze. Tím se sice zabere o 25% více místa, ale dává to dvě výhody. V průměru to sníží množství dat, přenesených mezi Web2py a databázovým serverem, a komunikace tím nebude závislá na specifických escape konvencích (ošetření problematických znaků) konkrétního back-endu (databázového stroje).
 
-Most attributes of fields and tables can be modified after they are defined:
+Většina atributů polí může být změněna i dodatečně, později než jsou definována pole:
 
 ``
-db.define_table('person',Field('name',default=''),format='%(name)s')
-db.person._format = '%(name)s/%(id)s'
-db.person.name.default = 'anonymous'
+db.define_table('osoba', Field('jmeno', default=''), format='%(jmeno)s')
+db.osoba._format = '%(jmeno)s/%(id)s'
+db.osoba.jmeno.default = 'anonym'
 ``
-(notice that attributes of tables are usually prefixed by an underscore to avoid conflict with possible field names).
+(poznamenejme, že atributy tabulek prefixujeme podtržítkem, aby se zabránilo možnému konfliktu se jmény polí).
 
-You can list the tables that have been defined for a given database connection:
+Můžete získat seznam (list) tabulek, definovaných pro dané databázové připojení:
 
 ``tables``:inxx
 ``
 >>> print db.tables
-['person']
+['osoba']
 ``:code
 
-You can also list the fields that have been defined for a given table:
+Podobně můžete získat seznam polí, definovaných pro danou tabulku:
 
 ``fields``:inxx
 ``
->>> print db.person.fields
-['id', 'name']
+>>> print db.osoba.fields
+['id', 'jmeno']
 ``:code
 
 
-You can query for the type of a table:
+Typ tabulky - instance třídy Table:
 
 ``Table``:inxx
 ``
@@ -412,124 +413,123 @@ You can query for the type of a table:
 <class 'gluon.sql.Table'>
 ``:code
 
-and you can access a table from the DAL connection using:
+jiný způsob, jak použít tabulku:
 ``
->>> print type(db['person'])
+>>> print type(db['osoba'])
 <class 'gluon.sql.Table'>
 ``:code
 
-Similarly you can access fields from their name in multiple equivalent ways:
+Podobně můžete přistupovat k polím více způsoby:
 ``
->>> print type(db.person.name)
+>>> print type(db.osoba.jmeno)
 <class 'gluon.sql.Field'>
->>> print type(db.person['name'])
+>>> print type(db.osoba['jmeno'])
 <class 'gluon.sql.Field'>
->>> print type(db['person']['name'])
+>>> print type(db['osoba']['jmeno'])
 <class 'gluon.sql.Field'>
 ``:code
 
-Given a field, you can access the attributes set in its definition:
+Pro konkrétní pole můžete získat aktuální nastavení jeho atributů:
 ``
->>> print db.person.name.type
+>>> print db.osoba.jmeno.type
 string
->>> print db.person.name.unique
+>>> print db.osoba.jmeno.unique
 False
->>> print db.person.name.notnull
+>>> print db.osoba.jmeno.notnull
 False
->>> print db.person.name.length
+>>> print db.osoba.jmeno.length
 32
 ``:code
 
-including its parent table, tablename, and parent connection:
+a to včetně tabulky, do které patří (jako odkaz nebo jako řetězec) a včetně připojení, k němuž definice patří:
 ``
->>> db.person.name._table == db.person
+>>> db.osoba.jmeno._table == db.osoba
 True
->>> db.person.name._tablename == 'person'
+>>> db.osoba.jmeno._tablename == 'osoba'
 True
->>> db.person.name._db == db
+>>> db.osoba.jmeno._db == db
 True
 ``:code
 
-A field also has methods. Some of them are used to build queries and we will see them later.
-A special method of the field object is ``validate`` and it calls the validators for the field.
+Pole má také metody. Některé se používají pro sestavení dotazů (queries) a seznámíme se s nimi je později.
+Speciální metodou objektu pole je ``validate``, které provede validátor(y) pole.
 
 ``
-print db.person.name.validate('John')
+print db.osoba.jmeno.validate('Honza')
 ``
 
-which returns a tuple ``(value, error)``. ``error`` is ``None`` if the input passes validation.
+což vrátí vektor (tuple) ``(value, error)``. ``error`` je ``None``, jestliže validace prošla bez chyb.
 
-### Migrations
+### Migrace
 ``migrations``:inxx
 
-``define_table`` checks whether or not the corresponding table exists. If it does not, it generates the SQL to create it and executes the SQL. If the table does exist but differs from the one being defined, it generates the SQL to alter the table and executes it. If a field has changed type but not name, it will try to convert the data (If you do not want this, you need to redefine the table twice, the first time, letting web2py drop the field by removing it, and the second time adding the newly defined field so that web2py can create it.). If the table exists and matches the current definition, it will leave it alone. In all cases it will create the ``db.person`` object that represents the table.
+``define_table`` kontroluje, zda příslušná tabulka existuje nebo ne. Pokud ne, sestaví SQL příkaz pro její vytvoření a provede jej. Jestliže tabulka už existuje, ale liší se od zadané definice, sestaví se SQL příkaz pro úpravu struktury tabulky a provede se. Pokud pole nezměnilo název, ale změnilo typ, dojde k pokusu převést data. (Pokud tomuto chcete zabránit, je potřeba redefinovat strukturu tabulky postupně dvakrát, napoprvé odstraněním pole (a uložených dat v něm) a napodruhé jeho opětovným nadefinováním, takže bude vytvořeno jako prázdné.) Pokud tabulka existuje ve správné struktuře, neprovede se nic, ale ve všech případech se vytvoří objekt ``db.person`` jako reprezentace databázové tabulky.
 
-We refer to this behavior as a "migration". web2py logs all migrations and migration attempts in the file "databases/sql.log".
+Toto chování označujeme jako "migrace". Web2py loguje všechny migrace a pokusy o ni do souboru "databases/sql.log".
 
-The first argument of ``define_table`` is always the table name. The other unnamed arguments are the fields (Field). The function also takes an optional last argument called "migrate" which must be referred to explicitly by name as in:
+Prvním argumentem ``define_table`` je vždy jméno tabulky. Následující další nepojmenované argumenty jsou definice polí (Field). Funkce má také nepovinný pojmenovaný parametr "migrate":
 ``
->>> db.define_table('person', Field('name'), migrate='person.table')
+>>> db.define_table('osoba', Field('jmeno'), migrate='osoba.table')
 ``:code
 
-The value of migrate is the filename (in the "databases" folder for the application) where web2py stores internal migration information for this table.
-These files are very important and should never be removed while the corresponding tables exist.  In cases where a table has been dropped and the corresponding file still exist, it can be removed manually. By default, migrate is set to True. This causes web2py to generate the filename from a hash of the connection string. If migrate is set to False, the migration is not performed, and web2py assumes that the table exists in the datastore and it contains (at least) the fields listed in ``define_table``.
-The best practice is to give an explicit name to the migrate table.
+Jméno, uvedené v "migrate", je jméno souboru (který vznikne ve složce "databases" aplikace) a v němž si Web2py udržuje své interní informace o této tabulce. Tyto soubory jsou velice důležité a nikdy je neodstraňujte, dokud v databázi existují odpovídající tabulky. Jen v případě, že jste tabulku už zrušili (drop) lze smazat i soubor s interními informacemi a jménem zrušené tabulky (pokud by zůstal).
+Defaultně je "migrate" nastaveno na True. Web2py pak sestaví jméno souboru s interními informacemi z hashe připojení a ze jména tabulky.
+Nastavíme-li migrate=False, není migrace povolena a Web2py předpokládá, že tabulka existuje v databázi a že má správnou strukturu, a sice alespoň ta pole, která jsou uvedena v ``define_table``.
 
-There may not be two tables in the same application with the same migrate filename.
+Je doporučeno migrační tabulky explicitně pojmenovat. Migrační tabulky dvou různých tabulek v aplikaci pochopitelně nesmějímít stejná jména.
 
-The DAL class also takes a "migrate" argument, which determines the default value of migrate for calls to ``define_table``. For example,
+Také DAL třída má parametr "migrate", který určuje defaultní hodnotu pro "migrate" při volání ``define_table``. Například:
 ``
 >>> db = DAL('sqlite://storage.db', migrate=False)
 ``:code
 
-will set the default value of migrate to False whenever ``db.define_table`` is called without a migrate argument.
+nastaví defaultní hodnotu "migrate" na False při každém volání ``db.define_table``, v němž chybí argument "migrate". Kontrola existence a struktury tabulky je tím potlačena.
 
 ------
-Notice that web2py only migrates new columns, removed columns, and changes in column type (except in sqlite). web2py does not migrate changes in attributes such as changes in the values of ``default``, ``unique``, ``notnull``, and ``ondelete``.
+Poznamenáváme, že Web2py migruje jen nové sloupce, odstraněné sloupce a změny v typu sloupce (to poslední s výjimkou SQLite). Web2py nemigruje změněné atributy jako ``default``, ``unique``, ``notnull``, nebo ``ondelete``.
 ------
 
-Migrations can be disabled for all tables at once:
+Migrace lze striktně zakázat všem tabulkám najednou:
 
 ``
 db = DAL(...,migrate_enabled=False)
 ``
 
-This is the recommended behavior when two apps share the same database. Only one of the two apps should perform migrations, the other should disabled them.
+To je doporučené chování a nastavení, jestliže dvě aplikace sdílejí stejnou databázi. Jen jedna z nich by měla mít povoleny migrace a provádět je, druhá (nebo ostatní) by měly mít migrace zakázané.
 
-### Fixing broken migrations
+### Oprava poškozených migrací
 ``fake_migrate``:inxx
 
-There are two common problems with migrations and there are ways to recover from them.
+Existují dva běžné problémy s migracemi a k nim vhodné postupy, jak je řešit.
 
-One problem is specific with SQLite. SQLite does not enforce column types and cannot drop columns. This means that if you have a column of type string and you remove it, it is not really removed. If you add the column again with a different type (for example datetime) you end up with a datetime column that contains strings (junk for practical purposes). web2py does not complain about this because it does not know what is in the database, until it tries to retrieve records and fails.
+Jeden problém je specifický pro SQLite. SQLite nevynucuje typy sloupců a neumí fyzicky odstranit sloupec. Znamená to, že máte-li pole (sloupec) typu string a odstraníte jej, z databáze fyzicky odstraněn nebude, pouze se nepoužívá. Jestliže stejně pojmenovaný sloupec přidáte znovu s jiným typem, dejme tomu datetime (nebo to celé provedete v jediném migračním kroku), skončíte s datetime sloupcem, který ve své části obsahuje řetězce (string). Web2py neví, co z databáze obdrží, takže zkusí načíst záznamy a havaruje.
 
-If web2py returns an error in the gluon.sql.parse function when selecting records, this is the problem: corrupted data in a column because of the above issue.
+Jestliže Web2py vrátí chybu v gluon.sql.parse funkci při načtení (select) záznamů, jedná se o tento problém: poškozená data ve sloupci v důsledku uvedeného problematického chování.
 
-The solution consists in updating all records of the table and updating the values in the column in question with None.
+Řešením je aktualizovat v opětovně přidaném (nebo v jediném kroku přetypovaném) sloupci data hodnotou správného typu. Např. můžeme přetypovaný sloupec ve všech záznamech aktualizovat hodnotou None.
 
-The other problem is more generic but typical with MySQL. MySQL does not allow more than one ALTER TABLE in a transaction. This means that web2py must break complex transactions into smaller ones (one ALTER TABLE at the time) and commit one piece at the time. It is therefore possible that part of a complex transaction gets committed and one part fails, leaving web2py in a corrupted state. Why would part of a transaction fail? Because, for example, it involves altering a table and converting a string column into a datetime column, web2py tries to convert the data, but the data cannot be converted. What happens to web2py? It gets confused about what exactly is the table structure actually stored in the database.
+Jiný problém je obecnější, ale typický pro MySQL. MySQL nedovoluje více než jeden ALTER TABLE v transakci. Znamená to, že Web2py musí rozdělit složitější transakce na jednoduché transakční kroky (s nějvýše jedním ALTER TABLE) a každý z nich commitovat individuálně. Může tak dojít k tomu, že zatímco část celého postupu projde a je commitována, následující část selže a zanechá tak Web2py v poškozeném stavu. Z jakého důvodu může dílčí transakce havarovat? Protože například zahrnuje změnu typu string na datetime a spolu s ní se Web2py pokusí data převést a havaruje při převodu. Co to pro Web2py bude dále znamenat? Bude zmatené v tom, jaká přesně struktura tabulky zůstala v databázi.
 
-The solution consists of disabling migrations for all tables and enabling fake migrations:
+Opravu lze provést zakázáním migrací a povolením falešných (fake) migrací:
 ``
-db.define_table(....,migrate=False,fake_migrate=True)
+db.define_table(...., migrate=False, fake_migrate=True)
 ``:code
 
-This will rebuild web2py metadata about the table according to the table definition. Try multiple table definitions to see which one works (the one before the failed migration and the one after the failed migration). Once successful remove the ``fake_migrate=True`` attribute.
+Tím se přebudují Web2py metadata (migrační tabulka) podle definice tabulky. Vyzkoušejte různé definice a zjistěte, která pracuje správně (definici před migrací a definici po migraci). Jakmile budete úspěšní, odstraňte zase ``fake_migrate=True`` atribut.
 
-Before attempting to fix migration problems it is prudent to make a copy of "applications/yourapp/databases/*.table" files.
+Před pokusem o opravu poškozené migrace je vhodné si zálohovat soubory "applications/yourapp/databases/*.table".
 
-Migration problems can also be fixed for all tables at once:
+Migrační problémy lze také opravit pro všechny tabulky najednou:
 
 ``
-db = DAL(...,fake_migrate_all=True)
+db = DAL(..., fake_migrate_all=True)
 ``:code
 
-This also fails if the model describes tables that do not exist in the database,
-but it can help narrowing down the problem.
+To havaruje, jestliže model obsahuje tabulky, které v databázi právě neexistují, ale může to při řešení problému pomoci.
 
 ### ``insert``
 
-Given a table, you can insert records
+Do určené tabulky můžete vkládat záznamy:
 
 ``insert``:inxx
 ``
@@ -539,86 +539,86 @@ Given a table, you can insert records
 2
 ``:code
 
-Insert returns the unique "id" value of each record inserted.
+Insert vrátí unikátní "id" záznamu, který byl právě vytvořen.
 
-You can truncate the table, i.e., delete all records and reset the counter of the id.
+Můžete vymazat obsah tabulky neboli zrušit všechny záznamy a resetovat čítač přidělovaných id:
 
 ``truncate``:inxx
 ``
 >>> db.person.truncate()
 ``:code
 
-Now, if you insert a record again, the counter starts again at 1 (this is back-end specific and does not apply to Google NoSQL):
+Když nyní zopakujete přidání, čítač začne znova přidělovat id od 1 (což je back-end specifické a neplatí na Google NoSQL):
 ``
 >>> db.person.insert(name="Alex")
 1
 ``:code
 
-Notice you can pass parameters to ``truncate``, for example you can tell SQLITE to restart the id counter.
+Poznamenejme, že pro ``truncate`` lze zadat argumenty, např. říci SQLite, že má restartovat čítač id.
 
 ``
 db.person.truncate('RESTART IDENTITY CASCADE')
 ``:code
 
-The argument is in raw SQL and therefore engine specific.
+Argumenty jsou v cílovém SQL a tím pádem specifické pro konkrétní databázový stroj.
 
 ``bulk_insert``:inxx
-web2py also provides a bulk_insert method
+Web2py má také metodu pro hromadný import (bulk_insert)
 ``
 >>> db.person.bulk_insert([{'name':'Alex'}, {'name':'John'}, {'name':'Tim'}])
 [3,4,5]
 ``:code
 
-It takes a list of dictionaries of fields to be inserted and performs multiple inserts at once. It returns the IDs of the inserted records. On the supported relational databases there is no advantage in using this function as opposed to looping and performing individual inserts but on Google App Engine NoSQL, there is a major speed advantage.
+Argumentem je seznam (list) slovníků (dictionary). Pro každý slovník ze seznamu se importuje jeden záznam. Jako seznam (list) jsou vrácena id přidaných záznamů. Na podporovaných relačních databázích není tento import žádným přínosem ve srovnání s cyklem a prováděním jednotlivých importů. Ale na Google App Engine NoSQL dosáhnete podstatného zvýšení rychlosti.
 
-### ``commit`` and ``rollback``
+### ``commit`` a ``rollback``
 
-No create, drop, insert, truncate, delete, or update operation is actually committed until you issue the commit command
+create, drop, insert, truncate, delete, nebo update operace nejsou potvrzeny, dokud nepoužijete příkaz commit:
 
 ``commit``:inxx
 ``
 >>> db.commit()
 ``:code
 
-To check it let's insert a new record:
+Ověřte si to tak, že přidáte záznam:
 ``
 >>> db.person.insert(name="Bob")
 2
 ``:code
 
-and roll back, i.e., ignore all operations since the last commit:
+a revertujete, neboli budete ignorovat všechny operace, provedené od předchozího commitu:
 
 ``rollback``:inxx
 ``
 >>> db.rollback()
 ``:code
 
-If you now insert again, the counter will again be set to 2, since the previous insert was rolled back.
+Když nyní zopakujete insert, čítač znova vrátí 2, protože předchozí insert byl odvolán.
 ``
 >>> db.person.insert(name="Bob")
 2
 ``:code
 
-Code in models, views and controllers is enclosed in web2py code that looks like this:
+Kód v modelech, controllerech a view je obalen Web2py kódem, který vypadá zhruba takto:
 ``
 try:
-     execute models, controller function and view
+     provést všechny modely, funkci controlleru a view
 except:
-     rollback all connections
-     log the traceback
-     send a ticket to the visitor
+     rollback všech připojení
+     zaznamenat stack volání do logu
+     vystavit chybový ticket uživateli
 else:
-     commit all connections
-     save cookies, sessions and return the page
+     commit všech připojení
+     uložit cookies, sessiony a vrátit sestavenou stránku
 ``:code
 
-There is no need to ever call ``commit``  or ``rollback`` explicitly in web2py unless one needs more granular control.
+Z toho důvodu není potřebné explicitně ve Web2py volat ``commit`` nebo ``rollback``, leda tehdy, když chcete potvrzovat změny dat po menších krocích.
 
-### Raw SQL
+### Hrubé SQL příkazy (Raw SQL)
 
-#### Timing queries
+#### Měření času provedení příkazů
 
-All queries are automatically timed by web2py. The variable ``db._timings`` is a list of tuples. Each tuple contains the raw SQL query as passed to the database driver and the time it took to execute in seconds. This variable can be displayed in views using the toolbar:
+Web2py automaticky měří čas vykonání SQL příkazů. Proměnná ``db._timings`` je seznam (list) vektorů (tuple). Každý vektor obsahuje cílový SQL příkaz, jak byl předán databázovému driveru, a čas, který zabralo jeho vykonání. Z diagnostických důvodů si toto můžete zobrazit ve view pomocí toolbaru:
 
 ``
 {{=response.toolbar()}}
@@ -626,7 +626,7 @@ All queries are automatically timed by web2py. The variable ``db._timings`` is a
 
 #### ``executesql``
 
-The DAL allows you to explicitly issue SQL statements.
+DAL umožňuje vykonávat i explicitní SQL příkazy (tedy nejen automaticky sestavené SQL příkazy).
 
 ``executesql``:inxx
 ``
@@ -634,47 +634,32 @@ The DAL allows you to explicitly issue SQL statements.
 [(1, u'Massimo'), (2, u'Massimo')]
 ``:code
 
-In this case, the return values are not parsed or transformed by the DAL, and the format depends on the specific database driver. This usage with selects is normally not needed, but it is more common with indexes.
-``executesql`` takes four optional arguments: ``placeholders``, ``as_dict``, ``fields`` and ``colnames``.
-``placeholders`` is an optional
-sequence of values to be substituted in
-or, if supported by the DB driver, a dictionary with keys
-matching named placeholders in your SQL.
+V takovém případě DAL neparsuje a nepřevádí vrácené hodnoty a formát tak závisí na konkrétním databázovém ovladači. Takové použití obvykle není potřeba pro SELECTy, ale je typické např. pro SQL příkazy pro práci s indexy.
+``executesql`` má 4 volitelné argumenty: ``placeholders``, ``as_dict``, ``fields`` a ``colnames``.
+``placeholders`` je volitelná sekvence hodnot pro náhradu zástupných symbolů (placeholders) ve vašem SQL příkazu nebo (pokud to databázový stroj podporuje) slovník (dictionary) s klíči, které odpovídají zástupným symbolům v SQL příkaze.
 
-If ``as_dict`` is set to True, the results cursor returned by the DB driver will be converted to a sequence of dictionaries keyed with the db field names.  Results returned with ``as_dict = True`` are the same as those returned when applying **.as_list()** to a normal select.
+Jestliže ``as_dict`` je nastaveno na True, výsledný kurzor, jak jej vrátí DB driver, bude zkonvertován na seznam (list) slovníků (dictionary), jejichž klíči jsou jména db polí. Výsledky, vrácené při ``as_dict = True`` jsou stejné, jako když aplikujete **.as_list()** na výsledky normálního DAL selectu.
 ``
 [{field1: value1, field2: value2}, {field1: value1b, field2: value2b}]
 ``:code
 
-The ``fields`` argument is a list of DAL Field objects that match the
-fields returned from the DB. The Field objects should be part of one or
-more Table objects defined on the DAL object. The ``fields`` list can
-include one or more DAL Table objects in addition to or instead of
-including Field objects, or it can be just a single table (not in a
-list). In that case, the Field objects will be extracted from the
-table(s).
+V opačném případě (defaultně) získáte seznam (list) vektorů (tuple).
 
-Instead of specifying the ``fields`` argument, the ``colnames`` argument
-can be specified as a list of field names in tablename.fieldname format.
-Again, these should represent tables and fields defined on the DAL
-object.
+Argument ``fields`` je seznam (list) DAL Field objektů, které odpovídají polím, vráceným z databáze. Field objekty mají být použity v definici jedné nebo více DAL tabulek. ``fields`` seznam může také obsahovat jako položku DAL tabulku nebo tabulky, a to místo polí nebo spolu s dalšími poli. Chceme-li uvést jedinou tabulku, nemusí ani být parametrem seznam, ale přímo objekt tabulky. Tam, kde je použit objekt tabulky, získají se Field objekty z definice tabulky.
 
-It is also possible to specify both ``fields`` and the associated
-``colnames``. In that case, ``fields`` can also include DAL Expression
-objects in addition to Field objects. For Field objects in "fields",
-the associated ``colnames`` must still be in tablename.fieldname format.
-For Expression objects in ``fields``, the associated ``colnames`` can
-be any arbitrary labels.
+Místo určení argumentu ``fields`` lze použít argument ``colnames``, což je seznam (list) jmen polí ve formátu jmenotabulky.jmenopole. I v tomto případě by měly být použity pole a tabulky, které jsou definovány v DAL objektu připojení (obvykle pojmenovaném: db).
 
-Notice, the DAL Table objects referred to by ``fields`` or ``colnames`` can
-be dummy tables and do not have to represent any real tables in the
-database. Also, note that the ``fields`` and ``colnames`` must be in the
-same order as the fields in the results cursor returned from the DB.
+Je i možné zadat obojí současně, ``fields`` i příslušné ``colnames``. V takovém případě může kromě Fields objektů argument ``fields`` obsahovat DAL Expression
+objekty (výrazy). K Field objektům ve "fields" odpovídající ``colnames`` musí stále být ve formátu jmenotabulky.jmenopole, kdežto pro Expression objekty může být použito libovolné jméno.
+
+``fields`` a ``colnames`` musí být ve stejném pořadí, jako jsou pole ve výsledném kurzoru, jak jej vrátí databáze.
+
+Poznamenejme ještě, že DAL Table objekty, na které odkazují ``fields`` a ``colnames``, mohou být fiktivní (dummy) tabulky, které nemusí představovat žádnou skutečnou tabulku v databázi.
 
 
 #### ``_lastsql``
 
-Whether SQL was executed manually using executesql or was SQL generated by the DAL, you can always find the SQL code in ``db._lastsql``. This is useful for debugging purposes:
+Ať už byl SQL příkaz zadán manuálně nebo byl sestaven pomocí DAL, vždy můžete zjistit poslední provedený SQL příkaz pomocí ``db._lastsql``. To je užitečné při ladění:
 
 ``_lastdb``:inxx
 ``
@@ -684,91 +669,87 @@ SELECT person.id, person.name FROM person;
 ``:code
 
 -------
-web2py never generates queries using the "*" operator. web2py is always explicit when selecting fields.
+Web2py nikdy nesestavuje SQL příkazy s operátorem "*" - místo toho je vždy explicitní při tvorbě seznamu požadovaných polí.
 -------
 
 ### ``drop``
 
-Finally, you can drop tables and all data will be lost:
+Celou tabulku můžete smazat:
 
 ``drop``:inxx
 ``
 >>> db.person.drop()
 ``:code
 
-Note for sqlite: web2py will not re-create the dropped table until you navigate the file system to the databases directory of your app, and delete the file associated with the dropped table. 
+Poznámka pro SQLite: Web2py nevytvoří tabulku znova (migrací při příštím přístupu), dokud v databases/ adresáři nezrušíte odpovídající .table soubor (s metadaty zrušené tabulky). 
 
-### Indexes
+### Indexy
 
-Currently the DAL API does not provide a command to create indexes on tables, but this can be done using the ``executesql`` command. This is because the existence of indexes can make migrations complex, and it is better to deal with them explicitly. Indexes may be needed for those fields that are used in recurrent queries.
+DAL API zatím nemá příkaz pro vytváření indexů, takže právě k tomu je vhodné použít příkaz ``executesql``. Existence indexů (zahrnutá do DAL) by totiž mohla příliš zkomplikovat problematiku migrací, takže je lepší s indexy manipulovat explicitně.
 
-Here is an example of how to [[create an index using SQL in SQLite http://www.sqlite.org/lang_createindex.html]]:
+Tady je příklad, jak [[vytvořit index pomocí SQL příkazu v SQLite http://www.sqlite.org/lang_createindex.html]]:
 ``
 >>> db = DAL('sqlite://storage.db')
 >>> db.define_table('person', Field('name'))
 >>> db.executesql('CREATE INDEX IF NOT EXISTS myidx ON person (name);')
 ``:code
 
-Other database dialects have very similar syntaxes but may not support the optional "IF NOT EXISTS" directive.
+Jiné databázové dialekty mají velice podobnou syntaxim ale např. nemusí rozumět volitelné direktivě "IF NOT EXISTS".
 
-### Legacy databases and keyed tables
+### Databáze jiných aplikací (legacy databases) a "tabulky s klíčem"
 
-web2py can connect to legacy databases under some conditions.
+Web2py se může připojit k databázím jiných aplikací jen za určitých podmínek.
 
-The easiest way is when these conditions are met:
-- Each table must have a unique auto-increment integer field called "id"
-- Records must be referenced exclusively using the "id" field.
+Nejsnazší je to při splnění těchto podmínek:
+- Každá tabulka má unikátní auto-inkrement integer pole, pojmenované "id"
+- Záznamy jsou z jiných tabulek odkazovány výhradně pomocí tohoto "id" pole.
 
-When accessing an existing table, i.e., a table not created by web2py in the current application, always set ``migrate=False``.
+Když se připojujete k existující tabulce (k tabulce, kterou nevytvořila tato Web2py aplikace), vždy nastavte ``migrate=False``.
 
-If the legacy table has an auto-increment integer field but it is not called "id", web2py can still access it but the table definition must contain explicitly as ``Field('....','id')`` where ... is the name of the auto-increment integer field.
+Jestliže cizí tabulka má auto-increment integer pole, ale to se jmenuje jinak než "id", Web2py k ní může i tak přistupovat, ale do definice tabulky musíte explicitně přidat ``Field('....','id')``, kde .... je jméno auto-increment integer pole.
 
 ``keyed table``:inxx
 
-Finally if the legacy table uses a primary key that is not an auto-increment id field it is possible to use a "keyed table", for example:
+Jestliže cizí tabulka používá primární klíč, tvořený jinak než jako jediné auto-inkrementální integer pole, můžete využít "tabulku s klíčem" ("keyed table"), například:
 ``
 db.define_table('account',
     Field('accnum','integer'),
     Field('acctype'),
     Field('accdesc'),
-    primarykey=['accnum','acctype'],
+    primarykey=['accnum', 'acctype'],
     migrate=False)
 ``:code
 
-- ``primarykey`` is a list of the field names that make up the primary key.
-- All primarykey fields have a ``NOT NULL`` set even if not specified.
-- Keyed tables can only reference other keyed tables.
-- Referencing fields must use the ``reference tablename.fieldname`` format.
-- The ``update_record`` function is not available for Rows of keyed tables.
+- ``primarykey`` je seznam jmen polí, které tvoří primární klíč.
+- Všechna primarykey pole budou mít nastavení ``NOT NULL``, i když to explicitně nespecifikujete.
+- "Tabulky s klíčem" mohou odkazovat pomocí cizích klíčů zase jen na tabulky s klíčem (s argumentem "primarykey").
+- Odkazující pole musí používat formát ``reference tablename.fieldname``. (?? nemá být ``reference tablename`` ??)
+- Funkce ``update_record`` není k dispozici pro Rows objekt "tabulek s klíčem".
 
 -------
-Currently keyed tables are only supported for DB2, MS-SQL, Ingres and Informix, but others engines will be added.
--------
-
-At the time of writing, we cannot guarantee that the ``primarykey`` attribute works with every existing legacy table and every supported database backend.
-For simplicity, we recommend, if possible, creating a database view that has an auto-increment id field.
+Tabulky s klíčem jsou podporovány jen pro některé back-endy (DB2, MS-SQL, Ingres, Informix, případně později přidané). Nezaručujeme tedy, že ``primarykey`` atribut je použitelný pro jakoukoli cizí tabulku a libovolný db back-end.
+Řešením v takovém případě může být vytvoření view, které má auto-inkrementální id pole.
 
 
-### Distributed transaction
+### Distribuované transakce
 ``distributed transactions``:inxx
 
 ------
-At the time of writing this feature is only supported
-by PostgreSQL, MySQL and Firebird, since they expose API for two-phase commits.
+V době psaní je tato vlastnost podporována jen pro PostgreSQL, MySQL a Firebird, protože mají API pro dvoufázové commity.
 ------
 
-Assuming you have two (or more) connections to distinct PostgreSQL databases, for example:
+Předpokládejme, že máte dvě (nebo více) připojení k různým PostgreSQL databázím, například:
 ``
 db_a = DAL('postgres://...')
 db_b = DAL('postgres://...')
 ``:code
 
-In your models or controllers, you can commit them concurrently with:
+V modelu nebo controlleru je můžete commitovat současně, pomocí:
 ``
 DAL.distributed_transaction_commit(db_a, db_b)
 ``:code
 
-On failure, this function rolls back and raises an ``Exception``.
+Dojde-li k chybě, tato metoda revertuje vše a vyhodí ``Exception``.
 
 In controllers, when one action returns, if you have two distinct connections and you do not call the above function, web2py commits them separately. This means there is a possibility that one of the commits succeeds and one fails. The distributed transaction prevents this from happening.
 
