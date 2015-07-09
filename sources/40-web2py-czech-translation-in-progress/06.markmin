@@ -1001,38 +1001,38 @@ record = db.mytable(id,myfield='somevalue')
 
 Je poněkud podobná syntaxi ``db.mytable[id]``, ale je flexibilnější a bezpečnější. V obou případech může být id zadáno jako integer nebo jako string (1, '1'). Ale chování se liší, pokud není vůbec zadáno číslo: db.mytable['a'] vyvolá výjimku, kdežto db.mytable('a') vrátí None (čili: neexistuje požadovaný záznam). Ve druhé variantě (s kulatými závorkami) tedy výjimka nevznikne nikdy. Druhá varianta také umožňuje zadat více podmínek, které musí být splněny současně. Pokud nejsou, je rovněž vráceno ``None``.
 
-#### Recursive ``select``s
+#### Rekurzivní ``select``
 ``recursive selects``:inxx
 
-Consider the previous table person and a new table "thing" referencing a "person":
+Uvažujme předcházející tabulku "person" a novou tabulku "thing", která se na záznamy z "person" odkazuje:
 ``
 >>> db.define_table('thing',
         Field('name'),
-        Field('owner_id','reference person'))
+        Field('owner_id', 'reference person'))
 ``:code
 
-and a simple select from this table:
+proveďme jednoduchý select() z této tabulky:
 ``
 >>> things = db(db.thing).select()
 ``:code
 
-which is equivalent to
+což, jak jsme si ukázali, je totéž jako:
 
 ``
 >>> things = db(db.thing._id>0).select()
 ``:code
 
-where ``._id`` is a reference to the primary key of the table. Normally ``db.thing._id`` is the same as ``db.thing.id`` and we will assume that in most of this book. ``_id``:inxx
+``._id`` znamená primární klíč tabulky. Pokud se nejedná o tabulku jiné aplikace, ale o standardní tabulku Web2py aplikace, tak ``db.thing._id`` je totéž jako ``db.thing.id``, což jsme použili ve výkladu dříve a budeme tak uvádět i ve většině ostatních příkladů v této knize. ``_id``:inxx
 
 
-For each Row of things it is possible to fetch not just fields from the selected table (thing) but also from linked tables (recursively):
+Pro každý záznam (Row), získaný z tabulky things, je nejen možné získat pole z této tabulky (thing), ale také z relačně navázaných tabulek (rekursivně):
 ``
 >>> for thing in things: print thing.name, thing.owner_id.name
 ``:code
 
-Here ``thing.owner_id.name`` requires one database select for each thing in things and it is therefore inefficient. We suggest using joins whenever possible instead of recursive selects, nevertheless this is convenient and practical when accessing individual records.
+Nicméně zde ``thing.owner_id.name`` vyvolá jeden SQL select pro každý záznam ve things, což je samozřejmě velice neefektivní. Doporučujeme proto používat joiny místo rekurzivních selectů všude, kde je to možné. Přesto tato vlastnost může být pohodlná a praktická, pokud pracujeme jen s jednotlivým záznamem nebo velmi málo záznamy.
 
-You can also do it backwards, by selecting the things referenced by a person:
+Funguje to i zpětně, pro směr relace 1->m, tedy můžete zjistit věci (things), které patří některé osobě (person):
 
 ``
 person =  db.person(id)
@@ -1040,18 +1040,18 @@ for thing in person.thing.select(orderby=db.thing.name):
     print person.name, 'owns', thing.name
 ``:code
 
-In this last expressions ``person.thing`` is a shortcut for
+``person.thing`` je zkratka (shortcut) pro
 
 ``
 db(db.thing.owner_id==person.id)
 ``:code
 
-i.e. the Set of ``thing``s referenced by the current ``person``. This syntax breaks down if the referencing table has multiple references to the referenced table. In this case one needs to be more explicit and use a full Query.
+tedy pro sadu (Set) záznamů z ``thing``, které jsou vázány na zadanou osobu ``person``. Tato zkratka ale selže, jestliže odkazovaná tabulka (things) má více klíčů, které propojují záznamy do řídící tabulky (preson). V takovém případě musíte být konkrétnější a použít druhou syntaxi (celý Dotaz).
 
 
-#### Serializing ``Rows`` in views
+#### Serializace ``Rows`` do views
 
-Given the following action containing a query
+Mějme následující akci index(), která na základě dotazu query vytvoří Rows objekt (sekvenci záznamů).
 ``SQLTABLE``:inxx
 
 ``
@@ -1059,25 +1059,25 @@ def index()
     return dict(rows = db(query).select())
 ``:code
 
-The result of a select can be displayed in a view with the following syntax:
+Výsledek můžete zobrazit ve view touto jednoduchou syntaxí:
 ``
 {{extend 'layout.html'}}
-<h1>Records</h1>
+<h1>Záznamy</h1>
 {{=rows}}
 ``:code
 
-Which is equivalent to:
+To je ekvivalentní zápisu:
 ``
 {{extend 'layout.html'}}
 <h1>Records</h1>
 {{=SQLTABLE(rows)}}
 ``:code
 
-``SQLTABLE`` converts the rows into an HTML table with a header containing the column names and one row per record. The rows are marked as alternating class "even" and class "odd". Under the hood, Rows is first converted into a SQLTABLE object (not to be confused with Table) and then serialized. The values extracted from the database are also formatted by the validators associated to the field and then escaped.
+``SQLTABLE`` konvertuje Rows objekt na HTML tabulku s hlavičkou se jmény sloupců a s jedním řádkem pro každý záznam. Řádky jsou doplněny střídavě o css class "even" resp. "odd". Interně je Rows objekt nejprve konvertován na SQLTABLE objekt (nazeměňujte s Table) a pak je serializován. Hodnoty z databáze jsou při tom zformátovány pomocí validátorů a escapovány pro HTML výstup.
 
-Yet it is possible and sometimes convenient to call SQLTABLE explicitly.
+Je také možné a někdy užitečné zavolat SQLTABLE explicitně.
 
-The SQLTABLE constructor takes the following optional arguments:
+SQLTABLE konstruktor má následující volitelné argumenty:
 
 - ``linkto`` the URL or an action to be used to link reference fields (default to None)
 - ``upload`` the URL or the download action to allow downloading of uploaded files (default to None)
