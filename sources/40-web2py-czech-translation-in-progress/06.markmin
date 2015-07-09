@@ -723,7 +723,7 @@ db.define_table('account',
 - ``primarykey`` je seznam jmen polí, které tvoří primární klíč.
 - Všechna primarykey pole budou mít nastavení ``NOT NULL``, i když to explicitně nespecifikujete.
 - "Tabulky s klíčem" mohou odkazovat pomocí cizích klíčů zase jen na tabulky s klíčem (s argumentem "primarykey").
-- Odkazující pole musí používat formát ``reference tablename.fieldname``. (?? nemá být ``reference tablename`` ??)
+- Odkazující pole musí používat formát ``reference tablename.fieldname``.
 - Funkce ``update_record`` není k dispozici pro Rows objekt "tabulek s klíčem".
 
 -------
@@ -751,36 +751,36 @@ DAL.distributed_transaction_commit(db_a, db_b)
 
 Dojde-li k chybě, tato metoda revertuje vše a vyhodí ``Exception``.
 
-In controllers, when one action returns, if you have two distinct connections and you do not call the above function, web2py commits them separately. This means there is a possibility that one of the commits succeeds and one fails. The distributed transaction prevents this from happening.
+Normálně, po návratu z akce (funkce) controlleru, jsou-li použita dvě připojení současně a nezavoláte tuto funkci, Web2py je obě připojení commituje, jenže separátně. Znamená to, že jeden z commitů může být úspěšný a druhý selhat. Distribuovaná transakce (explicitní zavolání popsané funkce) takové situaci zabrání.
 
-### More on uploads
+### Více o uploadech
 
-Consider the following model:
+Uvažujme následující model:
 ``
 >>> db.define_table('myfile',
     Field('image', 'upload', default='path/'))
 ``:code
 
-In the case of an 'upload' field, the default value can optionally be set to a path (an absolute path or a path relative to the current app folder) and the default image will be set to a copy of the file at the path. A new copy is made for each new record that does not specify an image.
+Pro 'upload' pole může být jeho default nastaven na cestu (absolutní nebo relativní k aktuální aplikaci) a defaultní image se vytvoří jako kopie souboru na zadané cestě. Vytvoří se nová samostatná kopie pro každý přidaný záznam, v němž nebude upload (v příkladu pojmenovaný: image) zadán.
 
-Normally an insert is handled automatically via a SQLFORM or a crud form (which is a SQLFORM) but occasionally you already have the file on the filesystem and want to upload it programmatically. This can be done in this way:
+Normálně je vložení uploadu zajištěno automaticky pomocí SQLFORM nebo crud formuláře (což je rovněž varianta SQLFORM), ale někdy již máte soubor v souborovém systému a chcete ho uploadovat programově. To je možné provést takto:
 ``
 >>> stream = open(filename, 'rb')
 >>> db.myfile.insert(image=db.myfile.image.store(stream, filename))
 ``:code
 
-It is also possible to insert a file in a simpler way and have the insert method call store automatically:
+Je také možné vložit soubor ještě jednodušším způsobem, kdy insert metoda zavolá store() automaticky:
 
 ``
 >>> stream = open(filename, 'rb')
 >>> db.myfile.insert(image=stream)
 ``:code
 
-In this case the filename is obtained from the stream object if available.
+V tomto případě bude jméno souboru zjištěno ze stream objektu.
 
-The ``store`` method of the upload field object takes a file stream and a filename. It uses the filename to determine the extension (type) of the file, creates a new temp name for the file (according to web2py upload mechanism) and loads the file content in this new temp file (under the uploads folder unless specified otherwise). It returns the new temp name, which is then stored in the ``image`` field of the ``db.myfile`` table.
+Metoda ``store`` upload pole má dva parametry: stream a jméno souboru. Založí nový soubor, pojmenovaný jako dočasný, a sice v uploads/ adresáři, není-li zadáno jinak, a obsah souboru zkopíruje do tohoto nového dočasného souboru. Vrátí jméno souboru, které je nakonec uloženo do ``image`` pole tabulky ``db.myfile``.
 
-Note, if the file is to be stored in an associated blob field rather than the file system, the ``store()`` method will not insert the file in the blob field (because ``store()`` is called before the insert), so the file must be explicitly inserted into the blob field:
+Poznamenejme, že jestliže má být soubor uložen ne jako samostatný soubor, ale do blob pole databáze, metoda ``store()`` soubor do blob pole neuloží - a to proto, že je zavolána dříve než insert(). Soubor tedy v tomto případě musíme uložit do blob pole explicitně:
 ``
 >>> db.define_table('myfile',
         Field('image', 'upload', uploadfield='image_file'),
@@ -791,7 +791,7 @@ Note, if the file is to be stored in an associated blob field rather than the fi
 ``:code
 
 
-The opposite of ``.store`` is ``.retrieve``:
+Opakem ``.store`` je ``.retrieve``:
 
 ``
 >>> row = db(db.myfile).select().first()
@@ -802,7 +802,7 @@ The opposite of ``.store`` is ``.retrieve``:
 
 ### ``Query``, ``Set``, ``Rows``
 
-Let's consider again the table defined (and dropped) previously and insert three records:
+Uvažujme znova tabulku, definovanou výše, prázdnou (např. po truncate() nebo po drop() následovaném opětovným vytvořením tabulky mechanismem migrace). Vložme do ní tři záznamy:
 ``
 >>> db.define_table('person', Field('name'))
 >>> db.person.insert(name="Alex")
@@ -813,40 +813,40 @@ Let's consider again the table defined (and dropped) previously and insert three
 3
 ``:code
 
-You can store the table in a variable. For example, with variable ``person``, you could do:
+Odkaz na tabulku můžete pochopitelně uložit do proměnné, dejme tomu pojmenované ``person``:
 
 ``Table``:inxx
 ``
 >>> person = db.person
 ``:code
 
-You can also store a field in a variable such as ``name``.  For example, you could also do:
+Stejně si můžete do proměnné uložit odkaz na pole, např. pojmenujme proměnnou opět stejně se jménem pole:
 
 ``Field``:inxx
 ``
 >>> name = person.name
 ``:code
 
-You can even build a query (using operators like ==, !=, <, >, <=, >=, like, belongs) and store the query in a variable ``q`` such as in:
+Vytvořme si dotaz (query) pomocí operátorů (jako jsou ==, !=, <, >, <=, >=, like nebo belongs) a tento dotaz můžeme opět uložit do proměnné - pojmenujme ji třeba ``q``:
 
 ``Query``:inxx
 ``
 >>> q = name=='Alex'
 ``:code
 
-When you call ``db`` with a query, you define a set of records. You can store it in a variable ``s`` and write:
+Zavoláním ``db`` s parametrem <dotaz> definujete sadu záznamů (set of records). Zase si ji uložíme do proměnné, pojmenované např. ``s``:
 
 ``Set``:inxx
 ``
 >>> s = db(q)
 ``:code
 
-Notice that no database query has been performed so far. DAL + Query simply define a set of records in this db that match the query.
-web2py determines from the query which table (or tables) are involved and, in fact, there is no need to specify that.
+Poznamenejme, že zatím nebyl vykonán žádný SQL příkaz do databáze. DAL + Query jen připravily objekt pro sadu záznamů, které tomuto dotazu (query) vyhovují.
+Web2py z dotazu vyhodnotí, do které tabulky (nebo tabulek) dotaz zasahuje. Není potom potřeba tabulky explicitně určit.
 
 ### ``select``
 
-Given a Set, ``s``, you can fetch the records with the command ``select``:
+Se Set objektem, který máme nyní přístupný pod proměnnou ``s``, můžete získat skutečné záznamy z databáze příkazem ``select``:
 
 ``Rows``:inxx ``select``:inxx
 ``
@@ -854,16 +854,16 @@ Given a Set, ``s``, you can fetch the records with the command ``select``:
 ``:code
 
 ``Row``:inxx
-It returns an iterable object of class ``gluon.sql.Rows`` whose elements are Row objects. ``gluon.sql.Row`` objects act like dictionaries, but their elements can also be accessed as attributes, like ``gluon.storage.Storage``.The former differ from the latter because its values are read-only.
+Dostaneme iterovatelný objekt třídy ``gluon.sql.Rows``, jehož položkami (prvky) jsou objekty Row. ``gluon.sql.Row`` objekty se chovají jako slovníky (dictionary), ale s jejich prvky můžete také pracovat jako s atributy: row['jmeno'] nebo row.jmeno. Rows objekt (sada záznamů) je read-only, do Row objekt (jednotlivý záznam) lze i měnit.
 
-The Rows object allows looping over the result of the select and printing the selected field values for each row:
+Rows objekt umožňuje v cyklu procházet jednotlivé záznamy výsledku SELECTu, např. můžete vypsat hodnoty polí pro jednotlivé záznamy:
 ``
 >>> for row in rows:
         print row.id, row.name
 1 Alex
 ``:code
 
-You can do all the steps in one statement:
+Všechny kroky můžete spojit do jediného příkazu:
 ``
 >>> for row in db(db.person.name=='Alex').select():
         print row.name
@@ -872,7 +872,7 @@ Alex
 
 ``ALL``:inxx
 
-The select command can take arguments. All unnamed arguments are interpreted as the names of the fields that you want to fetch. For example, you can be explicit on fetching field "id" and field "name":
+Metodě select můžete předat argumenty. Všechny nepojmenované argumenty budou chápany jako pole, které chcete z databáze získat (fetch). Např. můžete explicitně chtít pole "id" a "name":
 ``
 >>> for row in db().select(db.person.id, db.person.name):
         print row.name
@@ -881,7 +881,7 @@ Bob
 Carl
 ``:code
 
-The table attribute ALL allows you to specify all fields:
+Atribut tabulky ALL vám umožňuje požadovat všechna pole tabulky:
 ``
 >>> for row in db().select(db.person.ALL):
         print row.name
@@ -890,9 +890,9 @@ Bob
 Carl
 ``:code
 
-Notice that there is no query string passed to db. web2py understands that if you want all fields of the table person without additional information then you want all records of the table person.
+Všimněte si, že jsme nezadali žádný dotaz (query) jako argument db(). Web2py pochopí, že jestliže chcete všechna pole tabulky person bez uvedení nějaké dodatečné informace, tak chcete získat všechny záznamy této tabulky.
 
-An equivalent alternative syntax is the following:
+Ekvivalentní alternativní syntaxe je tato:
 ``
 >>> for row in db(db.person.id > 0).select():
         print row.name
@@ -901,15 +901,15 @@ Bob
 Carl
 ``:code
 
-and web2py understands that if you ask for all records of the table person (id > 0) without additional information, then you want all the fields of table person.
+V tomto případě Web2py naopak pochopí, že chcete-li všechny záznamy tabulky person (id > 0) a neuvádíte žádnou informaci navíc (o požadovaných polích), má vrátit všechna pole této tabulky.
 
-Given one row
+Vezměme nyní jeden řádek výsledku (záznam, větu tabulky):
 
 ``
 row = rows[0]
 ``
 
-you can extract its values using multiple equivalent expressions:
+Můžete získat obsah polí více ekvivalentními způsoby:
 
 ``
 >>> row.name
@@ -920,82 +920,78 @@ Alex
 Alex
 ``
 
-The latter syntax is particularly handy when selecting en expression instead of a column. We will show this later.
+Poslední uvedená syntaxe (s kulatými závorkami) je zvláště praktická, když chcete získat výraz místo pole. Ukážeme si to později.
 
-You can also do
+Můžete nastavit
 ``
 rows.compact = False
 ``
-to disable the notation
+tím zakážete notaci
 ``
-row[i].name
+row.name
 ``
-and enable, instead, the less compact notation:
+a místo ní povolíte méně stručnou notaci:
 ``
-row[i].person.name
+row.person.name
 ``
-Yes this is unusual and rarely needed.
+To je ovšem méně obvyklé a málokdy potřebné.
 
-#### Shortcuts
+#### Zkratky (shortcuts)
 ``DAL shortcuts``:inxx
 
-The DAL supports various code-simplifying shortcuts.
-In particular:
+DAL nabízí různé zkratky ke zjednodušení kódu.
+Podívejme se na ně:
 ``
 myrecord = db.mytable[id]
 ``:code
 
-returns the record with the given ``id`` if it exists. If the ``id`` does not exist, it returns ``None``. The above statement is equivalent to
+Vrátí záznam (Row objekt) se zadaným ``id``. Pokud ``id`` v tabulce neexistuje, vrátí ``None``. Je to ekvivalentní této úplné syntaxi:
 
 ``
 myrecord = db(db.mytable.id==id).select().first()
 ``:code
 
-You can delete records by id:
+Můžete zrušit záznam pomocí id, takto:
 
 ``
 del db.mytable[id]
 ``:code
 
-and this is equivalent to
+což je ekvivalent úplného znění:
 
 ``
 db(db.mytable.id==id).delete()
 ``:code
 
-and deletes the record with the given ``id``, if it exists.
-
-You can insert records:
+Záznam můžete vložit i takto:
 
 ``
 db.mytable[0] = dict(myfield='somevalue')
 ``:code
 
-It is equivalent to
+což je ekvivalent
 
 ``
 db.mytable.insert(myfield='somevalue')
 ``:code
 
-and it creates a new record with field values specified by the dictionary on the right hand side.
+a v obou případech přidá záznam, přičemž v prvním případě předáme hodnoty jako slovník (dictionary).
 
-You can update records:
+Můžete aktualizovat záznam:
 
 ``
 db.mytable[id] = dict(myfield='somevalue')
 ``:code
 
-which is equivalent to
+což je ekvivalent úplné syntaxe
 
 ``
 db(db.mytable.id==id).update(myfield='somevalue')
 ``:code
 
-and it updates an existing record with field values specified by the dictionary on the right hand side.
+#### Získání ``Row``
 
-#### Fetching a ``Row``
-
-Yet another convenient syntax is the following:
+Další praktická syntaxe je tato:
 
 ``
 record = db.mytable(id)
@@ -1003,7 +999,7 @@ record = db.mytable(db.mytable.id==id)
 record = db.mytable(id,myfield='somevalue')
 ``:code
 
-Apparently similar to ``db.mytable[id]`` the above syntax is more flexible and safer. First of all it checks whether ``id`` is an int (or ``str(id)`` is an int) and returns ``None`` if not (it never raises an exception). It also allows to specify multiple conditions that the record must meet. If they are not met, it also returns ``None``.
+Je poněkud podobná syntaxi ``db.mytable[id]``, ale je flexibilnější a bezpečnější. V obou případech může být id zadáno jako integer nebo jako string (1, '1'). Ale chování se liší, pokud není vůbec zadáno číslo: db.mytable['a'] vyvolá výjimku, kdežto db.mytable('a') vrátí None (čili: neexistuje požadovaný záznam). Ve druhé variantě (s kulatými závorkami) tedy výjimka nevznikne nikdy. Druhá varianta také umožňuje zadat více podmínek, které musí být splněny současně. Pokud nejsou, je rovněž vráceno ``None``.
 
 #### Recursive ``select``s
 ``recursive selects``:inxx
