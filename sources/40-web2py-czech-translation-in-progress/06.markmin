@@ -834,7 +834,7 @@ Vytvořme si dotaz (query) pomocí operátorů (jako jsou ==, !=, <, >, <=, >=, 
 >>> q = name=='Alex'
 ``:code
 
-Zavoláním ``db`` s parametrem <dotaz> definujete sadu záznamů (set of records). Zase si ji uložíme do proměnné, pojmenované např. ``s``:
+Zavoláním ``db`` s parametrem <dotaz> definujete objekt Set - sadu (množinu) záznamů (set of records). Zase si ji uložíme do proměnné, pojmenované např. ``s``:
 
 ``Set``:inxx
 ``
@@ -1194,9 +1194,9 @@ query1 vybírá záznamy, které se mají zobrazit, kdežto query2 záznamy, kte
 
 ``distinct``:inxx
 
-With the argument ``distinct=True``, you can specify that you only want to select distinct records. This has the same effect as grouping using all specified fields except that it does not require sorting. When using distinct it is important not to select ALL fields, and in particular not to select the "id" field, else all records will always be distinct.
+Argumentem ``distinct=True`` můžete zadat. že chcete, aby každý vrácený záznam byl unikátní (uvést duplicitní záznamy jen jednou). Je to totéž jako groupovat (seskupit) podle všech výstupních polí, s tím rozdílem, že nemusíte zadat pořadí (orderby). Rozumné použití znamená, že jednak pomocí ALL nevyberete všechna pole, jednak nevyberete pole id explicitně, protože v obou případech by id způsobilo, že každý výstupní záznam by byl unikátní a výsledek by se tedy nelišil bez ohledu na nastavení distinct.
 
-Here is an example:
+Příklad:
 ``
 >>> for row in db().select(db.person.name, distinct=True):
         print row.name
@@ -1205,16 +1205,16 @@ Bob
 Carl
 ``:code
 
-Notice that ``distinct`` can also be an expression for example:
+Jako ``distinct`` můžete uvést také výraz, např.:
 ``
->>> for row in db().select(db.person.name,distinct=db.person.name):
+>>> for row in db().select(db.person.name, distinct=db.person.name):
         print row.name
 Alex
 Bob
 Carl
 ``:code
 
-With limitby=(min, max), you can select a subset of the records from offset=min to but not including offset=max (in this case, the first two starting at zero):
+Pomocí limitby=(min, max) můžete vybrat část výstupních záznamů s offset od min (včetně) do max (bez něj). Např. zde chceme získat jen první dva záznamy:
 
 ``limitby``:inxx
 ``
@@ -1225,9 +1225,9 @@ Bob
 ``:code
 
 
-#### Logical operators
+#### Logické oprátory
 
-Queries can be combined using the binary AND operator "``&``":
+Dotazy (query) lze kombinovat do složitějších. Binární AND (logický součin, splněný při splnění obou dílčích podmínek) zajišťuje operátor "``&``":
 
 ``and``:inxx ``or``:inxx ``not``:inxx
 ``
@@ -1236,14 +1236,14 @@ Queries can be combined using the binary AND operator "``&``":
 4 Alex
 ``:code
 
-and the binary OR operator "``|``":
+Binární OR (logický součet, splněný při splnění aspoň jedné z dílčích podmínek) zajišťuje operátor "``|``":
 ``
 >>> rows = db((db.person.name=='Alex') | (db.person.id>3)).select()
 >>> for row in rows: print row.id, row.name
 1 Alex
 ``:code
 
-You can negate a query (or sub-query) with the "``!=``" binary operator:
+Můžete negovat dotaz změnou operátoru za opačný, typicky pomocí operátoru "``!=``":
 ``
 >>> rows = db((db.person.name!='Alex') | (db.person.id>3)).select()
 >>> for row in rows: print row.id, row.name
@@ -1251,7 +1251,7 @@ You can negate a query (or sub-query) with the "``!=``" binary operator:
 3 Carl
 ``:code
 
-or by explicit negation with the "``~``" unary operator:
+Negovat dotaz (nebo dílčí podmínku složeného dotazu) můžete také unárním operátorem "``~``". Ubární operátor se aplikuje na za ním následující výraz:
 ``
 >>> rows = db(~(db.person.name=='Alex') | (db.person.id>3)).select()
 >>> for row in rows: print row.id, row.name
@@ -1260,10 +1260,10 @@ or by explicit negation with the "``~``" unary operator:
 ``:code
 
 ------
-Due to Python restrictions in overloading "``and``" and "``or``" operators, these cannot be used in forming queries.  The binary operators "``&``" and "``|``" must be used instead. Note that these operators (unlike "``and``" and "``or``") have higher precedence than comparison operators, so the "extra" parentheses in the above examples are mandatory. Similarly, the unary operator "``~``" has higher precedence than comparison operators, so ``~``-negated comparisons must also be parenthesized.
+Nelze použít operátory "``and``" a "``or``", a to vzhledem k omezením Pythonu z hlediska možnosti je předefinovat. Právě proto je potřeba používat při skládání dotazů operátory "``&``" a "``|``". Tyto operátory mají větší přednost než operátory porovnání (na rozdíl od "``and``" a "``or``"), takže je nutné používat "extra" závorky navíc kolem vzájemně spojovaných dílčích dotazů. Podobně i operátor "``~``" má větší přednost než operátory pro porovnání, takže i negovaný dílčí dotaz je potřeba uzavřít do závorky.
 ------
 
-It is also possible to build queries using in-place logical operators:
+Dotazy lze také měnit pomocí in-place logických operátorů:
 
 ``
 >>> query = db.person.name!='Alex'
@@ -1273,7 +1273,7 @@ It is also possible to build queries using in-place logical operators:
 
 #### ``count``, ``isempty``, ``delete``, ``update``
 
-You can count records in a set:
+Spočítat záznamy můžete metodou count():
 
 ``count``:inxx ``isempty``:inxx
 
@@ -1282,39 +1282,39 @@ You can count records in a set:
 3
 ``:code
 
-Notice that ``count`` takes an optional ``distinct`` argument which defaults to False, and it works very much like the same argument for ``select``. ``count`` has also a ``cache`` argument that works very much like the equivalent argument of the ``select`` method.
+``count`` má také volitelný argument ``distinct`` (defaultně False), který se chová identicky jako u metody ``select``. ``count`` má dále argument ``cache``, který se také chová stejně jako u ``select`` metody.
 
-Sometimes you may need to check if a table is empty. A more efficient way than counting is using the ``isempty`` method:
+Někdy potřebujete zjistit, zda je tabulka (případně sada (set)) prázdná. Efektivnější než počítat záznamy je použít metodu ``isempty``:
 
 ``
 >>> print db(db.person.id > 0).isempty()
 False
 ``:code
 
-or equivalently:
+ekvivalentní, ale kratší, je:
 
 ``
 >>> print db(db.person).isempty()
 False
 ``:code
 
-You can delete records in a set:
+Můžete smazat záznamy vybrané sady:
 
 ``delete``:inxx
 ``
 >>> db(db.person.id > 3).delete()
 ``:code
 
-And you can update all records in a set by passing named arguments corresponding to the fields that need to be updated:
+Můžete aktualizovat všechny záznamy sady předáním pojmenovaných argumentů metodě ``update``. Jména parametrů musí být identická se jmény aktualizovaných polí:
 
 ``update``:inxx
 ``
 >>> db(db.person.id > 3).update(name='Ken')
 ``:code
 
-#### Expressions
+#### Výrazy
 
-The value assigned an update statement can be an expression. For example consider this model
+Hodnota, předaná argumentu metody ``update``, může být také výraz. Např.
 ``
 >>> db.define_table('person',
         Field('name'),
@@ -1323,7 +1323,8 @@ The value assigned an update statement can be an expression. For example conside
         visits = db.person.visits + 1)
 ``:code
 
-The values used in queries can also be expressions
+Výraz se vyhodnotí pro každý záznam sady zvlášť.
+Také dotazy mohou obsahovat výrazy:
 ``
 >>> db.define_table('person',
         Field('name'),
@@ -1334,10 +1335,10 @@ The values used in queries can also be expressions
 
 #### ``case`` ``case``:inxx
 
-An expression can contain a case clause for example:
+Výraz může obsahovat kluzuli ``case``, např.:
 
 ``
->>> db.define_table('person',Field('name'))
+>>> db.define_table('person', Field('name'))
 >>> condition = db.person.name.startswith('M')
 >>> yes_or_no = condition.case('Yes','No')
 >>> for row in db().select(db.person.name, yes_or_no):
@@ -1349,54 +1350,54 @@ John No
 #### ``update_record``
 
 ``update_record``:inxx
-web2py also allows updating a single record that is already in memory using ``update_record``
+Web2py poskytuje také metodu pro aktualizaci jednoho záznamu současně v paměti i v databázi, ``update_record``:
 
 ``
 >>> row = db(db.person.id==2).select().first()
 >>> row.update_record(name='Curt')
 ``:code
 
-``update_record`` should not be confused with
+Nezaměňujte ``update_record`` s metodou ``update`` (aplikovanou na jediný řádek)
 
 ``
 >>> row.update(name='Curt')
 ``:code
 
-because for a single row, the method ``update`` updates the row object but not the database record, as in the case of ``update_record``.
+protože metoda ``update`` aktualizuje jen row objekt (kopii záznamu v paměti), ale ne záznam v databázi.
 
-It is also possible to change the attributes of a row (one at a time) and then call ``update_record()`` without arguments to save the changes:
+Je však možné měnit atributy row objektu popsaným způsobem pomocí ``update`` nebo jednotlivě pomocí přiřazení, a pak zavolat ``update_record()`` bez argumentů, což uloží provedené změny:
 
 ``
 >>> row = db(db.person.id > 2).select().first()
 >>> row.name = 'Curt'
->>> row.update_record() # saves above change
+>>> row.update_record() # uloží dříve provedenou změnu
 ``:code
 
-The ``update_record`` method is available only if the table's ``id`` field is included in the select, and ``cacheable`` is not set to ``True``.
+Metoda ``update_record`` je k dispozici JEN TEHDY, pokud je v selectu (tedy i v záznamu) pole ``id`` a pokud není nastaveno ``cacheable`` na ``True``.
 
-#### Inserting and updating from a dictionary
+#### Vkládání a aktualizace pomocí slovníku (dictionary)
 
-A common issue consists of needing to insert or update records in a table where the name of the table, the field to be updated, and the value for the field are all stored in variables. For example: ``tablename``, ``fieldname``, and ``value``.
+Občas je potřeba vkládat nebo aktualizovat záznamy v tabulce, kdy jméno tabulky, jména dotčených polí a ukládané hodnoty jsou uloženy v proměnných. Např. ``tablename`` (proměnná se jménem tabulky), ``fieldname`` (proměnná se jménem pole, kam ukládáme), and ``value`` (proměnná s hodnotou, která má být uložena).
 
-The insert can be done using the following syntax:
+Pro vkládání upravíme syntaxi takto:
 
 ``
 db[tablename].insert(**{fieldname:value})
 ``:code
 
-The update of record with given id can be done with: ``_id``:inxx
+Aktualizace záznamu s určeným id: ``_id``:inxx
 
 ``
 db(db[tablename]._id==id).update(**{fieldname:value})
 ``:code
 
-Notice we used ``table._id`` instead of ``table.id``. In this way the query works even for tables with a field of type "id" which has a name other than "id".
+Použití ``table._id`` místo ``table.id`` je obecnější - dotaz pak funguje i pro případ cizích tabulek s polem typu "id", které je ale pojmenováno jinak.
 
 
-#### ``first`` and ``last``
+#### ``first`` a ``last``
 ``first``:inxx ``last``:inxx
 
-Given a Rows object containing records:
+Z Rows objektu můžeme jako Row objekt získat první nebo poslední záznam:
 
 ``
 >>> rows = db(query).select()
@@ -1404,32 +1405,32 @@ Given a Rows object containing records:
 >>> last_row = rows.last()
 ``:code
 
-are equivalent to
+což je ekvivalent zápisu:
 ``
 >>> first_row = rows[0] if len(rows)>0 else None
 >>> last_row = rows[-1] if len(rows)>0 else None
 ``:code
 
-#### ``as_dict`` and ``as_list``
+#### ``as_dict`` a ``as_list``
 ``as_list``:inxx ``as_dict``:inxx
 
-A Row object can be serialized into a regular dictionary using the ``as_dict()`` method and a Rows object can be serialized into a list of dictionaries using the ``as_list()`` method. Here are some examples:
+Row objekt (1 záznam) může být převeden na standardní slovník (dictionary) pomocí metody ``as_dict()``. Rows object (sekvence záznamů) může být převeden na standardní seznam (list) pomocí metody ``as_list()``:
 ``
 >>> rows = db(query).select()
 >>> rows_list = rows.as_list()
 >>> first_row_dict = rows.first().as_dict()
 ``:code
 
-These methods are convenient for passing Rows to generic views and or to store Rows in sessions (since Rows objects themselves cannot be serialized since contain a reference to an open DB connection):
+Tyto metody mohou být užitečné ((?? for passing Rows to generic views a ??)) chceme-li uložit Rows objekt do sessions (protože Rows objekt nemůže být přímo serializován, obsahuje totiž odkaz na otevřené db připojení):
 ``
 >>> rows = db(query).select()
 >>> session.rows = rows # not allowed!
 >>> session.rows = rows.as_list() # allowed!
 ``:code
 
-#### Combining rows
+#### Skládání Rows objektů
 
-Row objects can be combined at the Python level. Here we assume:
+Rows objekty je možné slučovat na úrovni Pythonu. Dejme tomu, že máme tyto dva Rows objekty:
 
 ``
 >>> print rows1
@@ -1442,8 +1443,7 @@ John
 Tim
 ``
 
-
-You can do a union of the records in two set of rows:
+Můžeme je spojit do jediného objektu:
 
 ``
 >>> rows3 = rows1 & rows2
@@ -1455,7 +1455,7 @@ John
 Tim
 ``:code
 
-You can do a union of the records removing duplicates:
+Můžeme je spojit do jediného objektu s vyloučením duplicit:
 
 ``
 >>> rows3 = rows1 | rows2
@@ -1469,16 +1469,16 @@ John
 #### ``find``, ``exclude``, ``sort``
 ``find``:inxx ``exclude``:inxx ``sort``:inxx
 
-Some times you need to perform two selects and one contains a subset of a previous select. In this case it is pointless to access the database again. The ``find``, ``exclude`` and ``sort`` objects allow you to manipulate a Rows objects and generate another one without accessing the database. More specifically:
-- ``find`` returns a new set of Rows filtered by a condition and leaves the original unchanged.
-- ``exclude`` returns a new set of Rows filtered by a condition and removes them from the original Rows.
-- ``sort`` returns a new set of Rows sorted by a condition and leaves the original unchanged.
+Někdy je potřeba provést dva selecty, přičemž druhý zahrnuje podmnožinu předchozího selectu. V takovém případě není vhodné zatěžovat zbytečně databázi dalším dotazem. Metody ``find``, ``exclude`` a ``sort`` umožňují pracovat s Rows objektem a vytvořit z jeho (všech nebo některých) záznamů jiný, bez přístupu do databáze:
+- ``find`` vrátí nový Rows objekt s vybranými záznamy podle podmínky; originál zůstane beze změny.
+- ``exclude`` vrátí nový Rows objekt s vybranými záznamy podle podmínky; z původního Rows objektu budou vyhovující záznamy odstraněny.
+- ``sort`` vrátí nový Rows objekt setříděný podle zadaného výrazu; originál zůstane beze změny.
 
-All these methods take a single argument, a function that acts on each individual row.
+Všechny metody mají shodný parametr: funkci, která se provede nad každým jednotlivým řádkem.
 
-Here is an example of usage:
+Příklad:
 ``
->>> db.define_table('person',Field('name'))
+>>> db.define_table('person', Field('name'))
 >>> db.person.insert(name='John')
 >>> db.person.insert(name='Max')
 >>> db.person.insert(name='Alex')
@@ -1499,7 +1499,7 @@ Alex
 John
 ``:code
 
-They can be combined:
+Další příklad - volání dvou metod v jednom příkazu:
 ``
 >>> rows = db(db.person).select()
 >>> rows = rows.find(
@@ -1511,97 +1511,96 @@ Alex
 Max
 ``:code
 
-Sort takes an optional argument ``reverse=True`` with the obvious meaning.
+``Sort`` může mít parametr ``reverse=True`` pro opačné setřídění.
 
-The ``find`` method has an optional limitby argument with the same syntax and functionality as the Set select ``method``.
+Metoda ``find`` má volitelný argument ``limitby`` se stejnou syntaxí a funkcí jako u ``select`` metody objektu Set.
 
 
 
-### Other methods
+### Další metody
 
 #### ``update_or_insert``
 ``update_or_insert``:inxx
 
-Some times you need to perform an insert only if there is no record with the same values as those being inserted.
-This can be done with
+Někdy potřebujete vložit záznam jen tehdy, pokud ještě neexistuje záznam s danými hodnotami.
+To je možné provést takto:
 
 ``
-db.define_table('person',Field('name'),Field('birthplace'))
-db.person.update_or_insert(name='John',birthplace='Chicago')
+db.define_table('person', Field('name'), Field('birthplace'))
+db.person.update_or_insert(name='John', birthplace='Chicago')
 ``:code
 
-The record will be inserted only if there is no other user called John born in Chicago.
+Záznam se založí jen když dosud neevidujeme žádného Johna z Chicaga.
 
-You can specify which values to use as a key to determine if the record exists. For example:
+Jiná verze může být užitečnější: Jako poziční (nepojmenovaný) první parametr můžeme uvést Dotaz (query), pomocí něhož se určí, zda vhodný záznam existuje nebo ne:
 ``
 db.person.update_or_insert(db.person.name=='John',
-     name='John',birthplace='Chicago')
+     name='John', birthplace='Chicago')
 ``:code
 
-and if there is John his birthplace will be updated else a new record will be created.
+Jestliže John je v evidenci, aktualizuje se jeho místo narození. V opačném případě se vytvoří nový záznam.
 
-The selection criteria in the example above is a single field. 
-It can also be a query, such as 
+Jiný příklad se složitějším dotazem:
 ``
 db.person.update_or_insert((db.person.name=='John') & (db.person.birthplace=='Chicago'),
-     name='John',birthplace='Chicago',pet='Rover')
+     name='John', birthplace='Chicago', pet='Rover')
 ``:code
 
 #### ``validate_and_insert``, ``validate_and_update``
 
 ``validate_and_insert``:inxx ``validate_and_update``:inxx
 
-The function
+Funkce
 
 ``
 ret = db.mytable.validate_and_insert(field='value')
 ``:code
 
-works very much like
+pracuje podobně jako
 
 ``
 id = db.mytable.insert(field='value')
 ``:code
 
-except that it calls the validators for the fields before performing the insert and bails out if the validation does not pass. If validation does not pass the errors can be found in ``ret.error``. If it passes, the id of the new record is in ``ret.id``. Mind that normally validation is done by the form processing logic so this function is rarely needed.
+s tím rozdílem, že nejprve validuje zadaná pole a nevykoná insert(), jestliže validace selže. Jestliže validace selžou, problémy lze nalézt ve vráceném objektu v ``ret.error``. Jestliže validace projdou a záznam se uloží, přidělené id je v ``ret.id``. Vzhledem k tomu, že validace se provádí automaticky během logiky zpracování formuláře, není tato funkce běžně potřeba.
 
-Similarly
+Obdobně
 
 ``
 ret = db(query).validate_and_update(field='value')
 ``:code
 
-works very much the same as
+pracuje podobně jako
 
 ``
 num = db(query).update(field='value')
 ``:code
 
-except that it calls the validators for the fields before performing the update. Notice that it only works if query involves a single table. The number of updated records can be found in ``res.updated`` and errors will be ``ret.errors``.
+ale s provedením validace předem. To funguje jedině tehdy, když dotaz (query) pracuje jen s jedinou tabulkou (bez joinů). Počet ovlivněných záznamů lze pak najít v ``res.updated`` a chyby v ``ret.errors``.
 
-#### ``smart_query`` (experimental)
+#### ``smart_query`` (experimentální)
 
-There are times when you need to parse a query using natural language such as
+Umožňuje parsovat dotaz v přirozeném jazyce (anglicky)
 
 ``
 name contain m and age greater than 18
 ``
 
-The DAL provides a method to parse this type of queries:
+DAL umí parsovat takovýto dotaz:
 
 ``
 search = 'name contain m and age greater than 18'
-rows = db.smart_query([db.person],search).select()
+rows = db.smart_query([db.person], search).select()
 ``
 
-The first argument must be a list of tables or fields that should be allowed in the search. It raises a ``RuntimeError`` if the search string is invalid. This functionality can be used to build RESTful interfaces (see chapter 10) and it is used internally by the ``SQLFORM.grid`` and ``SQLFORM.smartgrid``.
+První argument musí být seznam tabulek nebo polí, které jsou v dotazu dovoleny. Při chybě v řetězci ``search`` je vyvolán ``RuntimeError``. Tato funkcionalita může být použita při tvorbě RESTful interface (více v kapitole 10) a je interně použita u ``SQLFORM.grid`` a ``SQLFORM.smartgrid``.
 
-In the smartquery search string, a field can be identified by fieldname only and or by tablename.fieldname. Strings may be delimited by double quotes if they contain spaces.
+V řetězci pro smart_query může být pole určeno jen jako samotné jméno pole (fieldname) nebo ve formátu tablename.fieldname. Řetězce lze omezit uvozovkami (double quotes), jestliže obsahují mezery.
 
-### Computed fields
+### Vypočtená pole (computed fields)
 ``compute``:inxx
 
-DAL fields may have a ``compute`` attribute. This must be a function (or lambda) that takes a Row object and returns a value for the field. When a new record is modified, including both insertions and updates, if a value for the field is not provided, web2py tries to compute from the other field values using the ``compute`` function. Here is an example:
+DAL pole může mít atribut ``compute``. Musí to být funkce (často lambda funkce), která vezme parametr Row objekt a vrátí hodnotu pole. Když je vkládán nový záznam nebo aktualizován existující, pak není-li hodnota pole explicitně uvedena, Web2py ji určí výpočtem pomocí ``compute`` funkce:
 ``
 >>> db.define_table('item',
         Field('unit_price','double'),
@@ -1613,21 +1612,21 @@ DAL fields may have a ``compute`` attribute. This must be a function (or lambda)
 9.95
 ``:code
 
-Notice that the computed value is stored in the db and it is not computed on retrieval, as in the case of virtual fields, described later. Two typical applications of computed fields are:
-- in wiki applications, to store the processed input wiki text as HTML, to avoid re-processing on every request
-- for searching, to compute normalized values for a field, to be used for searching.
+Poznamenejme, že vypočtená hodnota je uložena v poli v databázi a nepočítá se až při získání (načtení) hodnoty, jako je tomu u virtuálních polí, která popisujeme níže. Dvě typická použití "vypočtených polí" jsou:
+- ve wiki aplikacích pro uložení textu ve verzi symbolického jazyka do verze HTML, aby nebylo nutné překládat symbolický jazyk do HTML až později, při zobrazení článku.
+- při vyhledávání, k určení normalizované verze hodnoty pro vyhledávání.
 
-### Virtual fields
+### Virtuální pole
 
 ``virtual fields``:inxx
 
-Virtual fields are also computed fields (as in the previous subsection) but they differ from those because they are ''virtual'' in the sense that they are not stored in the db and they are computed each time records are extracted from the database. They can be used to simplify the user's code without using additional storage but they cannot be used for searching.
+Virtuální pole jsou rovněž počítaná pole, ale liší se tím, že jsou "virtuální" v tom smyslu, že ve skutečnosti neexistují v databázi. Jsou vypočtena vždy až v okamžiku, kdy je záznam získán z databáze. Mohou být použita ke zjednodušení kódu, který se záznamem pracuje, ale nelze podle nich (z pochopitelných důvodů) vyhledávat.
 
-#### New style virtual fields
+#### Nový styl virtuálních polí
 
-web2py provides a new and easier way to define virtual fields and lazy virtual fields. This section is marked experimental because they APIs may still change a little from what is described here.
+Novější verze Web2py poskytují nový snadnější způsob definice virtuálních polí a virtuálních polí s odloženým vyčíslením (lazy virtual fields). Tuto sekci považujeme ještě za experimentální, protože API těchto virtuálních polí (příkazy pro práci s nimi) se ještě může změnit vůči popisu, který uvádíme zde.
 
-Here we will consider the same example as in the previous subsection. In particular we consider the following model:
+Zde uvažujme stejný příklad jako v minulém odstavci, konkrétně tento model:
 
 ``
 >>> db.define_table('item',
@@ -1635,56 +1634,56 @@ Here we will consider the same example as in the previous subsection. In particu
         Field('quantity','integer'),
 ``:code
 
-One can define a ``total_price`` virtual field as
+Můžeme definovat virtuální pole ``total_price`` takto
 
 ``
 >>> db.item.total_price = Field.Virtual(
     lambda row: row.item.unit_price*row.item.quantity)
 ``:code
 
-i.e. by simply defining a new field ``total_price`` to be a ``Field.Virtual``. The only argument of the constructor is a function that takes a row and returns the computed values.
+Jediný argument konstruktoru pro ``Field.Virtual`` je funkce, která pro zadaný Row objekt vrátí hodnotu virtuálního pole.
 
-A virtual field defined as the one above is automatically computed for all records when the records are selected:
+Takto definované virtuální pole je automaticky spočteno pro všechny záznamy poté, co jsou získány select-em:
 
 ``
 >>> for row in db(db.item).select(): print row.total_price
 ``
 
-It is also possible to define method fields which are calculated on-demand, when called.
-For example:
+Je také možné virtruální pole definovat jako metodu, která spočte hodnotu až když ji budeme opravdu potřebovat.
+Například:
 
 ``
 >>> db.item.discounted_total = Field.Method(lambda row, discount=0.0: \
        row.item.unit_price*row.item.quantity*(1.0-discount/100))
 ``:code
 
-In this case ``row.discounted_total`` is not a value but a function. The function takes the same arguments as the function passed to the ``Method`` constructor except for ``row`` which is implicit (think of it as ``self`` for rows objects).
+V tomto případě ``row.discounted_total`` není hodnota, ale funkce. Tato funkce má takové parametry, jaké jsme uvedli při definici, ale s výjimkou prvního parametru (row), který se při volání neuvádí a je předán implicitně (představme si jej jako obdobu pythonovského "self" pro row objekt virtuální metody).
 
-The lazy field in the example above allows one to compute the total price for each ``item``:
+Lazy pole (s odloženým vyčíslením) ve výše uvedeném příkladu dovoluje spočítat výslednou cenu každé položky ``item``:
 
 ``
 >>> for row in db(db.item).select(): print row.discounted_total()
 ``
 
-And it also allows to pass an optional ``discount`` percentage (15%):
+přičemž současně lze zadat volitelnou slevu jako argument ``discount``, např. 15%:
 
 ``
 >>> for row in db(db.item).select(): print row.discounted_total(15)
 ``
 
-Virtual and Method fields can also be defined in place when a table is defined:
+Virtuální pole Virtual a Method nemusíme definovat až dodatečně, ale můžeme je také definovat přímo jako součást definice tabulky:
 
 ``
 >>> db.define_table('item',
-        Field('unit_price','double'),
-        Field('quantity','integer'),
+        Field('unit_price', 'double'),
+        Field('quantity', 'integer'),
         Field.Virtual('total_price', lambda row: ...),
         Field.Method('discounted_total', lambda row, discount=0.0: ...))
 ``:code
 
 
 ------
-Mind that virtual fields do not have the same attributes as the other fields (default, readable, requires, etc).  In older versions of web2py they do not appear in the list of ``db.table.fields`` and they require a special approach to display in SQLFORM.grid and SQLFORM.smartgrid. See the discussion on grids and virtual fields in the Forms chapter.
+Pamatujte, že virtuální pole nemají stejné atributy jako ostatní pole (default, readable, requires, apod.). Ve starších verzích Web2py chyběly v seznamu ``db.table.fields``. Vyžadují zvláštní ošetření při použití v SQLFORM.grid a SQLFORM.smartgrid - více o gridu a virtuálních polích je diskutováno v kapitole o Formulářích.
 ------
 
 #### Old style virtual fields
