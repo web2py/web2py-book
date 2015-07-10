@@ -1562,7 +1562,7 @@ pracuje podobně jako
 id = db.mytable.insert(field='value')
 ``:code
 
-s tím rozdílem, že nejprve validuje zadaná pole a nevykoná insert(), jestliže validace selže. Jestliže validace selžou, problémy lze nalézt ve vráceném objektu v ``ret.error``. Jestliže validace projdou a záznam se uloží, přidělené id je v ``ret.id``. Vzhledem k tomu, že validace se provádí automaticky během logiky zpracování formuláře, není tato funkce běžně potřeba.
+s tím rozdílem, že nejprve validuje zadaná pole a nevykoná insert(), jestliže validace selže. Jestliže validace selžou, problémy lze nalézt ve vráceném objektu v ``ret.errors``. Jestliže validace projdou a záznam se uloží, přidělené id je v ``ret.id``. Vzhledem k tomu, že validace se provádí automaticky během logiky zpracování formuláře, není tato funkce běžně potřeba.
 
 Obdobně
 
@@ -1622,7 +1622,7 @@ Poznamenejme, že vypočtená hodnota je uložena v poli v databázi a nepočít
 
 Virtuální pole jsou rovněž počítaná pole, ale liší se tím, že jsou "virtuální" v tom smyslu, že ve skutečnosti neexistují v databázi. Jsou vypočtena vždy až v okamžiku, kdy je záznam získán z databáze. Mohou být použita ke zjednodušení kódu, který se záznamem pracuje, ale nelze podle nich (z pochopitelných důvodů) vyhledávat.
 
-#### Nový styl virtuálních polí
+#### Nová koncepce virtuálních polí
 
 Novější verze Web2py poskytují nový snadnější způsob definice virtuálních polí a virtuálních polí s odloženým vyčíslením (lazy virtual fields). Tuto sekci považujeme ještě za experimentální, protože API těchto virtuálních polí (příkazy pro práci s nimi) se ještě může změnit vůči popisu, který uvádíme zde.
 
@@ -1686,9 +1686,9 @@ Virtuální pole Virtual a Method nemusíme definovat až dodatečně, ale můž
 Pamatujte, že virtuální pole nemají stejné atributy jako ostatní pole (default, readable, requires, apod.). Ve starších verzích Web2py chyběly v seznamu ``db.table.fields``. Vyžadují zvláštní ošetření při použití v SQLFORM.grid a SQLFORM.smartgrid - více o gridu a virtuálních polích je diskutováno v kapitole o Formulářích.
 ------
 
-#### Old style virtual fields
+#### Stará koncepce virtuálních polí
 
-In order to define one or more virtual fields, you can also define a container class, instantiate it and link it to a table or to a select. For example, consider the following table:
+Pro definování jednoho nebo více virtuálních polí můžete rovněž definovat containerovou třídu, vytvořit její instanci a propojit ji s tabulkou nebo selectem. Například:
 
 ``
 >>> db.define_table('item',
@@ -1696,7 +1696,7 @@ In order to define one or more virtual fields, you can also define a container c
         Field('quantity','integer'),
 ``:code
 
-One can define a ``total_price`` virtual field as
+Definujeme virtuální pole ``total_price`` takto
 ``
 >>> class MyVirtualFields(object):
         def total_price(self):
@@ -1704,9 +1704,10 @@ One can define a ``total_price`` virtual field as
 >>> db.item.virtualfields.append(MyVirtualFields())
 ``:code
 
-Notice that each method of the class that takes a single argument (self) is a new virtual field. ``self`` refers to each one row of the select. Field values are referred by full path as in ``self.item.unit_price``. The table is linked to the virtual fields by appending an instance of the class to the table's ``virtualfields`` attribute.
 
-Virtual fields can also access recursive fields as in
+Každá metoda této třídy, která má jediný argument (self) představuje nové virtuální pole. ``self`` zde odkazuje na jednotlivý řádek selectu. Obsah polí je zde potřeba odkazovat plným jménem (včetně jména tabulky), např. ``self.item.unit_price``. Tabulku a virtuální pole vzájemně propojíme tak, že do atributu db.jmenotabulky.virtualfields provedeme .append() instance třídy, ve které virtuální pole definujeme.
+
+Virtuální pole mohou přistupovat i k rekurzivním polím jako je tomu v tomto příkladu:
 ``
 >>> db.define_table('item',
         Field('unit_price','double'))
@@ -1720,9 +1721,9 @@ Virtual fields can also access recursive fields as in
 >>> db.order_item.virtualfields.append(MyVirtualFields())
 ``:code
 
-Notice the recursive field access ``self.order_item.item.unit_price`` where ``self`` is the looping record.
+Všimněte si přístupu k rekurzivnímu poli ``self.order_item.item.unit_price``, kde ``self`` znamená záznam (row) v order_item.
 
-They can also act on the result of a JOIN
+S poněkud pozměněnou syntaxí mohou spolupracovat také s výsledkem JOINu:
 ``
 >>> db.define_table('item',
         Field('unit_price','double'))
@@ -1738,7 +1739,7 @@ They can also act on the result of a JOIN
 >>> for row in rows: print row.order_item.total_price
 ``:code
 
-Notice how in this case the syntax is different. The virtual field accesses both ``self.item.unit_price`` and ``self.order_item.quantity`` which belong to the join select. The virtual field is attached to the rows of the table using the ``setvirtualfields`` method of the rows object. This method takes an arbitrary number of named arguments and can be used to set multiple virtual fields, defined in multiple classes, and attach them to multiple tables:
+Všimněte si, v čem se syntaxe liší: Virtuální pole přistupuje k údajům původně z různých tabulek ``self.item.unit_price`` a ``self.order_item.quantity``, a sice do výsledného joinovaného selectu. K Rows objektu připojíme virtuální pole voláním jeho metody ``setvirtualfields``. Tato metoda může mít libovolný počet pojmenovaných argumentů, může tím vytvářet více virtuálních polí, definovaných v jedné nebo více třídách a připojovat je k různým tabulkám:
 ``
 >>> class MyVirtualFields1(object):
         def discounted_unit_price(self):
@@ -1757,7 +1758,7 @@ Notice how in this case the syntax is different. The virtual field accesses both
         print row.order_item.discounted_total_price
 ``:code
 
-Virtual fields can be ''lazy''; all they need to do is return a function and access it by calling the function:
+Virtuální pole mohou být ''lazy'' (s odloženým výpočtem); k tomu musí vracet funkci a musí se k nim přistupovat zavoláním funkce, jak ukazuje tento příklad:
 ``
 >>> db.define_table('item',
         Field('unit_price','double'),
@@ -1773,7 +1774,7 @@ Virtual fields can be ''lazy''; all they need to do is return a function and acc
         print item.lazy_total_price()
 ``:code
 
-or shorter using a lambda function:
+nebo stručněji, když funkci zkrátíme na lambda funkci:
 ``
 >>> class MyVirtualFields(object):
         def lazy_total_price(self):
@@ -1781,10 +1782,10 @@ or shorter using a lambda function:
                 * self.item.quantity
 ``:code
 
-### One to many relation
+### Relace 1:m (jedna ku mnoho)
 ``one to many``:inxx
 
-To illustrate how to implement one to many relations with the web2py DAL, define another table "thing" that refers to the table "person" which we redefine here:
+Abychom si ukázali, jak implementovat 1:m relaci pomocí DAL Web2py frameworku, definujte další tabulku "thing", která bude odkazovat na tabulku "person":
 ``
 >>> db.define_table('person',
                     Field('name'),
@@ -1795,32 +1796,32 @@ To illustrate how to implement one to many relations with the web2py DAL, define
                     format='%(name)s')
 ``:code
 
-Table "thing" has two fields, the name of the thing and the owner of the thing. The "owner_id" field id a reference field. A reference type can be specified in two equivalent ways:
+Tabulka "thing" má dvě pole, jméno věci a jejího vlastníka. "owner_id" je odkazující pole (cizí klíč). Typ "odkaz" můžeme popsat dvěma rovnocennými způsoby:
 
 ``
 Field('owner_id', 'reference person')
 Field('owner_id', db.person)
 ``:code
 
-The latter is always converted to the former. They are equivalent except in the case of lazy tables, self references or other types of cyclic references where the former notation is the only allowed notation.
+Později uvedená verze je vždy konvertována na první variantu. Druhá varianta je sice ekvivalentní, ale v některých případech ji nelze použít, a sice u lazy tabulek (vytvářených se zpožděním), odkazů klíče na stejnou tabulku (v níž se klíč sám nachází) a případu cyklických odkazů v datovém modelu, kdy nemůžeme zajistit, aby vždy byla cílová tabulka klíče už definovaná. V těchto případech je možné jen použití první varianty.
 
-When a field type is another table, it is intended that the field reference the other table by its id. In fact, you can print the actual type value and get:
+Jestliže je typem pole jiná tabulka, znamená to, že pole odkazuje na záznam jiné tabulky pomocí id. Můžete si zkusit vypsat typ pole a dostanete:
 ``
 >>> print db.thing.owner_id.type
 reference person
 ``:code
 
-Now, insert three things, two owned by Alex and one by Bob:
+Nyní přidejte 3 věci, dvě do vlastnictví Alexe a jednu Bobovi:
 ``
->>> db.thing.insert(name='Boat', owner_id=1)
+>>> db.thing.insert(name='člun', owner_id=1)
 1
->>> db.thing.insert(name='Chair', owner_id=1)
+>>> db.thing.insert(name='křeslo', owner_id=1)
 2
->>> db.thing.insert(name='Shoes', owner_id=2)
+>>> db.thing.insert(name='boty', owner_id=2)
 3
 ``:code
 
-You can select as you did for any other table:
+Pokud znáte klíč (id) záznamu, můžete vybírat obvyklým způsobem:
 ``
 >>> for row in db(db.thing.owner_id==1).select():
         print row.name
@@ -1828,7 +1829,7 @@ Boat
 Chair
 ``:code
 
-Because a thing has a reference to a person, a person can have many things, so a record of table person now acquires a new attribute thing, which is a Set, that defines the things of that person. This allows looping over all persons and fetching their things easily:
+Protože věc/thing má odkaz na osobu/person, osoba může mít více věcí. Row objekt záznamu z tabulky person nyní obsahuje nový atribut "thing", což je instance Set, která definuje věci této osoby. Můžeme tedy volat metody třídy Set, zejména metodu select(), která vybere osobě příslušné věci do objektu Rows:
 
 ``referencing``:inxx
 ``
@@ -1837,53 +1838,53 @@ Because a thing has a reference to a person, a person can have many things, so a
         for thing in person.thing.select():
             print '    ', thing.name
 Alex
-     Boat
-     Chair
+     člun
+     křeslo
 Bob
-     Shoes
+     boty
 Carl
 ``:code
 
-#### Inner joins
+#### Inner join (vnitřní join - vzájemné navázání tabulek)
 
-Another way to achieve a similar result is by using a join, specifically an INNER JOIN. web2py performs joins automatically and transparently when the query links two or more tables as in the following example:
+Jiná cesta, jak dosáhneme podobný výsledek, je použitím joinů, např. INNER JOINu. Web2py provede joiny automaticky, jestliže dotaz (query) spojuje dvě nebo více tabulek, jak ukazuje tento příklad:
 
 ``Rows``:inxx ``inner join``:inxx ``join``:inxx
 ``
 >>> rows = db(db.person.id==db.thing.owner_id).select()
 >>> for row in rows:
-        print row.person.name, 'has', row.thing.name
-Alex has Boat
-Alex has Chair
-Bob has Shoes
+        print row.person.name, 'má', row.thing.name
+Alex má člun
+Alex má křeslo
+Bob má boty
 ``:code
 
-Observe that web2py did a join, so the rows now contain two records, one from each table, linked together. Because the two records may have fields with conflicting names, you need to specify the table when extracting a field value from a row. This means that while before you could do:
+Web2py provedlo join, takže výsledný záznam (objekt Row) je nyní sestaven ze záznamů dvou tabulek, spojených do jednoho výsledného. Protože oba spojené záznamy mohou mít pole s konfliktními názvy, je potřeba při přístupu k polím výsledku zadávat i tabulku, z níž údaj pochází. Takže zatímco dřív jste mohli jednoduše napsat jen:
 ``
 row.name
 ``:code
 
-and it was obvious whether this was the name of a person or a thing, in the result of a join you have to be more explicit and say:
+a bylo jasné (dokud se vybíralo z jediné tabulky), zda se jedná o jméno osoby/person nebo věci/thing, při práci s výsledkem joinu to musíte explicitně určit:
 ``
 row.person.name
 ``:code
 
-or:
+nebo:
 ``
 row.thing.name
 ``:code
 
-There is an alternative syntax for INNER JOINS:
+Je tu ještě alternativní syntaxe pro INNER JOINy:
 ``
 >>> rows = db(db.person).select(join=db.thing.on(db.person.id==db.thing.owner_id))
 >>> for row in rows:
-    print row.person.name, 'has', row.thing.name
-Alex has Boat
-Alex has Chair
-Bob has Shoes
+    print row.person.name, 'má', row.thing.name
+Alex má člun
+Alex má křeslo
+Bob má boty
 ``:code
 
-While the output is the same, the generated SQL in the two cases can be different. The latter syntax removes possible ambiguities when the same table is joined twice and aliased:
+Ačkoli výstup je totožný, sestavený SQL příkaz se může mezi oběma případy lišit. Druhá verze syntaxe odstraňuje pochybnosti v případě, že stejné tabulky jsou propojeny (joinovány) 2x a k jejich používání je proto potřeba aliasů (náhradních jmen):
 
 ``
 >>> db.define_table('thing',
@@ -1895,11 +1896,11 @@ While the output is the same, the generated SQL in the two cases can be differen
           db.person.with_alias('owner_id2').on(db.person.id==db.thing.owner_id2)])
 ``
 
-The value of ``join`` can be list of ``db.table.on(...)`` to join.
+Hodnotou ``join`` parametru, jak vidíte, může být i seznam ``db.table.on(...)``, tedy joinů, které spojují tabulky v datovém modelu, a tedy i pro náš výběr.
 
-#### Left outer join
+#### Left outer join (levý vnější join)
 
-Notice that Carl did not appear in the list above because he has no things. If you intend to select on persons (whether they have things or not) and their things (if they have any), then you need to perform a LEFT OUTER JOIN. This is done using the argument "left" of the select command. Here is an example:
+Možná jste si ani nevšimli, že Carl se ve výstupu neobjevil. Je to proto, že nemá žádnou věc. Jestliže chcete vybírat osoby a získat je do výsledku bez ohledu na to, zda mají nějakou věc, potřebujete použít LEFT OUTER JOIN. V DAL to umožňuje argument "left" metody select(). Tady je příklad:
 
 ``Rows``:inxx ``left outer join``:inxx ``outer join``:inxx
 ``
@@ -1908,24 +1909,24 @@ Notice that Carl did not appear in the list above because he has no things. If y
         left=db.thing.on(db.person.id==db.thing.owner_id))
 >>> for row in rows:
         print row.person.name, 'has', row.thing.name
-Alex has Boat
-Alex has Chair
-Bob has Shoes
-Carl has None
+Alex má člun
+Alex má křeslo
+Bob má boty
+Carl má None
 ``:code
 
-where:
+kde:
 ``
 left = db.thing.on(...)
 ``:code
 
-does the left join query. Here the argument of ``db.thing.on`` is the condition required for the join (the same used above for the inner join). In the case of a left join, it is necessary to be explicit about which fields to select.
+definuje dotaz (query) pro left join. Argument metody ``db.thing.on`` je podmínka joinu (dotaz, query; stejná jako v předchozím případě inner joinu). Na rozdíl od Inner joinu, kde to nebylo potřeba, musíme být u Left joinu explicitní a uvést, která pole chceme vybrat (zde pomocí .jmenotabulky.ALL).
 
-Multiple left joins can be combined by passing a list or tuple of ``db.mytable.on(...)`` to the  ``left`` attribute.
+Více Left joinů můžete zkombinovat tak, že do atributu ``left`` předáte seznam (list) nebo vektor (tuple) výrazů ``db.mytable.on(...)``.
 
-#### Grouping and counting
+#### Seskupování a počítání
 
-When doing joins, sometimes you want to group rows according to certain criteria and count them. For example, count the number of things owned by every person. web2py allows this as well. First, you need a count operator. Second, you want to join the person table with the thing table by owner. Third, you want to select all rows (person + thing), group them by person, and count them while grouping:
+Když používáte joiny, chcete někdy seskupit záznamy podle určitých kritérií a spočítat je. Např. bychom chtěli spočítat počet věcí, které ta která osoba vlastní. First, you need a count operator. Second, you want to join the person table with the thing table by owner. Third, you want to select all rows (person + thing), group them by person, and count them while grouping:
 
 ``grouping``:inxx
 ``
