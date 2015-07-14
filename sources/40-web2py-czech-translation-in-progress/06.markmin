@@ -1926,7 +1926,7 @@ Více Left joinů můžete zkombinovat tak, že do atributu ``left`` předáte s
 
 #### Seskupování a počítání
 
-Když používáte joiny, chcete někdy seskupit záznamy podle určitých kritérií a spočítat je. Např. bychom chtěli spočítat počet věcí, které ta která osoba vlastní. First, you need a count operator. Second, you want to join the person table with the thing table by owner. Third, you want to select all rows (person + thing), group them by person, and count them while grouping:
+Když používáte joiny, chcete někdy seskupit záznamy podle určitých kritérií a spočítat je. Např. bychom chtěli spočítat počet věcí, které ta která osoba vlastní. Za prvé, potřebujete count operátor. Za druhé, potřebujete propojit (join) tabulku osob (person) a tabulku věcí (thing). Za třetí, chcete vybrat všechny řádky (jako kombinaci person + thing), seskupit je podle osoby (person), a během seksupování je spočítat:
 
 ``grouping``:inxx
 ``
@@ -1938,11 +1938,13 @@ Alex 2
 Bob 1
 ``:code
 
-Notice the ``count`` operator (which is built-in) is used as a field. The only issue here is in how to retrieve the information. Each row clearly contains a person and the count, but the count is not a field of a person nor is it a table. So where does it go? It goes into the storage object representing the record with a key equal to the query expression itself. The count method of the Field object has an optional ``distinct`` argument. When set to ``True`` it specifies that only distinct values of the field in question are to be counted.
+Všimněte si ``count`` operátoru, který se zde používá jako pole. Jediná těžkost tady je, jak přistupovat k vypočtenému počtu. Každý řádek totiž obsahuje osobu a jí odpovídající počet, ale count (počet) není pole tabulky person, a ani to není tabulka. Takže kam se výsledný počet uloží? Do Row obkejtu (což, jak jsme si řekli, je storage objekt, neboli objekt podobný slovníku (dictionary), který obsahuje jeden záznam). Klíčem je samotný výraz operátoru count.
 
-### Many to many
+ The count method of the Field object has an optional ``distinct`` argument. Je-li ``True``, budou spočítány jen unikátní hodnoty pole ((?? jedná se o pole seskupení - name ??)).
+
+### m:n - mnoho ku mnoho
 ``many-to-many``:inxx
-In the previous examples, we allowed a thing to have one owner but one person could have many things. What if Boat was owned by Alex and Curt? This requires a many-to-many relation, and it is realized via an intermediate table that links a person to a thing via an ownership relation.
+V předchozím případě jsme umožnili, aby věc měla jediného vlastníka (zatímco vlastník mohl mít více věcí). Co když ve skutečnosti může být vlastnictví společné, např. člun může vlastnit Alex s Curtem dohromady? Budeme potřebovat relaci (vazbu) mnoho:mnoho, kterou vytvoříme pomocí vložené mezitabulky, která propojí osoby (person) a věci (thing), obsahuje odkazy na záznamy obou těchto tabulek, a má tedy význam vlastnictví (ownership).
 
 Here is how to do it:
 ``
@@ -1955,28 +1957,28 @@ Here is how to do it:
                     Field('thing', 'reference thing'))
 ``:code
 
-the existing ownership relationship can now be rewritten as:
+Zatím existující vlastnictví tedy můžeme do nově přidané vazební tabulky uložit takto:
 ``
->>> db.ownership.insert(person=1, thing=1) # Alex owns Boat
->>> db.ownership.insert(person=1, thing=2) # Alex owns Chair
->>> db.ownership.insert(person=2, thing=3) # Bob owns Shoes
+>>> db.ownership.insert(person=1, thing=1) # Alex vlastní člun
+>>> db.ownership.insert(person=1, thing=2) # Alex vlastní křeslo
+>>> db.ownership.insert(person=2, thing=3) # Bob vlastní boty
 
 ``:code
 
-Now you can add the new relation that Curt co-owns Boat:
+a pak přidáme Curtovo spoluvlastnictví člunu:
 ``
->>> db.ownership.insert(person=3, thing=1) # Curt owns Boat too
+>>> db.ownership.insert(person=3, thing=1) # Curt vlastní (tentýž) člun
 
 ``:code
 
-Because you now have a three-way relation between tables, it may be convenient to define a new set on which to perform operations:
+Můžeme si definovat nový Set, nad nímž budeme provádět operace:
 ``
 >>> persons_and_things = db(
         (db.person.id==db.ownership.person) \
         & (db.thing.id==db.ownership.thing))
 ``:code
 
-Now it is easy to select all persons and their things from the new Set:
+S pomocí tohoto nového Setu bude snadné vybrat všechny osoby s věcmi, které vlastní:
 ``
 >>> for row in persons_and_things.select():
         print row.person.name, row.thing.name
@@ -1986,15 +1988,15 @@ Bob Shoes
 Curt Boat
 ``:code
 
-Similarly, you can search for all things owned by Alex:
+Nebo můžeme snadno vybrat předměty, které vlastní Alex:
 ``
 >>> for row in persons_and_things(db.person.name=='Alex').select():
         print row.thing.name
-Boat
-Chair
+člun
+křeslo
 ``:code
 
-and all owners of Boat:
+nebo všechny vlastníky člunu:
 ``
 >>> for row in persons_and_things(db.thing.name=='Boat').select():
         print row.person.name
@@ -2002,9 +2004,9 @@ Alex
 Curt
 ``:code
 
-A lighter alternative to Many 2 Many relations is tagging. Tagging is discussed in the context of the ``IS_IN_DB`` validator. Tagging works even on database backends that do not support JOINs like the Google App Engine NoSQL.
+Méně náročnou alternativou m:n relace je tagging (značkování). Tagging probereme v souvislosti s ``IS_IN_DB`` validátorem. Tagging bude pracovat i nad databázovými back-endy, které nepodporují JOINy, jako je např. Google App Engine NoSQL.
 
-### ``list:<type>``, and ``contains``
+### ``list:<type>`` a ``contains``
 ``list:string``:inxx
 ``list:integer``:inxx
 ``list:reference``:inxx
@@ -2012,7 +2014,7 @@ A lighter alternative to Many 2 Many relations is tagging. Tagging is discussed 
 ``multiple``:inxx
 ``tags``:inxx
 
-web2py provides the following special field types:
+Web2py poskytuje tyto speciální typy polí:
 
 ``
 list:string
@@ -2020,70 +2022,70 @@ list:integer
 list:reference <table>
 ``:code
 
-They can contain lists of strings, of integers and of references respectively.
+Mohou obsahovat seznam (list) řetězců (strings), celých čísel (integers) nebo odkazů (references).
 
-On Google App Engine NoSQL ``list:string`` is mapped into ``StringListProperty``, the other two are mapped into ``ListProperty(int)``. On relational databases they all mapped into text fields which contain the list of items separated by ``|``. For example ``[1,2,3]`` is mapped into ``|1|2|3|``.
+Na Google App Engine NoSQL ``list:string`` bude mapován na ``StringListProperty`` a ostatní dva na ``ListProperty(int)``. Na relačních databázích budou všechna tato pole mapována do pole text a seznam (list) v poli text bude tvořen prvky, oddělenými pomocí ``|``. Například ``[1,2,3]`` bude uloženo v poli text jako ``|1|2|3|``.
 
-For lists of string the items are escaped so that any ``|`` in the item is replaced by a ``||``. Anyway this is an internal representation and it is transparent to the user.
+V případě seznamu řetězců (list of strings) jsou položky escapovány (ošetřeny na výskyt problematických znaků), takže každý znak ``|`` v položce je nahrazen pomocí ``||``. To je ale jen interní reprezentace a obsah pro uživatele zůstává stejný.
 
-You can use ``list:string``, for example, in the following way:
+Pole typu ``list:string`` můžete použít například takto:
 
 ``
 >>> db.define_table('product',
         Field('name'),
         Field('colors','list:string'))
->>> db.product.colors.requires=IS_IN_SET(('red','blue','green'))
->>> db.product.insert(name='Toy Car',colors=['red','green'])
->>> products = db(db.product.colors.contains('red')).select()
+>>> db.product.colors.requires = IS_IN_SET(('červená', 'modrá', 'zelená'))
+>>> db.product.insert(name='hračka',colors=['červená', 'zelená'])
+>>> products = db(db.product.colors.contains('červená')).select()
 >>> for item in products:
         print item.name, item.colors
-Toy Car ['red', 'green']
+hračka ['červená', 'zelená']
 ``:code
 
-``list:integer`` works in the same way but the items must be integers.
+Podobně se chová pole ``list:integer``, ale jeho prvky musí být celá čísla (integers).
 
-As usual the requirements are enforced at the level of forms, not at the level of ``insert``.
+Tyto požadavky (requires=..) jsou zajišťovány (validovány) na úrovni formulářů a nikoli na úrovni ``insert``-u.
 
 ------
-For ``list:<type>`` fields the ``contains(value)`` operator maps into a non trivial query that checks for lists containing the ``value``.  The ``contains`` operator also works for regular ``string`` and ``text`` fields and it maps into a ``LIKE '%value%'``.
+Pro pole ``list:<type>`` operátor ``contains(value)`` je mapován na složitější dotaz (query), který hledá seznam, obsahující požadovanou hodnotu ``value``. Operátor ``contains`` můžete ale použít i pro normální ``string`` a ``text`` pole, kde je mapován na SQL frázi ``LIKE '%value%'``.
 ------
 
-The ``list:reference`` and the ``contains(value)`` operator are particularly useful to de-normalize many-to-many relations. Here is an example:
+Pole typu ``list:reference`` a operátor ``contains(value)`` mohou být prospěšné při denormalizaci m:n (mnoho:mnoho) relace. Tady je příklad:
 
 ``
->>> db.define_table('tag',Field('name'),format='%(name)s')
+>>> db.define_table('tag', Field('name'), format='%(name)s')
 >>> db.define_table('product',
         Field('name'),
-        Field('tags','list:reference tag'))
->>> a = db.tag.insert(name='red')
->>> b = db.tag.insert(name='green')
->>> c = db.tag.insert(name='blue')
->>> db.product.insert(name='Toy Car',tags=[a, b, c])
+        Field('tags', 'list:reference tag'))
+>>> a = db.tag.insert(name='červená')
+>>> b = db.tag.insert(name='zelená')
+>>> c = db.tag.insert(name='modrá')
+>>> db.product.insert(name='hračka', tags=[a, b, c])
 >>> products = db(db.product.tags.contains(b)).select()
 >>> for item in products:
         print item.name, item.tags
-Toy Car [1, 2, 3]
+hračka [1, 2, 3]
 >>> for item in products:
         print item.name, db.product.tags.represent(item.tags)
-Toy Car red, green, blue
+hračka červená, zelená, modrá
 ``:code
 
-Notice that a ``list:reference tag`` field get a default constraint
+Všimněme si, že pole ``list:reference tag`` dostalo defaultní omezení (constraint):
 
 ``
-requires = IS_IN_DB(db,'tag.id',db.tag._format,multiple=True)
+requires = IS_IN_DB(db, 'tag.id', db.tag._format, multiple=True)
 ``:code
 
-that produces a ``SELECT/OPTION`` multiple drop-box in forms.
+což vytvoří ve formulářích ``SELECT/OPTION`` drop-box s možností výběru více položek.
 
-Also notice that this field gets a default ``represent`` attribute which represents the list of references as a comma-separated list of formatted references. This is used in read forms and ``SQLTABLE``s.
+Také si všimněte, že toto pole dostalo defaultní atribut ``represent``, který vytvoří čárkami oddělený seznam formátovaných odkazů. To se použije v readonly (jen pro čtení) výpisech, jaké provádí např. ``SQLTABLE``.
 
 -----
-While ``list:reference`` has a default validator and a default representation, ``list:integer`` and ``list:string`` do not. So these two need an ``IS_IN_SET`` or an ``IS_IN_DB`` validator if you want to use them in forms.
+Zatímco ``list:reference`` má defaultní validátor a reprezentaci, pole typu ``list:integer`` a ``list:string`` ji stanovenu nemají. Takže pokud chcete tato pole použít ve formulářích, je potřeba jim pomocí requires=.. přiřadit ``IS_IN_SET`` nebo ``IS_IN_DB`` validátor.
 -----
 
 
-### Other operators
+### Další operátory
 
 web2py has other operators that provide an API to access equivalent SQL operators.
 Let's define another table "log" to store security events, their event_time and severity, where the severity is an integer number.
