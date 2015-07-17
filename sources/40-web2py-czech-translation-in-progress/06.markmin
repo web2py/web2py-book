@@ -1938,9 +1938,11 @@ Alex 2
 Bob 1
 ``:code
 
-Všimněte si ``count`` operátoru, který se zde používá jako pole. Jediná těžkost tady je, jak přistupovat k vypočtenému počtu. Každý řádek totiž obsahuje osobu a jí odpovídající počet, ale count (počet) není pole tabulky person, a ani to není tabulka. Takže kam se výsledný počet uloží? Do Row obkejtu (což, jak jsme si řekli, je storage objekt, neboli objekt podobný slovníku (dictionary), který obsahuje jeden záznam). Klíčem je samotný výraz operátoru count.
+Všimněte si ``count`` operátoru, který se zde používá jako pole. Jediná těžkost tady je, jak přistupovat k vypočtenému počtu. Každý řádek totiž obsahuje osobu a jí odpovídající počet, ale count (počet) není pole tabulky person, a ani to není tabulka. Takže kam se výsledný počet uloží? Do Row objektu (což, jak jsme si řekli, je storage objekt, neboli objekt podobný slovníku (dictionary), který obsahuje jeden záznam). Klíčem je proměnná count.
 
- The count method of the Field object has an optional ``distinct`` argument. Je-li ``True``, budou spočítány jen unikátní hodnoty pole ((?? jedná se o pole seskupení - name ??)).
+Technicky je do Row objektu vložen další Row objekt s klíčem '_extra'. ``row[count]`` funguje jako zkratka, ale zrovna tak se k počtu dostanete i jinak: row[str(count)], row['COUNT(person.id)'], row._extra[count], row._extra[str(count)], row._extra['COUNT(person.id)']. Místo row._extra také lze psát row['_extra'].
+
+Metoda ``count`` objektu pole (Field) má nepovinný argument ``distinct``. Je-li ``True``, budou spočítány jen unikátní hodnoty pole.
 
 ### m:n - mnoho ku mnoho
 ``many-to-many``:inxx
@@ -2087,8 +2089,8 @@ Zatímco ``list:reference`` má defaultní validátor a reprezentaci, pole typu 
 
 ### Další operátory
 
-web2py has other operators that provide an API to access equivalent SQL operators.
-Let's define another table "log" to store security events, their event_time and severity, where the severity is an integer number.
+Web2py má další operátory pro používání obdobných operátorů SQL jazyka.
+Dejme tomu, že budeme mít jinou tabulku "log" pro zaznamenávání událostí, důležitých z hlediska bezpečnosti, času jejich vzniku (event_time) a závažnosti (severity), kterou ohodnotíme pomocí integer čísla.
 
 ``date``:inxx ``datetime``:inxx ``time``:inxx
 ``
@@ -2097,8 +2099,8 @@ Let's define another table "log" to store security events, their event_time and 
                            Field('severity', 'integer'))
 ``:code
 
-As before, insert a few events, a "port scan", an "xss injection" and an "unauthorized login".
-For the sake of the example, you can log events with the same event_time but with different severities (1, 2, and 3 respectively).
+Stejně jako minule, vložme několik událostí.
+Pro náš příklad nevadí, když budou mít stejný čas. Dáme jim ale odlišnou závažnost.
 ``
 >>> import datetime
 >>> now = datetime.datetime.now()
@@ -2118,7 +2120,7 @@ For the sake of the example, you can log events with the same event_time but wit
 ``like``:inxx ``startswith``:inxx ``regexp``:inxx
 ``contains``:inxx ``upper``:inxx ``lower``:inxx
 
-Fields have a like operator that you can use to match strings:
+Pole mají operátor ``like``, který lze použít ke zjišťování shody řetězců:
 
 ``
 >>> for row in db(db.log.event.like('port%')).select():
@@ -2126,44 +2128,44 @@ Fields have a like operator that you can use to match strings:
 port scan
 ``:code
 
-Here "port%" indicates a string starting with "port". The percent sign character, "%", is a wild-card character that means "any sequence of characters".
+"port%" znamená řetězec, který začíná znaky "port". "%" je zástupný znak (wild-card) s významem jakékoli (jakkoli dlouhé) posloupnosti znaků.
 
-The like operator is case-insensitive but it can be made case-sensitive with
+Operátor ``like`` nerespektuje velikost znaků (není case-sensitive), ale můžete říci, že velikost znaků má respektovat:
 
 ``
-db.mytable.myfield.like('value',case_sensitive=True)
+db.mojetabulka.mojepole.like('value', case_sensitive=True)
 ``:code
 
 
-web2py also provides some shortcuts:
+Ve Web2py máte také k dispozici tyto zkratky:
 
 ``
-db.mytable.myfield.startswith('value')
-db.mytable.myfield.contains('value')
+db.mojetabulka.mojepole.startswith('value')
+db.mojetabulka.mojepole.contains('value')
 ``:code
 
-which are equivalent respectively to
+které jsou ekvivalentní tomuto zadání:
 
 ``
-db.mytable.myfield.like('value%')
-db.mytable.myfield.like('%value%')
+db.mojetabulka.mojepole.like('value%')
+db.mojetabulka.mojepole.like('%value%')
 ``:code
 
-Notice that ``contains`` has a special meaning for ``list:<type>`` fields and it was discussed in a previous section.
+Připomeňme si, že ``contains`` má speciální význam pro pole typu ``list:<type>``, což jsme probrali v předchozím oddíle.
 
-The ``contains`` method can also be passed a list of values and an optional boolean argument ``all`` to search for records that contain all values:
+Metodu ``contains`` lze také volat se seznamem (list) hodnot a volitelným argumentem ``all``. Pak najde záznamy, kde pole mojepole obsahuje všechny zadané hodnoty současně:
 
 ``
-db.mytable.myfield.contains(['value1','value2'], all=True)
+db.mojetabulka.mojepole.contains(['hodnota1', 'hodnota2'], all=True)
 ``
-or any value from the list
+nebo které obsahují kteroukoli hodnotu ze seznamu:
 ``
-db.mytable.myfield.contains(['value1','value2'], all=false)
+db.mojetabulka.mojepole.contains(['hodnota1', 'hodnota2'], all=false)
 ``
 
-There is a also a ``regexp`` method that works like the ``like`` method but allows regular expression syntax for the look-up expression. It is only supported by PostgreSQL and SQLite.
+K dispozici je také metoda ``regexp``, která pracuje podobně jako ``like`` metoda, ale povoluje pro hledaný výraz syntaxi regulárních výrazů. Lze ji použít pouze u PostgreSQL a u SQLite.
 
-The ``upper`` and ``lower`` methods allow you to convert the value of the field to upper or lower case, and you can also combine them with the like operator:
+Metody ``upper`` a ``lower`` umožňují převést obsah pole na velká, resp. malá písmena. Můžete je kombinovat s metodou ``like``:
 
 ``upper``:inxx ``lower``:inxx
 ``
@@ -2175,7 +2177,7 @@ port scan
 #### ``year``, ``month``, ``day``, ``hour``, ``minutes``, ``seconds``
 ``hour``:inxx ``minutes``:inxx ``seconds``:inxx ``day``:inxx ``month``:inxx ``year``:inxx
 
-The date and datetime fields have day, month and year methods. The datetime and time fields have hour, minutes and seconds methods. Here is an example:
+Pole typů date a datetime mají metody day, month a year, datetime má navíc hour, minutes a seconds (obě poslední poněkud nesystematicky v množném čísle). Příklad je tady:
 
 ``
 >>> for row in db(db.log.event_time.year()==2013).select():
@@ -2187,7 +2189,7 @@ unauthorized login
 
 #### ``belongs``
 
-The SQL IN operator is realized via the belongs method which returns true when the field value belongs to the specified set (list or tuples):
+SQL IN operátor můžeme vyvolat pomocí metody ``belongs``, která vrátí True, jestliže je hodnota pole uvedena v zadané sekvenci (seznamu (list) nebo vektoru (tuple)):
 
 ``belongs``:inxx
 ``
@@ -2197,19 +2199,21 @@ port scan
 xss injection
 ``:code
 
-The DAL also allows a nested select as the argument of the belongs operator. The only caveat is that the nested select has to be a ``_select``, not a ``select``, and only one field has to be selected explicitly, the one that defines the set.
+Jako argument metody ``belongs`` DAL umožňuje také vnořený select. Ten ale musí být přejmenován na ``_select`` a musí vracet jediné pole, které určí množinu povolených hodnot:
 
 ``nested select``:inxx
 ``
->>> bad_days = db(db.log.severity==3)._select(db.log.event_time)
->>> for row in db(db.log.event_time.belongs(bad_days)).select():
+>>> mizerna_doba = db(db.log.severity==3)._select(db.log.event_time)
+>>> for row in db(db.log.event_time.belongs(mizerna_doba)).select():
         print row.event
 port scan
 xss injection
 unauthorized login
 ``:code
 
-In those cases where a nested select is required and the look-up field is a reference we can also use a query as argument. For example:
+Výsledek není právě ilustrativní, protože jsme zkušební data naplnili stejným časem události. Vypsali jsme ale všechny události, ke kterým došlo ve stejné vteřině jako k nějaké události se závažností 3.
+
+Tam, kde je potřeba vnořený select a kde pole, v němž hledáme je odkaz do jiné tabulky (reference; cizí klíč), můžeme také jako rgument použít dotaz (query). Například:
 
 ``
 db.define_table('person', Field('name'))
@@ -2217,30 +2221,32 @@ db.define_table('thing', Field('name'), Field('owner_id', 'reference thing'))
 db(db.thing.owner_id.belongs(db.person.name=='Jonathan')).select()
 ``:code
 
-In this case it is obvious that the next select only needs the field referenced by the ``db.thing.owner_id`` field so we do not need the more verbose ``_select`` notation.
+Zde se využívá toho, že je zřejmé, že vnořený select musí vracet pole odkazované cizím klíčem ``db.thing.owner_id``, takže není potřeba toto zadávat pomocí podrobnější notace se ``_select``.
 
 ``nested_select``:inxx
 
-A nested select can also be used as insert/update value but in this case the syntax is different:
+Vnořený select se dá použít také pro případ vložení nebo aktualizace hodnoty, v takovém případě se ale používá odlišná syntaxe:
 
 ``
 lazy = db(db.person.name=='Jonathan').nested_select(db.person.id)
 db(db.thing.id==1).update(owner_id = lazy)
 ``:code
 
-In this case ``lazy`` is a nested expression that computes the ``id`` of person "Jonathan". The two lines result in one single SQL query.
+V tomto případě je ``lazy`` vnořený výraz pro určení ``id`` osoby "Jonathan". Obě řádky sestaví dohromady jediný SQL příkaz. (Pojmenování ``lazy`` je tedy zvoleno podle odloženého vyhodnocení.)
 
 #### ``sum``, ``avg``, ``min``, ``max`` and ``len``
 
 ``sum``:inxx ``avg``:inxx ``min``:inxx ``max``:inxx
-Previously, you have used the count operator to count records. Similarly, you can use the sum operator to add (sum) the values of a specific field from a group of records. As in the case of count, the result of a sum is retrieved via the store object:
+Dříve jsme si popsali, jak použít operátor ``count`` ke spočítání záznamů. Podobně můžete použít operátor ``sum`` k sečtení hodnot číselného pole pro skupinu záznamů. Podobně jako u count získáme výsledek z Row objektu (což je, připomeňme si, vlastně slovník (dictionary) s rozšířenými vlastnostmi), kde klíč bude proměnná (sum):
 ``
 >>> sum = db.log.severity.sum()
 >>> print db().select(sum).first()[sum]
 6
 ``:code
 
-You can also use ``avg``, ``min``, and ``max`` to the average, minimum, and maximum value respectively for the selected records. For example:
+db().select(sum) provede agregaci a vrátí ji jako Rows objekt (podobný seznamu). Metoda first() z tohoto seznamu vrátí první (v tomto případě jediný) záznam (Row objekt). V něm je jako prvek row._extra (nebo chcete-li row['_extra']) vnořen další Row objekt se samotným výsledkem agregace. Tento implementační detail ale není důležitý - výsledek sčítání získáte zkratkou row[sum].
+
+Podobně můžete použít ``avg``, ``min`` a ``max`` k získání průměru, nejmenší a největší hodnoty pole ve výsledných záznamech. Například:
 
 ``
 >>> max = db.log.severity.max()
@@ -2248,32 +2254,34 @@ You can also use ``avg``, ``min``, and ``max`` to the average, minimum, and maxi
 3
 ``:code
 
-``.len()`` computes the length of a string, text or boolean fields.
+Poznamenejme ještě, že zatímco count vrátí správně 0, sum, avg, min a max mohou vracet None, pokud je nulový počet výsledných záznamů.
 
-Expressions can be combined to form more complex expressions. For example here we are computing the sum of the length of all the severity strings in the logs, increased of one:
+Metoda ``len`` spočítá délku údaje po jeho převodu na řetězec (str(..)).
+
+Výrazy lze kombinovat do složitějších. Například zde spočítáme délku (počet znaků) všech čísel v poli severity, a chceme-li to např. vědět pro jejich vypsání za sebe, přidáme +1 pro mezeru mezi čísly:
 
 ``
 >>> sum = (db.log.severity.len()+1).sum()
 >>> print db().select(sum).first()[sum]
 ``:code
 
-#### Substrings
+#### Podřetězce
 
-One can build an expression to refer to a substring. For example, we can group things whose name starts with the same three characters and select only one from each group:
+Můžeme psát výrazy, které znamenají podřetězec (substring). Například můžete seskupit věci, jejichž jméno začíná stejnými třemi znaky a vybrat jen jednu takovou věc ze skupiny:
 
 ``
 db(db.thing).select(distinct = db.thing.name[:3])
 ``:code
 
 
-#### Default values with ``coalesce`` and ``coalesce_zero``
+#### Defaultní hodnoty při ``coalesce`` a ``coalesce_zero``
 
-There are times when you need to pull a value from database but also need a default values if the value for a record is set to NULL. In SQL there is a keyword, ``COALESCE``, for this. web2py has an equivalent ``coalesce`` method:
+Někdy potřebujete získat hodnotu z databáze, ale zároveň použít default, je-li v databázi hodnota NULL. SQL má pro tento případ příkaz ``COALESCE``. Web2py podobně nabízí metodu ``coalesce``:
 
 ``
->>> db.define_table('sysuser',Field('username'),Field('fullname'))
->>> db.sysuser.insert(username='max',fullname='Max Power')
->>> db.sysuser.insert(username='tim',fullname=None)
+>>> db.define_table('sysuser', Field('username'), Field('fullname'))
+>>> db.sysuser.insert(username='max', fullname='Max Power')
+>>> db.sysuser.insert(username='tim', fullname=None)
 print db(db.sysuser).select(db.sysuser.fullname.coalesce(db.sysuser.username))
 "COALESCE(sysuser.fullname,sysuser.username)"
 Max Power
