@@ -2404,14 +2404,11 @@ Soubor neobsahuje uploadované soubory, pokud nebyly uloženy přímo do databá
 
 Když importujete a databáze není prázdná, nové záznamy budou do tabulek přidány. Záznamy obecně nebudou mít totéž id v databázi jako měly v csv souboru. Nicméně Web2py obnoví odkazy (cizí klíče), takže vazby (relace) mezi záznamy nebudou porušeny, bez ohledu na změny id.
 
-If a table contains a field called
-"uuid", this field will be used to identify duplicates.  Also, if an
-imported record has the same "uuid" as an existing record, the
-previous record will be updated.
+Obsahuje-li tabulka pole se jménem "uuid", bude použito pro určení duplicit. Jestliže má importovaný záznam stejné "uuid" jako existující, bude ((?? předchozí ??)) záznam aktualizován.
 
-#### CSV and remote database synchronization
+#### CSV synchronizace vzdálených databází
 
-Consider the following model:
+Uvažujme následuující model:
 ``
 db = DAL('sqlite:memory:')
 db.define_table('person',
@@ -2427,20 +2424,17 @@ if not db(db.person).count():
     db.thing.insert(owner_id=id, name="Chair")
 ``:code
 
-Each record is identified by an ID and referenced by that ID. If you
-have two copies of the database used by distinct web2py installations,
-the ID is unique only within each database and not across the databases.
-This is a problem when merging records from different databases.
+Každý záznam je identifikován pomocí ID a záznamy jiných tabulek na něj mohou pomocí tohoto ID odkazovat. Jestliže máte dvě kopie databáze, které používají dvě různé instalace Web2py, je ID unikátní jen uvnitř jednotlivé databáze a nikoli mezi oběma databázemi.
+Pak vzniká problém při slučování (merging) záznamů z různých databází.
 
-In order to make a record uniquely identifiable across databases, they
-must:
-- have a unique id (UUID),
-- have an event_time (to figure out which one is more recent if multiple copies),
-- reference the UUID instead of the id.
+Abychom záznam změnili na unikátně identifikovatelný mezi více databázemi, musí:
+- mít unikátní id (UUID),
+- mít event_time (abychom se mohli rozhodnout, která kopie je mezi více kopiemi nejaktuálnější),
+- odkazovat na UUID místo na id.
 
-This can be achieved without modifying web2py. Here is what to do:
+Tento režim lze zavést bez úpravy Web2py frameworku, a sice takto:
 
-Change the above model into:
+Změňte předešlý model:
 
 ``
 db.define_table('person',
@@ -2456,7 +2450,7 @@ db.define_table('thing',
     Field('name'),
     format='%(name)s')
 
-db.thing.owner_id.requires = IS_IN_DB(db,'person.uuid','%(name)s')
+db.thing.owner_id.requires = IS_IN_DB(db, 'person.uuid', '%(name)s')
 
 if not db(db.person.id).count():
     id = uuid.uuid4()
@@ -2465,10 +2459,10 @@ if not db(db.person.id).count():
 ``:code
 
 -------
-Notice that in the above table definitions, the default value for the two ``uuid`` fields is set to a lambda function, which returns a UUID (converted to a string). The lambda function is called once for each record inserted, ensuring that each record gets a unique UUID, even if multiple records are inserted in a single transaction.
+Všimněte si, že v předchozích definicích tabulek je defaultní hodnota pro obě ``uuid`` pole zadána pomocí lambda funkce, která vrátí UUID, zkonvertované na řetězec. lambda funkce se zavolá jedenkrát pro kterýkoli vložený záznam a zajistí, že každý záznam dostane unikátní UUID.
 -------
 
-Create a controller action to export the database:
+Vytvořme akci (funkci) controlleru pro export databáze:
 
 ``
 def export():
@@ -2478,7 +2472,7 @@ def export():
     return s.getvalue()
 ``:code
 
-Create a controller action to import a saved copy of the other database and sync records:
+Vytvořme akci controlleru pro import uložené kopie druhé databáze a synchronizaci záznamů:
 
 ``
 def import_and_sync():
@@ -2498,18 +2492,18 @@ def import_and_sync():
     return dict(form=form)
 ``:code
 
-Optionally you should create an index manually to make the search by uuid faster.
+Eventuálně je vhodné ručně vytvořit index podle uuid, aby hledání uuid probíhalo rychleji.
 
 
 ``XML-RPC``:inxx
-Alternatively, you can use XML-RPC to export/import the file.
+Pro export/import souboru můžete také použít XML-RPC.
 
-If the records reference uploaded files, you also need to export/import the content of the uploads folder. Notice that files therein are already labeled by UUIDs so you do not need to worry about naming conflicts and references.
+Jestliže záznamy odkazují na uploadované soubory, potřebujete ještě exportovat/importovat obsah adresáře uploads. Soubory v uploads adresáři jsou už označeny pomocí UUID, takže se nemusíte obávat konfliktů a poruch odkazů při slučování databází.
 
-#### HTML and XML (one Table at a time)
+#### HTML a XML (jednotlivá tabulka)
 
 ``Rows objects``:inxx
-Rows objects also have an ``xml`` method (like helpers) that serializes it to XML/HTML:
+Rows objekty mají také metodu ``xml`` (stejně jako HTML helpers), která je serializuje na XML/HTML:
 
 ``HTML``:inxx
 
@@ -2540,7 +2534,7 @@ Rows objects also have an ``xml`` method (like helpers) that serializes it to XM
 ``:code
 
 ``Rows custom tags``:inxx
-If you need to serialize the Rows in any other XML format with custom tags, you can easily do that using the universal TAG helper and the * notation:
+Pokud potřebujete serializovat Rows do jakéhokoli jiného XML formátu s proprietárními tagy, můžete využít univerzální helper TAG a notaci pro sekvenci s *:
 ``XML``:inxx
 
 ``
@@ -2556,20 +2550,20 @@ If you need to serialize the Rows in any other XML format with custom tags, you 
 </result>
 ``:code
 
-#### Data representation
+#### Representace exportovaných dat
 
 ``export_to_csv_file``:inxx
-The ``export_to_csv_file`` function accepts a keyword argument named ``represent``. When ``True`` it will use the columns ``represent`` function while exporting the data instead of the raw data.
+Funkce ``export_to_csv_file`` má pojmenovaný parametr ``represent``. Nastavíte-li jej na ``True``, použije se výsledek ``represent`` funkce příslušných polí místo údaje přímo z databáze.
 
 ``colnames``:inxx
-The function also accepts a keyword argument named ``colnames`` that should contain a list of column names one wish to export. It defaults to all columns.
+Pomocí pojmenovaného parametru ``colnames`` lze také zadat výčet polí, které si přejeme exportovat. Defaultně se exportují všechny sloupce.
 
-Both ``export_to_csv_file`` and ``import_from_csv_file`` accept keyword arguments that tell the csv parser the format to save/load the files:
-- ``delimiter``: delimiter to separate values (default ',')
-- ``quotechar``: character to use to quote string values (default to double quotes)
-- ``quoting``: quote system (default ``csv.QUOTE_MINIMAL``)
+Obě funkce ``export_to_csv_file`` a ``import_from_csv_file`` mají další parametry, kterými lze ovlivnit strukturu csv souboru:
+- ``delimiter``: oddělovač jednotlivých údajů (defaultně ',')
+- ``quotechar``: omezovač řetězců (defaultně "..")
+- ``quoting``: systém použití omezovačů (default ``csv.QUOTE_MINIMAL``)
 
-Here is some example usage:
+Tady je příklad:
 ``
 >>> import csv
 >>> rows = db(query).select()
@@ -2579,18 +2573,18 @@ Here is some example usage:
         quoting=csv.QUOTE_NONNUMERIC)
 ``:code
 
-Which would render something similar to
+Výsledek bude vypadat nějak takto
 ``
-"hello"|35|"this is the text description"|"2013-03-03"
+"nazdar"|35|"nějký podrobný popis"|"2013-03-03"
 ``:code
 
-For more information consult the official Python documentation ``quoteall``:cite
+Pro podrobnější informace se podívejte do oficiální dokumentace Pythonu. ``quoteall``:cite
 
-### Caching selects
+### Kešování selectu (caching)
 
-The select method also takes a cache argument, which defaults to None. For caching purposes, it should be set to a tuple where the first element is the cache model (cache.ram, cache.disk, etc.), and the second element is the expiration time in seconds.
+Metoda select má také parametr cache, s defaultní hodnotou None. Chceme-li výsledky cacheovat (opakovat nedávný výsledek bez dalšího dotazu do databáze), nastavíme tento argument na vektor (tuple), jehož prvním prvkem bude kešovací mechanismus (cache.ram, cache.disk, apod.) a druhým prvkem doba platnosti keše v sekundách.
 
-In the following example, you see a controller that caches a select on the previously defined db.log table. The actual select fetches data from the back-end database no more frequently than once every 60 seconds and stores the result in cache.ram. If the next call to this controller occurs in less than 60 seconds since the last database IO, it simply fetches the previous data from cache.ram.
+V následujícím příkladu vidíte controller, který kešuje výběr záznamů z výše definované tabulky db.log. Skutečné výsledky se z databáze přenášejí nejčastěji jednou za 60 sekund, při dřívějším dalším dotazu se poskytnou z cache.ram.
 
 ``cache select``:inxx
 ``
@@ -2601,25 +2595,25 @@ def cache_db_select():
 
 ``cacheable``:inxx
 
-The ``select`` method has an optional ``cacheable`` argument, normally set to ``False``. When ``cacheable=True`` the resulting ``Rows`` is serializable but The ``Row``s lack ``update_record`` and ``delete_record`` methods.
+Metoda ``select`` má volitelný parametr ``cacheable``, který je normálně nastaven na ``False``. Nastavíte-li ``cacheable=True``, bude výsledný ``Rows`` objekt normálně serializovatelný, ale ``Row`` objekty nebudou mít metodu ``update_record`` ani ``delete_record``.
 
-If you do not need these methods you can speed up selects a lot by setting the cacheable attribute:
+Jestliže tyto metody v daném provozním scénáři nepotřebujete, můžete získat vyšší výkonnost nastavením atributu cacheable:
 
 ``
 rows = db(query).select(cacheable=True)
 ``:code
 
-When the ``cache`` argument is set but ``cacheable=False`` (default) only the database results are cached, not the actual Rows object. When the ``cache`` argument is used in conjunction with ``cacheable=True`` the entire Rows object is cached and this results in much faster caching:
+Když je nastaven ``cache`` argument, ale ``cacheable=False`` (defaultně) jsou kešovány výsledky z databáze, ale ne samotný Rows objekt. Spojíme-li argument ``cache`` a ``cacheable=True``, je kešován i výsledný Rows objekt a výsledkem jsou mnohem rychlejší doby přístupu:
 
 ``
-rows = db(query).select(cache=(cache.ram,3600),cacheable=True)
+rows = db(query).select(cache=(cache.ram, 3600), cacheable=True)
 ``:code
 
-### Self-Reference and aliases
+### Odkaz na záznamy stejné tabulky (self-reference) a aliasy
 
 ``self reference``:inxx
 ``alias``:inxx
-It is possible to define tables with fields that refer to themselves, here is an example:
+Můžete definovat tabulky s poli (cizími klíči), které odkazují na stejnou tabulku. Tady je příklad:
 ``reference table``:inxx
 ``
 db.define_table('person',
@@ -2628,7 +2622,7 @@ db.define_table('person',
     Field('mother_id', 'reference person'))
 ``:code
 
-Notice that the alternative notation of using a table object as field type will fail in this case, because it uses a variable ``db.person`` before it is defined:
+Ovšem alternativní zápis pomocí table objektu (db.person) jako typu pole, by zde selhal, protože použije proměnnou ``db.person`` ještě dříve, než je definována:
 ``
 db.define_table('person',
     Field('name'),
@@ -2636,10 +2630,10 @@ db.define_table('person',
     Field('mother_id', db.person)) # wrong!
 ``:code
 
-In general ``db.tablename`` and ``"reference tablename"`` are equivalent field types, but the latter is the only one allowed for self.references.
+Ačkoli obecně vzato jsou ``db.tablename`` a ``"reference tablename"`` ekvivalentní typy pole, jen druhý zápis se dá použít pro případ, kdy definice odkazované tabulky ještě není hotova.
 
 ``with_alias``:inxx
-If the table refers to itself, then it is not possible to perform a JOIN to select a person and its parents without use of the SQL "AS" keyword. This is achieved in web2py using the ``with_alias``. Here is an example:
+Pokud tabulka odkazuje sama na sebe (rozuměj: její záznamy na jiné záznamy té samé tabulky, např. osoba a její rodiče), není možné použít JOIN, aniž by SQL příkaz obsahoval frázi "AS". Ve Web2py tuto druhou kopii stejné tabulky zpřístupníme metodou ``with_alias``. Tady je příklad:
 ``
 >>> Father = db.person.with_alias('father')
 >>> Mother = db.person.with_alias('mother')
@@ -2659,12 +2653,12 @@ Claudia None None
 Marco Massimo Claudia
 ``:code
 
-Notice that we have chosen to make a distinction between:
-- "father_id": the field name used in the table "person";
-- "father": the alias we want to use for the table referenced by the above field; this is communicated to the database;
-- "Father": the variable used by web2py to refer to that alias.
+Upřesněme si význam:
+- "father_id": je jméno pole v tabulce "person";
+- "father": je alias, kterým zpřístupňujeme tabulku "person" v situaci, kdy se na její záznamy odkazujeme pomocí předchozího pole - toto je v SQL dotazu předáno i do databáze
+- "Father": je proměnná Web2py, kterou se na tento alias odkazujeme.
 
-The difference is subtle, and there is nothing wrong in using the same name for the three of them:
+Odlišnosti jsou malé, a tak byste ani nic zásadního nepokazili, kdybyste všechny tři pojmenovali stejně:
 ``
 db.define_table('person',
     Field('name'),
@@ -2688,21 +2682,21 @@ Claudia None None
 Marco Massimo Claudia
 ``:code
 
-But it is important to have the distinction clear in order to build correct queries.
+Je však vhodné rozdílům rozumět, zejména při (odlišném pojmenování a) sestavování dotazů.
 
-### Advanced features
+### Pokročilé vlastnosti
 
-#### Table inheritance
+#### Dědičnost tabulek
 ``inheritance``:inxx
 
-It is possible to create a table that contains all the fields from another table. It is sufficient to pass the other table in place of a field to ``define_table``. For example
+Je možné definovat tabulku, která převezme definice všech polí z jiné tabulky. V tom případě stačí uvést takovou tabulku na místě argumentu Field ve volání metody ``define_table``. Například:
 ``
 db.define_table('person', Field('name'))
 db.define_table('doctor', db.person, Field('specialization'))
 ``:code
 
 ``dummy table``:inxx
-It is also possible to define a dummy table that is not stored in a database in order to reuse it in multiple other places. For example:
+Je také možné definovat tabulku, která fyzicky nebude existovat, jen se použije opakovaně pro definování odvozených tabulek. Příklad je zde:
 
 ``
 signature = db.Table(db, 'signature',
@@ -2714,27 +2708,27 @@ signature = db.Table(db, 'signature',
 db.define_table('payment', Field('amount', 'double'), signature)
 ``:code
 
-This example assumes that standard web2py authentication is enabled.
+Příklad předpokládá, že je ve Web2py aplikaci zapnutá standardní autentikace.
 
-Notice that if you use ``Auth`` web2py already creates one such table for you:
+Když se používá ``Auth`` objekt, Web2py už pro vás jednu takovou fiktivní tabulku vytvoří a můžete ji využít:
 
 ``
 auth = Auth(db)
 db.define_table('payment', Field('amount', 'double'), auth.signature)
 ``
 
-When using table inheritance, if you want the inheriting table to inherit validators, be sure to define the validators of the parent table before defining the inheriting table.
+Jestliže jste se rozhodli použít dědičnost tabulek a chcete, aby se převzaly i validátory polí, pamatujte, že validátory musí být definovány dříve, než definujete odvozenou tabulku.
 
-#### ``filter_in`` and ``filter_out``
+#### ``filter_in`` a ``filter_out``
 ``filter_in``:inxx ``filter_out``:inxx
 
-It is possible to define a filter for each field to be called before a value is inserted into the database for that field and after a value is retrieved from the database.
+Je možné definovat filtr na každé pole, který se zavolá před vložením hodnoty do databáze a poté, co se hodnota z databáze získá.er a value is retrieved from the database.
 
-Imagine for example that you want to store a serializable Python data structure in a field in the json format. Here is how it could be accomplished:
+Např. byste chtěli zajistit, aby se nějaká serializovatelná datová struktura Pythonu ukládala do databáze v json formátu. Můžete si to zařídit takto:
 
 ``
 >>> from simplejson import loads, dumps
->>> db.define_table('anyobj',Field('name'),Field('data','text'))
+>>> db.define_table('anyobj', Field('name'), Field('data','text'))
 >>> db.anyobj.data.filter_in = lambda obj, dumps=dumps: dumps(obj)
 >>> db.anyobj.data.filter_out = lambda txt, loads=loads: loads(txt)
 >>> myobj = ['hello', 'world', 1, {2: 3}]
@@ -2744,9 +2738,9 @@ Imagine for example that you want to store a serializable Python data structure 
 ['hello', 'world', 1, {2: 3}]
 ``:code
 
-Another way to accomplish the same is by using a Field of type ``SQLCustomType``, as discussed later.
+Jiný způsob je definovat pole typu ``SQLCustomType``, což probereme později.
 
-#### before and after callbacks
+#### before a after callbacky (funkce volané před a po akci)
 
 ``_before_insert``:inxx
 ``_after_insert``:inxx
@@ -2755,9 +2749,9 @@ Another way to accomplish the same is by using a Field of type ``SQLCustomType``
 ``_before_delete``:inxx
 ``_after_delete``:inxx
 
-Web2py provides a mechanism to register callbacks to be called before and/or after insert, update and delete of records.
+Web2py má mechanismus registrování callbacků, funkcí, které se provedou před resp. po insert, update nebo delete.
 
-Each table stores six lists of callbacks:
+Každá tabulka má 6 seznamů (list) callback funkcí:
 
 ``
 db.mytable._before_insert
@@ -2768,12 +2762,12 @@ db.mytable._before_delete
 db.mytable._after_delete
 ``:code
 
-You can register callback function by appending it the corresponding function to one of those lists. The caveat is that depending on the functionality, the callback has different signature.
+Požadavek vykonávání funkce můžete zaregistrovat přidáním (append) funkce do některého z těchto seznamů. Určitá obtíž je v tom, že podle použití se liší signatura funkce (parametry).
 
-This is best explained via some examples.
+Nejsnáze si to ukážeme na příkladech.
 
 ``
->>> db.define_table('person',Field('name'))
+>>> db.define_table('person', Field('name'))
 >>> def pprint(*args): print args
 >>> db.person._before_insert.append(lambda f: pprint(f))
 >>> db.person._after_insert.append(lambda f,id: pprint(f,id))
@@ -2783,7 +2777,7 @@ This is best explained via some examples.
 >>> db.person._after_delete.append(lambda s: pprint(s))
 ``:code
 
-Here ``f`` is a dict of fields passed to insert or update, ``id`` is the id of the newly inserted record, ``s`` is the Set object used for update or delete.
+Tady je ``f`` slovník (dictionary) polí, předaný do insert nebo update, ``id`` je id nově založeného záznamu, ``s`` je Set objekt, který určuje záznamy, ovlivněné updatem nebo deletem.
 
 ``
 >>> db.person.insert(name='John')
@@ -2797,48 +2791,47 @@ Here ``f`` is a dict of fields passed to insert or update, ``id`` is the id of t
 (<Set (person.id = 1)>,)
 ``:code
 
-The return values of these callback should be ``None`` or ``False``. If any of the ``_before_*`` callback returns a ``True`` value it will abort the actual insert/update/delete operation.
+Hodnota, vrácená z callbacků, má být ``None`` nebo ``False``. Jestliže některý z ``_before_*`` callbacků vrátí ``True``, zabrání tím aktuální insert/update/delete operaci.
 
 ``update_naive``:inxx.
 
-Some times a callback may need to perform an update in the same or a different table and one wants to avoid callbacks calling themselves recursively.
+Může nastat případ, kdy callback má provést update v té samé tabulce nebo v jiné tabulce, a my chceme zabránit, aby se callbacky v tomto případě vyvolávaly rekurzivně.
 
-For this purpose there the Set objects have an ``update_naive`` method that works like ``update`` but ignores before and after callbacks.
+Z toho důvodu má Set objekt ještě metodu ``update_naive``, která pracuje stejně jako ``update``, ale už neaktivuje žádné z právě definovaných callbacků.
 
-#### Record versioning
+#### Verzování záznamů
 
 ``_enable_record_versioning``:inxx
 
-It is possible to ask web2py to save every copy of a record when the record is individually modified. There are different ways to do it and it can be done for all tables at once using the syntax:
+Je možné Web2py požádat, aby ukládalo všechny stavy záznamů během historie jejich postupné modifikace. Je více možností, jak to udělat, a je možné to zajistit naráz pro všechny tabulky za pomoci této syntaxe:
 
 ``
 auth.enable_record_versioning(db)
 ``:code
 
-this requires Auth and it is discussed in the chapter about authentication.
-It can also be done for each individual table as discussed below.
+vyžaduje to používat Auth objekt a více se o tom píše v kapitole o autentikaci.
+Také je možné tuto vlastnost aktivovat jen pro jednotlivé tabulky, což popíšeme zde.
 
-Consider the following table:
+Představte si následující tabulku:
 
 ``
 db.define_table('stored_item',
     Field('name'),
-    Field('quantity','integer'),
-    Field('is_active','boolean',
-          writable=False,readable=False,default=True))
+    Field('quantity', 'integer'),
+    Field('is_active', 'boolean',
+          writable=False, readable=False, default=True))
 ``:code
 
-Notice the hidden boolean field called ``is_active`` and defaulting to
-True.
+Všimněte si skrytého boolean pole ``is_active``, které má defaultní hodnotu True.
 
-We can tell web2py to create a new table (in the same or a different database) and store all previous versions of each record in the table, when modified.
+Můžeme Web2py říci, aby vytvořilo novou tabulku (ve stejné nebo jiné databázi) a uložit do ní všechny starší verze záznamů, jakmile byly změněny.
 
-This is done in the following way:
+Provede se to takto:
 ``
 db.stored_item._enable_record_versioning()
 ``:code
 
-or in a more verbose syntax:
+případně výřečnější syntaxe:
 
 ``
 db.stored_item._enable_record_versioning(
@@ -2848,11 +2841,11 @@ db.stored_item._enable_record_versioning(
     is_active = 'is_active')
 ``
 
-The ``archive_db=db`` tells web2py to store the archive table in the same database as the ``stored_item`` table. The ``archive_name`` sets the name for the archive table. The archive table has the same fields as the original table ``stored_item`` except that unique fields are no longer unique (because it needs to store multiple versions) and has an extra field which name is specified by ``current_record`` and which is a reference to the current record in the ``stored_item`` table.
+``archive_db=db`` řekne, ve které databázi se má archivní tabulka udržovat, v tomto případě ve stejné jako "živá" tabulka ``stored_item``. ``archive_name`` zadává jméno pro archivní tabulku. Archivní tabulka má stejná pole jako "živá" tabulka, ale s tím rozdílem, že unikátní pole už nadále nejsou unique (protože uložíme více verzí stejného záznamu) a má jedno pole navíc, jehož jméno zadáváme argumentem ``current_record`` - v tomto poli bude reference na aktuální záznam v "živé" tabulce (``stored_item``).
 
-When records are deleted, they are not really deleted. A deleted record is copied in the ``stored_item_archive`` table (like when it is modified) and the ``is_active`` field is set to False. By enabling record versioning web2py sets a ``custom_filter`` on this table that hides all records in table ``stored_item`` where the ``is_active`` field is set to False. The ``is_active`` parameter in the ``_enable_record_versioning`` method allows to specify the name of the field used by the ``custom_filter`` to determine if the field was deleted or not.
+Při rušení záznamů se záznamy neruší fyzicky. Poslední obsah záznamu se zkopíruje do archivní tabulky ``stored_item_archive`` (stejně jako při modifikaci záznamu) a pole ``is_active`` se nastaví na False. Povolením verzování záznamů Web2py zapne filtr ``custom_filter`` nad tabulkou ``stored_item`` a skryje záznamy, kde ``is_active`` je False. Parametr ``is_active`` metody ``_enable_record_versioning`` vám případně umožňuje použít jinak pojmenované pole pro zjišťování, zda je záznam zrušený nebo platný.
 
-``custom_filter``s are ignored by the appadmin interface.
+``custom_filter`` jsou ignorovány v appadmin rozhraní, kde tedy vidíte a můžete pracovat i se smazanými záznamy.
 
 #### Common fields and multi-tenancy
 ``common fields``:inxx
