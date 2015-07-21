@@ -2777,7 +2777,7 @@ Nejsnáze si to ukážeme na příkladech.
 >>> db.person._after_delete.append(lambda s: pprint(s))
 ``:code
 
-Tady je ``f`` slovník (dictionary) polí, předaný do insert nebo update, ``id`` je id nově založeného záznamu, ``s`` je Set objekt, který určuje záznamy, ovlivněné updatem nebo deletem.
+``f`` je slovník (dictionary) polí, předaný do insert nebo update, ``id`` je id nově založeného záznamu, ``s`` je Set objekt, který určuje záznamy, ovlivněné updatem nebo deletem.
 
 ``
 >>> db.person.insert(name='John')
@@ -2803,7 +2803,7 @@ Z toho důvodu má Set objekt ještě metodu ``update_naive``, která pracuje st
 
 ``_enable_record_versioning``:inxx
 
-Je možné Web2py požádat, aby ukládalo všechny stavy záznamů během historie jejich postupné modifikace. Je více možností, jak to udělat, a je možné to zajistit naráz pro všechny tabulky za pomoci této syntaxe:
+Je možné požadovat po Web2py, aby ukládalo všechny stavy záznamů během historie jejich postupné modifikace. Je více možností, jak to udělat, a je možné to zajistit naráz pro všechny tabulky za pomoci této syntaxe:
 
 ``
 auth.enable_record_versioning(db)
@@ -2847,7 +2847,7 @@ Při rušení záznamů se záznamy neruší fyzicky. Poslední obsah záznamu s
 
 ``custom_filter`` jsou ignorovány v appadmin rozhraní, kde tedy vidíte a můžete pracovat i se smazanými záznamy.
 
-#### Společná pole a společné vlastnictví tabulky
+#### Společná pole a rozdělené vlastnictví tabulky
 ``common fields``:inxx
 ``multi tenancy``:inxx
 
@@ -2871,28 +2871,29 @@ Má-li tabulka pole ``db._request_tenant ('request_tenant')``, její záznamy, z
 db.table.request_tenant == db.table.request_tenant.default
 ``:code
 
-and for every record insert, this field is set to the default value.
-In the example above we have chosen
+V každém přidaném záznamu bude toto pole nastaveno na (právě tuto) defaultní hodnotu.
+V předchozím příkladě jsme zadali
 ``
 default = request.env.http_host
 ``
-i.e. we have chose to ask our app to filter all tables in all queries with
+neboli rozhodli jsme se, že chceme, aby naše aplikace filtrovala všechny záznamy ze všech dotazů filtrem
 ``
 db.table.request_tenant == request.env.http_host
 ``
 
-This simple trick allow us to turn any application into a multi-tenant application. i.e. even if we run one instance of the app and we use one single database, if the app is accessed under two or more domains (in the example the domain name is retrieved from ``request.env.http_host``) the visitors will see different data depending on the domain. Think of running multiple web stores under different domains with one app and one database.
+Tímto jednoduchým trikem můžeme ze kterékoli aplikace udělat aplikaci paralelně používanou více vlastníky, neboli - ačkoli provozujeme jedinou instanci aplikace nad jedinou databází - jestliže budou uživatelé (bude uživatel) aplikaci používat pod různými doménami (doména je obsažena v ``request.env.http_host``), uvidí data jen pro svoji konkrétní doménu. Můžeme tedy třeba provozovat více obchodů pod různými doménami - s jedinou aplikací a jedinou databází.
 
-You can turn off multi tenancy filters using: ``ignore_common_filters``:inxx
+Filtr rozděleného vlastnictví záznamů můžete vypnout pomocí
+``ignore_common_filters``:inxx
 ``
 rows = db(query, ignore_common_filters=True).select()
 ``:code
 
-#### Common filters
+#### Trvalé filtry
 
-A common filter is a generalization of the above multi-tenancy idea.
-It provides an easy way to prevent repeating of the same query.
-Consider for example the following table:
+Trvalý filtr je generalizací výše popsané myšlenky rozděleného vlastnictví.
+Umožňuje se vyhnout neustálému opakování stejného dotazu.
+Např. předpokládejme tuto definici:
 
 ``
 db.define_table('blog_post',
@@ -2903,29 +2904,29 @@ db.define_table('blog_post',
 )
 ``
 
-Any select, delete or update in this table, will include only public blog posts. The attribute can also be changed in controllers:
+Jakýkoli select, delete nebo update v této tabulce se bude týkat jen veřejných blogových příspěvků. Atribut můžete nastavit také v controlleru:
 
 ``
 db.blog_post._common_filter = lambda query: db.blog_post.is_public == True
 ``
 
-It serves both as a way to avoid repeating the "db.blog_post.is_public==True" phrase in each blog post search, and also as a security enhancement, that prevents you from forgetting to disallow viewing of none public posts.
+Jednak tím zabráníte neustálému opakování fráze "db.blog_post.is_public==True", jednak se na toto můžeme dívat i jako na bezpečnostní vylepšení, které brání tomu, abyste někdy nechtíc (díky opomenutí připsání filtru) zobrazili neveřejný příspěvek.
 
-In case you actually do want items left out by the common filter (for example, allowing the admin to see none public posts), you can either remove the filter:
+V případech, kdy chcete obejít trvalý filtr (např. když chcete administrátorovi dát možnost prohlížet neveřejné příspěvky), můžete trvalý filtr vypnout:
 ``
 db.blog_post._common_filter = None
 ``
-or ignore it:
+nebo jej během DAL příkazu ignorovat:
 ``
 db(query, ignore_common_filters=True).select(...)
 ``
 
-#### Custom ``Field`` types (experimental)
+#### Uživatelsky definované typy polí (experimentální)
 
 ``SQLCustomType``:inxx
 
-Aside for using ``filter_in`` and ``filter_out``, it is possible to define new/custom field types.
-For example we consider here a field that contains binary data in compressed form:
+Kromě možnosti použít ``filter_in`` a ``filter_out``, můžete použít uživatelsky definované typy polí.
+Např. si vytvoříme pole, které bude mít uložena binární data v komprimované formě:
 
 ``
 from gluon.dal import SQLCustomType
@@ -2938,119 +2939,119 @@ compressed = SQLCustomType(
      decoder = (lambda x: zlib.decompress(x))
 )
 
-db.define_table('example', Field('data',type=compressed))
+db.define_table('example', Field('data', type=compressed))
 ``:code
 
-``SQLCustomType`` is a field type factory. Its ``type`` argument must be one of the standard web2py types. It tells web2py how to treat the field values at the web2py level. ``native`` is the name of the field as far as the database is concerned. Allowed names depend on the database engine. ``encoder`` is an optional transformation function applied when the data is stored and ``decoder`` is the optional reversed transformation function.
+``SQLCustomType`` je předloha pro typy polí. Jejím ``type`` argumentem musí být jeden ze standardních typů Web2py frameworku. Říká Web2py, jak má s polem zacházet na úrovni Web2py. ``native`` je typ pole z hlediska databáze. Povolené hodnoty tedy záleží na konkrétním databázovém stroji. ``encoder`` je (nepovinná) transformační funkce, která se provede při ukládání do databáze a ``decoder`` je inverzní transformační funkce (použitá při zjišťování hodnoty z databáze).
 
-This feature is marked as experimental. In practice it has been in web2py for a long time and it works but it can make the code not portable, for example when the native type is database specific. It does not work on Google App Engine NoSQL.
+Tato vlastnost je označena jako experimentální. Ve skutečnosti je ve Web2py již dlouho a lze ji používat, ale může potlačit přenositelnost kódu nejčastěji tím, je-li native typ pole databázově specifický. Tato vlastnost nepracuje s Google App Engine NoSQL.
 
-#### Using DAL without define tables
+#### Použití DAL bez definice tabulek
 
-The DAL can be used from any Python program simply by doing this:
+DAL může být používána z kteréhokoli programu, napsaného v Pythonu, stačí udělat např. toto:
 
 ``
 from gluon import DAL, Field
-db = DAL('sqlite://storage.sqlite',folder='path/to/app/databases')
+db = DAL('sqlite://storage.sqlite', folder='path/to/app/databases')
 ``:code
 
-i.e. import the DAL, Field, connect and specify the folder which contains the .table files (the app/databases folder).
+tedy importovat DAL a Field, připojit se do databáze, k čemuž je v případě používání mimo prostředí Web2py aplikace potřeba uvést adresář, kde se budou ukládat metadata o tabulkách (soubory .table) a v případě SQLite i samotný soubor databáze.
 
-To access the data and its attributes we still have to define all the tables we are going to access with ``db.define_tables(...)``.
+Chceme-li přistupovat k datům a k Web2py atributům, které popisují tabulky a data, musíme definovat všechny tabulky, které chceme používat, pomocí ``db.define_tables(...)``.
 
-If we just need access to the data but not to the web2py table attributes, we get away without re-defining the tables but simply asking web2py to read the necessary info from the metadata in the .table files:
+Jestliže ale chceme jen přistupovat k datům a nechceme využívat atributy tabulek a dat, můžeme místo provedení definic tabulek říci Web2py, aby jen načetlo potřebné informace z aktuálních metadat v souborech .table:
 
 ``
 from gluon import DAL, Field
-db = DAL('sqlite://storage.sqlite',folder='path/to/app/databases',
-         auto_import=True))
+db = DAL('sqlite://storage.sqlite', folder='path/to/app/databases',
+         auto_import=True)
 ``:code
 
-This allows us to access any ``db.table`` without need to re-define it.
+To nám umožní přistupovat ke kterékoli tabulce ``db.table``, aniž bychom ji definovali.
 
-#### PostGIS, SpatiaLite, and MS Geo (experimental)
+#### PostGIS, SpatiaLite a MS Geo (experimentální)
 
 ``PostGIS``:inxx ``StatiaLite``:inxx ``Geo Extensions``:inxx
 ``geometry``:inxx ``geoPoint``:inxx ``geoLine``:inxx ``geoPolygon``:inxx
 
-The DAL supports geographical APIs using PostGIS (for PostgreSQL), spatialite (for SQLite), and MSSQL and Spatial Extensions. This is a feature that was sponsored by the Sahana project and implemented by Denes Lengyel.
+DAL podporuje geografická API pomocí PostGIS (pro PostgreSQL), spatialite (pro SQLite) a MSSQL se Spatial Extensions. Tato vlastnost byla sponzorována projektem Sahana a implementována Denesem Lengyelem.
 
-DAL provides geometry and geography fields types and the following functions:
+DAL poskytuje geometry a geography typy polí a následující funkce:
 
 ``st_asgeojson``:inxx ``st_astext``:inxx ``st_contains``:inxx
 ``st_distance``:inxx ``st_equals``:inxx ``st_intersects``:inxx ``st_overlaps``:inxx
 ``st_simplify``:inxx ``st_touches``:inxx ``st_within``:inxx
 
 ``
-st_asgeojson (PostGIS only)
+st_asgeojson (jen PostGIS)
 st_astext
 st_contains
 st_distance
 st_equals
 st_intersects
 st_overlaps
-st_simplify (PostGIS only)
+st_simplify (jen PostGIS)
 st_touches
 st_within
 st_x
 st_y
 ``
 
-Here are some examples:
+Zde je několik příkladů:
 
 ``
 from gluon.dal import DAL, Field, geoPoint, geoLine, geoPolygon
 db = DAL("mssql://user:pass@host:db")
-sp = db.define_table('spatial', Field('loc','geometry()'))
+sp = db.define_table('sp', Field('loc', 'geometry()'))  # sp=spatial
 ``:code
 
-Below we insert a point, a line, and a polygon:
+Vložíme bod (uzel), čáru, a plochu (polygon, mnohoúhelník):
 ``
 sp.insert(loc=geoPoint(1,1))
 sp.insert(loc=geoLine((100,100),(20,180),(180,180)))
 sp.insert(loc=geoPolygon((0,0),(150,0),(150,150),(0,150),(0,0)))
 ``:code
 
-Notice that
+Poznamenejme, že
 ``
 rows = db(sp.id>0).select()
 ``:code
 
-Always returns the geometry data serialized as text.
-You can also do the same more explicitly using ``st_astext()``:
+vrací vždy data geometrie serializovaná jako text.
+Totéž můžete zadat více explicitně pomocí ``st_astext()``:
 
 ``
 print db(sp.id>0).select(sp.id, sp.loc.st_astext())
-spatial.id,spatial.loc.STAsText()
+spatial.id, spatial.loc.STAsText()
 1, "POINT (1 2)"
 2, "LINESTRING (100 100, 20 180, 180 180)"
 3, "POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))"
 ``:code
 
-You can ask for the native representation by using ``st_asgeojson()`` (in PostGIS only):
+Můžete data přečíst jako nativní reprezentaci pomocí ``st_asgeojson()`` (jen PostGIS):
 
 ``
 print db(sp.id>0).select(sp.id, sp.loc.st_asgeojson().with_alias('loc'))
-spatial.id,loc
+spatial.id, loc
 1, [1, 2]
 2, [[100, 100], [20 180], [180, 180]]
 3, [[[0, 0], [150, 0], [150, 150], [0, 150], [0, 0]]]
 ``:code
 
-(notice an array is a point, an array of arrays is a line, and an array of array of arrays is a polygon).
+(všimněme si, že pole (array) znamená bod (uzel), pole polí (array of arrays) čáru, a pole, jehož obsahem je pole polí, znamená polygon.
 
-Here are example of how to use geographical functions:
+Zde jsou příklady, jak používat geografické funkce:
 
 ``
 query = sp.loc.st_intersects(geoLine((20,120),(60,160)))
 query = sp.loc.st_overlaps(geoPolygon((1,1),(11,1),(11,11),(11,1),(1,1)))
 query = sp.loc.st_contains(geoPoint(1,1))
-print db(query).select(sp.id,sp.loc)
-spatial.id,spatial.loc
+print db(query).select(sp.id, sp.loc)
+spatial.id, spatial.loc
 3,"POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))"
 ``:code
 
-Computed distances can also be retrieved as floating point numbers:
+Vypočtené vzdálenosti můžeme také získat jako floating čísla:
 
 ``
 dist = sp.loc.st_distance(geoPoint(-1,2)).with_alias('dist')
@@ -3061,23 +3062,23 @@ spatial.id, dist
 3 1.0
 ``:code
 
-#### Copy data from one db into another
+#### Kopírování dat mezi dvěma db
 
-Consider the situation in which you have been using the following database:
+Dejme tomu, že používáte následujíc databázi:
 
 ``
 db = DAL('sqlite://storage.sqlite')
 ``
 
-and you wish to move to another database using a different connection string:
+a chcete přejít na jinou a změnit řetězec připojení (connection string):
 
 ``
 db = DAL('postgres://username:password@localhost/mydb')
 ``
 
-Before you switch, you want to move the data and rebuild all the metadata for the new database. We assume the new database to exist but we also assume it is empty.
+Než přejdete, chcete přesunout data a přebudovat metadata (soubory .table) pro novou databázi. Předpokládáme, že novou databázi máme vytvořenou a že je prázdná.
 
-Web2py provides a script that does this work for you:
+Web2py poskytuje skript, který toto provede za vás:
 
 ``
 cd web2py
@@ -3087,23 +3088,23 @@ python scripts/cpdb.py \
    -Y 'postgres://username:password@localhost/mydb'
 ``
 
-After running the script you can simply switch the connection string in the model and everything should work out of the box. The new data should be there.
+Po provedení skriptu můžete jednoduše connection string v modelu zaměnit za nový a vše by mělo pracovat, s původními daty v nové databázi.
 
-This script provides various command line options that allows you to move data from one application to another, move all tables or only some tables, clear the data in the tables. for more info try:
+Uvedený skript nabízí command line přepínače pro přesun dat mezi aplikacemi, přesun všech nebo jen vybraných tabulek, smazání dat v tabulkách, apod. Pro více informací napište:
 
 ``
 python scripts/cpdb.py -h
 ``
 
-#### Note on new DAL and adapters
+#### Poznámka k "nové" verzi DAL a adaptérům (driverům)
 
-The source code of the Database Abstraction Layer was completely rewritten in 2010. While it stays backward compatible, the rewrite made it more modular and easier to extend. Here we explain the main logic.
+Zdrojový kód DAL byl zcela přepsán v roce 2010, a to jako zpětně kompatibilní, ale více modulární a snadněji rozšiřovatelný. Zde vysvětlíme hlavní logiku.
 
-The file "gluon/dal.py" defines, among other, the following classes.
+Soubor "gluon/dal.py" definuje, mimo jiné, následující třídy.
 
 ``
 ConnectionPool
-BaseAdapter extends ConnectionPool
+BaseAdapter extends (děděno z) ConnectionPool
 Row
 DAL
 Reference
@@ -3115,38 +3116,40 @@ Set
 Rows
 ``
 
-Their use has been explained in the previous sections, except for ``BaseAdapter``. When the methods of a ``Table`` or ``Set`` object need to communicate with the database they delegate to methods of the adapter the task to generate the SQL and or the function call.
+Řekli jsme si o nich v předchozích oddílech, s výjimkou ``BaseAdapter``. Jestliže metoda ``Table`` nebo ``Set`` objektu chce komunikovat s databází, deleguje metodám adaptéru samotné sestavení SQL příkazu nebo zavolání funkce.
 
-For example:
+Např.:
 
 ``
 db.mytable.insert(myfield='myvalue')
 ``
 
-calls
+zavolá:
 
 ``
 Table.insert(myfield='myvalue')
 ``
 
-which delegates the adapter by returning:
+a ta to deleguje aktuálnímu konkrétnímu adaptéru takto:
 
 ``
-db._adapter.insert(db.mytable,db.mytable._listify(dict(myfield='myvalue')))
+db._adapter.insert(db.mytable, db.mytable._listify(dict(myfield='myvalue')))
 ``
 
-Here ``db.mytable._listify`` converts the dict of arguments into a list of ``(field,value)`` and calls the ``insert`` method of the ``adapter``. ``db._adapter`` does more or less the following:
+``db.mytable._listify`` zkonvertuje slovník (dictionary) argumentů na seznam (list) párů ``(field,value)`` a zavolá ``insert`` metodu adaptéru. ``db._adapter`` udělá více nebo méně toto:
 
 ``
-query = db._adapter._insert(db.mytable,list_of_fields)
+query = db._adapter._insert(db.mytable, list_of_fields)
 db._adapter.execute(query)
 ``
 
-where the first line builds the query and the second executes it.
+kde první řádek sestaví dotaz a druhý řádek jej provede.
 
-``BaseAdapter`` defines the interface for all adapters.
+Pozn. překladatele: V předchozím textu překladu není možná vždy důsledně rozlišován adaptér a driver (ovladač). Zde se tedy snažím být přesnější. Driverem (ovladačem) se myslí modul Pythonu pro používání konkrétního databázového stroje, adaptérem se myslí kód Web2py, který přizpůsobuje absatrakční jazyk DAL konkrétnímu databázovému stroji, z větší části právě pomocí jeho driveru (ovladače).
 
-"gluon/dal.py" at the moment of writing this book, contains the following adapters:
+``BaseAdapter`` definuje společné rozhraní všech adaptérů.
+
+"gluon/dal.py" v době psaní tohoto oddílu obsahuje následující adaptéry:
 
 ``
 SQLiteAdapter extends BaseAdapter
@@ -3166,25 +3169,25 @@ IngresUnicodeAdapter extends IngresAdapter
 GoogleSQLAdapter extends MySQLAdapter
 NoSQLAdapter extends BaseAdapter
 GoogleDatastoreAdapter extends NoSQLAdapter
-CubridAdapter extends MySQLAdapter (experimental)
-TeradataAdapter extends DB2Adapter (experimental)
-SAPDBAdapter extends BaseAdapter (experimental)
-CouchDBAdapter extends NoSQLAdapter (experimental)
-IMAPAdapter extends NoSQLAdapter (experimental)
-MongoDBAdapter extends NoSQLAdapter (experimental)
+CubridAdapter extends MySQLAdapter (experimentální)
+TeradataAdapter extends DB2Adapter (experimentální)
+SAPDBAdapter extends BaseAdapter (experimentální)
+CouchDBAdapter extends NoSQLAdapter (experimentální)
+IMAPAdapter extends NoSQLAdapter (experimentální)
+MongoDBAdapter extends NoSQLAdapter (experimentální)
 ``
 
-which override the behavior of the ``BaseAdapter``.
+které přepisují nebo upřesňují chování ovladače ``BaseAdapter``.
 
-Each adapter has more or less this structure:
+Každý adaptér má přibližně tuto strukturu:
 
 ``
 class MySQLAdapter(BaseAdapter):
 
-    # specify a diver to use
-    driver = globals().get('pymysql',None)
+    # driver, který se má použít
+    driver = globals().get('pymysql', None)
 
-    # map web2py types into database types
+    # mapování Web2py typů na typy databázového stroje
     types = {
         'boolean': 'CHAR(1)',
         'string': 'VARCHAR(%(length)s)',
@@ -3192,37 +3195,37 @@ class MySQLAdapter(BaseAdapter):
         ...
         }
 
-    # connect to the database using driver
-    def __init__(self,db,uri,pool_size=0,folder=None,db_codec ='UTF-8',
+    # připojení do databáze za pomoci driveru
+    def __init__(self, db,uri, pool_size=0, folder=None, db_codec ='UTF-8',
                 credential_decoder=lambda x:x, driver_args={},
                 adapter_args={}):
-        # parse uri string and store parameters in driver_args
+        # analyzuj (parse) řetězec připojení (uri string) a parametry ulož jako driver_args
         ...
-        # define a connection function
+        # definuj funkci pro připojení
         def connect(driver_args=driver_args):
             return self.driver.connect(**driver_args)
-        # place it in the pool
+        # vlož ji do zásobníku (poolu)
         self.pool_connection(connect)
-        # set optional parameters (after connection)
+        # nastav volitelné parametry (po připojení)
         self.execute('SET FOREIGN_KEY_CHECKS=1;')
         self.execute("SET sql_mode='NO_BACKSLASH_ESCAPES';")
 
-   # override BaseAdapter methods as needed
-   def lastrowid(self,table):
+   # přepiš metody základní třídy BaseAdapter podle potřeby
+   def lastrowid(self, table):
         self.execute('select last_insert_id();')
         return int(self.cursor.fetchone()[0])
 
 ``:code
 
-Looking at the various adapters as example should be easy to write new ones.
+Podíváme-li se na různé existující adaptéry, nebude těžké napsat případný adaptér nový.
 
-When ``db`` instance is created:
+Když vytváříme instanci ``db``:
 
 ``
 db = DAL('mysql://...')
 ``
 
-the prefix in the uri string defines the adapter. The mapping is defined in the following dictionary also in "gluon/dal.py":
+tak prefix uri řetězce (řetězce připojení) určuje použitý adaptér. Mapování určuje tento slovník (dictionary), který je rovněž součástí "gluon/dal.py":
 
 ``
 ADAPTERS = {
@@ -3245,7 +3248,7 @@ ADAPTERS = {
     'jdbc:sqlite': JDBCSQLiteAdapter,
     'jdbc:sqlite:memory': JDBCSQLiteAdapter,
     'jdbc:postgres': JDBCPostgreSQLAdapter,
-    'gae': GoogleDatastoreAdapter, # discouraged, for backward compatibility
+    'gae': GoogleDatastoreAdapter,   # zastaralé, pro zpětnou kompatibilitu
     'google:datastore': GoogleDatastoreAdapter,
     'google:sql': GoogleSQLAdapter,
     'couchdb': CouchDBAdapter,
@@ -3254,24 +3257,24 @@ ADAPTERS = {
 }
 ``:code
 
-the uri string is then parsed in more detail by the adapter itself.
+Uri řetězec (řetězec připojení) je pak podorbněji parsován (analyzován) samotným použitým adaptérem.
 
-For any adapter you can replace the driver with a different one:
+Pro kterýkoli adaptér můžete nahradit ovladač jiným ovladačem:
 
 ``
 import MySQLdb as mysqldb
 from gluon.dal import MySQLAdapter
 MySQLAdapter.driver = mysqldb
 ``
-i.e. ``mysqldb`` has to be ''that module'' with a .connect() method.
-You can specify optional driver arguments and adapter arguments:
+takže ``mysqldb`` nyní bude modulem, který poskytuje metodu .connect().
+Můžete zadat další parametry ovladače (driveru) a adaptéru:
 
 ``
 db =DAL(..., driver_args={}, adapter_args={})
 ``
 
 
-#### Gotchas
+#### Specifické odchylky a problémy různých databázových strojů
 
 **SQLite** does not support dropping and altering columns. That means that web2py migrations will work up to a point. If you delete a field from a table, the column will remain in the database but will be invisible to web2py. If you decide to reinstate the column, web2py will try re-create it and fail. In this case you must set ``fake_migrate=True`` so that metadata is rebuilt without attempting to add the column again. Also, for the same reason, **SQLite** is not aware of any change of column type. If you insert a number in a string field, it will be stored as string. If you later change the model and replace the type "string" with type "integer", SQLite will continue to keep the number as a string and this may cause problem when you try to extract the data.
 
