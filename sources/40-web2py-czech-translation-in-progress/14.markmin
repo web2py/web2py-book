@@ -36,6 +36,80 @@ There is no requirement on the user side, not even Python pre-installed.
 
 For Mac binaries the process is the same but there is no need for the "bat" file.
 
+### WingIDE, Rad2Py, and Eclipse
+
+``WingIDE``:inxx ``Eclipse``:inxx ``Rad2Py``:inxx
+
+You can use web2py with third party IDEs with as WingIDE, Rad2Py, and Eclipse.
+
+Here is a screenshot of using web2py with WingIDE:
+
+[[image @///image/wingide.png center 480px]]
+
+The general problem with these IDEs (except Rad2Py which is designed specifically to work with web2py) is that they do not understand the context in which models and controllers are executed and therefore autocompletion does not work out of the box.
+
+To make autocompletion work the general trick consists in editing your models and controllers and adding the following code:
+
+``
+if False:
+    from gluon import *
+    request = current.request
+    response = current.response
+    session = current.session
+    cache = current.cache
+    T = current.T
+``:code
+
+if you are relying on variables in your models (such as database definitions) you can add to the list like this:
+``
+   from db import *
+``:code
+
+In Eclipse with PyDev 2.7.5, this simplified version seems to work well in controllers:
+``
+if False:  
+    from gluon import *
+    from db import *  #repeat for all models
+    from menu import *
+``:code
+
+As well, if using Eclipse with PyDev you should add the web2py folder to the system python path (in PyDev preferences for the python interpreter). This brings auto-completion. 
+
+The import block does not change the logic as this is never executed but it forces the IDE to parse it and understand where the objects in the global namespace come from (the ``gluon`` module) thus making autocompletion work.
+
+
+### SQLDesigner
+
+There is a software called SQLDesigner which allows you to build web2py models visually and then generate the corresponding code. Here is a screenshot.
+
+[[image @///image/designer.png center 480px]]
+
+The version of SQLDesigner which works with web2py can be found here:
+
+``https://github.com/elcio/visualdal``
+
+### Publishing a folder
+
+Consider the problem of sharing a folder (and subfolders) on the web. web2py makes this very easy. You just need a controller like this:
+
+``
+from gluon.tools import Expose
+def myfolder():
+    return dict(files=Expose('/path/to/myfolder'))
+``:code
+
+which you can render in a view with ``{{=files}}``. It will create an interface to view the files and folders, and navigate the tree structure. Images will have a preview. 
+
+The path prefix "/path/to/myfolder" will be hidden to the visitors. For example a file called "/path/to/myfolder/a/b.txt" will be replaced with "base/a/b.txt". The "base" prefix can be specified using the ``basename`` argument of the Expose function. Using the argument ``extensions`` can specify a list of file extensions to be listed, other files will be hidden. For example:
+
+``
+def myfolder():
+    return dict(files=Expose('/path/to/myfolder',basename='.',
+                             extensions=['.py', '.jpg']))
+``:code
+
+Files and folders that contain the word "private" in the path or have file that start with "." or terminate in "~" are always hidden.
+
 ### Functional testing
 
 web2py comes with a module ``gluon.contrib.webclient`` which allows functional testing of local and remote web2py applications. Actually, this module is not web2py specific and it can be used for testing and interacting programmatically with any web application, yet it is designed to understand web2py session and web2py postbacks.
@@ -54,13 +128,13 @@ client = WebClient('http://127.0.0.1:8000/welcome/default/',
 
 client.get('index')
 # register
-data = dict(first_name = 'Homer',
-            last_name = 'Simpson',
-            email = 'homer@web2py.com',
-            password = 'test',
-            password_two = 'test',
-            _formname = 'register')
-client.post('user/register',data = data)
+data = dict(first_name='Homer',
+            last_name='Simpson',
+            email='homer@web2py.com',
+            password='test',
+            password_two='test',
+            _formname='register')
+client.post('user/register', data=data)
 
 # logout
 client.get('user/logout')
@@ -68,8 +142,8 @@ client.get('user/logout')
 # login again
 data = dict(email='homer@web2py.com',
             password='test',
-            _formname = 'login')
-client.post('user/login',data = data)
+            _formname='login')
+client.post('user/login', data=data)
 
 # check registration and login were successful
 client.get('index')
@@ -79,7 +153,7 @@ assert('Welcome Homer' in client.text)
 The WebClient constructor takes a URL prefix as argument. In the example that is "http://127.0.0.1:8000/welcome/default/". It does not perform any network IO. The ``postbacks`` argument defaults to ``True`` and tells the client how to handle web2py postbacks.
 
 The WebClient object, ``client``, has only two methods:
-``get`` and ``post``.  The first argument is always a URL postfix. 
+``get`` and ``post``.  The first argument is always a URL postfix.
 The full URL for the GET of POST request is constructed simply by concatenating the prefix and the postfix. The purpose of this is imply making the syntax less verbose for long conversations between client and server.
 
 ``data`` is a parameter specific of POST request and contains a dictionary of the data to be posted. Web2py forms have a hidden ``_formname`` field and its value must be provided unless there is a single form in the page. Web2py forms also contain a hidden ``_formkey`` field which is designed to prevent CSRF attacked. It is handled automatically by WebClient.
@@ -89,7 +163,7 @@ Both ``client.get`` and ``client.post`` accept the following extra arguments:
 - ``cookies``: a dictionary of optional HTTP cookies.
 - ``auth``: a dictionary of parameters to be passed to ``urllib2.HTTPBasicAuthHandler().add_password(**auth)`` in order to perform basic authentication. For more information about this we refer to the Python documentation for the urllib2 module.
 
-The ``client`` object in the example carries on a conversation with the server specified in the constructor by making GET and POST requests. It automatically handles all cookies and sends them back to maintain sessions. If it detects that a new session cookie is issued while an existing one is already present, it interprets it as a boken session and raises an exception. If the server returns an HTTP error, it raises an exception. If the server returns an HTTP error which contains a web2py ticket, it returns a RuntimeError exception containing the ticket code.
+The ``client`` object in the example carries on a conversation with the server specified in the constructor by making GET and POST requests. It automatically handles all cookies and sends them back to maintain sessions. If it detects that a new session cookie is issued while an existing one is already present, it interprets it as a broken session and raises an exception. If the server returns an HTTP error, it raises an exception. If the server returns an HTTP error which contains a web2py ticket, it returns a RuntimeError exception containing the ticket code.
 
 The ``client`` object maintains a log of requests in ``client.history`` and a state associated with its last successful request. The state consists of:
 
@@ -147,7 +221,7 @@ page = urllib.urlopen('http://www.web2py.com').read()
 
 This is often fine, but the ``urllib`` module does not work on the Google App Engine. Google provides a different API for downloading URLs that works on GAE only. In order to make your code portable, web2py includes a ``fetch`` function that works on GAE as well as other Python installations:
 ``
-from google.tools import fetch
+from gluon.tools import fetch
 page = fetch('http://www.web2py.com')
 ``:code
 
@@ -315,7 +389,7 @@ There are times when you need more control and you want to generate yourself the
 
 For this reason web2py provide integration out of the box with Stripe, Authorize.net (the module was developed by John Conde and slightly modified) and DowCommerce. Stripe is the simplest to use and also the cheapest for low volume of transactions (they charge no fix cost but charge about 3% per transaction). Authorize.net is better for high volumes (has a fixed yearly costs plus a lower cost per transaction).
 
-Mind that in the case of Stripe and Authorize.net your program will be accepting credit cards information. You do not have to store this information and we advise you not to because of the legal requirements involved (check with Visa or Mastercard), but there are times when you may want to store the information for recurrent payments or to reproduce the Amazon one-click pay button.
+Mind that in the case of Stripe and Authorize.net your program will be accepting credit cards information. You do not have to store this information and we advise you not to because of the legal requirements involved (check with Visa or MasterCard), but there are times when you may want to store the information for recurrent payments or to reproduce the Amazon one-click pay button.
 
 #### Google Wallet
 
@@ -377,7 +451,7 @@ Once you have the API key you can accept credit cards with the following code:
 from gluon.contrib.stripe import Stripe
 stripe = Stripe(api_key)
 d = stripe.charge(amount=100,
-	      currency='usd',
+              currency='usd',
               card_number='4242424242424242',
               card_exp_month='5',
               card_exp_year='2012',
@@ -391,7 +465,7 @@ elif:
 
 The response, ``d``, is a dictionary which you can explore yourself. The card number used in the example is a sandbox and it will always succeed. Each transaction is associated to a transaction id stored in ``d['id']``.
 
-Stripe also allows you verify a transaction at a later time:
+Stripe also allows you to verify a transaction at a later time:
 
 ``
 d = Stripe(key).check(d['id'])
@@ -579,4 +653,3 @@ route_in=(
 ``:code
 
 The first time you are attacked you may incur a small overhead, but our experience is that the same attacker will not try twice.
-
