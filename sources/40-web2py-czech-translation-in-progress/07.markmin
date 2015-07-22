@@ -10,7 +10,7 @@ All these forms are self-aware and, if the input does not pass validation, they 
 
 Arbitrary HTML code can be inserted into or extracted from the form using helpers.
 
-``FORM`` and ``SQLFORM`` are helpers and they can be manipulated in as similar way as the ``DIV``. For example you can set a form style:
+``FORM`` and ``SQLFORM`` are helpers and they can be manipulated in a similar way as the ``DIV``. For example you can set a form style:
 
 ``
 form = SQLFORM(..)
@@ -40,9 +40,9 @@ Your name:
 {{=BEAUTIFY(request.vars)}}
 ``:code
 
-This is a regular HTML form that asks for the user's name. When you fill the form and click the submit button, the form self-submits, and the variable ``request.vars.name`` and its value is displayed at the bottom.
+This is a regular HTML form that asks for the user's name. When you fill the form and click the submit button, the form self-submits, and the variable ``request.vars.name`` along with its provided value is displayed at the bottom.
 
-You can generate the same form using helpers. This can be done in the view or in the action. Since web2py processed the form in the action, it is OK to define the form in the action.
+You can generate the same form using helpers. This can be done in the view or in the action. Since web2py processed the form in the action, it is better to define the form in the action itself.
 
 Here is the new controller:
 ``
@@ -150,7 +150,7 @@ The process function takes some extra argument that ``accepts`` does not take:
 - ``onsuccess``: if equal to 'flash' (default) and the form is accepted it will flash the above `message_onsuccess``
 - ``message_onfailure``
 - ``onfailure``: if equal to 'flash' (default) and the form fails validation, it will flash the above `message_onfailure``
-- ``next`` the user to redirect after the form is accepted.
+- ``next`` indicates where to redirect the user after the form is accepted.
 ``onsuccess`` and ``onfailure`` can be functions like ``lambda form: do_something(form)``.
 
 ``
@@ -337,6 +337,9 @@ form.add_button('Back', URL('other_page'))
 
 You can add more than one button to form. The arguments of ``add_button`` are the value of the button (its text) and the url where to redirect to.
 
+#### More about manipulation of FORMs
+As discussed in the Views chapter, a FORM is an HTML helper. Helpers can be manipulated as Python lists and as dictionaries, which enables run-time creation and modification.
+
 ### ``SQLFORM``
 
 We now move to the next level by providing the application with a model file:
@@ -414,21 +417,21 @@ The class ``SQLFORM`` is defined in "gluon/sqlhtml.py". It can be easily extende
 ``fields``:inxx ``labels``:inxx
 The signature for the ``SQLFORM`` constructor is the following:
 ``
-SQLFORM(table, record=None,
-        deletable=False, linkto=None,
-        upload=None, fields=None, labels=None,
-        col3={}, submit_button='Submit',
-        delete_label='Check to delete:',
-        showid=True, readonly=False,
-        comments=True, keepopts=[],
-        ignore_rw=False, record_id=None,
-        formstyle='table3cols',
-	buttons=['submit'], separator=': ',
+SQLFORM(table, record = None,
+        deletable = False, linkto = None,
+        upload = None, fields = None, labels = None,
+        col3 = {}, submit_button = 'Submit',
+        delete_label = 'Check to delete:',
+        showid = True, readonly = False,
+        comments = True, keepopts = [],
+        ignore_rw = False, record_id = None,
+        formstyle = 'table3cols',
+        buttons = ['submit'], separator = ': ',
         **attributes)
 
 ``:code
 - The optional second argument turns the INSERT form into an UPDATE form for the specified record (see next subsection). ``showid``:inxx ``delete_label``:inxx ``id_label``:inxx ``submit_button``:inxx
-- If ``deletable`` is set to ``True``, the UPDATE form displays a "Check to delete" checkbox. The value of the label if this field is set via the ``delete_label`` argument.
+- If ``deletable`` is set to ``True``, the UPDATE form displays a "Check to delete" checkbox. The value of the label for this field is set via the ``delete_label`` argument.
 - ``submit_button`` sets the value of the submit button.
 - ``id_label`` sets the label of the record "id"
 - The "id" of the record is not shown if ``showid`` is set to ``False``.
@@ -511,7 +514,7 @@ An update form is very similar to a create form except that it is pre-populated 
 
 Edit forms also contain a hidden INPUT field with ``name="id"`` which is used to identify the record. This id is also stored server-side for additional security and, if the visitor tampers with the value of this field, the UPDATE is not performed and web2py raises a SyntaxError, "user is tampering with form".
 
-When a Field is marked with ``writable=False``, the field is not shown in create forms, and it is shown readonly in update forms. If a field is marked as ``writable=False`` and ``readable=False``, then the field is not shown at all, not even in update forms.
+When a field is marked with ``writable=False``, the field is not shown in create forms, and it is shown readonly in update forms. If a field is marked as ``writable=False`` and ``readable=False``, then the field is not shown at all, not even in update forms.
 
 Forms created with
 ``
@@ -526,6 +529,10 @@ form = SQLFORM(table,record_id,readonly=True)
 ``:code
 
 always show all fields in readonly mode, and they cannot be accepted.
+
+Marking a field with ``writable=False`` prevents the field from being part of the form, and causes the form processing to disregard the value of ``request.vars.field`` when processing the form.  However, if you assign a value to ``form.vars.field``, this value ''will'' be part of the insert or update when the form is processed. 
+This enables you to change the value of fields that for some reason you do not wish to include in a form.
+
 
 #### ``SQLFORM`` in HTML
 
@@ -548,7 +555,7 @@ def display_manual_form():
 and insert the form in the associated "default/display_manual_form.html" view:
 ``
 {{extend 'layout.html'}}
-<form>
+<form action="#" enctype="multipart/form-data" method="post">
 <ul>
   <li>Your name is <input name="name" /></li>
 </ul>
@@ -697,7 +704,7 @@ The ``SQLFORM``, upon deleting a record, does not delete the physical uploaded f
 ``
 db.define_table('image',
     Field('name', requires=IS_NOT_EMPTY()),
-    Field('file','upload',autodelete=True))
+    Field('source','upload',autodelete=True))
 ``:code
 
 The ``autodelete`` attribute is ``False`` by default. When set to ``True`` is makes sure the file is deleted when the record is deleted.
@@ -855,10 +862,18 @@ def form_from_factory():
     if form.process().accepted:
         response.flash = 'form accepted'
         session.your_name = form.vars.your_name
-        session.filename = form.vars.your_image
+        session.your_image = form.vars.your_image
     elif form.errors:
         response.flash = 'form has errors'
     return dict(form=form)
+``:code
+
+The Field object in the SQLFORM.factory() constructor is fully documented in the DAL chapter.
+A run-time construction technique for SQLFORM.factory() is
+``
+fields = []
+fields.append(Field(...))
+form=SQLFORM.factory(*fields)
 ``:code
 
 Here is the "default/form_from_factory.html" view:
@@ -873,6 +888,9 @@ form = SQLFORM.factory(...,table_name='other_dummy_name')
 ``:code
 
 Changing the ``table_name`` is necessary if you need to place two factory generated forms in the same table and want to avoid CSS conflicts.
+
+##### Uploading files with SQLFORM.factory
+
 
 #### One form for multiple tables
 
@@ -917,7 +935,7 @@ This only works when the tables don't have field names in common.
 
 ``confirm``:inxx
 
-Often you needs a form with to confirma choice. The form should be accepted if the choice is accepted and none otherwise. The form may have additional options that link other web pages. web2py provides a simple way to do this:
+Often you need a form with a confirmation choice. The form should be accepted if the choice is accepted and none otherwise. The form may have additional options that link other web pages. web2py provides a simple way to do this:
 
 ``
 form = FORM.confirm('Are you sure?')
@@ -936,7 +954,7 @@ if form.accepted: do_what_needs_to_be_done()
 Imagine a system that stores configurations options in a dictionary,
 
 ``
-config = dict(color='black', language='english')
+config = dict(color='black', language='English')
 ``:code
 
 and you need a form to allow the visitor to modify this dictionary.
@@ -952,7 +970,7 @@ The form will display one INPUT field for each item in the dictionary. It will u
 This works great but leave to you the logic of making the config dictionary persistent. For example you may want to store the ``config`` in a session.
 
 ``
-session.config or dict(color='black', language='english')
+session.config or dict(color='black', language='English')
 form = SQLFORM.dictform(session.config)
 if form.process().accepted:
     session.config.update(form.vars)
@@ -1082,7 +1100,7 @@ crud.settings.create_onvalidation = StorageList()
 crud.settings.create_onvalidation.mytablename.append(lambda form:....)
 ``:code
 
-To specify extra functions to be executed after	standard validation procedures for ``crud.update`` forms:
+To specify extra functions to be executed after        standard validation procedures for ``crud.update`` forms:
 
 ``
 crud.settings.update_onvalidation = StorageList()
@@ -1211,7 +1229,9 @@ crud.messages.delete_log = 'Record %(id)s deleted'
 
 sets the log message on successful record deletion.
 
+------
 Notice that ``crud.messages`` belongs to the class ``gluon.storage.Message`` which is similar to ``gluon.storage.Storage`` but it automatically translates its values, without need for the ``T`` operator.
+------
 
 Log messages are used if and only if CRUD is connected to Auth as discussed in Chapter 9. The events are logged in the Auth table "auth_events".
 
@@ -1327,14 +1347,14 @@ form.process(onsuccess = lambda form:auth.archive(form,
 If a form is created with SQLFORM, SQLFORM.factory or CRUD, there are multiple ways it can be embedded in a view allowing multiple degrees of customization. Consider for example the following model:
 ``
 db.define_table('image',
-    Field('name'),
-    Field('file', 'upload'))
+    Field('name', requires=IS_NOT_EMPTY()),
+    Field('source', 'upload'))
 ``:code
 
 and upload action
 ``
 def upload_image():
-    return dict(form=crud.create(db.image))
+    return dict(form=SQLFORM(db.image).process())
 ``:code
 
 The simplest way to embed the form in the view for ``upload_image`` is
@@ -1346,7 +1366,7 @@ This results in a standard table layout. If you wish to use a different layout, 
 ``
 {{=form.custom.begin}}
 Image name: <div>{{=form.custom.widget.name}}</div>
-Image file: <div>{{=form.custom.widget.file}}</div>
+Image file: <div>{{=form.custom.widget.source}}</div>
 Click here to upload: {{=form.custom.submit}}
 {{=form.custom.end}}
 ``:code
@@ -1357,19 +1377,33 @@ The above sample form is show in the image below.
 
 [[image @///image/en6500.png center 300px]]
 
-Notice that a similar result could have been obtained with:
+A similar result could have been obtained without using a custom form:
+
+``
+SQLFORM(...,formstyle='table2cols')
+``:code
+
+or in case of CRUD forms with the following parameter:
 
 ``
 crud.settings.formstyle='table2cols'
 ``:code
 
-without using a custom form. Other possible ``formstyle``s are "table3cols" (the default), "divs" and "ul".
+Other possible ``formstyle``s are "table3cols" (the default), "divs" and "ul".
 
 If you do not wish to use the widgets serialized by web2py, you can replace them with HTML. There are some variables that will be useful for this:
 - ``form.custom.label[fieldname]`` contains the label for the field.
 - ``form.custom.comment[fieldname]`` contains the comment for the field.
 - ``form.custom.dspval[fieldname]`` form-type and field-type dependent display representation of the field.
 - ``form.custom.inpval[fieldname]`` form-type and field-type dependent values to be used in field code.
+
+If you form has ``deletable=True`` you should also insert
+
+``
+{{=form.custom.delete}}
+``:code
+
+to display the delete checkbox.
 
 It is important to follow the conventions described below.
 
@@ -1641,6 +1675,11 @@ requires = [IS_INT_IN_RANGE(0, 8), IS_IN_SET([2, 3, 5, 7],
           error_message='must be prime and less than 10')]
 ``:code
 
+For a form checkbox, use this:
+``
+requires=IS_IN_SET(['on'])
+``:code
+
 You may also use a dictionary or a list of tuples to make the drop down list more descriptive:
 ``
 #### Dictionary example:
@@ -1738,6 +1777,9 @@ For more information on Python regular expressions, refer to the official Python
 ``
 
 ``IS_MATCH`` takes an other optional argument ``search`` which defaults to ``False``. When set to ``True``, it uses regex method ``search`` instead of method ``match`` to validate the string.
+
+``IS_MATCH('...', extract=True)`` filters and extract only the first matching
+substring rather than the original value.
 
 ##### ``IS_NOT_EMPTY``
 ``IS_NOT_EMPTY``:inxx
@@ -1930,14 +1972,6 @@ Check for valid private network IPv4 address:
 requires = IS_IPV4(minip='192.168.0.1', maxip='192.168.255.255')
 ``:code
 
-##### ``IS_LOWER``
-``IS_LOWER``:inxx
-
-This validator never returns an error. It converts the value to lower case.
-``
-requires = IS_LOWER()
-``:code
-
 ##### ``IS_UPPER``
 ``IS_UPPER``:inxx
 
@@ -1976,7 +2010,7 @@ This is also a filter. It performs a secure hash on the input and it is used to 
 requires = CRYPT()
 ``:code
 
-By default, CRYPT uses 1000 iterations of the pbkdf2 algorithm combined with SHA1 to produce a 20-byte-long hash. Older versions of web2py used "md5" or HMAC+SHA512 depending on whether a key was was specified or not.
+By default, CRYPT uses 1000 iterations of the pbkdf2 algorithm combined with SHA512 to produce a 20-byte-long hash. Older versions of web2py used "md5" or HMAC+SHA512 depending on whether a key was was specified or not.
 
 If a key is specified, CRYPT uses the HMAC algorithm. The key may contain a prefix that determines the algorithm to use with HMAC, for example SHA512:
 
@@ -1986,6 +2020,18 @@ requires = CRYPT(key='sha512:thisisthekey')
 
 This is the recommended syntax. The key must be a unique string associated with the database used. The key can never be changed. If you lose the key, the previously hashed values become useless.
 
+By default, CRYPT uses random salt, such that each result is different. To use a constant salt value, specify its value:
+
+``
+requires = CRYPT(salt='mysaltvalue')
+``:code
+
+Or, to use no salt:
+
+``
+requires = CRYPT(salt=False)
+``:code
+
 The CRYPT validator hashes its input, and this makes it somewhat special. If you need to validate a password field before it is hashed, you can use CRYPT in a list of validators, but must make sure it is the last of the list, so that it is called last. For example:
 
 ``
@@ -1993,6 +2039,8 @@ requires = [IS_STRONG(),CRYPT(key='sha512:thisisthekey')]
 ``:code
 
 ``CRYPT`` also takes a ``min_length`` argument, which defaults to zero.
+
+The resulting hash takes the form ``alg$salt$hash``, where ``alg`` is the hash algorithm used, ``salt`` is the salt string (which can be empty), and ``hash`` is the algorithm's output. Consequently, the hash is self-identifying, allowing, for example, the algorithm to be changed without invalidating previous hashes. The key, however, must remain the same.
 
 #### Database validators
 
@@ -2201,7 +2249,7 @@ Widgets are helper factories and their first two arguments are always ``field`` 
 
 You can create new widgets or extend existing widgets.
 
-``SQLFORM.widgets[type]`` is a class and ``SQLFORM.widgets[type].widget`` is a static member function of the corresponding class. Each widget function takes two arguments: the field object, and the current value of that field. It returns a representation of the widget. As an example, the string widget could be recoded as follows:
+``SQLFORM.widgets[type]`` is a class and ``SQLFORM.widgets[type].widget`` is a static member function of the corresponding class. Each widget function takes two arguments: the field object, and the current value of that field. It returns a representation of the widget. As an example, the string widget could be re-coded as follows:
 ``
 def my_string_widget(field, value):
     return INPUT(_name=field.name,
@@ -2250,6 +2298,7 @@ Attention: grid and smartgrid were experimental prior web2py version 2.0 and wer
 
 These are two high level gadgets that create complex CRUD controls. They provide pagination, the ability to browser, search, sort, create, update and delete records from a single gadgets.
 
+#### ``SQLFORM.grid`` 
 The simplest of the two is ``SQLFORM.grid``. Here is an example of usage:
 
 ``
@@ -2257,7 +2306,7 @@ The simplest of the two is ``SQLFORM.grid``. Here is an example of usage:
 def manage_users():
     grid = SQLFORM.grid(db.auth_user)
     return locals()
-``
+``:code
 
 which produces the following page:
 
@@ -2271,15 +2320,16 @@ Before we dive into the long list of arguments of the grid gadget we need to und
 def manage_users():
     grid = SQLFORM.grid(db.auth_user,user_signature=False)
     return locals()
-``
+``:code
 
 but we do not recommend it.
 
 -----
 Because of the way grid works one can only have one grid per controller function, unless they are embedded as components via ``LOAD``.
+To make the default search grid work in more than one LOADed grid, please use a different ``formname`` for each one.
 -----
 
-Because the function that contains the grid may itself manipulate the command line arguments, the grid needs to know which args should be handled by the grid and which not. For example here is an example of code that allows one to manage any table:
+Because the function that contains the grid may itself manipulate the command line arguments, the grid needs to know which args should be handled by the grid and which not. Here is an example of code that allows one to manage any table:
 
 ``
 @auth.requires_login()
@@ -2288,91 +2338,144 @@ def manage():
     if not table in db.tables(): redirect(URL('error'))
     grid = SQLFORM.grid(db[table],args=request.args[:1])
     return locals()
-``
+``:code
 
 the ``args`` argument of the ``grid`` specifies which ``request.args`` should be passed along and ignored by the gadget. In our case ``request.args[:1]`` is the name of the table we want to manage and it is handled by the ``manage`` function itself, not by the gadget.
 
 The complete signature for the grid is the following:
 
 ``
-SQLFORM.grid(query,
-             fields=None,
-             field_id=None,
-             left=None,
-             headers={},
-             orderby=None,
-	     groupby=None,
-             searchable=True,
-             sortable=True,
-             deletable=True,
-             editable=True,
-             details=True,
-             create=True,
-             csv=True,
-             paginate=20,
-             selectable=None,
-             links=None,
-             upload = '<default>',
-             args=[],
-             user_signature = True,
-             maxtextlengths={},
-             maxtextlength=20,
-             onvalidation=None,
-             oncreate=None,
-             onupdate=None,
-             ondelete=None,
-             sorter_icons=('[^]','[v]'),
-             ui = 'web2py',
-             showbuttontext=True,
-             search_widget='default',
-             _class="web2py_grid",
-             formname='web2py_grid',
-             ignore_rw = False,
-             formstyle = 'table3cols'):
+SQLFORM.grid(
+    query,
+    fields=None,
+    field_id=None,
+    left=None,
+    headers={},
+    orderby=None,
+    groupby=None,
+    searchable=True,
+    sortable=True,
+    paginate=20,
+    deletable=True,
+    editable=True,
+    details=True,
+    selectable=None,
+    create=True,
+    csv=True,
+    links=None,
+    links_in_grid=True,
+    upload='<default>',
+    args=[],
+    user_signature=True,
+    maxtextlengths={},
+    maxtextlength=20,
+    onvalidation=None,
+    oncreate=None,
+    onupdate=None,
+    ondelete=None,
+    sorter_icons=(XML('&#x2191;'), XML('&#x2193;')),
+    ui = 'web2py',
+    showbuttontext=True,
+    _class="web2py_grid",
+    formname='web2py_grid',
+    search_widget='default',
+    ignore_rw = False,
+    formstyle = 'table3cols',
+    exportclasses = None,
+    formargs={},
+    createargs={},
+    editargs={},
+    viewargs={},
+    buttons_placement = 'right',
+    links_placement = 'right'
+    )
 ``:code
 
 - ``fields`` is a list of fields to be fetched from the database. It is also used to determine which fields to be shown in the grid view.
 - ``field_id`` must be the field of the table to be used as ID, for example ``db.mytable.id``.
-- ``headers`` is a dictionary that maps 'tablename.fieldname' into the corresponding header label.
 - ``left`` is an optional left join expressions used to build ``...select(left=...)``.
+- ``headers`` is a dictionary that maps 'tablename.fieldname' into the corresponding header label, e.g. ``{'auth_user.email' : 'Email Address'}``
 - ``orderby`` is used as default ordering for the rows.
-- ``searchable``, ``sortable``, ``deletable``, ``details``, ``create`` determine whether one can search, sort, delete, view details, and create new records respectively.
-- ``csv`` if set to true allows to download the grid in CSV.
+- ``groupby`` is used to group the set. Use the same syntax as you were passing in a simple ``select(groupby=...)``.
+- ``searchable``, ``sortable``, ``deletable``, ``editable``, ``details``, ``create`` determine whether one can search, sort, delete, edit, view details, and create new records respectively.
+- ``selectable`` can be used to call a custom function on multiple records (a checkbox will be inserted for every row) e.g.
+  ``
+   selectable = lambda ids : redirect(URL('default', 'mapping_multiple', vars=dict(id=ids)))
+``:code
 - ``paginate`` sets the max number of rows per page.
+- ``csv`` if set to true allows to download the grid in various format (more on that later).
 - ``links`` is used to display new columns which can be links to other pages. The ``links`` argument must be a list of  ``dict(header='name',body=lambda row: A(...))`` where ``header`` is the header of the new column and ``body`` is a function that takes a row and returns a value. In the example, the value is a ``A(...)`` helper.
-- ``maxtextlength`` sets the maximum length of text to be displayed for each field value, in the grid view. This value can be overwritten for each field using ``maxtextlengths``, a dictionary of 'tablename.fieldname':length.
+- ``links_in_grid`` if set to False, links will only be displayed in the "details" and "edit" page (so, not on the main grid)
+- ``upload`` same as SQLFORM's one. web2py uses the action at that URL to download the file
+- ``maxtextlength`` sets the maximum length of text to be displayed for each field value, in the grid view. This value can be overwritten for each field using ``maxtextlengths``, a dictionary of 'tablename.fieldname':length e.g. ``{'auth_user.email' : 50}``
 - ``onvalidation``, ``oncreate``, ``onupdate`` and ``ondelete`` are callback functions. All but ``ondelete`` take a form object as input.
 - ``sorter_icons`` is a list of two strings (or helpers) that will be used to represent the up and down sorting options for each field.
 - ``ui`` can be set equal to 'web2py' and will generate web2py friendly class names, can be set equal to ``jquery-ui`` and will generate jquery UI friendly class names, but it can also be its own set of class names for the various grid components:
-
-``
-ui = dict(widget='',
-          header='',
-          content='',
-          default='',
-          cornerall='',
-          cornertop='',
-          cornerbottom='',
-          button='button',
-          buttontext='buttontext button',
-          buttonadd='icon plus',
-          buttonback='icon leftarrow',
-          buttonexport='icon downarrow',
-          buttondelete='icon trash',
-          buttonedit='icon pen',
-          buttontable='icon rightarrow',
-          buttonview='icon magnifier')
+  ``
+ui = dict(
+    widget='',
+    header='',
+    content='',
+    default='',
+    cornerall='',
+    cornertop='',
+    cornerbottom='',
+    button='button',
+    buttontext='buttontext button',
+    buttonadd='icon plus',
+    buttonback='icon leftarrow',
+    buttonexport='icon downarrow',
+    buttondelete='icon trash',
+    buttonedit='icon pen',
+    buttontable='icon rightarrow',
+    buttonview='icon magnifier')
 ``:code
 
 - ``search_widget`` allows to override the default search widget and we refer the reader the source code in "gluon/sqlhtml.py" for details.
-- ``showbutton`` allows to turn off all buttons.
+- ``showbuttontext`` allows to have buttons without text (there will effectively be only icons)
 - ``_class`` is the class for the grid container.
-- ``formname``, ``ignore_rw`` and ``formstyle`` are passed to the SQLFORM objects used by the grid for create/update forms.
+- ``showbutton`` allows to turn off all buttons.
+- ``exportclasses`` takes a dictionary of tuples: by default it's defined as
 
+``
+csv_with_hidden_cols=(ExporterCSV, 'CSV (hidden cols)'),
+csv=(ExporterCSV, 'CSV'),
+xml=(ExporterXML, 'XML'),
+html=(ExporterHTML, 'HTML'),
+tsv_with_hidden_cols=(ExporterTSV, 'TSV (Excel compatible, hidden cols)'),
+tsv=(ExporterTSV, 'TSV (Excel compatible)'))
+``:code
+
+ExporterCSV, ExporterXML, ExporterHTML and ExporterTSV are all defined in gluon/sqlhtml.py. Take a look at those for creating your own exporter. If you pass a dict like ``dict(xml=False, html=False)`` you will disable the xml and html export formats.
+
+- ``formargs`` is passed to all SQLFORM objects used by the grid, while ``createargs``,``editargs`` and ``viewargs`` are passed only to the specific create, edit and details SQLFORMs
+- ``formname``, ``ignore_rw`` and ``formstyle`` are passed to the SQLFORM objects used by the grid for create/update forms.
+- ``buttons_placement`` and ``links_placement`` both take a parameter ('right', 'left', 'both') that will affect where on the row the buttons (or the links) will be placed
 ------
 ``deletable``, ``editable`` and ``details`` are usually boolean values but they can be functions which take the row object and decide whether to display the corresponding button or not.
 -----
 
+##### ``Showing virtual fields in SQLFORM.grid and smartgrid``
+In recent versions of web2py, virtual fields are shown in grids like normal fields: either shown alongside all other fields by default, or by including them in the ``fields`` argument. However, virtual fields are not sortable. 
+
+In older web2py versions (up to 2.4.7), showing virtual fields in a grid requires use of the ``links`` argument. If table db.t1 has a field called t1.vfield which is based on the values of t1.field1 and t1.field2, do this:
+
+``grid = SQLFORM.grid(db.t1, ..., fields = [t1.field1, t1.field2,...], 
+   links = [dict(header='Virtual Field',body=lamba row:row.vfield),...] )
+``:code
+
+In all cases, because t1.vfield depends on t1.field1 and t1.field2, these fields must be present in the row. In the example above, this is guaranteed by including t1.field1 and t1.field2 in the fields argument. Alternatively, showing all fields will also work. You can suppress a field from displaying by setting the readable attibute to False. 
+
+Note that when defining the virtual field, the lambda function must qualify fields with the database name, but in the links argument, this is not necessary.
+So for the example above, the virtual field may be defined like:
+``
+db.define_table('t1',Field('field1','string'),
+   Field('field2','string'),
+  Field.Virtual('virtual1', lambda row: row.t1.field1 + row.t1.field2),
+  ...)
+``:code
+
+#### ``SQLFORM.smartgrid``
 A ``SQLFORM.smartgrid`` looks a lot like a ``grid``, in fact it contains a grid but it is designed to take as input not a query but only one table and to browse said table and selected referencing tables.
 
 For example consider the following table structure:
@@ -2399,7 +2502,7 @@ SQLFORM.grid(db.parent,left=db.child.on(db.child.parent==db.parent.id))
 With SQLFORM.smartgrid you can put all the data in one gadget that spawns both tables:
 
 ``
-@auth.requires_login():
+@auth.requires_login()
 def manage():
     grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'])
     return locals()
@@ -2439,25 +2542,27 @@ The ``smartgrid`` takes the same arguments as a ``grid`` and some more with some
 - The first argument is a table, not a query
 - There is a extra argument ``constraints`` which is a dictionary of 'tablename':query which can be used to further restrict access to the records displayed in the 'tablename' grid.
 - There is a extra argument ``linked_tables`` which is a list of tablenames of tables that should be accessible via the smartgrid.
+- ``divider`` allows to specify a character to use in the breadcrumb navigator, ``breadcrumbs_class`` will apply the class to the breadcrumb element
 - All the arguments but the table, ``args``, ``linked_tables`` and ``user_signatures`` can be dictionaries as explained below.
 
 Consider the previous grid:
 ``
 grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'])
-``
+``:code
 It allows one to access both a ``db.parent`` and a ``db.child``. Apart for navigation controls, for each one table, a smarttable is nothing but a grid. This means that, in this case, one smartgrid can create a grid for parent and one grid for child. We may want to pass different sets of parameters to these grids. For example different sets of ``searchable`` parameters.
 
 While for a grid we would pass a boolean:
 ``
 grid = SQLFORM.grid(db.parent,searchable=True)
-``
+``:code
+
 for a smartgrid we would pass a dictionary of booleans:
 ``
 grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'],
      searchable= dict(parent=True, child=False))
-``
-In this way we made parents searchable but children for each parent not searchable (there should not be that many to need the search widget).
+``:code
 
+In this way we made parents searchable but children for each parent not searchable (there should not be that many to need the search widget).
 
 -------
 The grid and smartgrid gadgets are here to stay but they are marked experimental because the actual html layout of what they return and the exact set of parameters one can pass to them  may be subject to change as new functionalities are added.
@@ -2470,7 +2575,7 @@ The grid and smartgrid gadgets are here to stay but they are marked experimental
 grid = SQLFORM.grid(db.auth_user,
      editable = auth.has_membership('managers'),
      deletable = auth.has_membership('managers'))
-``
+``:code
 
 or
 
@@ -2478,7 +2583,7 @@ or
 grid = SQLFORM.grid(db.auth_user,
      editable = auth.has_permission('edit','auth_user'),
      deletable = auth.has_permission('delete','auth_user'))
-``
+``:code
 
 The ``smartgrid`` is the only gadget in web2py that displays the table name and it need both the singular and the plural. For example one parent can have one "Child" or many "Children". Therefore a table object needs to know its own singular and plural names. web2py normally guesses them but you can set the explicitly:
 
@@ -2496,4 +2601,5 @@ db.child._plural = "Children"
 
 They should also be internationalized using the ``T`` operator.
 
-The plural and singular values are then used by ``smartgrid`` to provide correct names for headers and links.
+The plural and singular values are then used by ``smartgrid``
+to provide correct names for headers and links.
