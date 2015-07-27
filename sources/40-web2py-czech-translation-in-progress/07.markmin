@@ -203,13 +203,21 @@ Od hlavní šablony "layout.html" se očekává, že zpracuje DIVy se třídou "
 
 ``keepvalues``:inxx
 
-The optional argument ``keepvalues`` tells web2py what to do when a form is accepted and there is no redirection, so the same form is displayed again. By default the form is cleared. If ``keepvalues`` is set to ``True``, the form is pre-populated with the previously inserted values. This is useful when you have a form that is supposed to be used repeatedly to insert multiple similar records. If the ``dbio`` argument is set to ``False``, web2py will not perform any DB insert/update after accepting form. If ``hideerror`` is set to ``True`` and the form contains errors, these will not be displayed when the form is rendered (it will be up to you to display them from ``form.errors`` somehow. The ``onvalidation`` argument is explained below.
+Volitelný argument ``keepvalues`` se týká případu, kdy data formuláře pro přidání nového záznamu jsou akceptována a nepřesměrujete na jinou (následující) URL, takže se tentýž formulář zobrazí znovu. Defaultně jsou údaje smazány a zobrazí se prázdné. Jestliže nastavíme ``keepvalues`` na ``True``, formulář se předvyplní naposledy zadanými hodnotami. To je užitečné tehdy, když se pomocí formuláře má zadávat více podobných záznamů.
+
+#### ``dbio``
+
+Jestliže je ``dbio`` argument nastaven na ``False``, Web2py neprovede po akceptování formuláře fyzické změny (insert/update) v databázi.
+
+#### ``hideerror``
+
+Jestliže nastavíte ``hideerror`` na ``True``, pak formulář nezobrazí chyby, které byly zjištěny ve validaci. Je pak na vás, abyste nějakým způsobem zpracovali a zobrazili ``form.errors``.
 
 #### ``onvalidation``
 
-The ``onvalidation`` argument can be ``None`` or can be a function that takes the form and returns nothing. Such a function would be called and passed the form, immediately after validation (if validation passes) and before anything else happens. The purpose of this function is multifold. It can be used, for example, to perform additional checks on the form and eventually add errors to the form. It can also be used to compute the values of some fields based on the values of other fields. It can be used to trigger some action (like sending an email) before a record is created/updated.
+Argument ``onvalidation`` může být ``None`` nebo to může být funkce, která jako argument vezme objekt formuláře a nevrátí nic. Taková funkce se zavolá (a předá se jí, jak bylo řečeno, jako argument objekt formuláře) ihned poté, kdy proběhla validace (pokud byla úspěšná). Funkci lze použít různými způsoby. Např. můžete provést další kontroly nad formulářem a případně přidat další chyby k těm, které byly zjištěny pomocí standardní validace. Dále je možné vypočíst hodnoty některých polí na základě jiných polí. Může být vyvolána nějaká akce (např. odeslání emailu) před tím, než dojde k aktualizaci záznamu.
 
-Here is an example:
+Tady je příklad:
 ``
 db.define_table('numbers',
     Field('a', 'integer'),
@@ -219,7 +227,7 @@ db.define_table('numbers',
 def my_form_processing(form):
     c = form.vars.a * form.vars.b
     if c < 0:
-       form.errors.b = 'a*b cannot be negative'
+       form.errors.b = 'součin a*b nesmí být záporný'
     else:
        form.vars.c = c
 
@@ -231,55 +239,55 @@ def insert_numbers():
    return dict(form=form)
 ``:code
 
-#### Detect record change
+#### Kontrola změny záznamu jiným uživatelem
 
-When filling a form to edit a record there is a small probability that another user may concurrently be editing the same record. So when we save the record we want to check for possible conflicts. This can be done:
+Když editujetě záznam ve formuláři, je zde jistá, i když velmi nízká možnost, že by jiný uživatel v tu samou chvíli změnil editovaný záznam. Může být proto vhodné zjistit případný konflikt. Lze to udělat takto:
 
 ``
-db.define_table('dog',Field('name'))
+db.define_table('dog', Field('name'))
 
 def edit_dog():
     dog = db.dog(request.args(0)) or redirect(URL('error'))
-    form=SQLFORM(db.dog,dog)
+    form = SQLFORM(db.dog, dog)
     form.process(detect_record_change=True)
     if form.record_changed:
-        # do something
+        # jiný změnil - udělej něco
     elif form.accepted:
-        # do something else
+        # akceptováno, nikdo nezměnil - udělej něco jiného
     else:
-        # do nothing
+        # nic nedělat
     return dict(form=form)
 ``:code
 
-#### Forms and redirection
+#### Formuláře a přesměrování (redirect)
 
-The most common way to use forms is via self-submission, so that the submitted field variables are processed by the same action that generated the form. Once the form is accepted, it is unusual to display the current page again (something we are doing here only to keep things simple). It is more common to redirect the visitor to a "next" page.
+Standardní použití formulářů je se sebe-potvrzením (self-submission), takže potvrzené (odeslané) hodnoty údajů se zpracují na stejné adrese (stejnou akcí), která vystavila formulář. Jakmile je formulář akceptován, je sice možné zobrazit tutéž stránku znovu, ale není to obvyklé. (Pokud jsme to tak dělali v příkladech, tak jedině kvůli jednoduchosti ukázky.) Mnohem běžnější je přesměrovat uživatele na "další" ("next") stránku.
 
-Here is the new example controller:
+Tady to vidíme na příkladu:
 ``
 def display_form():
-    form = FORM('Your name:',
+    form = FORM('Vaše jméno:',
               INPUT(_name='name', requires=IS_NOT_EMPTY()),
               INPUT(_type='submit'))
     if form.process().accepted:
-        session.flash = 'form accepted'
+        session.flash = 'formulář úspěšně zpracován'
         redirect(URL('next'))
     elif form.errors:
-        response.flash = 'form has errors'
+        response.flash = 've formuláři jsou chyby'
     else:
-        response.flash = 'please fill the form'
+        response.flash = 'prosím, vyplň formulář'
     return dict(form=form)
 
 def next():
     return dict()
 ``:code
 
-In order to set a flash on the next page instead of the current page you must use ``session.flash`` instead of ``response.flash``. web2py moves the former into the latter after redirection. Note that using ``session.flash`` requires that you do not ``session.forget()``.
+Jestliže chceme zobrazit flash hlášení až na následující straně (po redirekci), musíme použít ``session.flash`` místo ``response.flash``. Web2py tím získá hlášení ze session po redirekci, převede jej do ``response.flash`` a zobrazí. Pozor, pro použití přiřazení do ``session.flash`` nesmíte potlačovat práci se session pomocí ``session.forget()``.
 
-#### Multiple forms per page
+#### Více formulářů na stránce
 
-The content of this section applies to both ``FORM`` and ``SQLFORM`` objects.
-It is possible to have multiple forms per page, but you must allow web2py to distinguish them. If these are derived by ``SQLFORM`` from different tables, then web2py gives them different names automatically; otherwise you need to explicitly give them different form names. Here is an example:
+Obsah této sekce platí pro ``FORM`` i ``SQLFORM`` objekty.
+Je možné zobrazit několik formulářů na stránce, ale musíte umožnit, aby bylo Web2py schopné je rozlišovat. Jestliže jsou vygenerovány pomocí ``SQLFORM`` z různých tabulek, dá jim Web2py unikátní jména automaticky. V opačném případě musíte nastavit unikátní jména explicitně. Příklad:
 ``
 def two_forms():
     form1 = FORM(INPUT(_name='name', requires=IS_NOT_EMPTY()),
@@ -293,15 +301,15 @@ def two_forms():
     return dict(form1=form1, form2=form2)
 ``:code
 
-and here is the output it produces:
+což vytvoří tento výstup:
 
 [[image @///image/en6100.png center 300px]]
 
-When the visitor submits an empty form1, only form1 displays an error; if the visitor submits an empty form2, only form2 displays an error message.
+Když uživatel potvrdí prázdný formulář form1, jen form1 zobrazí chyby; když uživatel potvrdí prázdný formulář form2, jen form2 zobrazí chyby.
 
-#### Sharing forms
+#### Sdílení formulářů
 
-The content of this section applies to both ``FORM`` and ``SQLFORM`` objects. What we discuss here is possible but not recommended, since it is always good practice to have forms that self-submit. Sometimes, though, you don't have a choice, because the action that sends the form and the action that receives it belong to different applications.
+Tento oddíl se opět týká i objektu ``FORM`` i ``SQLFORM`` objects. Co zde probíráme, se nedoporučuje, protože správný postup je vždy používat formuláře, které se samo-potvrzují ve stejné akci (self-submit). Někdy ale nemáte tu možnost, a sice v případě, když by akce, která vystaví formulář a akce, která jej zpracovává, patřily do dvou různých aplikací.
 
 It is possible to generate a form that submits to a different action. This is done by specifying the URL of the processing action in the attributes of the ``FORM`` or ``SQLFORM`` object. For example:
 ``
