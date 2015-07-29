@@ -309,9 +309,9 @@ Když uživatel potvrdí prázdný formulář form1, jen form1 zobrazí chyby; k
 
 #### Sdílení formulářů
 
-Tento oddíl se opět týká i objektu ``FORM`` i ``SQLFORM`` objects. Co zde probíráme, se nedoporučuje, protože správný postup je vždy používat formuláře, které se samo-potvrzují ve stejné akci (self-submit). Někdy ale nemáte tu možnost, a sice v případě, když by akce, která vystaví formulář a akce, která jej zpracovává, patřily do dvou různých aplikací.
+Tento oddíl se opět týká i objektu ``FORM`` i ``SQLFORM`` objects. Co zde probíráme, se nedoporučuje, protože správný postup je vždy používat formuláře, které se samo-potvrzují ve stejné akci (self-submit). Někdy ale nemáte tu možnost, například v případě, když by akce, která vystaví formulář a akce, která jej zpracovává, patřily do dvou různých aplikací. Takové chování byste získali úpravou následujícího postupu:
 
-It is possible to generate a form that submits to a different action. This is done by specifying the URL of the processing action in the attributes of the ``FORM`` or ``SQLFORM`` object. For example:
+Vytvořit formulář, který potvrzuje (submits) pomocí jiné akce je možné. Provedete to zadáním URL v atributech objektu ``FORM`` nebo ``SQLFORM``. Například:
 ``
 form = FORM(INPUT(_name='name', requires=IS_NOT_EMPTY()),
         INPUT(_type='submit'), _action=URL('page_two'))
@@ -321,63 +321,64 @@ def page_one():
 
 def page_two():
     if form.process(session=None, formname=None).accepted:
-         response.flash = 'form accepted'
+         response.flash = 'formulář byl zpracován'
     else:
-         response.flash = 'there was an error in the form'
+         response.flash = 've formuláři byly chyby'
     return dict()
 ``:code
 
-Notice that since both "page_one" and "page_two" use the same ``form``, we have defined it only once by placing it outside of all the actions, in order not to repeat ourselves. The common portion of code at the beginning of a controller gets executed every time before giving control to the called action.
+Všimněte si, že obě stránky, "page_one" i "page_two", používají tentýž ``form``. Definovali jsme ho jen jednou, tak, že jsme ho umístili mimo obě akce, abychom kód dvakrát neopakovali. Zde vidíme, že se úvodní část kódu v kontroléru provede pokaždé, a poté se předá řízení konkrétní akci.
 
-Since "page_one" does not call ``process`` (nor ``accepts``), the form has no name and no key, so you must pass  ``session=None`` and set ``formname=None`` in ``process``, or the form will not validate when "page_two" receives it.
+Protože akce "page_one" nevolá ``process`` (ani ``accepts``), nemá formulář žádné jméno ani klíč a musíte zadat ``session=None`` a nastavit ``formname=None`` ve volání metody ``process``, jinak neproběhne validace poté, co jej obdrží druhá akce.
 
-#### Adding buttons to FORMs
+#### Přidání tlačítek do formuláře
 
-Usually a form provides a single submit button. It is common to want to add a "back" button that instead of submitting the form, directs the visitor to a different page.
+Základní formulář má jediné tlačítko pro Odeslání (Submit). Často je potřeba přidat tlačítko "Zpět", které místo potvrzení formuláře směruje uživatele na jinou stránku.
 
 ``add_button``:inxx
 
-This can be done with the ``add_button`` method:
+Můžete využít metodu ``add_button``:
 
 ``
-form.add_button('Back', URL('other_page'))
+form.add_button('Zpět', URL('jina_akce'))
 ``:code
 
-You can add more than one button to form. The arguments of ``add_button`` are the value of the button (its text) and the url where to redirect to.
+Opakovaným voláním můžete přidat více tlačítek. Argumentem metody ``add_button`` je value tlačítka (jeho text) a url, kam se přesměruje při stisknutí tlačítka.
 
-#### More about manipulation of FORMs
-As discussed in the Views chapter, a FORM is an HTML helper. Helpers can be manipulated as Python lists and as dictionaries, which enables run-time creation and modification.
+#### Více o manipulaci s formuláři
+
+Jak jsme ukázali v kapitole o šablonách (Views), FORM je HTML helper. S helpery můžeme manipulovat jako s jinými seznamy (lists) nebo slovníky (dictionaries) Pythonu, což umožňuje vytváření a modifikaci za běhu. (Pozn. překl.: více zde není uvedeno - zřejmě je potřeba nastavit bod přerušení (import pdb; pdb.set_trace()) a provést introspekci objektu (dir(form)).)
 
 ### ``SQLFORM``
 
-We now move to the next level by providing the application with a model file:
+Nyní půjdeme dále a přidáme další úroveň spoluprací formuláře s modelem:
 ``
 db = DAL('sqlite://storage.sqlite')
-db.define_table('person', Field('name', requires=IS_NOT_EMPTY()))
+db.define_table('person', Field('name', requires=IS_NOT_EMPTY(), label="Vaše jméno: "))
 ``:code
 
-Modify the controller as follows:
+Změníme kontrolér takto:
 ``
 def display_form():
-   form = SQLFORM(db.person)
-   if form.process().accepted:
-       response.flash = 'form accepted'
-   elif form.errors:
-       response.flash = 'form has errors'
-   else:
-       response.flash = 'please fill out the form'
-   return dict(form=form)
+    form = SQLFORM(db.person)
+    if form.process().accepted:
+        response.flash = 'formulář úspěšně zpracován'
+    elif form.errors:
+        response.flash = 've formuláři jsou chyby'
+    else:
+        response.flash = 'prosím, vyplň formulář'
+    return dict(form=form)
 ``:code
 
-The view does not need to be changed.
+Šablonu (view) ponecháme stejnou.
 
-In the new controller, you do not need to build a ``FORM``, since the ``SQLFORM`` constructor built one from the table ``db.person`` defined in the model. This new form, when serialized, appears as:
+V novém kontroléru nemusíte sestavovat ``FORM``, protože volání ``SQLFORM`` formulář sestaví na základě tabulky ``db.person``, jak ji definoval model. Tento formulář bude po serializaci (voláním {{=form}} v šabloně) vypadat takto:
 ``
 <form enctype="multipart/form-data" action="" method="post">
   <table>
     <tr id="person_name__row">
        <td><label id="person_name__label"
-                  for="person_name">Your name: </label></td>
+                  for="person_name">Vaše jméno: </label></td>
        <td><input type="text" class="string"
                   name="name" value="" id="person_name" /></td>
        <td></td>
@@ -393,37 +394,42 @@ In the new controller, you do not need to build a ``FORM``, since the ``SQLFORM`
 </form>
 ``:code
 
-The automatically generated form is more complex than the previous low-level form. First of all, it contains a table of rows, and each row has three columns. The first column contains the field labels (as determined from the ``db.person``), the second column contains the input fields (and eventually error messages), and the third column is optional and therefore empty (it can be populated with the fields in the ``SQLFORM`` constructor).
+Automaticky sestavený formulář je trochu složitější než ten, který jsme sestavovali dříve, na nižší úrovni. Obsahuje HTML tabulku řádků, z nichž každý má 3 sloupce. V prvním sloupci je label (titulek) pole tabulky z define_table(.., Field(.., label=..)), ve druhém sloupci je INPUT prvek pro zadání pole tabulky (a po potvrzení a neúspěšné validaci případně také chybové hlášení). Třetí sloupec je prázdný a může být zadán ??((pomocí fields v konstruktoru ``SQLFORM``))??.
 
-All tags in the form have names derived from the table and field name. This allows easy customization of the form using CSS and JavaScript. This capability is discussed in more detail in Chapter 11.
+Všechny HTML entity (tags) ve formuláři mají jména odvozená od jména tabulky a jejích polí. Vzhled a chování formuláře tedy můžete snadno přizpůsobit pomocí CSS nebo JavaScriptu. Podrobněji se tomu věnujeme v kapitole 11.
 
-More important is that now the ``accepts`` method does a lot more work for you. As in the previous case, it performs validation of the input, but additionally, if the input passes validation, it also performs a database insert of the new record and stores in ``form.vars.id`` the unique "id" of the new record.
+Podstatnější je, že metoda ``accepts`` pro vás nyní dělá mnohem více. Stejně jako v předchozím případě zajistí validaci vstupu, ale navíc, když data validaci vyhoví, provede insert nového záznamu do databáze a uloží přidělené unikátní "id" do ``form.vars.id``.
 
-A ``SQLFORM`` object also deals automatically with "upload" fields by saving uploaded files in the "uploads" folder (after having them renamed safely to avoid conflicts and prevent directory traversal attacks) and stores their names (their new names) into the appropriate field in the database. After the form has been processed, the new filename is available in ``form.vars.fieldname`` (i.e., it replaces the ``cgi.FieldStorage`` object in ``request.vars.fieldname``), so you can easily reference the new name right after upload.
+Objekt ``SQLFORM`` také automaticky podporuje pole typu "upload" a ukládá uploadované soubory do adresáře "uploads" (poté, co je přejmenuje, a tak předejte možným konfliktům a útokům, založeným na znalosti jména souboru) a jejich (nová) jména do příslušného pole databáze. Po zpracování ve ``form.process()`` je nové jméno souboru dostupné jako ``form.vars.fieldname`` (to znamená, že nahradí standardní ``cgi.FieldStorage`` objekt, který přijde jako ``request.vars.fieldname``), takže se můžete snadněji na soubor odkazovat ihned poté, co byl nahrán.
 
-A ``SQLFORM`` displays "boolean" values with checkboxes, "text" values with textareas, values required to be in a definite set or a database with drop-boxes, and "upload" fields with links that allow users to download the uploaded files. It hides "blob" fields, since they are supposed to be handled differently, as discussed later.
+``SQLFORM`` zobrazí na stránce
+- "boolean" hodnoty pomocí checkboxů,
+- hodnoty typu "text" pomocí HTML textarea,
+- hodnoty, jejichž validátor vyžaduje, aby byly ze zadané množiny nebo aby byly v tabulce databáze, pomocí drop-boxů,
+- "upload" pole pomocí odkazu, který umožňuje uživateli stáhnout uploadovaný soubor.
+Skryje pole typu "blob", protože o nich se předpokládá, že budou ošetřena jinak, jak popíšeme později.
 
-For example, consider the following model:
+Např. uvažujme tento model:
 ``
 db.define_table('person',
     Field('name', requires=IS_NOT_EMPTY()),
     Field('married', 'boolean'),
-    Field('gender', requires=IS_IN_SET(['Male', 'Female', 'Other'])),
+    Field('gender', requires=IS_IN_SET(['Muž', 'Žena', 'Nevíme'])),
     Field('profile', 'text'),
     Field('image', 'upload'))
 ``:code
 
-In this case, ``SQLFORM(db.person)`` generates the form shown below:
+``SQLFORM(db.person)`` vygeneruje následující formulář:
 
 [[image @///image/en6200.png center 300px]]
 
-The ``SQLFORM`` constructor allows various customizations, such as displaying only a subset of the fields, changing the labels, adding values to the optional third column, or creating UPDATE and DELETE forms, as opposed to INSERT forms like the current one.
-``SQLFORM`` is the single biggest time-saver object in web2py.
+Konstruktor ``SQLFORM`` umožňuje různá přizpůsobení (customizations), např. zobrazit jenom vybraná pole, změnit popisné texty (labely), přidat hodnoty do volitelného třetího sloupce, nebo změnit formulář pro vložení nového záznamu na formulář pro Update/Delete stávajícího záznamu.
+Objekt ``SQLFORM`` znamená nejspíš největší úsporu času při používání Web2py.
 
-The class ``SQLFORM`` is defined in "gluon/sqlhtml.py". It can be easily extended by overriding its ``xml`` method, the method that serializes the objects, to change its output.
+Třída ``SQLFORM`` je definovaná v "gluon/sqlhtml.py". Může být snadno rozšířena tím, že (ve vyděděné třídě) přepíšeme její ``xml`` metodu, čili metodu, která serializuje objekt do HTML, a tak změníme její HTML reprezentaci.
 
 ``fields``:inxx ``labels``:inxx
-The signature for the ``SQLFORM`` constructor is the following:
+Úplná signatura ``SQLFORM`` konstruktoru je:
 ``
 SQLFORM(table, record = None,
         deletable = False, linkto = None,
@@ -438,28 +444,28 @@ SQLFORM(table, record = None,
         **attributes)
 
 ``:code
-- The optional second argument turns the INSERT form into an UPDATE form for the specified record (see next subsection). ``showid``:inxx ``delete_label``:inxx ``id_label``:inxx ``submit_button``:inxx
-- If ``deletable`` is set to ``True``, the UPDATE form displays a "Check to delete" checkbox. The value of the label for this field is set via the ``delete_label`` argument.
-- ``submit_button`` sets the value of the submit button.
-- ``id_label`` sets the label of the record "id"
-- The "id" of the record is not shown if ``showid`` is set to ``False``.
-- ``fields`` is an optional list of field names that you want to display. If a list is provided, only fields in the list are displayed. For example:
+- Pomocí nepovinného druhého parametru změníte formulář pro vložení nového záznamu (Insert) na formulář pro aktualizaci (Update) stávajícího záznamu (více v následujícím oddíle).
+``showid``:inxx ``delete_label``:inxx ``id_label``:inxx ``submit_button``:inxx
+- Jestliže nastavíte ``deletable`` na ``True``, Update verze formuláře zobrazí checkbox "Check to delete". Text můžete přizpůsobit pomocí ``delete_label``.
+- ``submit_button`` určuje value (text) potvrzovacího tlačítka.
+- ``id_label`` je popisný text pro "id" záznamu. "id" se vůbec nezobrazí, jestliže zadáte ``showid=False``.
+- ``fields`` je nepovinný seznam (list) jmen polí, která chcete zobrazit. Bez jeho zadání se zobrazí všechna pole. Například:
 ``
 fields = ['name']
 ``:code
-- ``labels`` is a dictionary of field labels. The dictionary key is a field name and the corresponding value is what gets displayed as its label. If a label is not provided, web2py derives the label from the field name (it capitalizes the field name and replaces underscores with spaces). For example:
+- ``labels`` je slovník (dictionary) popisných textů pro jednotlivá pole. Klíčem je jméno pole a hodnotou požadovaný popisný text. Není-li popisný text takto zadán, Web2py vezme popisný text z definice tabulky a když i ten chybí, použije přímo jméno pole (změní první písmeno na velké a nahradí podtržítka mezerami). Například:
 ``
-labels = {'name':'Your Full Name:'}
+labels = {'name':'Vaše celé jméno:'}
 ``:code
-- ``col3`` is a dictionary of values for the third column. For example:
+- ``col3`` je slovní (dictionary) obsahu pro třetí sloupec. Například:
 ``
-col3 = {'name':A('what is this?',
+col3 = {'name':A('co je to?',
       _href='http://www.google.com/search?q=define:name')}
 ``:code
-- ``linkto`` and ``upload`` are optional URLs to user-defined controllers that allow the form to deal with reference fields. This is discussed in more detail later in the section.
-- ``readonly``. If set to True, displays the form as readonly
-- ``comments``. If set to False, does not display the col3 comments
-- ``ignore_rw``. Normally, for a create/update form, only fields marked as writable=True are shown, and for readonly forms, only fields marked as readable=True are shown. Setting ``ignore_rw=True`` causes those constraints to be ignored, and all fields are displayed. This is mostly used in the appadmin interface to display all fields for each table, overriding what the model indicates.
+- ``linkto`` a ``upload`` jsou nepovinní URL adresy na akce kontroléru(ů), které umožňují pracovat s referencemi (s poli, které odkazují jinam). Podrobněji si to ještě popíšeme.
+- ``readonly``. Je-li True, formulář se zobrazí jen pro čtení (readonly).
+- ``comments``, True/False. Řídí, zda třetí sloupec zobrazí comments z definice tabulky.
+- ``ignore_rw``. Normálně create i update formulář nezobrazí pole, označená v definici tabulky jako writable=False, a readonly formulář nezobrazí pole, označená readable=False. Nastavením ``ignore_rw=True`` toto chování potlačíte a zobrazí se všechna pole. Používá se to především v appadmin rozhraní, když se zobrazují úplné obsahy tabulek.
 - ``formstyle``:inxx ``formstyle`` determines the style to be used when serializing the form in html. It can be "table3cols" (default), "table2cols" (one row for label and comment, and one row for input), "ul" (makes an unordered list of input fields), "divs" (represents the form using css friendly divs, for arbitrary customization). ``formstyle`` can also be a function that takes (record_id, field_label, field_widget, field_comment) as attributes and returns a TR() object.
 - ``buttons``:inxx is a list of ``INPUT``s or ``TAG.BUTTON``s (though technically could be any combination of helpers) that will be added to a DIV where the submit button would go.
 - ``separator``:inxx ``separator`` sets the string that separates form labels from form input fields.
