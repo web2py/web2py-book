@@ -457,203 +457,198 @@ fields = ['name']
 ``
 labels = {'name':'Vaše celé jméno:'}
 ``:code
-- ``col3`` je slovní (dictionary) obsahu pro třetí sloupec. Například:
+- ``col3`` je slovník (dictionary) obsahu pro třetí sloupec. Například:
 ``
 col3 = {'name':A('co je to?',
       _href='http://www.google.com/search?q=define:name')}
 ``:code
-- ``linkto`` a ``upload`` jsou nepovinní URL adresy na akce kontroléru(ů), které umožňují pracovat s referencemi (s poli, které odkazují jinam). Podrobněji si to ještě popíšeme.
+- ``linkto`` a ``upload`` jsou nepovinné URL adresy na akce kontroléru(ů), které umožňují pracovat s referencemi (s poli, které odkazují jinam). Podrobněji si to ještě popíšeme.
 - ``readonly``. Je-li True, formulář se zobrazí jen pro čtení (readonly).
 - ``comments``, True/False. Řídí, zda třetí sloupec zobrazí comments z definice tabulky.
 - ``ignore_rw``. Normálně create i update formulář nezobrazí pole, označená v definici tabulky jako writable=False, a readonly formulář nezobrazí pole, označená readable=False. Nastavením ``ignore_rw=True`` toto chování potlačíte a zobrazí se všechna pole. Používá se to především v appadmin rozhraní, když se zobrazují úplné obsahy tabulek.
-- ``formstyle``:inxx ``formstyle`` determines the style to be used when serializing the form in html. It can be "table3cols" (default), "table2cols" (one row for label and comment, and one row for input), "ul" (makes an unordered list of input fields), "divs" (represents the form using css friendly divs, for arbitrary customization). ``formstyle`` can also be a function that takes (record_id, field_label, field_widget, field_comment) as attributes and returns a TR() object.
-- ``buttons``:inxx is a list of ``INPUT``s or ``TAG.BUTTON``s (though technically could be any combination of helpers) that will be added to a DIV where the submit button would go.
-- ``separator``:inxx ``separator`` sets the string that separates form labels from form input fields.
-- Optional ``attributes`` are arguments starting with underscore that you want to pass to the ``FORM`` tag that renders the ``SQLFORM`` object. Examples are:
+- ``formstyle``:inxx ``formstyle`` určuje styl při serializování formuláře do html. Lze nastavit "table3cols" (default), "table2cols" (jeden řádek pro label a comment, jeden řádek pro input prvek), "ul" (seznam s input prvky), "divs" (div prvky s atributy pro snadné stylování). ``formstyle`` může také být funkce, která má parametry (record_id, field_label, field_widget, field_comment) a vrátí TR() objekt.
+- ``buttons``:inxx je seznam (list) HTML helperů jako ``INPUT`` nebo ``TAG.BUTTON`` (případně i jiných helperů), které se přidají do DIVu, v němž se nachází tlačítko Submit.
+- ``separator``:inxx ``separator`` je oddělovač mezi popisnými texty údajů a input prvky.
+- Nepovinné ``attributes`` jsou argumenty, zapsané s úvodním podtržítkem, které chcete předat ``<form>`` tagu. Například:
 ``
 _action = '.'
 _method = 'POST'
 ``:code
 
-There is a special ``hidden`` attribute. When a dictionary is passed as ``hidden``, its items are translated into "hidden" INPUT fields (see the example for the ``FORM`` helper in Chapter 5).
+Dalším atributem je ``hidden``. Předáme-li jako argument ``hidden`` slovník (dictionary), z jeho prvků se vytvoří skryté (hidden) prvky INPUT. (viz příklad pro ``FORM`` helper v kapitole 5).
 
 ``
-form = SQLFORM(....,hidden=...)
+form = SQLFORM(...., hidden=...)
 ``:code
-causes the hidden fields to be passed  with the submission, no more, no less.
-``form.accepts(...)`` is not
-intended to read the received hidden fields and move them into
-form.vars. The reason is security. hidden fields can be tampered with.
-So you have to do explicitly move hidden fields from the request to the form:
+to způsobí, že skrytá (hidden) pole formuláře budou předána při potvrzení formuláře - a právě jen to.
+``form.accepts(...)`` není totiž zamýšlen pro načtení skrytých polí a jejich převedení na form.vars. Je to z důvodu bezpečnosti. Se skrytými poli by mohlo být manipulováno.
+Proto musíte explicitně provést přiřazení z objektu request do objektu form:
 
 ``
 form.vars.a = request.vars.a
 form = SQLFORM(..., hidden=dict(a='b'))
 ``:code
 
-#### ``SQLFORM`` and ``insert``/``update``/``delete``
+#### ``SQLFORM`` a ``insert``/``update``/``delete``
 
-``SQLFORM`` creates a new db record when the form is accepted. Assuming ``form=SQLFORM(db.test)``:code, then the id of the last-created record will be accessible in ``myform.vars.id``.
+Po potvzení formuláře vytvoří ``SQLFORM`` nový záznam v databázi db. Máme-li formulář ``form=SQLFORM(db.test)``:code, po potvrzení (a úspěšné validaci) bude id nově založeného záznamu dostupné jako ``form.vars.id``.
 
 ``delete record``:inxx
-If you pass a record as the optional second argument to the ``SQLFORM`` constructor, the form becomes an UPDATE form for that record. This means that when the form is submitted the existing record is updated and no new record is inserted. If you set the argument ``deletable=True``, the UPDATE form displays a "check to delete" checkbox. If checked, the record is deleted.
+Když předáte jako druhý argument pro ``SQLFORM`` konstruktor id záznamu, formulář se z formuláře pro přidání nového záznamu změní na formulář pro editaci. Poté, co je formulář potvrzen, je aktualizován záznam se zadaným id. Předáte-li také argument ``deletable=True``, editační formulář zobrazí navíc checkbox "check to delete" (označ záznam ke zrušení). Pokud jej uživatel zaškrtne, záznam bude (po potvrzení formuláře) zrušen.
 
 ------
-If a form is submitted and the delete checkbox is checked the attribute
-``form.deleted`` is set to ``True``.
+Jestliže je uvedený checkbox zaškrtnut a formulář je již potvrzen,
+``form.deleted`` bude nastaveno na ``True``.
 ------
 
-You can modify the controller of the previous example so that when we pass an additional integer argument in the URL path, as in:
+Akci kontroléru můžete upravit tak, že když se na konec URL přidá číslo, jako v tomto příkladu:
 ``
 /test/default/display_form/2
 ``:code
 
-and if there is a record with the corresponding id, the ``SQLFORM`` generates an UPDATE/DELETE form for the record:
+a když existuje záznam s odpovídajícím id (id=2 v našem příkladu), ``SQLFORM`` vygeneruje formulář pro editaci pro záznam, který byl vyžádán uvedeným formátem URL adresy:
 ``
 def display_form():
-   record = db.person(request.args(0)) or redirect(URL('index'))
-   form = SQLFORM(db.person, record)
-   if form.process().accepted:
-       response.flash = 'form accepted'
-   elif form.errors:
-       response.flash = 'form has errors'
-   return dict(form=form)
+    record = db.person(request.args(0)) or redirect(URL('index'))
+    form = SQLFORM(db.person, record)
+    if form.process().accepted:
+        response.flash = 'formulář úspěšně zpracován'
+    elif form.errors:
+        response.flash = 've formuláři jsou chyby'
+    return dict(form=form)
 ``:code
 
-Line 2 finds the record and line 3 makes an UPDATE/DELETE form. Line 4 does all the corresponding form processing.
+Druhý řádek najde záznam, třetí řádek vytvoří editační formulář (lze předat record nebo record.id). Řádek 4 zajistí veškeré zpracování formuláře.
 
-------
-An update form is very similar to a create form except that it is pre-populated with the current record and it previews images. By default ``deletable = True`` which means the update form will display a "delete record" option.
-------
+Editační formulář je velmi podobný formuláři pro zadávání nových záznamů. V aktivních HTML prvcích jsou předvyplněny hodnoty z editovaného záznamu.
 
-Edit forms also contain a hidden INPUT field with ``name="id"`` which is used to identify the record. This id is also stored server-side for additional security and, if the visitor tampers with the value of this field, the UPDATE is not performed and web2py raises a SyntaxError, "user is tampering with form".
+Editační formulář také obsahuje skrytý provek INPUT s ``name="id"``, který slouží k identifikaci záznamu. Totéž id je uloženo pro větší bezpečnost i na straně serveru a když se uživatel pokusí manipulovat s hodnotou pole s id, UPDATE se neprovede a Web2py vystaví chybu SyntaxError s informací, že uživatel nedovoleně manipuloval s formulářem ("user is tampering with form").
 
-When a field is marked with ``writable=False``, the field is not shown in create forms, and it is shown readonly in update forms. If a field is marked as ``writable=False`` and ``readable=False``, then the field is not shown at all, not even in update forms.
+Jestliže je pole označeno jako ``writable=False``, nezobrazuje se ve formulářích pro založení nového záznamu, kdežto ve formulářích pro editaci se zobrazí jen ke čtení (readonly). Ale když navíc zadáte pro toto pole (v definici tabulky nebo později) ``readable=False``, nebude se zobrazovat vůbec ani v editačních formulářích.
 
-Forms created with
+Můžete ignorovat uvedené atributy ``readable`` a ``writable``
 ``
-form = SQLFORM(...,ignore_rw=True)
+form = SQLFORM(..., ignore_rw=True)
 ``:code
 
-ignore the ``readable`` and ``writable`` attributes and always show all fields. Forms in ``appadmin`` ignore them by default.
+a tak se vždy zobrazí všechna pole. Tak se chovají formuláře v kontroléru ``appadmin``.
 
-Forms created with
+Formuláře vytvořené s argumentem ``readonly=True``
 ``
-form = SQLFORM(table,record_id,readonly=True)
+form = SQLFORM(table, record_id, readonly=True)
 ``:code
 
-always show all fields in readonly mode, and they cannot be accepted.
+vždy ukazují data jen pro čtení a nemohou být potvrzeny - neboli generovat nějaký zápis do databáze a/nebo mít nastaveno ``form.accepted=True`` nebo ``form.deleted=True``.
 
-Marking a field with ``writable=False`` prevents the field from being part of the form, and causes the form processing to disregard the value of ``request.vars.field`` when processing the form.  However, if you assign a value to ``form.vars.field``, this value ''will'' be part of the insert or update when the form is processed. 
-This enables you to change the value of fields that for some reason you do not wish to include in a form.
+Označení pole ``writable=False`` zabrání poli, aby bylo (aktivním) prvkem formuláře a způsobí, že zpracování formuláře nebude brát ohled na případnou hodnotu ``request.vars.field``. Když ale přiřadíte hodnotu do ``form.vars.field``, pak takové pole ''bude'' součástí příkazu insert nebo update při zpracování formuláře. 
+To vám umožňuje programově měnit i obsah polí, které z nějakého důvodu nechcete ve formuláři zobrazit.
 
 
-#### ``SQLFORM`` in HTML
+#### ``SQLFORM`` a HTML
 
-There are times when you want to use ``SQLFORM`` to benefit from its form generation and processing, but you need a level of customization of the form in HTML that you cannot achieve with the parameters of the ``SQLFORM`` object, so you have to design the form using HTML.
+Může nastat situace, že chcete použít ``SQLFORM`` kvůli vygenerování formuláře a zpracování potvrzeného formuláře, ale chcete takové úpravy HTML, které není možné zajistit pomocí parameterů ``SQLFORM`` objektu. Formulář v tom případě musíte designovat přímo v HTML.
 
-Now, edit the previous controller and add a new action:
+Editujte kontrolér a přidejte novou akci:
 ``
 def display_manual_form():
-   form = SQLFORM(db.person)
-   if form.process(session=None, formname='test').accepted:
-       response.flash = 'form accepted'
-   elif form.errors:
-       response.flash = 'form has errors'
-   else:
-       response.flash = 'please fill the form'
-   # Note: no form instance is passed to the view
+    form = SQLFORM(db.person)
+    if form.process(session=None, formname='test').accepted:
+        response.flash = 'formulář úspěšně zpracován'
+    elif form.errors:
+        response.flash = 've formuláři jsou chyby'
+    else:
+        response.flash = 'prosím, vyplňte formulář'
+    # Poznámka: do šablony nepředáváme instanci formuláře
    return dict()
 ``:code
 
-and insert the form in the associated "default/display_manual_form.html" view:
+a formulář do odpovídající šablony "default/display_manual_form.html" zadáme ručně:
 ``
 {{extend 'layout.html'}}
-<form action="#" enctype="multipart/form-data" method="post">
-<ul>
-  <li>Your name is <input name="name" /></li>
-</ul>
+<form action="#">
+  <ul>
+    <li>Vaše jméno je: <input name="name" /></li>
+  </ul>
   <input type="submit" />
   <input type="hidden" name="_formname" value="test" />
 </form>
 ``:code
 
-Notice that the action does not return the form because it does not need to pass it to the view. The view contains a form created manually in HTML. The form contains a hidden field "_formname" that must be the same ``formname`` specified as an argument of ``accepts`` in the action. web2py uses the form name in case there are multiple forms on the same page, to determine which one was submitted. If the page contains a single form, you can set ``formname=None`` and omit the hidden field in the view.
+Všimněte si, že akce nevrací formulář jako jeden z klíčů návratového slovníku, a to proto, že šablona tuto proměnnou nepotřebuje. Šablona obsahuje formulář manuálně vytvořený pomocí HTML. Formulář musí obsahovat skryté pole "_formname" s hodnotou stejnou jako ``formname``, zadané při volání metody ``accepts`` nebo ``process``. Web2py používá jméno formuláře (formname) v případě více formulářů na stránce k rozeznání toho, který byl potvrzen. Když je na stránce jediný formulář, může být zadáno ``formname=None`` a vynecháno skryté pole v HTML.
 
-``form.accepts`` will look inside ``response.vars`` for data that matches fields in the database table ``db.person``.  These fields are declared in the HTML in the format
-``<input name="field_name_goes_here" />
+``form.accepts / process`` bude v ``response.vars`` hledat data, pojmenovaná shodně s poli v databázové tabulce ``db.person``. Takto pojmenovaná pole musíme mít (a máme) v HTML v tomto formátu:
+``<input name="jednotlive_jmeno_pole" />
 ``:code
 
-Note that in the example given, the form variables will be passed on the URL as arguments.  If this is not desired, the ``POST`` protocol will have to be specified.  Note furthermore, that if upload fields are specified, the form will have to be set up to allow this.  Here, both options are shown:
+Poznamenejme, že v uvedeném příkladu se data z formuláře přenesou v URL adrese. Když to tak nechceme, musíme vynutit použití protokolu ``POST``. Také, chceme-li používat upload pole, musíme formulář nastavit, aby to povoloval. Obojí nastavení vidíme zde:
 ``
-<form enctype="multipart/form-data" method="post">
+<form action="#" enctype="multipart/form-data" method="post">
 ``:code
 
-#### ``SQLFORM`` and uploads
+#### ``SQLFORM`` a upload
 
-Fields of type "upload" are special. They are rendered as INPUT fields of ``type="file"``. Unless otherwise specified, the uploaded file is streamed in using a buffer, and stored under the "uploads" folder of the application using a new safe name, assigned automatically. The name of this file is then saved into the field of type uploads.
+Pole typu "upload" jsou zvláštní. Vykreslují se (renderují) jako INPUT pole s ``type="file"``. Není-li určeno jinak, uploadovaný soubor je streamován za použití vyrovnávacího bufferu a uložen v adresáři "uploads" pod novým bezpečným jménem, které je přiděleno automaticky. Toto nové jméno se pak zapíše do pole typu upload.
 
-As an example, consider the following model:
+Např. máme-li tento model:
 ``
 db.define_table('person',
     Field('name', requires=IS_NOT_EMPTY()),
     Field('image', 'upload'))
 ``:code
 
-You can use the same controller action "display_form" shown above.
+můžete použít akci "display_form" kontroléru, jak jsme ji uvedli výše.
 
-When you insert a new record, the form allows you to browse for a file.
-Choose, for example, a jpg image. The file is uploaded and stored as:
+Když vkládáte nový záznam, formulář umožní hledat (browse for..) soubor.
+Dejme tomu, že vybereme jpg fotografii. Soubor je při uploadu uložen jako:
 ``
 applications/test/uploads/person.image.XXXXX.jpg
 ``:code
 
-"XXXXXX" is a random identifier for the file assigned by web2py.
+"XXXXXX" je náhodný identifikátor, který Web2py přidělí.
 
 ``content-disposition``:inxx
 
 -------
-Notice that, by default, the original filename of an uploaded file is b16encoded and used to build the new name for the file. This name is retrieved by the default "download" action and used to set the content disposition header to the original filename.
+Defaultně je původní jméno souboru převedeno funkcí b16encode() a použito pro sestavení nového jména souboru. Toto jméno pak obdrží defaultní "download" akce a použije jej pro sestavení hlavičky (content disposition header) tak, aby uživatel znovu získal původní jméno souboru.
 -------
 
-Only its extension is preserved. This is a security requirement since the filename may contain special characters that could allow a visitor to perform directory traversal attacks or other malicious operations.
+Pro uložený soubor je zachována jen přípona. Jedná se o bezpečnostní požadavek, protože jméno souboru může obsahovat speciální znaky, zneužitelné k útoku (directory traversal attacks nebo jiné nebezpečné akce).
 
-The new filename is also stored in ``form.vars.image``.
+Nové jméno souboru je po zpracování ve ``form.vars.image``.
 
-When editing the record using an UPDATE form, it would be nice to display a link to the existing uploaded file, and web2py provides a way to do it.
+Během editace záznamu v editačním formuláři je dobrá možnost zobrazit odkaz pro download na serveru uloženého souboru, a Web2py to může zajistit.
 
-If you pass a URL to the ``SQLFORM`` constructor via the upload argument, web2py uses the action at that URL to download the file. Consider the following actions:
+Předáte-li ``SQLFORM`` konstruktoru pomocí argumentu upload adresu URL, Web2py ji (tedy akci na této adrese) použije pro download souboru. Mějme např. v kontroléru tyto akce:
 ``
 def display_form():
    record = db.person(request.args(0)) or redirect(URL('index'))
    form = SQLFORM(db.person, record, deletable=True,
                   upload=URL('download'))
    if form.process().accepted:
-       response.flash = 'form accepted'
+       response.flash = 'potvrzeno'
    elif form.errors:
-       response.flash = 'form has errors'
+       response.flash = 've formuláři jsou chyby'
    return dict(form=form)
 
 def download():
     return response.download(request, db)
 ``:code
 
-Now, insert a new record at the URL:
+Vložme nový záznam pomocí URL adresy:
 ``
 http://127.0.0.1:8000/test/default/display_form
 ``:code
 
-Upload an image, submit the form, and then edit the newly created record
-by visiting:
+Uploadujte fotografii, potvrďte formulář, a pak editujte nově vytvořený záznam pomocí adresy:
 ``
 http://127.0.0.1:8000/test/default/display_form/3
 ``:code
 
-(here we assume the latest record has id=3). The form will display an image preview as shown below:
+(předpokládáme tady, že jsme právě přidali záznam id=3). Formulář zobrazí preview fotografie:
 
 [[image @///image/en6300.png center 300px]]
 
-This form, when serialized, generates the following HTML:
+Serializovaný formulář generuje toto HTML:
 ``
 <td><label id="person_image__label" for="person_image">Image: </label></td>
 <td><div><input type="file" id="person_image" class="upload" name="image"
@@ -664,25 +659,25 @@ This form, when serialized, generates the following HTML:
 class="delete" name="delete_this_record" /></td>
 ``:code
 
-which contains a link to allow downloading of the uploaded file, and a checkbox to remove the file from the database record, thus storing NULL in the "image" field.
+které obsahuje odkaz na stažení souboru dříve uploadovaného na server a checkbox pro možnost zrušení souboru (fotografie) neboli pro jeho odstranění z editovaného záznamu tabulky, neboli pro uložení hodnoty NULL do pole "image".
 
-Why is this mechanism exposed? Why do you need to write the download function? Because you may want to enforce some authorization mechanism in the download function. See Chapter 9 for an example.
+Proč je tento mechanismus zpřístupněn pomocí separátní akce pro download? Protože možná budete chtít vynutit nějakou autorizaci ve funkci pro download. V kapitole 9 najdete příklad.
 
-Normally uploaded files are stored into "app/uploads" but you can specify an alternate location:
+Standardně jsou uploadované soubory ukládány do "<aplikace>/uploads", ale můžete zadat jiné umístění:
 ``
 Field('image', 'upload', uploadfolder='...')
 ``
-In most operating system, accessing the file system can become slow when there are many files in the same folder. If you plan to upload more than 1000 files you can ask web2py to organize the uploads in subfolders:
+Řada operačních systémů bude zpomalovat s narůstajícím počtem souborů v adresáři. Víte-li, že bude uploadováno více než 1000 souborů, nastavte Web2py, aby je rozdělilo do více podadresářů:
 ``
 Field('image', 'upload', uploadseparate=True)
 ``
 
 
-#### Storing the original filename
+#### Uložení včetně původního jména souboru
 
-web2py automatically stores the original filename inside the new UUID filename and retrieves it when the file is downloaded. Upon download, the original filename is stored in the content-disposition header of the HTTP response. This is all done transparently without the need for programming.
+Web2py automaticky ukládá původní jméno uploadovaného souboru do nového unikátního jména souboru. Při downloadu je pak původní jméno součástí hlavičky (content-disposition header) HTTP odpovědi. To se provede automaticky bez jakéhokoli programování.
 
-Occasionally you may want to store the original filename in a database field. In this case, you need to modify the model and add a field to store it in:
+Někdy můžete chtít uložit původní jméno souboru do databázového pole. V tom případě je potřeba upravit model a přidat pole na uložení původního jména:
 ``
 db.define_table('person',
     Field('name', requires=IS_NOT_EMPTY()),
@@ -690,7 +685,7 @@ db.define_table('person',
     Field('image', 'upload'))
 ``:code
 
-then you need to modify the controller to handle it:
+a dále je potřeba upravit kontrolér:
 ``
 def display_form():
     record = db.person(request.args(0)) or redirect(URL('index'))
@@ -700,48 +695,45 @@ def display_form():
     if request.vars.image!=None:
         form.vars.image_filename = request.vars.image.filename
     if form.process().accepted:
-        response.flash = 'form accepted'
+        response.flash = 'potvrzeno'
     elif form.errors:
-        response.flash = 'form has errors'
+        response.flash = 've formuláři jsou chyby'
     return dict(form=form)
 ``:code
 
-Notice that the ``SQLFORM`` does not display the "image_filename" field.
-The "display_form" action moves the filename of the ``request.vars.image``
-into the ``form.vars.image_filename``, so that it gets processed by ``accepts`` and
-stored in the database. The download function, before serving the file, checks in the database for the original filename and uses it in the content-disposition header.
+Všimněte si, že v ``SQLFORM`` nezobrazujeme pole "image_filename".
+Akce "display_form" přesune původní jméno souboru z ``request.vars.image`` do ``form.vars.image_filename``, čímž se nové pole přidá ke zpracování v ``accepts`` (nebo ``process``) a bude uloženo do databáze.
 
 #### ``autodelete``
 ``autodelete``:inxx
 
-The ``SQLFORM``, upon deleting a record, does not delete the physical uploaded file(s) referenced by the record. The reason is that web2py does not know whether the same file is used/linked by other tables or used for other purpose. If you know it is safe to delete the actual file when the corresponding record is deleted, you can do the following:
+Standardně ``SQLFORM`` při rušení záznamu neruší fyzicky uploadované soubory, na které záznam odkazuje. Důvod je, že Web2py neví, zda soubor není případně odkazován odjinud nebo používán k jiným účelům. Jestliže víte, že je bezpečné a vhodné spolu s rušeným záznamem zrušit i soubor, udělejte následující:
 ``
 db.define_table('image',
     Field('name', requires=IS_NOT_EMPTY()),
-    Field('source','upload',autodelete=True))
+    Field('source', 'upload', autodelete=True))
 ``:code
 
-The ``autodelete`` attribute is ``False`` by default. When set to ``True`` is makes sure the file is deleted when the record is deleted.
+Atribut ``autodelete`` je defaultně ``False`` a jestliže ho změníme na ``True``, způsobí to právě automatické zrušení odkazovaného souboru během rušení záznamu.
 
-#### Links to referencing records
+#### Odkazy (links) na související záznamy
 
-Now consider the case of two tables linked by a reference field. For example:
+Nyní předpokládejme případ dvou tabulek propojených pomocí odkazu (cizího klíče). Například:
 ``
 db.define_table('person',
     Field('name', requires=IS_NOT_EMPTY()))
 db.define_table('dog',
     Field('owner', 'reference person'),
     Field('name', requires=IS_NOT_EMPTY()))
-db.dog.owner.requires = IS_IN_DB(db,db.person.id,'%(name)s')
+db.dog.owner.requires = IS_IN_DB(db, db.person.id, '%(name)s')
 ``:code
 
-A person has dogs, and each dog belongs to an owner, which is a person. The dog owner is required to reference a valid ``db.person.id`` by ``'%(name)s'``.
+Osoba má psy a každý ze psů patří některé osobě, jeho pánovi. Pole owner v tabulce psů odkazuje na správného majitele pomocí platného ``db.person.id`` a pro zobrazení majitelů na výběr se použije formátování ``'%(name)s'``.
 
-Let's use the **appadmin** interface for this application to add a
-few persons and their dogs.
+Použijme **appadmin** rozhraní této aplikace <aplikace>/appadmin a přidejme několik osob a jejich psů.
 
-When editing an existing person, the **appadmin** UPDATE form shows a link to a page that lists the dogs that belong to the person. This behavior can be replicated using the ``linkto`` argument of the ``SQLFORM``. ``linkto`` has to point to the URL of a new action that receives a query string from the ``SQLFORM`` and lists the corresponding records.
-Here is an example:
+Když v **appadmin** rozhraní editujeme existující osobu, editační formulář ukáže odkaz na psy, které tato osoba vlastní. Toto chování si ve vlastním kódu zprovozníme pomocí argumentu ``linkto`` formuláře ``SQLFORM``. ``linkto`` by mělo vést na další URL adresu (na novou akci), která z ``SQLFORM`` převezme dotaz (query string) a vypíše odpovídající záznamy.
+Tady je příklad:
 ``
 def display_form():
    record = db.person(request.args(0)) or redirect(URL('index'))
@@ -756,26 +748,25 @@ def display_form():
    return dict(form=form)
 ``:code
 
-Here is the page:
+Výsledná stránka je zde:
 
 [[image @///image/en6400.png center 300px]]
 
-There is a link called "dog.owner". The name of this link can be changed via the ``labels`` argument of the ``SQLFORM``, for example:
+Je na ní odkaz "dog.owner". Text odkazu lze změnit pomocí argumentu ``labels`` formuláře ``SQLFORM``, například:
 ``
-labels = {'dog.owner':"This person's dogs"}
+labels = {'dog.owner': "Psi tohoto majitele"}
 ``:code
 
-If you click on the link you get directed to:
+Klikem na odkaz jste přesměrováni na:
 ``
 /test/default/list_records/dog?query=db.dog.owner%3D%3D5
 ``:code
 
-"list_records" is the specified action, with ``request.args(0)`` set to the name of the referencing table and ``request.vars.query`` set to the SQL query string.
-The query string in the URL
-contains the value "dog.owner=5" appropriately url-encoded
-(web2py decodes this automatically when the URL is parsed).
+"list_records" je požadovaná akce, která jako ``request.args(0)`` obdrží jméno odkazující tabulky a jako ``request.vars.query`` dotaz (query string).
+Tento dotaz na konci URL obsahuje podmínku "dog.owner==5" správně escapovanou (url-encoded, tj. po nahrazení nebezpečných znaků).
+Escapování (konverze znaků) provádí Web2py automaticky.
 
-You can easily implement a very general "list_records" action as follows:
+Snadno můžete implementovat hodně obecnou akci "list_records" třeba takto (ošetřeno včetně kontroly správného (povoleného) formátu dotazu, ale s tím, že proměnnou db předpokládáme jako pevně danou):
 ``
 def list_records():
     REGEX = re.compile('^(\w+)\.(\w+)\.(\w+)\=\=(\d+)$')
@@ -787,63 +778,63 @@ def list_records():
     return dict(records=records)
 ``:code
 
-with the associated "default/list_records.html" view:
+a k akci přidružená šablona (view) "default/list_records.html":
 ``
 {{extend 'layout.html'}}
 {{=records}}
 ``:code
 
-When a set of records is returned by a select and serialized in a view, it is first converted into a SQLTABLE object (not the same as a Table) and then serialized into an HTML table, where each field corresponds to a table column.
+Když select vrátí Rows objekt (sadu záznamů) a ten je serializována v šabloně, je nejprve konvertován na objekt SQLTABLE (neplést s Table) a pak je serializován do HTML tabulky, v níž každé pole vytvoří sloupec.
 
-#### Pre-populating the form
-It is always possible to pre-populate a form using the syntax:
+#### Předvyplnění formuláře
+Vždy je možné formulář (obvykle částečně) předvyplnit pomocí příkazů:
 ``
-form.vars.name = 'fieldvalue'
+form.vars.jmenopole = 'hodnota'
 ``:code
 
-Statements like the one above must be inserted after the form declaration and before the form is accepted, whether or not the field ("name" in the example) is explicitly visualized in the form.
+Tyto příkazy musíme umístit za deklaraci formuláře (za instanciování objektu z ``SQLFORM``) a před volání metody ``process`` nebo ``accepts``, a to bez ohledu na to, zda se údaj ("jmenopole" v našem příkladu) ve formuláři zobrazuje nebo ne.
 
-#### Adding extra form elements to ``SQLFORM``
-Sometimes you may wish to add an extra element to your form after it has been created. For example, you may wish to add a checkbox which confirms the user agrees with the terms and conditions of your website:
+#### Přidání dalších formulářových prvků do ``SQLFORM``
+Někdy můžete chtít přidat do vytvořeného formuláře další prvky navíc. Třeba budete chtít zobrazit checkbox pro potvrzení, že uživatel souhlasí s podmínkami služby:
 ``
 form = SQLFORM(db.yourtable)
-my_extra_element = TR(LABEL('I agree to the terms and conditions'), \
-                      INPUT(_name='agree',value=True,_type='checkbox'))
-form[0].insert(-1,my_extra_element)
+my_extra_element = TR(LABEL('Souhlasím se závaznými podmínkami'), \
+                      INPUT(_name='agree', value=True, _type='checkbox'))
+form[0].insert(-1, my_extra_element)
 ``:code
 
-The variable ``my_extra_element`` should be adapted to the formstyle. In this example, the default ``formstyle='table3cols'`` has been assumed.
+Proměnnou ``my_extra_element`` je potřeba přizpůsobit aktuálně použitému argumentu formstyle. V příkladu jsme předpokládali defaultní ``formstyle='table3cols'``.
 
-After submission, ``form.vars.agree`` will contain the status of the checkbox, which could then be used in an ``onvalidation`` function, for instance.
+Po potvrzení bude ``form.vars.agree`` obsahovat status přidaného checkboxu, který můžeme například použít ve funkci ``onvalidation`` nebo můžeme rozložit zpracování na validaci a fyzický zápis, jak si ukážeme dále.
 
-#### ``SQLFORM`` without database IO
+#### ``SQLFORM`` bez zápisu do databáze
 
-There are times when you want to generate a form from a database table using ``SQLFORM`` and you want to validate a submitted form accordingly, but you do not want any automatic INSERT/UPDATE/DELETE in the database. This is the case, for example, when one of the fields needs to be computed from the value of other input fields. This is also the case when you need to perform additional validation on the inserted data that cannot be achieved via standard validators.
+Někdy může být potřebné generovat formulář pomocí ``SQLFORM`` a řádně validovat potvrzená data, ale neprovést automatický Insert/Update/Delete do databáze. Dejme tomu, že po validaci chcete ještě něco udělat, např. určit hodnoty dalších odvozených polí. Také můžete chtít ještě aplikovat dodatečné validace, které pomocí standardních validátorů nejsou možné.
 
-This can be done easily by breaking:
+Lze to udělat velmi jednoduše rozdělením:
 ``
 form = SQLFORM(db.person)
 if form.process().accepted:
-    response.flash = 'record inserted'
+    response.flash = 'záznam byl přidán'
 ``:code
 
-into:
+na:
 ``
 form = SQLFORM(db.person)
 if form.validate():
-    ### deal with uploads explicitly
+    ### případná další práce se záznamem ve form.vars
     form.vars.id = db.person.insert(**dict(form.vars))
-    response.flash = 'record inserted'
+    response.flash = 'záznam byl přidán'
 ``:code
 
-The same can be done for UPDATE/DELETE forms by breaking:
+Podobně pro Update/Delete:
 ``
-form = SQLFORM(db.person,record)
+form = SQLFORM(db.person, record)
 if form.process().accepted:
-    response.flash = 'record updated'
+    response.flash = 'záznam byl aktualizován'
 ``:code
 
-into:
+rozložením na:
 ``
 form = SQLFORM(db.person,record)
 if form.validate():
@@ -851,23 +842,21 @@ if form.validate():
         db(db.person.id==record.id).delete()
     else:
         record.update_record(**dict(form.vars))
-    response.flash = 'record updated'
+    response.flash = 'záznam byl aktualizován'
 ``:code
 
-In the case of a table including an "upload"-type field ("fieldname"), both ``process(dbio=False)`` and ``validate()`` deal with the storage of the uploaded file as if ``process(dbio=True)``, the default behavior.
-
-The name assigned by web2py to the uploaded file can be found in:
+Pro pole typu "upload" se i při volání ``process(dbio=False)`` resp. zkráceného ``validate()`` pracuje s upload polem stejně jako při ``process(dbio=True)``, takže nově přidělené jméno máte po validaci ve:
 ``
-form.vars.fieldname
+form.vars.jmeno_upload_pole
 ``:code
 
-### Other types of Forms
+### Další typy formulářů
 
 #### ``SQLFORM.factory``
 
-There are cases when you want to generate forms ''as if'' you had a database table but you do not want the database table. You simply want to take advantage of the ``SQLFORM`` capability to generate a nice looking CSS-friendly form and perhaps perform file upload and renaming.
+Je často výhodné sestavit formulář ''jako kdyby'' pracoval nad databázovou tabulkou (jak jsme právě popsali), i když skutečnou databázovou tabulku nemáte. Chcete totiž využít přednosti ``SQLFORM`` objektu k sestavení standardní a dobře CSS stylovatelné podoby formuláře včetně např. docela sofistikované podpory pro upload.
 
-This can be done via a ``form_factory``. Here is an example where you generate the form, perform validation, upload a file and store everything in the ``session`` :
+K tomu slouží ``SQLFORM.factory``. Tady je příklad, kde se sestaví formulář, provedou validace, uploaduje soubor a vše se uloží do ``session`` :
 ``
 def form_from_factory():
     form = SQLFORM.factory(
