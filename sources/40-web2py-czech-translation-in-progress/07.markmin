@@ -347,7 +347,7 @@ Opakovaným voláním můžete přidat více tlačítek. Argumentem metody ``add
 
 #### Více o manipulaci s formuláři
 
-Jak jsme ukázali v kapitole o šablonách (Views), FORM je HTML helper. S helpery můžeme manipulovat jako s jinými seznamy (lists) nebo slovníky (dictionaries) Pythonu, což umožňuje vytváření a modifikaci za běhu. (Pozn. překl.: více zde není uvedeno - zřejmě je potřeba nastavit bod přerušení (import pdb; pdb.set_trace()) a provést introspekci objektu (dir(form)).)
+Jak jsme ukázali v kapitole o šablonách (Views), FORM je HTML helper. S helpery můžeme manipulovat jako s jinými seznamy (lists) nebo slovníky (dictionaries) Pythonu, takže je můžeme sestavovat a měnit jejich obsah dynamicky za běhu.
 
 ### ``SQLFORM``
 
@@ -455,7 +455,7 @@ fields = ['name']
 ``:code
 - ``labels`` je slovník (dictionary) popisných textů pro jednotlivá pole. Klíčem je jméno pole a hodnotou požadovaný popisný text. Není-li popisný text takto zadán, Web2py vezme popisný text z definice tabulky a když i ten chybí, použije přímo jméno pole (změní první písmeno na velké a nahradí podtržítka mezerami). Například:
 ``
-labels = {'name':'Vaše celé jméno:'}
+labels = {'name': 'Vaše celé jméno:'}
 ``:code
 - ``col3`` je slovník (dictionary) obsahu pro třetí sloupec. Například:
 ``
@@ -856,121 +856,119 @@ form.vars.jmeno_upload_pole
 
 Je často výhodné sestavit formulář ''jako kdyby'' pracoval nad databázovou tabulkou (jak jsme právě popsali), i když skutečnou databázovou tabulku nemáte. Chcete totiž využít přednosti ``SQLFORM`` objektu k sestavení standardní a dobře CSS stylovatelné podoby formuláře včetně např. docela sofistikované podpory pro upload.
 
-K tomu slouží ``SQLFORM.factory``. Tady je příklad, kde se sestaví formulář, provedou validace, uploaduje soubor a vše se uloží do ``session`` :
+K tomu slouží ``SQLFORM.factory``. Tady je příklad, kde se sestaví formulář, provedou validace, uploaduje soubor a vše se uloží do ``session``:
 ``
 def form_from_factory():
     form = SQLFORM.factory(
         Field('your_name', requires=IS_NOT_EMPTY()),
         Field('your_image', 'upload'))
     if form.process().accepted:
-        response.flash = 'form accepted'
+        response.flash = 'potvrzeno'
         session.your_name = form.vars.your_name
         session.your_image = form.vars.your_image
     elif form.errors:
-        response.flash = 'form has errors'
+        response.flash = 've formuláři jsou chyby'
     return dict(form=form)
 ``:code
 
-The Field object in the SQLFORM.factory() constructor is fully documented in the DAL chapter.
-A run-time construction technique for SQLFORM.factory() is
+Objekt Field v konstruktoru SQLFORM.factory() je identický s definicí tabulky v modelu a je tedy dokumentován v kapitole o DAL (6.kap.).
+
+Také můžeme použít tuto techniku:
 ``
 fields = []
 fields.append(Field(...))
 form=SQLFORM.factory(*fields)
 ``:code
 
-Here is the "default/form_from_factory.html" view:
+Šablona "default/form_from_factory.html" pak bude v nejjednodušším případě vypadat takto:
 ``
 {{extend 'layout.html'}}
 {{=form}}
 ``:code
 
-You need to use an underscore instead of a space for field labels, or explicitly pass a dictionary of ``labels`` to ``form_factory``, as you would for a ``SQLFORM``. By default ``SQLFORM.factory`` generates the form using html "id" attributes generated as if the form was generated from a table called "no_table". To change this dummy table name, use the ``table_name`` attribute for the factory:
+``SQLFORM.factory`` vygeneruje formulář s html "id" atributy takovými, jako kdyby pracoval s tabulkou, nazvanou "no_table". Chcete-li změnit toto defaultní jméno tabulky, můžete uvést atribut ``table_name``:
 ``
-form = SQLFORM.factory(...,table_name='other_dummy_name')
+form = SQLFORM.factory(..., table_name='jine_pomocne_jmeno_tabulky')
 ``:code
 
-Changing the ``table_name`` is necessary if you need to place two factory generated forms in the same table and want to avoid CSS conflicts.
-
-##### Uploading files with SQLFORM.factory
+``table_name`` je potřeba explicitně uvést/změnit, když chcete umístit více než jeden '.factory' formulář na stránce.
 
 
-#### One form for multiple tables
+#### Společný formulář pro více tabulek
 
-It often happens that you have two tables (for example 'client' and
-'address' which are linked together by a reference and you want to
-create a single form that allows to insert info about one client and
-its default address. Here is how:
+Často se stane, že data jsou rozdělena do dvou relačně spojených tabulek (např. 'klient' a 'adresa') a vy je chcete zadávat v jediném formuláři. Tady si ukážeme, jak na to:
 
 model:
 ``
 db.define_table('client',
-     Field('name'))
+    Field('name'))
 db.define_table('address',
-    Field('client','reference client',
-          writable=False,readable=False),
-    Field('street'),Field('city'))
+    Field('client', 'reference client',
+          writable=False, readable=False),
+    Field('street'),
+    Field('city'))
 ``:code
 
-controller:
+kontrolér:
 ``
 def register():
-    form=SQLFORM.factory(db.client,db.address)
+    form=SQLFORM.factory(db.client, db.address)
     if form.process().accepted:
         id = db.client.insert(**db.client._filter_fields(form.vars))
         form.vars.client=id
         id = db.address.insert(**db.address._filter_fields(form.vars))
-        response.flash='Thanks for filling the form'
+        response.flash='Díky za vyplnění..'
     return dict(form=form)
 ``:code
 
-Notice the SQLFORM.factory (it makes ONE form using public fields from
-both tables and inherits their validators too).
-On form accepts this does two inserts, some data in one table and some
-data in the other.
+SQLFORM.factory vytvoří jediný formulář z polí obou tabulek a převezme i validátory polí).
+Po validaci rozdělíme data zpět do dvou insertů, podle tabulek, kam patří.
 
 -------
-This only works when the tables don't have field names in common.
+Bude to ale fungovat jen tehdy, když v tabulkách nebudou duplicitní jména polí. V opačném případě je potřeba např. vytvořit kopii seznamu polí db.xxx.fields a změnit v něm duplicitní jméno před přidáním do SQLFORM.factory(). Také při zápisu do databáze bude potřeba pole jmenovat explicitně.
 -------
 
 
-#### Confirmation Forms
+#### Potvrzovací formuláře
 
 ``confirm``:inxx
 
-Often you need a form with a confirmation choice. The form should be accepted if the choice is accepted and none otherwise. The form may have additional options that link other web pages. web2py provides a simple way to do this:
+Často se mohou hodit formuláře s tlačítkem pro potvrzení. Pokud tlačítko stiskneme, formulář bude potvrzen. Ve formuláři mohou být další volby s odkazy na další akce nebo stránky. Ve Web2py to můžete jednoduše dělat takhle:
 
 ``
-form = FORM.confirm('Are you sure?')
-if form.accepted: do_what_needs_to_be_done()
+form = FORM.confirm('Ano, pokračovat.')
+if form.accepted:
+    redirect(URL('pokracujeme'))
 ``:code
 
-Notice that the confirm form does not need and must not call ``.accepts`` or ``.process`` because this is done internally. You can add buttons with links to the confirmation form in the form of a dictionary of ``{'value':'link'}``:
+Všimněme si, že potvrzovací formulář nepotřebuje a nesmí volat ``.accepts`` nebo ``.process``, protože to už se dělá interně. Do formuláře můžete přidat další tlačítka s odkazy pomocí slovníku (dictionary) ``{'value':'link'}``:
 
 ``
-form = FORM.confirm('Are you sure?',{'Back':URL('other_page')})
-if form.accepted: do_what_needs_to_be_done()
+form = FORM.confirm('Pokračovat', {'Zpět': URL('jina_akce')})
+if form.accepted:
+    udelej_co_je_potreba()
 ``:code
 
-#### Form to edit a dictionary
+#### Formuláře pro editaci slovníku (dictionary)
 
-Imagine a system that stores configurations options in a dictionary,
+Představme si např. konfigurační volby, uložené ve slovníku:
 
 ``
 config = dict(color='black', language='English')
 ``:code
 
-and you need a form to allow the visitor to modify this dictionary.
-This can be done with:
+a chcete jednoduchý formulář, který uživateli umoží volby nastavit.
+Můžete to udělat takto:
 
 ``
 form = SQLFORM.dictform(config)
-if form.process().accepted: config.update(form.vars)
+if form.process().accepted:
+    config.update(form.vars)
 ``:code
 
-The form will display one INPUT field for each item in the dictionary. It will use dictionary keys as INPUT names and labels and current values to infer types (string, int, double, date, datetime, boolean).
+Formulář zobrazí INPUT pro každý prvek slovníku. Klíče slovníku budou použity jako name i jako popisný text pro INPUT a vstupní hodnoty určí typ INPUT prvku (string, int, double, date, datetime, boolean).
 
-This works great but leave to you the logic of making the config dictionary persistent. For example you may want to store the ``config`` in a session.
+Je to užitečné, ale musíte samozřejmě ošetřit vše potřebné, v tomto případě uchovat konfiguraci trvale. Například můžete uložit ``config`` do sessiony.
 
 ``
 session.config or dict(color='black', language='English')
