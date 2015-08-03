@@ -981,33 +981,34 @@ if form.process().accepted:
 ### CRUD
 ``CRUD``:inxx ``crud.create``:inxx ``crud.update``:inxx ``crud.select``:inxx ``crud.search``:inxx ``crud.tables``:inxx ``crud.delete``:inxx
 
-One of the recent additions to web2py is the Create/Read/Update/Delete (CRUD) API on top of SQLFORM.
-CRUD creates an SQLFORM, but it simplifies the coding because it incorporates the creation of the form, the processing of the form, the notification, and the redirection, all in one single function.
+Create/Read/Update/Delete (CRUD) API (vytvoř/čti/aktualizuj/ruš) je nadstavba SQLFORM.
+CRUD vytvoří SQLFORM a poněkud zjednoduší kód, protože zahrnuje standardní varianty zpracování do jediné funkce.
 
-The first thing to notice is that CRUD differs from the other web2py APIs we have used so far because it is not already exposed. It must be imported. It also must be linked to a specific database. For example:
+Na rozdíl od dosud probíraných prvků se použití CRUD rozhraní tak běžně neuvažuje a není tedy importován. Pokud se pro něj rozhodnete, musíte jej implicitně importovat. Také mu musíte předat odkaz na databázi, se kterou spolupracuje:
 ``
 from gluon.tools import Crud
 crud = Crud(db)
 ``:code
 
-The ``crud`` object defined above provides the following API:
+Objekt ``crud`` pak poskytuje následující rozhraní (API):
 
 ``crud.tables``:inxx ``crud.create``:inxx ``crud.read``:inxx ``crud.update``:inxx ``crud.delete``:inxx ``crud.select``:inxx .
-- ``crud.tables()`` returns a list of tables defined in the database.
-- ``crud.create(db.tablename)`` returns a create form for table tablename.
-- ``crud.read(db.tablename, id)`` returns a readonly form for tablename and record id.
-- ``crud.update(db.tablename, id)`` returns an update form for tablename and record id.
-- ``crud.delete(db.tablename, id)`` deletes the record.
-- ``crud.select(db.tablename, query)`` returns a list of records selected from the table.
-- ``crud.search(db.tablename)`` returns a tuple (form, records) where form is a search form and records is a list of records based on the submitted search form.
-- ``crud()`` returns one of the above based on the ``request.args()``.
+- ``crud.tables()`` vrátí seznam tabulek, definovaných v databázi.
+- ``crud.create(db.tablename)`` vrátí formulář pro vkládání nových záznamů do zadané tabulky.
+- ``crud.read(db.tablename, id)`` vrátí readonly (pro čtení) formulář pro zobrazení záznamu dané tabulky.
+- ``crud.update(db.tablename, id)`` vrátí editační formulář pro změnu údajů záznamu z dané tabulky s uvedeným id.
+- ``crud.delete(db.tablename, id)`` zruší zadaný záznam.
+- ``crud.select(db.tablename, query)`` vrátí SQLTABLE objekt z dotazu (query) vyhovujících záznamů (pomocí str() serializovatelný na HTML).
+- ``crud.search(db.tablename)`` vrátí dvojici (tuple) (form, records), kde formulář je jednoduchý formulář pro hledání a records jsou záznamy, nalezené podle zadání, jakmile je tento formulář potvrzen.
+- ``crud()`` vrátí jedno z předchozího, a to podle aktuálního ``request.args()``.
 
-For example, the following action:
+Např. tato akce:
 ``
-def data(): return dict(form=crud())
+def data():
+    return dict(form=crud())
 ``:code
 
-would expose the following URLs:
+zveřejní všechny tyto URL adresy:
 ``
 http://.../[app]/[controller]/data/tables
 http://.../[app]/[controller]/data/create/[tablename]
@@ -1018,161 +1019,161 @@ http://.../[app]/[controller]/data/select/[tablename]
 http://.../[app]/[controller]/data/search/[tablename]
 ``:code
 
-However, the following action:
+kdežto tato akce:
 
 ``
 def create_tablename():
     return dict(form=crud.create(db.tablename))
 ``:code
 
-would only expose the create method
+zveřejní jedinou adresu pro vytváření záznamů v tabulce tablename:
 
 ``
 http://.../[app]/[controller]/create_tablename
 ``:code
 
-While the following action:
+Podobně tato akce:
 
 ``
 def update_tablename():
     return dict(form=crud.update(db.tablename, request.args(0)))
 ``:code
 
-would only expose the update method
+zveřejní jen URL pro aktualizaci zadaného záznamu:
 
 ``
 http://.../[app]/[controller]/update_tablename/[id]
 ``:code
 
-and so on.
+... a tak dále.
 
-The behavior of CRUD can be customized in two ways: by setting some attributes of the ``crud`` object or by passing extra parameters to each of its methods.
+Chování CRUDu lze přizpůsobit dvěma způsoby: nastavením některých atributů objektu ``crud`` nebo předáním parametrů navíc při volání jeho metod.
 
-#### Settings
+#### Nastavení
 
-Here is a complete list of current CRUD attributes, their default values, and meaning:
+Následuje přehled atributů CRUDu, jejich defaultních hodnot a významu:
 
-To enforce authentication on all crud forms:
+K vynucení autentikace pro všechny crud formuláře:
 
 ``
 crud.settings.auth = auth
 ``:code
-The use is explained in chapter 9.
+To si podrobně ještě vysvětlíme v kapitole 9.
 
-To specify the controller that defines the ``data`` function which returns the ``crud`` object
+Můžete určit kontrolér, který zveřejní akci ``data``, která bude vracet objekt ``crud``:
 
 ``
 crud.settings.controller = 'default'
 ``:code
 
-To specify the URL to redirect to after a successful "create" record:
+Můžete určit adresy (URL) přesměrování po úspěšném zpracování záznamu. Po přidání ("create"):
 
 ``
 crud.settings.create_next = URL('index')
 ``:code
 
-To specify the URL to redirect to after a successful "update" record:
+Po aktualizaci ("update"):
 
 ``
 crud.settings.update_next = URL('index')
 ``:code
 
-To specify the URL to redirect to after a successful "delete" record:
+Po zrušení ("delete"):
 
 ``
 crud.settings.delete_next = URL('index')
 ``:code
 
-To specify the URL to be used for linking uploaded files:
+Pro určení adresy (URL), z níž je možné stahovat uploadované soubory:
 
 ``
 crud.settings.download_url = URL('download')
 ``:code
 
-To specify extra functions to be executed after standard validation procedures for ``crud.create`` forms:
+Lze určit seznam funkcí, které se provedou po standardní validaci pro ``crud.create``:
 
 ``
 crud.settings.create_onvalidation = StorageList()
 ``:code
 
-``StorageList`` is the same as a ``Storage`` object, they are both defined in the file "gluon/storage.py", but it defaults to ``[]`` as opposed to ``None``. It allows the following syntax:
+``StorageList`` je podobný ``Storage`` objektu, oba jsou definovány v "gluon/storage.py". Na rozdíl od prvního (s defaultem: ``None``) je jeho default ``[]``. Umožňuje následující syntaxi:
 
 ``
-crud.settings.create_onvalidation.mytablename.append(lambda form:....)
+crud.settings.create_onvalidation.jmenotabulky.append(lambda form:....)
 ``:code
 
-To specify extra functions to be executed after        standard validation procedures for ``crud.update`` forms:
+Podobně dodatečné funkce, které se provedou po validaci při aktualizaci záznamu (pro ``crud.update``):
 
 ``
 crud.settings.update_onvalidation = StorageList()
 ``:code
 
-To specify extra functions to be executed after completion of ``crud.create`` forms:
+Resp. pro ``crud.create`` formulář po zpracování:
 
 ``
 crud.settings.create_onaccept = StorageList()
 ``:code
 
-To specify extra functions to be executed after completion of ``crud.update`` forms:
+A podobně pro ``crud.update``:
 
 ``
 crud.settings.update_onaccept = StorageList()
 ``:code
 
-To specify extra functions to be executed after completion of ``crud.update`` if record is deleted:
+Po potvrzení editačního (``crud.update``) formuláře, jestliže uživatel požaduje zrušení záznamu:
 
 ``
 crud.settings.update_ondelete = StorageList()
 ``:code
 
-To specify extra functions to be executed after completion of ``crud.delete``:
+Po dokončení rušení pomocí ``crud.delete``:
 
 ``
 crud.settings.delete_onaccept = StorageList()
 ``:code
 
-To determine whether the "update" forms should have a "delete" button:
+Lze určitm, zda editační formulář bude mít tlačítko pro rušení záznamu:
 
 ``
 crud.settings.update_deletable = True
 ``:code
 
-To determine whether the "update" forms should show the id of the edited record:
+Lze určit, zda editační formulář bude zobrazovat id:
 
 ``
 crud.settings.showid = False
 ``:code
 
-To determine whether forms should keep the previously inserted values or reset to default after successful submission:
+Lze určit, zda formulář pro vkládání záznamu zachová data z předchozího záznamu, zůstane-li nadále zobrazen pro zadání dalšího záznamu:
 
 ``
 crud.settings.keepvalues = False
 ``:code
 
-Crud always detects whether a record being edited has been modified by a third party in the time between the time when the form is displayed and the time when it is submitted. This behavior is equivalent to
+Crud vždy detekuje, zda editovaný záznam byl nebo nebyl v době editace změněn někým jiným. Toto chování je ekvivalentní k tomuto chování normálního formuláře:
 ``
 form.process(detect_record_change=True)``
 
-and it is set in:
+a je nastaveno pomocí:
 
 ``
 crud.settings.detect_record_change = True
 ``:code
-and it can be changed/disabled by setting the variable to ``False``.
+takže nastavením na ``False`` můžete toto chování potlačit.
 
-You can change the form style by
+Můžete změnit generovaný HTML styl formuláře
 
 ``
-crud.settings.formstyle = 'table3cols' or 'table2cols' or 'divs' or 'ul'
+crud.settings.formstyle = 'table3cols' # nebo 'table2cols' nebo 'divs' nebo 'ul'
 ``:code
 
-You can set the separator in all crud forms:
+Lze nastavit oddělovač mezi popisnými texty a aktivními prvky:
 
 ``
 crud.settings.label_separator = ':'
 ``:code
 
-You can add captcha to forms, using the same convention explained for auth, with:
+Můžete přidat kontrolní kód (captcha) se stejným chováním, jak je vysvětleno pro auth (kapit.9):
 
 ``
 crud.settings.create_captcha = None
@@ -1181,64 +1182,64 @@ crud.settings.captcha = None
 ``:code
 
 
-#### Messages
+#### Texty (messages)
 
-Here is a list of customizable messages:
+Lze přizpůsobit různé texty CRUDu:
 ``
-crud.messages.submit_button = 'Submit'
+crud.messages.submit_button = 'Submit'  # 'Odeslat'
 ``:code
 
-sets the text of the "submit" button for both create and update forms.
+pro text potvrzovacího ("submit") tlačítka.
 ``
-crud.messages.delete_label = 'Check to delete:'
+crud.messages.delete_label = 'Check to delete:'  # 'Zrušit tento záznam'
 ``:code
 
-sets the label of the "delete" button in "update" forms.
+pro text předvolby rušení ("delete") v editačním formuláři.
 ``
-crud.messages.record_created = 'Record Created'
+crud.messages.record_created = 'Record Created'  # 'Záznam byl přidán'
 ``:code
 
-sets the flash message on successful record creation.
+pro flash (krátkodobě zobrazené) hlášení po úspěšném založení záznamu.
 ``
-crud.messages.record_updated = 'Record Updated'
+crud.messages.record_updated = 'Record Updated'  # 'Záznam byl aktualizován'
 ``:code
 
-sets the flash message on successful record update.
+pro flash hlášení po aktualizaci záznamu.
 ``
-crud.messages.record_deleted = 'Record Deleted'
+crud.messages.record_deleted = 'Record Deleted'  # 'Záznam byl zrušen'
 ``:code
 
-sets the flash message on successful record deletion.
+pro flash hlášení po zrušení záznamu.
 ``
-crud.messages.update_log = 'Record %(id)s updated'
+crud.messages.update_log = 'Record %(id)s updated'  # 'Záznam %(id)s byl aktualizován'
 ``:code
 
-sets the log message on successful record update.
+pro text logování při aktualizaci záznamu.
 ``
-crud.messages.create_log = 'Record %(id)s created'
+crud.messages.create_log = 'Record %(id)s created'  # 'Záznam %(id)s byl vytvořen'
 ``:code
 
-sets the log message on successful record creation.
+pro text logování při založení záznamu.
 ``
-crud.messages.read_log = 'Record %(id)s read'
+crud.messages.read_log = 'Record %(id)s read'  # 'Záznam %(id)s byl zobrazen'
 ``:code
 
-sets the log message on successful record read access.
+pro text logování při čtení záznamu.
 ``
-crud.messages.delete_log = 'Record %(id)s deleted'
+crud.messages.delete_log = 'Record %(id)s deleted'  # 'Záznam %(id)s byl zrušen'
 ``:code
 
-sets the log message on successful record deletion.
+pro text logování přizrušení záznamu.
 
 ------
-Notice that ``crud.messages`` belongs to the class ``gluon.storage.Message`` which is similar to ``gluon.storage.Storage`` but it automatically translates its values, without need for the ``T`` operator.
+Poznamenejme, že ``crud.messages`` je instancí třídy ``gluon.storage.Message``, která je podobná ``gluon.storage.Storage``, ale automaticky překládá své hodnoty, takže není potřeba používat ``T`` operátor pro překlad.
 ------
 
-Log messages are used if and only if CRUD is connected to Auth as discussed in Chapter 9. The events are logged in the Auth table "auth_events".
+Texty logování se použijí jen tehdy, když je CRUD propojen s Auth, jak popisujeme v kapitole 9. Události (events) jsou pak logovány do Auth tabulky "auth_events".
 
-#### Methods
+#### Metody
 
-The behavior of CRUD methods can also be customized on a per call basis. Here are their signatures:
+Chování metod CRUDu lze také přizpůsobit až při jejich volání. Signatury volání jsou:
 ``
 crud.tables()
 crud.create(table, next, onvalidation, onaccept, log, message)
@@ -1248,21 +1249,21 @@ crud.delete(table, record_id, next, message)
 crud.select(table, query, fields, orderby, limitby, headers, **attr)
 crud.search(table, query, queries, query_labels, fields, field_labels, zero, showall, chkall)
 ``:code
-- ``table`` is a DAL table or a tablename the method should act on.
-- ``record`` and ``record_id`` are the id of the record the method should act on.
-- ``next`` is the URL to redirect to after success. If the URL contains the substring "[id]" this will be replaced by the id of the record currently created/updated.
-- ``onvalidation`` has the same function as SQLFORM(..., onvalidation)
-- ``onaccept`` is a function to be called after the form submission is accepted and acted upon, but before redirection.
-- ``log`` is the log message. Log messages in CRUD see variables in the ``form.vars`` dictionary such as "%(id)s".
-- ``message`` is the flash message upon form acceptance.
-- ``ondelete`` is called in place of ``onaccept`` when a record is deleted via an "update" form.
-- ``deletable`` determines whether the "update" form should have a delete option.
-- ``query`` is the query to be used to select records.
-- ``fields`` is a list of fields to be selected.
-- ``orderby`` determines the order in which records should be selected (see Chapter 6).
-- ``limitby`` determines the range of selected records that should be displayed (see Chapter 6).
-- ``headers`` is a dictionary with the table header names.
-- ``queries`` a list like ``['equals', 'not equal', 'contains']`` containing the allowed methods in the search form.
+- ``table`` je jméno DAL tabulky, se kterou má metoda pracovat.
+- ``record`` a ``record_id`` určují záznam (id), se kterým se má pracovat.
+- ``next`` je URL pro přesměrování po úspěšné akci. Může obsahovat podřetězec "[id]", který bude v tom případě nahrazen skutečným id právě vytvořeného nebo aktualizovaného záznamu.
+- ``onvalidation`` odpovídá funkci SQLFORM(..., onvalidation)
+- ``onaccept`` je funkce, volaná po zpracování formuláře, před přesměrováním na novou URL adresu.
+- ``log`` text logování. Texty logování mají přístupný slovník (dictionary) ``form.vars``, takže lze použít dosazení např. "%(id)s".
+- ``message`` je krátkodobě zobrazený (flash) text po úspěšném zpracování.
+- ``ondelete`` je voláno místo ``onaccept``, když je záznam zrušen pomocí "update" formuláře.
+- ``deletable`` určuje, zda "update" formulář bude umožňovat rušení.
+- ``query`` je dotaz (query) pro výběr záznamů.
+- ``fields`` je seznam polí pro výsledek výběru záznamů.
+- ``orderby`` pořadí pro vyhovující záznamy výběru (viz kapitola 6).
+- ``limitby`` omezení počtu vrácených vyhovujících záznamů z výběru (viz kapitola 6).
+- ``headers`` je slovník (dictionary) s názvy sloupců.
+- ``queries`` je seznam (např. ``['equals', 'not equal', 'contains']``) s metodami, které budou k dispozici ve volbě search formuláře.
 - ``query_labels`` a dictionary like ``query_labels=dict(equals='Equals')`` giving names to search methods.
 - ``fields`` a list of fields to be listed in the search widget.
 - ``field_labels`` a dictionary mapping field names into labels.
