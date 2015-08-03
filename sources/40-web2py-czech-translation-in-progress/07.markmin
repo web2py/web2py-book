@@ -1247,7 +1247,7 @@ crud.read(table, record)
 crud.update(table, record, next, onvalidation, onaccept, ondelete, log, message, deletable)
 crud.delete(table, record_id, next, message)
 crud.select(table, query, fields, orderby, limitby, headers, **attr)
-crud.search(table, query, queries, query_labels, fields, field_labels, zero, showall, chkall)
+crud.search(table, query, queries, query_labels, fields, field_labels, zero, showall, chkall)   # vrací dvojici (tuple): form, results = crud.search(..)
 ``:code
 - ``table`` je jméno DAL tabulky, se kterou má metoda pracovat.
 - ``record`` a ``record_id`` určují záznam (id), se kterým se má pracovat.
@@ -1264,42 +1264,42 @@ crud.search(table, query, queries, query_labels, fields, field_labels, zero, sho
 - ``limitby`` omezení počtu vrácených vyhovujících záznamů z výběru (viz kapitola 6).
 - ``headers`` je slovník (dictionary) s názvy sloupců.
 - ``queries`` je seznam (např. ``['equals', 'not equal', 'contains']``) s metodami, které budou k dispozici ve volbě search formuláře.
-- ``query_labels`` a dictionary like ``query_labels=dict(equals='Equals')`` giving names to search methods.
-- ``fields`` a list of fields to be listed in the search widget.
-- ``field_labels`` a dictionary mapping field names into labels.
-- ``zero`` defaults to "choose one" is used as default option for the drop-down in the search widget.
-- ``showall`` set it to True if you want rows returned as per the query in the first call (added after 1.98.2).
-- ``chkall`` set it to True to turn on all the checkboxes in the search form (added after 1.98.2).
+- ``query_labels`` slovník (dictionary), např. ``query_labels=dict(equals='se shoduje s ..')``, který určí jména (popisy) search metod.
+- ``fields`` seznam polí, která se nabídnou ve vyhledávacím widgetu.
+- ``field_labels`` slovník (dictionary), který mapuje jména polí na popisné texty.
+- ``zero`` s defaultem "choose one" ("vyberte.."), je použito jako defaultní volba pro drop-down prvek ve vyhledávacím widgetu.
+- ``showall`` nastavte na True, jestliže chcete, aby již první zavolání (navigace na URL akce) vrátila výsledky dotazu.
+- ``chkall`` nastavte na True, pokud ve vyhledávacím widgetu chcete mít zaškrtnuty všechny checkboxy (checkboxy všech polí).
 
-Here is an example of usage in a single controller function:
+Příklady použití:
 ``
-## assuming db.define_table('person', Field('name'))
+## předpokládáme db.define_table('person', Field('name'))
 def people():
     form = crud.create(db.person, next=URL('index'),
-           message=T("record created"))
+           message=T("záznam byl vytvořen"))
     persons = crud.select(db.person, fields=['name'],
-           headers={'person.name': 'Name'})
+           headers={'person.name': 'Jméno'})
     return dict(form=form, persons=persons)
 ``:code
 
-Here is another very generic controller function that lets you search, create and edit any records from any table where the tablename is passed request.args(0):
+Jiná akce, která umožní vyhledávat, vytvářet a editovat záznamy ve kterékoli tabulce, když jméno tabulky předáte jako request.args(0) (app/kontroler/akce/jmenotabulky):
 ``
 def manage():
-    table=db[request.args(0)]
-    form = crud.update(table,request.args(1))
+    table = db[request.args(0)]
+    form = crud.update(table, request.args(1))
     table.id.represent = lambda id, row: \
-       A('edit:',id,_href=URL(args=(request.args(0),id)))
+       A('edit:', id, _href=URL(args=(request.args(0), id)))
     search, rows = crud.search(table)
-    return dict(form=form,search=search,rows=rows)
+    return dict(form=form, search=search, rows=rows)
 ``:code
 
-Notice the line ``table.id.represent=...`` that tells web2py to change the representation of the id field and display a link instead to the page itself and passes the id as request.args(1) which turns the create page into an update page.
+Všimněte si řádky ``table.id.represent=...``, která Web2py řekne, aby místo id zobrazilo odkaz na tutéž stránku, v němž předá id jako request.args(1) a tím změní formulář pro založení záznamu na editační formulář.
 
-#### Record versioning
+#### Sledování verze záznamu
 
-Both SQLFORM and CRUD provides a utility to version database records:
+Jak SQLFORM, tak i CRUD poskytují možnost sledovat verzi záznamu:
 
-If you have a table (db.mytable) that needs full revision history you can just do:
+Když máte tabulku (db.mytable), u níž chcete znát úplnou historii změn, stačí udělat toto:
 ``
 form = SQLFORM(db.mytable, myrecord).process(onsuccess=auth.archive)
 ``:code
@@ -1308,20 +1308,20 @@ form = SQLFORM(db.mytable, myrecord).process(onsuccess=auth.archive)
 form = crud.update(db.mytable, myrecord, onaccept=auth.archive)
 ``:code
 
-``auth.archive`` defines a new table called **db.mytable_archive** (the name is derived from the name of the table to which it refers) and on updating, it stores a copy of the record (as it was before the update) in the created archive table, including a reference to the current record.
+``auth.archive`` vytvoří novou tabulku **db.mytable_archive** (ke jménu tabulky připojí "_archive") a při každé aktualizaci uloží stav záznamu před aktualizací do této archivní tabulky, spolus s přidaným odkazem archivního záznamu na platný záznam.
 
-Because the record is actually updated (only its previous state is archived), references are never broken.
+"Živý" záznam se vždy aktualizuje (archivuje se jen předešlý stav), takže odkazy (vazby, reference) budou stále v pořádku.
 
-This is all done under the hood.  Should you wish to access the archive table you should define it in a model:
+K tomu není potřeba definovat archivní tabulku v modelu. Pokud ale budete chtít do archivní tabulky přistupovat, je potřeba v modelu definici přidat:
 ``
 db.define_table('mytable_archive',
    Field('current_record', 'reference mytable'),
    db.mytable)
 ``:code
 
-Notice the table extends ``db.mytable`` (including all its fields), and adds  a reference to the ``current_record``.
+Všimněte si, že archivní tabulka rozšiřuje ``db.mytable`` (zachová všechna její pole) a přidá jedno pole, odkaz na platný záznam: ``current_record``.
 
-``auth.archive`` does not timestamp the stored record unless your original table has timestamp fields, for example:
+``auth.archive`` nezajišťuje zápis časové značky (timestamp), ale zajistí ho, když do "živé" tabulky přidáte timestamp údaje. Například:
 
 ``
 db.define_table('mytable',
@@ -1331,121 +1331,120 @@ db.define_table('mytable',
           default=auth.user_id, update=auth.user_id, writable=False),
 ``:code
 
-There is nothing special about these fields and you may give them any name you like. They are filled before the record is archived and are archived with each copy of the record.  The archive table name and/or reference field name can be changed like this:
+Není zde vlastně nic specifického na těchto přidaných polích, takže jim můžete dát jakákoli jména. V záznamu jsou tyto údaje vždy vyplněny, a se záznamem jsou tedy zaarchivovány - to se týká každé postupné změny. Jméno archivní tabulky a/nebo jméno pole, které odkazuje na aktuální záznam, je možné změnit takto:
 
 ``
 db.define_table('myhistory',
     Field('parent_record', 'reference mytable'),
     db.mytable)
 ## ...
-form = SQLFORM(db.mytable,myrecord)
-form.process(onsuccess = lambda form:auth.archive(form,
+form = SQLFORM(db.mytable, myrecord)
+form.process(onsuccess = lambda form: auth.archive(form,
              archive_table=db.myhistory,
              current_record='parent_record'))
 ``:code
 
-### Custom forms
+### Uživatelská úprava formulářů
 
-If a form is created with SQLFORM, SQLFORM.factory or CRUD, there are multiple ways it can be embedded in a view allowing multiple degrees of customization. Consider for example the following model:
+Pro formulář, vytvořený pomocí SQLFORM, SQLFORM.factory nebo CRUDu, je více možností, jak může být renderován v šabloně, a každá z nich nabízí různou úroveň možností přizpůsobení. Např. uvažujme model:
 ``
 db.define_table('image',
     Field('name', requires=IS_NOT_EMPTY()),
     Field('source', 'upload'))
 ``:code
 
-and upload action
+a upload akci:
 ``
 def upload_image():
     return dict(form=SQLFORM(db.image).process())
 ``:code
 
-The simplest way to embed the form in the view for ``upload_image`` is
+Nejjednodušší způsob, jak formulář začlenit do šablony, je:
 ``
 {{=form}}
 ``:code
 
-This results in a standard table layout. If you wish to use a different layout, you can break the form into components
+To vykreslí formulář ve standardním vzhledu tabulky (table layout). Chcete-li jiný vzhled, můžete rozčlenit formulář na komponenty:
 ``
 {{=form.custom.begin}}
-Image name: <div>{{=form.custom.widget.name}}</div>
-Image file: <div>{{=form.custom.widget.source}}</div>
-Click here to upload: {{=form.custom.submit}}
+Name: <div>{{=form.custom.widget.name}}</div>
+File: <div>{{=form.custom.widget.source}}</div>
+{{=form.custom.submit}}
 {{=form.custom.end}}
 ``:code
 
-where ``form.custom.widget[fieldname]`` gets serialized into the proper widget for the field. If the form is submitted and it contains errors, they are appended below the widgets, as usual.
+``form.custom.widget[jmenopole]`` bude serializováno pomocí widgetu, který odpovídá typu pole. Když validace zjistí problémy, chyby se zobrazí jako obvykle pod widgety.
 
-The above sample form is show in the image below.
+Formulář vidíme na tomto obrázku.
 
 [[image @///image/en6500.png center 300px]]
 
-A similar result could have been obtained without using a custom form:
+Argument ``formstyle`` umožní určitou změnu vzhledu i bez použití form.custom. Např. podobný vzhled dostaneme takto:
 
 ``
-SQLFORM(...,formstyle='table2cols')
+SQLFORM(..., formstyle='table2cols')
 ``:code
 
-or in case of CRUD forms with the following parameter:
+nebo u CRUD formuláře nastavením:
 
 ``
-crud.settings.formstyle='table2cols'
+crud.settings.formstyle = 'table2cols'
 ``:code
 
-Other possible ``formstyle``s are "table3cols" (the default), "divs" and "ul".
+Další možná nastavení ``formstyle`` jsou "table3cols" (default), "divs" nebo "ul".
 
-If you do not wish to use the widgets serialized by web2py, you can replace them with HTML. There are some variables that will be useful for this:
-- ``form.custom.label[fieldname]`` contains the label for the field.
-- ``form.custom.comment[fieldname]`` contains the comment for the field.
-- ``form.custom.dspval[fieldname]`` form-type and field-type dependent display representation of the field.
-- ``form.custom.inpval[fieldname]`` form-type and field-type dependent values to be used in field code.
+Když nechcete, aby widgety serializovalo Web2py, můžete je nahradit pomocí HTML. Pomohou některé proměnné:
+- ``form.custom.label[fieldname]`` obsahuje popisný text (label) zadaného pole.
+- ``form.custom.comment[fieldname]`` obsahuje komentář (comment) pole.
+- ``form.custom.dspval[fieldname]`` zobrazená hodnota pole, která je závislá na typu ??((stylu))?? formuláře a na typu pole.
+- ``form.custom.inpval[fieldname]`` prvek pro editaci pole, opět závislý na typu/stylu formuláře a typu pole.
 
-If you form has ``deletable=True`` you should also insert
+Jestliže jste pro formulář nastavili ``deletable=True``, přidejte ještě
 
 ``
 {{=form.custom.delete}}
 ``:code
 
-to display the delete checkbox.
+tam, kde chcete zobrazit checkbox pro zrušení záznamu.
 
-It is important to follow the conventions described below.
+Je důležité se přizpůsobit konvencím, které nyní popíšeme.
 
-#### CSS conventions
+#### CSS konvence
 
-Tags in forms generated by SQLFORM, SQLFORM.factory and CRUD follow a strict CSS naming convention that can be used to further customize the forms.
+Značky (tags) ve formulářích, které generuje SQLFORM, SQLFORM.factory nebo CRUD se drží CSS konvence pojmenování, takže je lze využít pro přizpůsobení vzhledu formuláře snadno pochopitelným způsobem.
 
-Given a table "mytable", and a field "myfield" of type "string", it is rendered by default by a
+Mějme tabulku "mojetabulka" a pole "mojepole" typu "string", které se defaultně vykreslí jako
 ``
 SQLFORM.widgets.string.widget
 ``:code
 
-that looks like this:
+v HTML to bude vypadat takto:
 ``
-<input type="text" name="myfield" id="mytable_myfield"
-       class="string" />
+<input type="text" name="mojepole" id="mojetabulka_mojepole" class="string" />
 ``:code
 
-Notice that:
-- the class of the INPUT tag is the same as the type of the field. This is very important for the jQuery code in "web2py_ajax.html" to work. It makes sure that you can only have numbers in "integer" and "double" fields, and that "time", "date" and "datetime" fields display the popup calendar/datepicker.
-- the id is the name of the class plus the name of the field, joined by one underscore. This allows you to uniquely refer to the field via, for example, ``jQuery('#mytable_myfield')`` and manipulate the stylesheet of the field or bind actions associated to the field events (focus, blur, keyup, etc.).
-- the name is, as you would expect, the field name.
+Všimněte si, že:
+- třída tagu INPUT je stejná, jako typ pole. To je zásadní pro práci jQuery kódu v "web2py_ajax.html". Tento javascript zajistí, že do polí "integer" nebo "double" lze zadávat pouze čísla a že "time", "date" a "datetime" pole zobrazí javascriptové prvky kalendáře nebo volby času.
+- id je složeno ze jména tabulky, podtržítka a jména pole. Umožňuje to (kromě stylování) unikátně identifikovat prvek v javascriptu, např. ``jQuery('#mojetabulka_mojepole')``, a např. přiřazovat javascriptové události (events): focus, blur, keyup, apod.
+- name je totožné se jménem pole.
 
-#### Hide errors
+#### Skrytí chybových hlášení
 ``hideerror``:inxx
 
-Occasionally, you may want to disable the automatic error placement and display form error messages in some place other than the default. That can be done easily.
+Někdy můžete chtít, aby bylo potlačeno automatické umístění chybového hlášení a aby chyby byly zobrazeny jinde nebo jinak. Lze to zajistit jednoduše:
 
-- In the case of FORM or SQLFORM, pass ``hideerror=True`` to the ``accepts`` method.
-- In the case of CRUD, set ``crud.settings.hideerror=True``
+- Pro FORM nebo SQLFORM, zavolejte metodu ``accepts`` s argumentem ``hideerror=True``.
+- Pro CRUD nastavte ``crud.settings.hideerror = True``.
 
-You may also want to modify the views to display the error (since they are no longer displayed automatically).
+Asi také upravíte šablonu, aby vhodným způsobem zobrazila chyby (protože defaultní nastavení je nyní potlačeno).
 
-Here is an example where the errors are displayed above the form and not in the form.
+Tady je příklad, kdy se chyby zobrazí nad formulářem místo v něm:
 ``
 {{if form.errors:}}
-  Your submitted form contains the following errors:
+  Vámi potvrzené údaje obsahují tyto chyby:
   <ul>
   {{for fieldname in form.errors:}}
-    <li>{{=fieldname}} error: {{=form.errors[fieldname]}}</li>
+    <li>{{=fieldname}} chyba: {{=form.errors[fieldname]}}</li>
   {{pass}}
   </ul>
   {{form.errors.clear()}}
@@ -1453,11 +1452,11 @@ Here is an example where the errors are displayed above the form and not in the 
 {{=form}}
 ``:code
 
-The errors will displayed as in the image shown below.
+Chyby se pak zobrazí takto:
 
 [[image @///image/en6600.png center 300px]]
 
-This mechanism also works for custom forms.
+Tento mechanismus bude fungovat i při použití form.custom.
 
 
 ### Validators
