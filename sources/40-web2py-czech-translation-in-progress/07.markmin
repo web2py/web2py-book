@@ -6,7 +6,7 @@ Existují 4 způsoby, jak ve Web2py vytvářet formuláře:
 - ``SQLFORM.factory`` je abstrakce nad ``SQLFORM-em`` za účelem využití jeho výhod i pro případ, kdy nepracujeme s daty z databáze. Generuje tedy formulář velice podobný ``SQLFORM-u``, a to ze zadané definice dat, která je podobná definici tabulky v modelu, ale žádnou skutečnou tabulku nevytváří.
 - ``CRUD`` metody. Jejich funkčnost je identická se SQLFORM a jsou založeny na SQLFORM. Poskytují poněkud kompaktnější zápis.
 
-Všechny tyto formuláře se samy modifikují na základě zaávání dat. Pokud vstup neprojde validací, formulář se sám modifikuje přidáním chybových hlášení. Lze zjišťovat jednotlivé zadané údaje a výsledky a hlášení validace.
+Všechny tyto formuláře se samy modifikují na základě zadávání dat. Pokud vstup neprojde validací, formulář se sám modifikuje přidáním chybových hlášení. Lze zjišťovat jednotlivé zadané údaje a výsledky a hlášení validace.
 
 Do formuláře lze vložit nebo z něj získat jakýkoli HTML kód pomocí helperů.
 
@@ -47,7 +47,7 @@ Místo přímo pomocí HTML můžete stejný formulář vytvořit za pomoci help
 Kontrolér bude vypadat takto:
 ``
 def display_form():
-   form=FORM('Vaše jméno:', INPUT(_name='name'), INPUT(_type='submit'))
+   form = FORM('Vaše jméno:', INPUT(_name='name'), INPUT(_type='submit'))
    return dict(form=form)
 ``:code
 
@@ -468,6 +468,15 @@ col3 = {'name':A('co je to?',
 - ``ignore_rw``. Normálně create i update formulář nezobrazí pole, označená v definici tabulky jako writable=False, a readonly formulář nezobrazí pole, označená readable=False. Nastavením ``ignore_rw=True`` toto chování potlačíte a zobrazí se všechna pole. Používá se to především v appadmin rozhraní, když se zobrazují úplné obsahy tabulek.
 - ``formstyle``:inxx ``formstyle`` určuje styl při serializování formuláře do html. Lze nastavit "table3cols" (default), "table2cols" (jeden řádek pro label a comment, jeden řádek pro input prvek), "ul" (seznam s input prvky), "divs" (div prvky s atributy pro snadné stylování). ``formstyle`` může také být funkce, která má parametry (record_id, field_label, field_widget, field_comment) a vrátí TR() objekt.
 - ``buttons``:inxx je seznam (list) HTML helperů jako ``INPUT`` nebo ``TAG.BUTTON`` (případně i jiných helperů), které se přidají do DIVu, v němž se nachází tlačítko Submit.
+Např. přidejme tlačítko Zpět a přejmenujme Submit na Další (vícestránkový formulář):
+``
+buttons = [TAG.button('Zpět', _type="button", _onClick = "parent.location='%s' " % URL(...),
+             TAG.button('Další', _type="submit")]
+``:code
+nebo přidáme odkaz na jinou stránku:
+``
+buttons = [..., A("Přejít na jinou stránku", _class='btn', _href=URL("default", "anotherpage"))]
+``:code
 - ``separator``:inxx ``separator`` je oddělovač mezi popisnými texty údajů a input prvky.
 - Nepovinné ``attributes`` jsou argumenty, zapsané s úvodním podtržítkem, které chcete předat ``<form>`` tagu. Například:
 ``
@@ -673,7 +682,7 @@ Field('image', 'upload', uploadseparate=True)
 ``
 
 
-#### Uložení včetně původního jména souboru
+#### Uložení původního jména souboru
 
 Web2py automaticky ukládá původní jméno uploadovaného souboru do nového unikátního jména souboru. Při downloadu je pak původní jméno součástí hlavičky (content-disposition header) HTTP odpovědi. To se provede automaticky bez jakéhokoli programování.
 
@@ -1173,6 +1182,8 @@ Lze nastavit oddělovač mezi popisnými texty a aktivními prvky:
 crud.settings.label_separator = ':'
 ``:code
 
+#### captcha
+
 Můžete přidat kontrolní kód (captcha) se stejným chováním, jak je vysvětleno pro auth (kapit.9):
 
 ``
@@ -1515,14 +1526,165 @@ Pro pole typu ``list:`` lze použít jedině tyto validátory:
 
 Poslední z nich lze použít pro aplikování jakéhokoli validátoru na jednotlivé prvky seznamu.
 
-#### Přehled validátorů
+#### Validátory textu
 
 ##### ``IS_ALPHANUMERIC``
 ``IS_ALPHANUMERIC``:inxx
 
 Validátor ověří, že hodnota obsahuje jen znaky a-z, A-Z nebo 0-9.
 ``
-requires = IS_ALPHANUMERIC(error_message='must be alphanumeric!')
+requires = IS_ALPHANUMERIC(error_message='must be alphanumeric!')   # zadej alfanumerické znaky
+``:code
+
+##### ``IS_LOWER``
+``IS_LOWER``:inxx
+
+Také tento validátor neohlašuje žádnou chybu. Převede zadanou hodnotu na malá písmena.
+``
+requires = IS_LOWER()
+``:code
+
+##### ``IS_UPPER``
+``IS_UPPER``:inxx
+
+Také tento validátor neohlašuje žádnou chybu. Převede zadanou hodnotu na velká písmena.
+``
+requires = IS_LOWER()
+``:code
+
+##### ``IS_EMAIL``
+``IS_EMAIL``:inxx
+
+Validátor ověří, že hodnota formálně vypadá jako správná emailová adresa.
+``
+requires = IS_EMAIL(error_message='invalid email!')   # chybná e-mailová adresa
+``:code
+
+##### ``IS_MATCH``
+``IS_MATCH``:inxx
+
+Validátor ověří, že zadaná hodnota souhlasí s regulárním výrazem.
+V příkladu kontrolujeme, že zadaná hodnota je platný americký (US) poštovní kód (zip code):
+``
+requires = IS_MATCH('^\d{5}(-\d{4})?$',
+         error_message='not a zip code')   # není zip kód
+``:code
+
+V tomto příkladu validujeme IPv4 adresu (a sice jen jako příklad, protože je vhodnější použít přímo validátor IS_IPV4):
+``
+requires = IS_MATCH('^\d{1,3}(\.\d{1,3}){3}$',
+         error_message='zadejte správnou IP adresu')
+``:code
+
+Takto můžeme ověřit správnost US telefonního čísla:
+``
+requires = IS_MATCH('^1?((-)\d{3}-?|\(\d{3}\))\d{3}-?\d{4}$',
+         error_message='not a phone number')   # není US telefonní číslo
+``:code
+
+S používáním regulárních výrazů v Pythonu odkazujeme na oficiální dokumentaci.
+
+``IS_MATCH`` má volitelný argument ``strict``, defaultně ``False``. Není-li nastaven na ``True``, porovnává se jen začátek řetězce:
+
+``
+>>> IS_MATCH('a')('ab')
+('a', None)                          # projde
+>>> IS_MATCH('a', strict=False)('ab')
+('a', None)                          # projde
+>>> IS_MATCH('a', strict=True)('ab')
+('a', 'invalid expression')          # neprojde
+``
+
+``IS_MATCH`` má také volitelný argument ``search`` s defaultní hodnotou ``False``. Nastavíme-li jej na ``True``, bude použita místo regex metody ``match`` metoda ``search``.
+
+``IS_MATCH('...', extract=True)`` - v tomto případě se nevrátí původní hodnota, ale vrátí se první vyhovující podřetězec.
+
+##### ``IS_LENGTH``
+``IS_LENGTH``:inxx
+
+Ověří, že zadaný počet znaků je v daném rozsahu. Lze použít pro vstup textu i upload souboru.
+
+Argumenty jsou:
+- maxsize: maximální přípustná délka / velikost (default = 255)
+- minsize: minimální vyžadovaná délka / velikost
+
+Příklady:
+Je zadaný text kratší než 33 znaků?
+``
+INPUT(_type='text', _name='name', requires=IS_LENGTH(32))
+``:code
+
+Je heslo delší než 5 znaků?
+``
+INPUT(_type='password', _name='name', requires=IS_LENGTH(minsize=6))
+``:code
+
+Je uploadovaný soubor velký od 1KB do 1MB?
+``
+INPUT(_type='file', _name='name', requires=IS_LENGTH(1048576, 1024))
+``:code
+
+Pro jiná pole, než jsou soubory, testuje délku zadané hodnoty. V případě souborů je zadanou hodnotou ``cookie.FieldStorage``, a tím je testována délka (velikost) dat, což je chování, které intuitivně čekáme.
+
+##### ``IS_URL``
+``IS_URL``:inxx
+
+Kontrola URL adresy (zadané pomocí doménového jména nebo IP). Validace neprojde, pokud je pravda kterýkoli z následujících bodů:
+- Řetězec je prázdný nebo není nic zadáno (is None)
+- Řetězec obsahuje v URL nepovolené znaky
+- Řetězec porušuje kterékoli HTTP syntaktické pravidlo
+- Zadané URL schéma (pokud je uvedeno) je jiné než 'http' nebo 'https'
+- Top-level doména (je-li použito doménové jméno) neexistuje
+
+(Tato pravidla jsou založena na RFC 2616``RFC2616``:cite )
+
+Validátor zkonroluje URL syntaxi. Nezjišťuje, zda URL odkazuje na skutečný dokument nebo je tu nějaký sémantický problém. Není-li zadáno schéma, bude automaticky přidáno 'http://' před zadaný text.
+
+Použijeme-li argument mode='generic', chování validátoru se změní. Validace pak neprojde, pokud je pravda kterýkoli z následujících bodů:
+- Řetězec je prázdný nebo není nic zadáno (is None)
+- Řetězec obsahuje v URL nepovolené znaky
+- Zadané URL schéma (pokud je uvedeno) není dovolené
+
+(Tato pravidla jsou založena na RFC 2396``RFC2396``:cite )
+
+Seznam (list) povolených schémat lze přizpůsobit pomocí argumentu allowed_schemes. Pokud v tomto seznamu neuvedete také None, validací neprojdou ani zkrácené adresy, které nezačínají schématem (např. 'http').
+
+Pomocí argumentu prepend_scheme lze zvolit schéma, které se přidá v případě, že žádné není uvedeno. Zadáte-li prepend_scheme=None, schéma se nikdy nepřipojí. URL, kterému chybí schéma, nicméně validací projde. Vrácená hodnota se nezmění proti zadané hodnotě.
+
+IS_URL je kompatibilní s Internationalized Domain Name (IDN) standardem, jak jej specifikuje RFC 3490``RFC3490``:cite ). URL tedy může být ASCII řetězec nebo řetězec unicode.
+Pokud doménová část URL (např. google.cz) bude obsahovat znaky mimo ASCII, bude doménové jméno zkonvertováno do Punycode (jak jej definuje RFC 3492``RFC3492``:cite ). IS_URL jde poněkud za hranici standardu a dovoluje, aby znaky mimo US-ASCII byly obsaženy i v path složce a ve query složce adresy. Tyto znaky zakóduje, např. místo mezery zapíše %20, nebo místo unicode znaku s hex kódem 0x4e86
+zapíše %4e%86.
+
+Příklady:
+``
+requires = IS_URL())
+requires = IS_URL(mode='generic')
+requires = IS_URL(allowed_schemes=['https'])
+requires = IS_URL(prepend_scheme='https')
+requires = IS_URL(mode='generic',
+                  allowed_schemes=['ftps', 'https'],
+                  prepend_scheme='https')
+``:code
+
+##### ``IS_SLUG``
+``IS_SLUG``:inxx
+``
+requires = IS_SLUG(maxlen=80, check=False, error_message='must be slug')    # povolena jsou jen normalizovaná jména s pomlčkami
+``:code
+
+S argumentem ``check=True`` zjistí, zda se jedná o normalizované jméno s pomlčkami (slug), kde jsou dovoleny jen alfanumerické znaky a neopakující se pomlčky.
+
+S argumentem ``check=False`` (což je default) konvertuje vstup na slug: nahradí podtržítko a mezeru pomlčkou, odstraní ostatní nevhodné znaky a pak vynechá opakování pomlček.
+
+
+#### Validátory Data a Času
+
+##### ``IS_TIME``
+``IS_TIME``:inxx
+
+Validátor ověří, že je zadán platný časový údaj v uvedeném formátu.
+``
+requires = IS_TIME(error_message='must be HH:MM:SS!')   # použij formát ...
 ``:code
 
 ##### ``IS_DATE``
@@ -1531,20 +1693,7 @@ requires = IS_ALPHANUMERIC(error_message='must be alphanumeric!')
 Validátor ověří, že hodnota je platné datum v zadaném formátu. Je vhodné v argumentu ``format`` použít operátor pro překlad, čímž můžeme podporovat různé formáty data podle národních zvyklostí.
 ``
 requires = IS_DATE(format=T('%Y-%m-%d'),
-                   error_message='must be YYYY-MM-DD!')
-``:code
-
-"%" direktivy popisujeme u IS_DATETIME validátoru.
-
-##### ``IS_DATE_IN_RANGE``
-``IS_DATE_IN_RANGE``:inxx
-
-Pracuje jako předchozí validátor a navíc umožňuje omezit rozsah doby od-do:
-``
-requires = IS_DATE_IN_RANGE(format=T('%Y-%m-%d'),
-                   minimum=datetime.date(2008,1,1),
-                   maximum=datetime.date(2009,12,31),
-                   error_message='must be YYYY-MM-DD!')
+                   error_message='must be YYYY-MM-DD!')   # použij formát YYYY-MM-DD
 ``:code
 
 "%" direktivy popisujeme u IS_DATETIME validátoru.
@@ -1555,7 +1704,7 @@ requires = IS_DATE_IN_RANGE(format=T('%Y-%m-%d'),
 Validátor ověří, že hodnota je platné datum spolu s časem, v zadaném formátu. Je vhodné v argumentu ``format`` použít operátor pro překlad, čímž můžeme podporovat různé formáty data podle národních zvyklostí.
 ``
 requires = IS_DATETIME(format=T('%Y-%m-%d %H:%M:%S'),
-                       error_message='must be YYYY-MM-DD HH:MM:SS!')
+                       error_message='must be YYYY-MM-DD HH:MM:SS!')   # použij formát ...
 ``:code
 
 Možné hodnoty operátoru/symbolu "%" si ukážeme na příkladu:
@@ -1573,6 +1722,19 @@ Možné hodnoty operátoru/symbolu "%" si ukážeme na příkladu:
 %S  '59'
 ``:code
 
+##### ``IS_DATE_IN_RANGE``
+``IS_DATE_IN_RANGE``:inxx
+
+Pracuje jako předchozí validátor a navíc umožňuje omezit rozsah doby od-do:
+``
+requires = IS_DATE_IN_RANGE(format=T('%Y-%m-%d'),
+                   minimum=datetime.date(2008,1,1),
+                   maximum=datetime.date(2009,12,31),
+                   error_message='must be YYYY-MM-DD!')   # použij formát ...
+``:code
+
+"%" direktivy popisujeme u IS_DATETIME validátoru.
+
 ##### ``IS_DATETIME_IN_RANGE``
 ``IS_DATETIME_IN_RANGE``:inxx
 
@@ -1581,10 +1743,59 @@ Pracuje jako předchozí validátor a navíc umožňuje omezit rozsah doby od-do
 requires = IS_DATETIME_IN_RANGE(format=T('%Y-%m-%d %H:%M:%S'),
                        minimum=datetime.datetime(2008,1,1,10,30),
                        maximum=datetime.datetime(2009,12,31,11,45),
-                       error_message='must be YYYY-MM-DD HH:MM::SS!')
+                       error_message='must be YYYY-MM-DD HH:MM::SS!')   # použij formát ...
 ``:code
 
 "%" direktivy popisujeme u IS_DATETIME validátoru.
+
+#### Validátory pro rozsahu, výběr a porovnání
+
+##### ``IS_EQUAL_TO``
+``IS_EQUEL_TO``:inxx
+
+Validátor ověří, že hodnota je shodná s hodnotou argumentu, což může být proměnná:
+``
+requires = IS_EQUAL_TO(request.vars.password,
+                       error_message='passwords do not match')   # hesla nesouhlasí
+``:code
+
+##### ``IS_NOT_EMPTY``
+``IS_NOT_EMPTY``:inxx
+
+Validátor ověří, že hodnota je zadána (je zadán jiný než prázdný řetězec).
+``
+requires = IS_NOT_EMPTY(error_message='cannot be empty!')   # musí být zadáno
+``:code
+
+##### ``IS_NULL_OR``
+``IS_NULL_OR``:inxx
+
+Zastaralý. Alias pro modernější ``IS_EMPTY_OR`` popsaný níže.
+
+##### ``IS_EMPTY_OR``
+``IS_EMPTY_OR``:inxx
+
+Někdy můžete potřebovat povolit nevyplněný údaj a zároveň jej chtít validovat, pokud vyplněn bude. Např. můžete chtít, aby pole bylo buď prázdné nebo aby bylo zadáno datum.
+To umožňuje validátor ``IS_EMPTY_OR``:
+``
+requires = IS_EMPTY_OR(IS_DATE())
+``:code
+
+##### ``IS_EXPR``
+``IS_EXPR``:inxx
+
+Prvním argumentem je řetězec s logickým výrazem nad hodnotou "value". Validace projde, jestliže vyčíslená hodnota výrazu je ``True``. Příklad:
+``
+requires = IS_EXPR('int(value)%3==0',
+                   error_message='not divisible by 3')   # není dělitelné třemi
+``:code
+
+Defaultní chybové hlášení je "Invalid expression" ("chybný výraz").
+V uvedeném příkladu je vhodné v seznamu validátorů předřadit validátor, který nejprve otestuje, že předaná hodnota je typu Integer. Jinak dojde ve validátoru IS_EXPR() k výjimce.
+``
+requires = [IS_INT_IN_RANGE(0, 100), IS_EXPR('value%3==0')]
+``:code
+
 
 ##### ``IS_DECIMAL_IN_RANGE``
 ``IS_DECIMAL_IN_RANGE``:inxx
@@ -1601,45 +1812,13 @@ Minimum a maximum omezení mohou být None, což znamená, že daný limit není
 Argument ``dot`` je volitelný a umožňuje internacionalizovat znak pro oddělení desetinných míst.
 
 
-##### ``IS_EMAIL``
-``IS_EMAIL``:inxx
-
-Validátor ověří, že hodnota formálně vypadá jako správná emailová adresa.
-``
-requires = IS_EMAIL(error_message='invalid email!')
-``:code
-
-##### ``IS_EQUAL_TO``
-``IS_EQUEL_TO``:inxx
-
-Validátor ověří, že hodnota je shodná s hodnotou argumentu, což může být proměnná:
-``
-requires = IS_EQUAL_TO(request.vars.password,
-                       error_message='passwords do not match')
-``:code
-
-##### ``IS_EXPR``
-``IS_EXPR``:inxx
-
-Prvním argumentem je řetězec s logickým výrazem nad hodnotou "value". Validace projde, jestliže vyčíslená hodnota výrazu je ``True``. Příklad:
-``
-requires = IS_EXPR('int(value)%3==0',
-                   error_message='not divisible by 3')
-``:code
-
-Defaultní chybové hlášení je "Invalid expression" ("chybný výraz").
-V uvedeném příkladu je vhodné v seznamu validátorů předřadit validátor, který nejprve otestuje, že předaná hodnota je typu Integer. Jinak dojde ve validátoru IS_EXPR() k výjimce.
-``
-requires = [IS_INT_IN_RANGE(0, 100), IS_EXPR('value%3==0')]
-``:code
-
 ##### ``IS_FLOAT_IN_RANGE``
 ``IS_FLOAT_IN_RANGE``:inxx
 
 Validátor ověří, že hodnota je float číslo v zadaném rozsahu od-do, v našem příkladu ``0 <= hodnota <= 100``:
 ``
 requires = IS_FLOAT_IN_RANGE(0, 100, dot=".",
-         error_message='too small or too large!')
+         error_message='too small or too large!')   # mimo rozsah 0..100
 ``:code
 
 Volitený argument ``dot`` umožňuje internacionalizaci symbolu pro oddělení desetinných míst.
@@ -1650,7 +1829,7 @@ Volitený argument ``dot`` umožňuje internacionalizaci symbolu pro oddělení 
 Validátor ověří, že hodnota je integer číslo v zadaném rozsahu od-do, v našem příkladu ``0 <= hodnota <= 100``:
 ``
 requires = IS_INT_IN_RANGE(0, 100,
-         error_message='too small or too large!')
+         error_message='too small or too large!')   # mimo rozsah 0..100
 ``:code
 
 ##### ``IS_IN_SET``
@@ -1660,7 +1839,7 @@ requires = IS_INT_IN_RANGE(0, 100,
 Validátor ověří, že hodnota je rovna některé ze zadaných hodnot:
 ``
 requires = IS_IN_SET(['a', 'b', 'c'], zero=T('choose one'),
-         error_message='must be a or b or c')
+         error_message='must be a or b or c')        # vyber jednu možnost / musí být vybráno a|b|c
 ``:code
 
 Argument zero je volitelný a uplatní se jako text volby (OPTION) SELECTu, která bude přednastavena. Tuto hodnotu ``IS_IN_SET`` validátor neakceptuje. Pokud toto chování chcete potlačit, nastavte ``zero=None``.
@@ -1671,6 +1850,8 @@ requires = [IS_INT_IN_RANGE(0, 8), IS_IN_SET([2, 3, 5, 7],
           error_message='Zadej prvočíslo menší než 10.')]
 ``:code
 
+[[checkbox_validation]]
+###### Validace checkboxu
 Pro validaci zaškrtnutí checkboxu lze použít toto:
 ``
 requires=IS_IN_SET(['on'])
@@ -1690,216 +1871,110 @@ requires = IS_IN_SET([('J','Jablka'), ('T','Třešně'), ('B','Banány')])
 Validátor ``IS_IN_SET`` má volitelný atribut ``multiple=False``. Pokud jej nastavíme na True, do pole může být uloženo více hodnot. K tomu je potřeba použít pole typu ``list:integer`` nebo ``list:string``. Důrazně doporučujeme používat pro výběr možností jQuery multiselect plugin.
 
 ------
-Jestliže je nastaveno ``multiple=True``, ``IS_IN_SET`` akceptuje žádnou, jednu nebo několik hodnot, neboli validace projde, i když není nic vybráno. ``multiple`` můžete také nastavit jako dvojici (tuple) ``(a, b)``, kde ``a`` a ``b`` jsou minimální a maximální (ovšem exkluzivně zadáno, tj. testuje se po zmenšení o 1) počet voleb, které uživatel musí označit.
+Jestliže je nastaveno ``multiple=True``, ``IS_IN_SET`` akceptuje žádnou, jednu nebo několik hodnot, neboli validace projde, i když není nic vybráno. ``multiple`` můžete také nastavit jako dvojici (tuple) ``(a, b)``, kde ``a`` a ``b`` jsou minimální a maximální (maximum je ovšem zadáno exkluzivně, tj. testuje se po zmenšení o 1) počet voleb, které uživatel musí označit.
 ------
 
-##### ``IS_LENGTH``
-``IS_LENGTH``:inxx
-
-Checks if length of field's value fits between given boundaries. Works
-for both text and file inputs.
-
-Its arguments are:
-- maxsize: the maximum allowed length / size (has default = 255)
-- minsize: the minimum allowed length / size
-
-Examples:
-Check if text string is shorter than 33 characters:
-``
-INPUT(_type='text', _name='name', requires=IS_LENGTH(32))
-``:code
-
-Check if password string is longer than 5 characters:
-``
-INPUT(_type='password', _name='name', requires=IS_LENGTH(minsize=6))
-``:code
-
-Check if uploaded file has size between 1KB and 1MB:
-``
-INPUT(_type='file', _name='name', requires=IS_LENGTH(1048576, 1024))
-``:code
-
-For all field types except for files, it checks the length of the value. In the case of files, the value is a ``cookie.FieldStorage``, so it validates the length of the data in the file, which is the behavior one might intuitively expect.
-
-##### ``IS_LIST_OF``
-``IS_LIST_OF``:inxx
-
-This is not properly a validator. Its intended use is to allow validations of fields that return multiple values. It is used in those rare cases when a form contains multiple fields with the same name or a multiple selection box. Its only argument is another validator, and all it does is to apply the other validator to each element of the list. For example, the following expression checks that every item in a list is an integer in the range 0-10:
-``
-requires = IS_LIST_OF(IS_INT_IN_RANGE(0, 10))
-``:code
-
-It never returns an error and does not contain an error message. The inner validator controls the error generation.
-
-##### ``IS_LOWER``
-``IS_LOWER``:inxx
-
-This validator never returns an error. It just converts the value to lower case.
-``
-requires = IS_LOWER()
-``:code
-
-##### ``IS_MATCH``
-``IS_MATCH``:inxx
-
-This validator matches the value against a regular expression and returns an error if it does not match.
-Here is an example of usage to validate a US zip code:
-``
-requires = IS_MATCH('^\d{5}(-\d{4})?$',
-         error_message='not a zip code')
-``:code
-
-Here is an example of usage to validate an IPv4 address (note: the IS_IPV4 validator is more appropriate for this purpose):
-``
-requires = IS_MATCH('^\d{1,3}(\.\d{1,3}){3}$',
-         error_message='not an IP address')
-``:code
-
-Here is an example of usage to validate a US phone number:
-``
-requires = IS_MATCH('^1?((-)\d{3}-?|\(\d{3}\))\d{3}-?\d{4}$',
-         error_message='not a phone number')
-``:code
-
-For more information on Python regular expressions, refer to the official Python documentation.
-
-``IS_MATCH`` takes an optional argument ``strict`` which defaults to ``False``. When set to ``True`` it only matches the beginning of the string:
-
-``
->>> IS_MATCH('a')('ba')
-('ba', <lazyT 'invalid expression'>) # no pass
->>> IS_MATCH('a',strict=False)('ab')
-('a', None)                          # pass!
-``
-
-``IS_MATCH`` takes an other optional argument ``search`` which defaults to ``False``. When set to ``True``, it uses regex method ``search`` instead of method ``match`` to validate the string.
-
-``IS_MATCH('...', extract=True)`` filters and extract only the first matching
-substring rather than the original value.
-
-##### ``IS_NOT_EMPTY``
-``IS_NOT_EMPTY``:inxx
-
-This validator checks that the content of the field value is not an empty string.
-``
-requires = IS_NOT_EMPTY(error_message='cannot be empty!')
-``:code
-
-##### ``IS_TIME``
-``IS_TIME``:inxx
-
-This validator checks that a field value contains a valid time in the specified format.
-``
-requires = IS_TIME(error_message='must be HH:MM:SS!')
-``:code
-
-##### ``IS_URL``
-``IS_URL``:inxx
-
-Rejects a URL string if any of the following is true:
-- The string is empty or None
-- The string uses characters that are not allowed in a URL
-- The string breaks any of the HTTP syntactic rules
-- The URL scheme specified (if one is specified) is not 'http' or 'https'
-- The top-level domain (if a host name is specified) does not exist
-
-(These rules are based on RFC 2616``RFC2616``:cite )
-
-This function only checks the URL's syntax. It does not check that the URL points to a real document,
-for example, or that it otherwise makes semantic sense. This function does automatically prepend
-'http://' in front of a URL in the case of an abbreviated URL (e.g. 'google.ca').
-
-If the parameter mode='generic' is used, then this function's behavior changes. It then rejects a URL string if any of the following is true:
-- The string is empty or None
-- The string uses characters that are not allowed in a URL
-- The URL scheme specified (if one is specified) is not valid
-
-(These rules are based on RFC 2396``RFC2396``:cite )
-
-The list of allowed schemes is customizable with the allowed_schemes parameter. If you exclude None from
-the list, then abbreviated URLs (lacking a scheme such as 'http') will be rejected.
-
-The default prepended scheme is customizable with the prepend_scheme parameter. If you set prepend_scheme
-to None, then prepending will be disabled. URLs that require prepending to parse will still be accepted,
-but the return value will not be modified.
-
-IS_URL is compatible with the Internationalized Domain Name (IDN) standard specified in RFC 3490``RFC3490``:cite ). As a result, URLs can be regular strings or unicode strings.
-If the URL's domain component (e.g. google.ca) contains non-US-ASCII letters, then the domain will
-be converted into Punycode (defined in RFC 3492``RFC3492``:cite ). IS_URL goes a
-bit beyond the standards, and allows non-US-ASCII characters to be present in the path
-and query components of the URL as well. These non-US-ASCII characters will be encoded.
-For example, space will be encoded as'%20'. The unicode character with hex code 0x4e86
-will become '%4e%86'.
-
-Examples:
-``
-requires = IS_URL())
-requires = IS_URL(mode='generic')
-requires = IS_URL(allowed_schemes=['https'])
-requires = IS_URL(prepend_scheme='https')
-requires = IS_URL(mode='generic',
-                  allowed_schemes=['ftps', 'https'],
-                  prepend_scheme='https')
-``:code
-
-##### ``IS_SLUG``
-``IS_SLUG``:inxx
-``
-requires = IS_SLUG(maxlen=80, check=False, error_message='must be slug')
-``:code
-
-If ``check`` is set to ``True`` it check whether the validated value is a slug (allowing only alphanumeric characters and non-repeated dashes).
-
-If ``check`` is set to ``False`` (default) it converts the input value to a slug.
+#### Validátory pro hesla
 
 ##### ``IS_STRONG``
 ``IS_STRONG``:inxx
 
-Enforces complexity requirements on a field (usually a password field)
+Ověří, že hodnota pole (typicky hesla) je dostatečně složitá.
 
 Example:
 ``
 requires = IS_STRONG(min=10, special=2, upper=2)
 ``:code
 
-where
-- min is minimum length of the value
-- special is the minimum number of required special characters special characters are any of the following ``!@#$%^&*(){}[]-+``
-- upper is the minimum number of upper case characters
+kde
+- min je minimální počet znaků (délka)
+- special je minimální počet speciálních znaků ``!@#$%^&*(){}[]-+``
+- upper je minimální počet velkých písmen
+
+##### ``CRYPT``
+``CRYPT``:inxx
+
+Provede bezpečný hash vstupu. Používá se, aby hesla nebyla ukládána nezakódovaná do databáze.
+``
+requires = CRYPT()
+``:code
+
+Defaultně CRYPT použije 1000 iterací algoritmu pbkdf2 v kombinaci s SHA512 a vytvoří 20 bytů dlouhý hash. (Starší verze Web2py používaly "md5" nebo HMAC+SHA512 podle toho, zda byl nebo nebyl zadán klíč.)
+
+Je-li použit argument key, CRYPT použije HMAC algoritmus. Argument key může obsahovat prefix, kterým se určí algoritmus, použitý spolu s HMAC, např. SHA512:
+
+``
+requires = CRYPT(key='sha512:tohlejeklic')
+``:code
+
+To je doporučená syntaxe. Klíč by měl být unikátní pro danou databázi. Nesmíte ho nikdy změnit. Pokud jej ztratíte, dříve hashované hodnoty budou nadále nepoužitelné.
+
+CRYPT defaultně používá náhodnou hodnotu salt, takže každý výsledek je jiný. Chcete-li použít konstantní hodnotu pro salt, zadejte ji:
+
+``
+requires = CRYPT(salt='mojesalthodnota')
+``:code
+
+Nebo nechcete-li salt použít:
+
+``
+requires = CRYPT(salt=False)
+``:code
+
+CRYPT validátor hashuje vstup, takže jeho výsledek nelze dále validovat. Chcete-li heslo validovat dříve, než je zahashujete, použijte CRYPT v seznamu validátorů - musíte jej ale volat jako poslední z nich. Například:
+
+``
+requires = [IS_STRONG(),CRYPT(key='sha512:tohlejeklic')]
+``:code
+
+``CRYPT`` má také argument ``min_length``, default je =0 (nula).
+
+Výsledek má tvar ``alg$salt$hash``, kde ``alg`` je použitý hashovací algoritmus, ``salt`` je salt řetězec (jak jsme již uvedli, může být také prázdný) a ``hash`` je výsledek algoritmu. Z toho plyne, že hash (jako celek) umožňuje identifikaci sebe sama, a to například dovoluje změnit během doby kryptovací algoritmus, aniž bychom tím zneplatnili dříve provedené hashe. Ale klíč, jak jsme již řekli, musí zůstat trvale stejný.
+
+#### Zvláštní validátory
+
+##### ``IS_LIST_OF``
+``IS_LIST_OF``:inxx
+
+Toto není v pravém slova smyslu validátor. Slouží k tomu, aby bylo možné validovat jednotlivé hodnoty u polí, která vrací několik hodnot. Může být použit v atypických případech, kdy formulář obsahuje více polí stejného jména a nebo pro listbox s možností výběru více položek. Argumentem volání je jiný validátor, a IS_LIST_OF zajistí, že zadaný validátor se postupně aplikuje na všechny prvky seznamu. Např. zde budeme testovat, že v seznamu jsou jen čísla 0-10:
+``
+requires = IS_LIST_OF(IS_INT_IN_RANGE(0, 10))
+``:code
+
+Tento pseudovalidátor tedy sám nic nekontroluje, nevrací chybu a nemá žádné chybové validační hlášení. Ohlašování chyb řídí vnitřní validátor.
 
 ##### ``IS_IMAGE``
 ``IS_IMAGE``:inxx
 
-This validator checks if a file uploaded through the file input was saved in one of the selected image formats and has dimensions (width and height) within given limits.
+Ověří, že uploadovaný soubor byl uložen v některém formátu pro obrázky a že má rozměry (šířku a výšku) v požadovaném rozsahu.
 
-It does not check for maximum file size (use IS_LENGTH for that). It returns
-a validation failure if no data was uploaded. It supports the file formats BMP, GIF, JPEG, PNG, and it does not require the Python Imaging Library.
+Validátor nekontroluje velikost souboru (k tomu účelu použijte IS_LENGTH). Vrátí validační chybu, pokud nebyla uploadována žádná data. Podporuje BMP, GIF, JPEG, PNG a nezávisí na knihovně PIL (Python Imaging Library).
 
-Code parts taken from ref.``source1``:cite
+``source1``:cite
 
-It takes the following arguments:
-- extensions: iterable containing allowed image file extensions in lowercase
-- maxsize: iterable containing maximum width and height of the image
-- minsize: iterable containing minimum width and height of the image
+Validátor má tyto argumenty:
+- extensions: iterable (iterovatelná struktura: seznam (list) nebo vektor (tuple)), se seznamem dovolených přípon souboru (uváděných malými písmeny)
+- maxsize: iterable, resp. dvojice, s maximální šířkou a výškou obrázku
+- minsize: iterable, resp. dvojice, s minimální šířkou a výškou obrázku
 
-Use (-1, -1) as minsize to bypass the image-size check.
+Použijte minsize (-1, -1) pro vynechání testu velikosti rozlišení.
 
-Here are some Examples:
-- Check if uploaded file is in any of supported image formats:
+Příklady:
+- Ověřit, že uploadovaný soubor je ve kterémkoli z povolených formátů pro obrázky:
 ``
 requires = IS_IMAGE()
 ``:code
-- Check if uploaded file is either JPEG or PNG:
+- Ověřit, že soubor je JPEG nebo PNG:
 ``
 requires = IS_IMAGE(extensions=('jpeg', 'png'))
 ``:code
 
-- Check if uploaded file is PNG with maximum size of 200x200 pixels:
+- Ověřit, že byl uploadován PNG o rozměrech maximálně 200x200 pixelů:
 ``
 requires = IS_IMAGE(extensions=('png'), maxsize=(200, 200))
 ``:code
 
-- Note: on displaying an edit form for a table including ``requires = IS_IMAGE()``, a ``delete`` checkbox will NOT appear because to delete the file would cause the validation to fail. To display the ``delete`` checkbox use this validation:
+- Poznámka: při zobrazení editačního formuláře nad tabulkou, kde je použit validátor ``requires = IS_IMAGE()`` se NEZOBRAZÍ checkbox pro zrušení (``delete``), protože by selhala validace. Aby se checkbox rušení (``delete``) zobrazil, použijte takovouto validaci:
 ``
 requires = IS_EMPTY_OR(IS_IMAGE())
 ``:code
@@ -1968,28 +2043,7 @@ Check for valid private network IPv4 address:
 requires = IS_IPV4(minip='192.168.0.1', maxip='192.168.255.255')
 ``:code
 
-##### ``IS_UPPER``
-``IS_UPPER``:inxx
-
-This validator never returns an error. It converts the value to upper case.
-``
-requires = IS_UPPER()
-``:code
-
-##### ``IS_NULL_OR``
-``IS_NULL_OR``:inxx
-
-Deprecated, an alias for ``IS_EMPTY_OR`` described below.
-
-##### ``IS_EMPTY_OR``
-``IS_EMPTY_OR``:inxx
-
-Sometimes you need to allow empty values on a field along with other requirements. For example a field may be a date but it can also be empty.
-The ``IS_EMPTY_OR`` validator allows this:
-``
-requires = IS_EMPTY_OR(IS_DATE())
-``:code
-
+#### Other validators
 ##### ``CLEANUP``
 ``CLEANUP``:inxx
 
@@ -1998,50 +2052,13 @@ This is a filter. It never fails. It just removes all characters whose decimal A
 requires = CLEANUP()
 ``:code
 
-##### ``CRYPT``
-``CRYPT``:inxx
-
-This is also a filter. It performs a secure hash on the input and it is used to prevent passwords from being passed in the clear to the database.
-``
-requires = CRYPT()
-``:code
-
-By default, CRYPT uses 1000 iterations of the pbkdf2 algorithm combined with SHA512 to produce a 20-byte-long hash. Older versions of web2py used "md5" or HMAC+SHA512 depending on whether a key was was specified or not.
-
-If a key is specified, CRYPT uses the HMAC algorithm. The key may contain a prefix that determines the algorithm to use with HMAC, for example SHA512:
-
-``
-requires = CRYPT(key='sha512:thisisthekey')
-``:code
-
-This is the recommended syntax. The key must be a unique string associated with the database used. The key can never be changed. If you lose the key, the previously hashed values become useless.
-
-By default, CRYPT uses random salt, such that each result is different. To use a constant salt value, specify its value:
-
-``
-requires = CRYPT(salt='mysaltvalue')
-``:code
-
-Or, to use no salt:
-
-``
-requires = CRYPT(salt=False)
-``:code
-
-The CRYPT validator hashes its input, and this makes it somewhat special. If you need to validate a password field before it is hashed, you can use CRYPT in a list of validators, but must make sure it is the last of the list, so that it is called last. For example:
-
-``
-requires = [IS_STRONG(),CRYPT(key='sha512:thisisthekey')]
-``:code
-
-``CRYPT`` also takes a ``min_length`` argument, which defaults to zero.
-
-The resulting hash takes the form ``alg$salt$hash``, where ``alg`` is the hash algorithm used, ``salt`` is the salt string (which can be empty), and ``hash`` is the algorithm's output. Consequently, the hash is self-identifying, allowing, for example, the algorithm to be changed without invalidating previous hashes. The key, however, must remain the same.
 
 #### Database validators
 
 ##### ``IS_NOT_IN_DB``
 ``IS_NOT_IN_DB``:inxx
+######Synopsis:
+``IS_NOT_IN_DB(db|set, 'table.field')``
 
 Consider the following example:
 ``
@@ -2049,7 +2066,11 @@ db.define_table('person', Field('name'))
 db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
 ``:code
 
-It requires that when you insert a new person, his/her name is not already in the database, ``db``, in the field ``person.name``. As with all other validators this requirement is enforced at the form processing level, not at the database level. This means that there is a small probability that, if two visitors try to concurrently insert records with the same person.name, this results in a race condition and both records are accepted. It is therefore safer to also inform the database that this field should have a unique value:
+It requires that when you insert a new person, his/her name is not already in the database, ``db``, in the field ``person.name``. 
+
+A set can be used instead of ``db``.
+
+As with all other validators this requirement is enforced at the form processing level, not at the database level. This means that there is a small probability that, if two visitors try to concurrently insert records with the same person.name, this results in a race condition and both records are accepted. It is therefore safer to also inform the database that this field should have a unique value:
 ``
 db.define_table('person', Field('name', unique=True))
 db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
@@ -2058,6 +2079,12 @@ db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
 Now if a race condition occurs, the database raises an OperationalError and one of the two inserts is rejected.
 
 The first argument of ``IS_NOT_IN_DB`` can be a database connection or a Set. In the latter case, you would be checking only the set defined by the Set.
+
+A complete argument list for ``IS_NOT_IN_DB()`` is as follows:
+``
+IS_NOT_IN_DB(dbset, field, error_message='value already in database or empty', allowed_override=[],
+    ignore_common_filters=True)
+``:code
 
 The following code, for example, does not allow registration of two persons with the same name within 10 days of each other:
 ``
@@ -2072,7 +2099,16 @@ db.person.name.requires = IS_NOT_IN_DB(recent, 'person.name')
 
 ##### ``IS_IN_DB``
 ``IS_IN_DB``:inxx
+[[validate_IS_IN_DB]]
+######Synopsis:
+``IS_IN_DB(db|set,'table.value_field','%(representing_field)s',zero='choose one')``
+where the third and fourth arguments are optional.
 
+``multiple=`` is also possible if the field type is a list. The default is False. It can be set to True or to a tuple (min,max) to restrict the number of values selected. So ``multiple=(1,10)`` enforces at least one and at most ten selections.
+
+Other optional arguments are discussed below.
+
+######Example
 Consider the following tables and requirement:
 
 ``
@@ -2080,13 +2116,15 @@ db.define_table('person', Field('name', unique=True))
 db.define_table('dog', Field('name'), Field('owner', db.person)
 db.dog.owner.requires = IS_IN_DB(db, 'person.id', '%(name)s',
                                  zero=T('choose one'))
+*or using a Set*
+db.person.name.requires = IS_IN_DB(db(db.person.id>10), 'person.id', '%(name)s')
 ``:code
 
-It is enforced at the level of dog INSERT/UPDATE/DELETE forms. It requires that a ``dog.owner`` be a valid id in the field ``person.id`` in the database ``db``. Because of this validator, the ``dog.owner`` field is represented as a dropbox. The third argument of the validator is a string that describes the elements in the dropbox. In the example you want to see the person ``%(name)s`` instead of the person ``%(id)s``. ``%(...)s`` is replaced by the value of the field in brackets for each record.
+It is enforced at the level of dog INSERT/UPDATE/DELETE forms. This example requires that a ``dog.owner`` be a valid id in the field ``person.id`` in the database ``db``. Because of this validator, the ``dog.owner`` field is represented as a drop-down list. The third argument of the validator is a string that describes the elements in the drop-down list. In the example you want to see the person ``%(name)s`` instead of the person ``%(id)s``. ``%(...)s`` is replaced by the value of the field in brackets for each record.
 
 The ``zero`` option works very much like for the ``IS_IN_SET`` validator.
 
-The first argument of the validator can be a database connection or a DAL Set, as in ``IS_NOT_IN_DB``. This can be useful for example when wishing to limit the records in the drop-down box. In this example, we use ``IS_IN_DB`` in a controller to limit the records dynamically each time the controller is called:
+The first argument of the validator can be a database connection or a DAL Set, as in ``IS_NOT_IN_DB``. This can be useful for example when wishing to limit the records in the drop-down list. In this example, we use ``IS_IN_DB`` in a controller to limit the records dynamically each time the controller is called:
 
 ``
 def index():
@@ -2098,21 +2136,21 @@ def index():
     (...)
 ``:code
 
-If you want the field validated, but you do not want a dropbox, you must put the validator in a list.
+If you want the field validated, but you do not want a drop-down, you must put the validator in a list.
 
 ``
 db.dog.owner.requires = [IS_IN_DB(db, 'person.id', '%(name)s')]
 ``:code
 
 ``_and``:inxx
-Occasionally you want the drop-box (so you do not want to use the list syntax above) yet you want to use additional validators. For this purpose the ``IS_IN_DB`` validator takes an extra argument ``_and`` that can point to a list of other validators applied if the validated value passes the ``IS_IN_DB`` validation. For example to validate all dog owners in db that are not in a subset:
+Occasionally you want the drop-down (so you do not want to use the list syntax above) yet you want to use additional validators. For this purpose the ``IS_IN_DB`` validator takes an extra argument ``_and`` that can point to a list of other validators applied if the validated value passes the ``IS_IN_DB`` validation. For example to validate all dog owners in db that are not in a subset:
 ``
 subset=db(db.person.id>100)
 db.dog.owner.requires = IS_IN_DB(db, 'person.id', '%(name)s',
                                  _and=IS_NOT_IN_DB(subset,'person.id'))
 ``:code
 
-``IS_IN_DB`` has a boolean ``distinct`` argument which defaults to ``False``. When set to ``True`` it prevents repeated values in the dropdown.
+``IS_IN_DB`` has a boolean ``distinct`` argument which defaults to ``False``. When set to ``True`` it prevents repeated values in the drop-down.
 
 ``IS_IN_DB`` also takes a ``cache`` argument that works like the ``cache`` argument of select.
 
@@ -2286,15 +2324,20 @@ In this case the value of ``id_field`` tells the widget that even if the value t
 
 This widget works via Ajax. Where is the Ajax callback? Some magic is going on in this widget. The callback is a method of the widget object itself. How is it exposed? In web2py any piece of code can generate a response by raising an HTTP exception. This widget exploits this possibility in the following way: the widget sends the Ajax call to the same URL that generated the widget in the first place and puts a special token in the request.vars. Should the widget get instantiated again, it finds the token and raises an HTTP exception that responds to the request. All of this is done under the hood and hidden to the developer.
 
-### ``SQLFORM.grid`` and ``SQLFORM.smartgrid``
+## ``SQLFORM.grid`` and ``SQLFORM.smartgrid``
 
 -------
 Attention: grid and smartgrid were experimental prior web2py version 2.0 and were vulnerable to information leakage. The grid and smartgrid are no longer experimental, but we are still not promising backward compatibility of the presentation layer of the grid, only of its APIs.
 -------
 
-These are two high level gadgets that create complex CRUD controls. They provide pagination, the ability to browser, search, sort, create, update and delete records from a single gadgets.
+These are two high level objects that create complex CRUD controls. They provide pagination, the ability to browse, search, sort, create, update and delete records from a single object.
 
-#### ``SQLFORM.grid`` 
+Because web2py's HTML objects build on the underlying, simpler objects, the grids create SQLFORMs for viewing, editing and creating its rows. Many of the arguments to the grids are passed through to this SQLFORM. This means the documentation for SQLFORM (and FORM) is relevant. For example, the grid takes an ``onvalidation`` callback. The processing logic of the grid ultimately passes this through to the underlying process() method of FORM, which means you should consult the documentation of ``onvalidation`` for FORMs.
+
+As the grid passes through different states, such as editing a row, a new request is generated. request.args has information about which state the grid is in.
+
+
+### ``SQLFORM.grid`` 
 The simplest of the two is ``SQLFORM.grid``. Here is an example of usage:
 
 ``
@@ -2308,9 +2351,12 @@ which produces the following page:
 
 [[image @///image/en6700.png center 480px]]
 
-The first argument of ``SQLFORM.grid`` can be a table or a query. The grid gadget will provide access to records matching the query.
+The first argument of ``SQLFORM.grid`` can be a table or a query. The grid object will provide access to records matching the query.
 
-Before we dive into the long list of arguments of the grid gadget we need to understand how it works. The gadget looks at ``request.args`` in order to decide what to do (browse, search, create, update, delete, etc.). Each button created by the gadget links the same function (``manage_users`` in the above case) but passes different ``request.args``. By default all the URL generated by the grid are digitally signed and verified. This means one cannot perform certain actions (create, update, delete) without being logged-in. These restrictions can be relaxed:
+Before we dive into the long list of arguments of the grid object we need to understand how it works. The object looks at ``request.args`` in order to decide what to do (browse, search, create, update, delete, etc.). Each button created by the object links the same function (``manage_users`` in the above case) but passes different ``request.args``. 
+
+#### login required by default for data updates
+By default all the URLs generated by the grid are digitally signed and verified. This means one cannot perform certain actions (create, update, delete) without being logged-in. These restrictions can be relaxed:
 
 ``
 def manage_users():
@@ -2320,12 +2366,15 @@ def manage_users():
 
 but we do not recommend it.
 
+
+#### Multiple grids per controller function
 -----
 Because of the way grid works one can only have one grid per controller function, unless they are embedded as components via ``LOAD``.
 To make the default search grid work in more than one LOADed grid, please use a different ``formname`` for each one.
 -----
 
-Because the function that contains the grid may itself manipulate the command line arguments, the grid needs to know which args should be handled by the grid and which not. Here is an example of code that allows one to manage any table:
+#### Using requests.args safely
+Because the controller function that contains the grid may itself manipulate the URL arguments (known in web2py as response.args and response.vars), the grid needs to know which args should be handled by the grid and which not. Here is an example of code that allows one to manage any table:
 
 ``
 @auth.requires_login()
@@ -2336,8 +2385,9 @@ def manage():
     return locals()
 ``:code
 
-the ``args`` argument of the ``grid`` specifies which ``request.args`` should be passed along and ignored by the gadget. In our case ``request.args[:1]`` is the name of the table we want to manage and it is handled by the ``manage`` function itself, not by the gadget.
+the ``args`` argument of the ``grid`` specifies which ``request.args`` should be passed along and ignored by the ``grid``. In our case ``request.args[:1]`` is the name of the table we want to manage and it is handled by the ``manage`` function itself, not by the ``grid``. So, ``args=request.args[:1]`` tells the grid to preserve the first URL argument in any links that it generates, appending any grid-specific arguments after that first argument.
 
+#### SQLFORM.grid signature
 The complete signature for the grid is the following:
 
 ``
@@ -2387,16 +2437,23 @@ SQLFORM.grid(
     )
 ``:code
 
-- ``fields`` is a list of fields to be fetched from the database. It is also used to determine which fields to be shown in the grid view.
+- ``fields`` is a list of fields to be fetched from the database. It is also used to determine which fields to be shown in the grid view. However, it doesn't control what is displayed in the separate form used to edit rows. For that, use the readable and writable attribute of the database fields. For example, in a editable grid, suppress updating of a field like this: before creating the SQLFORM.grid, set 
+``
+db.my_table.a_field.writable = False
+db.my_table.a_field.readable = False
+
+``:code
 - ``field_id`` must be the field of the table to be used as ID, for example ``db.mytable.id``.
 - ``left`` is an optional left join expressions used to build ``...select(left=...)``.
 - ``headers`` is a dictionary that maps 'tablename.fieldname' into the corresponding header label, e.g. ``{'auth_user.email' : 'Email Address'}``
-- ``orderby`` is used as default ordering for the rows.
+- ``orderby`` is used as default ordering for the rows. See [[DAL chapter ../06#orderby]] (multiple fields are possible).
 - ``groupby`` is used to group the set. Use the same syntax as you were passing in a simple ``select(groupby=...)``.
 - ``searchable``, ``sortable``, ``deletable``, ``editable``, ``details``, ``create`` determine whether one can search, sort, delete, edit, view details, and create new records respectively.
 - ``selectable`` can be used to call a custom function on multiple records (a checkbox will be inserted for every row) e.g.
   ``
-   selectable = lambda ids : redirect(URL('default', 'mapping_multiple', vars=dict(id=ids)))
+   selectable = lambda ids : redirect(URL('default', 'mapping_multiple', vars=dict(id=ids)))``:code
+or for multiple action buttons, use a list of tuples: 
+`` selectable = [('button label1',lambda...),('button label2',lambda ...)]
 ``:code
 - ``paginate`` sets the max number of rows per page.
 - ``csv`` if set to true allows to download the grid in various format (more on that later).
@@ -2404,7 +2461,37 @@ SQLFORM.grid(
 - ``links_in_grid`` if set to False, links will only be displayed in the "details" and "edit" page (so, not on the main grid)
 - ``upload`` same as SQLFORM's one. web2py uses the action at that URL to download the file
 - ``maxtextlength`` sets the maximum length of text to be displayed for each field value, in the grid view. This value can be overwritten for each field using ``maxtextlengths``, a dictionary of 'tablename.fieldname':length e.g. ``{'auth_user.email' : 50}``
-- ``onvalidation``, ``oncreate``, ``onupdate`` and ``ondelete`` are callback functions. All but ``ondelete`` take a form object as input.
+- ``onvalidation``, ``oncreate``, ``onupdate`` and ``ondelete`` are callback functions. All but ``ondelete`` take a form object as input, ondelete takes the table and the record id
+Because the edit/create form is an SQLFORM which extends FORM, these callbacks are essentially used in the same way as documented in the sections for FORM and SQLFORM.
+
+Here is skeleton code:
+
+``
+def myonvalidation(form):
+    print "In onvalidation callback"
+    print form.vars
+    form.errors= True  #this prevents the submission from completing
+    
+    #...or to add messages to specific elements on the form
+    form.errors.first_name = "Do not name your child after prominent deities"	
+    form.errors.last_name = "Last names must start with a letter"
+    response.flash = "I don't like your submission" 
+
+def myoncreate(form):
+    print 'create!'
+    print form.vars
+
+def myonupdate(form):
+    print 'update!'
+    print form.vars
+
+def myondelete(table, id):
+    print 'delete!'
+    print table, id
+``:code
+
+onupdate and oncreate are the same callbacks available to SQLFORM.process()
+
 - ``sorter_icons`` is a list of two strings (or helpers) that will be used to represent the up and down sorting options for each field.
 - ``ui`` can be set equal to 'web2py' and will generate web2py friendly class names, can be set equal to ``jquery-ui`` and will generate jquery UI friendly class names, but it can also be its own set of class names for the various grid components:
   ``
@@ -2428,9 +2515,8 @@ ui = dict(
 ``:code
 
 - ``search_widget`` allows to override the default search widget and we refer the reader the source code in "gluon/sqlhtml.py" for details.
-- ``showbuttontext`` allows to have buttons without text (there will effectively be only icons)
+- ``showbuttontext`` allows buttons without text (there will effectively be only icons)
 - ``_class`` is the class for the grid container.
-- ``showbutton`` allows to turn off all buttons.
 - ``exportclasses`` takes a dictionary of tuples: by default it's defined as
 
 ``
@@ -2444,23 +2530,23 @@ tsv=(ExporterTSV, 'TSV (Excel compatible)'))
 
 ExporterCSV, ExporterXML, ExporterHTML and ExporterTSV are all defined in gluon/sqlhtml.py. Take a look at those for creating your own exporter. If you pass a dict like ``dict(xml=False, html=False)`` you will disable the xml and html export formats.
 
-- ``formargs`` is passed to all SQLFORM objects used by the grid, while ``createargs``,``editargs`` and ``viewargs`` are passed only to the specific create, edit and details SQLFORMs
+- ``formargs`` is passed to all SQLFORM objects used by the grid, while ``createargs``, ``editargs`` and ``viewargs`` are passed only to the specific create, edit and details SQLFORMs
 - ``formname``, ``ignore_rw`` and ``formstyle`` are passed to the SQLFORM objects used by the grid for create/update forms.
 - ``buttons_placement`` and ``links_placement`` both take a parameter ('right', 'left', 'both') that will affect where on the row the buttons (or the links) will be placed
 ------
 ``deletable``, ``editable`` and ``details`` are usually boolean values but they can be functions which take the row object and decide whether to display the corresponding button or not.
 -----
 
-##### ``Showing virtual fields in SQLFORM.grid and smartgrid``
-In recent versions of web2py, virtual fields are shown in grids like normal fields: either shown alongside all other fields by default, or by including them in the ``fields`` argument. However, virtual fields are not sortable. 
+#### Virtual fields in SQLFORM.grid and smartgrid
+In versions of web2py after 2.6, virtual fields are shown in grids like normal fields: either shown alongside all other fields by default, or by including them in the ``fields`` argument. However, virtual fields are not sortable. 
 
-In older web2py versions (up to 2.4.7), showing virtual fields in a grid requires use of the ``links`` argument. If table db.t1 has a field called t1.vfield which is based on the values of t1.field1 and t1.field2, do this:
+In older web2py versions, showing virtual fields in a grid requires use of the ``links`` argument. This is still supported for more recent versions. If table db.t1 has a field called t1.vfield which is based on the values of t1.field1 and t1.field2, do this:
 
 ``grid = SQLFORM.grid(db.t1, ..., fields = [t1.field1, t1.field2,...], 
-   links = [dict(header='Virtual Field',body=lamba row:row.vfield),...] )
+   links = [dict(header='Virtual Field 1',body=lambda row:row.vfield),...] )
 ``:code
 
-In all cases, because t1.vfield depends on t1.field1 and t1.field2, these fields must be present in the row. In the example above, this is guaranteed by including t1.field1 and t1.field2 in the fields argument. Alternatively, showing all fields will also work. You can suppress a field from displaying by setting the readable attibute to False. 
+In all cases, because t1.vfield depends on t1.field1 and t1.field2, these fields must be present in the row. In the example above, this is guaranteed by including t1.field1 and t1.field2 in the fields argument. Alternatively, showing all fields will also work. You can suppress a field from displaying by setting the readable attribute to False. 
 
 Note that when defining the virtual field, the lambda function must qualify fields with the database name, but in the links argument, this is not necessary.
 So for the example above, the virtual field may be defined like:
@@ -2471,7 +2557,8 @@ db.define_table('t1',Field('field1','string'),
   ...)
 ``:code
 
-#### ``SQLFORM.smartgrid``
+### SQLFORM.smartgrid
+
 A ``SQLFORM.smartgrid`` looks a lot like a ``grid``, in fact it contains a grid but it is designed to take as input not a query but only one table and to browse said table and selected referencing tables.
 
 For example consider the following table structure:
@@ -2495,7 +2582,7 @@ and all parents and children in one table:
 SQLFORM.grid(db.parent,left=db.child.on(db.child.parent==db.parent.id))
 ``:code
 
-With SQLFORM.smartgrid you can put all the data in one gadget that spawns both tables:
+With SQLFORM.smartgrid you can put all the data in one object that spawns both tables:
 
 ``
 @auth.requires_login()
@@ -2508,9 +2595,9 @@ which looks like this:
 
 [[image @///image/en6800.png center 480px]]
 
-Notice the extra "children" links. One could create the extra ``links`` using a regular ``grid`` but they would point to a different action. With a ``smartgrid`` they are created automatically and handled by the same gadget.
+Notice the extra "children" links. One could create the extra ``links`` using a regular ``grid`` but they would point to a different action. With a ``smartgrid`` they are created automatically and handled by the same object.
 
-Also notice that when clicking on the "children" link for a given parent one only gets the list of children for that parent (and that is obvious) but also notice that if one now tried to add a new child, the parent value for the new child is automatically set to the selected parent (displayed in the breadcrumbs associated to the gadget). The value of this field can be overwritten. We can prevent this by making it readonly:
+Also notice that when clicking on the "children" link for a given parent one only gets the list of children for that parent (and that is obvious) but also notice that if one now tried to add a new child, the parent value for the new child is automatically set to the selected parent (displayed in the breadcrumbs associated to the object). The value of this field can be overwritten. We can prevent this by making it readonly:
 
 ``
 @auth.requires_login():
@@ -2533,11 +2620,13 @@ def manage():
     return locals()
 ``:code
 
+#### smartgrid signature
+
 The ``smartgrid`` takes the same arguments as a ``grid`` and some more with some caveats:
 
 - The first argument is a table, not a query
-- There is a extra argument ``constraints`` which is a dictionary of 'tablename':query which can be used to further restrict access to the records displayed in the 'tablename' grid.
-- There is a extra argument ``linked_tables`` which is a list of tablenames of tables that should be accessible via the smartgrid.
+- There is an extra argument ``constraints`` which is a dictionary of 'tablename':query which can be used to further restrict access to the records displayed in the 'tablename' grid.
+- There is an extra argument ``linked_tables`` which is a list of tablenames of tables that should be accessible via the smartgrid.
 - ``divider`` allows to specify a character to use in the breadcrumb navigator, ``breadcrumbs_class`` will apply the class to the breadcrumb element
 - All the arguments but the table, ``args``, ``linked_tables`` and ``user_signatures`` can be dictionaries as explained below.
 
@@ -2552,7 +2641,7 @@ While for a grid we would pass a boolean:
 grid = SQLFORM.grid(db.parent,searchable=True)
 ``:code
 
-for a smartgrid we would pass a dictionary of booleans:
+For a smartgrid we would pass a dictionary of booleans:
 ``
 grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'],
      searchable= dict(parent=True, child=False))
@@ -2560,11 +2649,7 @@ grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'],
 
 In this way we made parents searchable but children for each parent not searchable (there should not be that many to need the search widget).
 
--------
-The grid and smartgrid gadgets are here to stay but they are marked experimental because the actual html layout of what they return and the exact set of parameters one can pass to them  may be subject to change as new functionalities are added.
--------
-
-
+### grid and smartgrid access control
 ``grid`` and ``smartgrid`` do not automatically enforce access control like crud does but you can integrate it with ``auth`` using explicit permission checking:
 
 ``
@@ -2581,7 +2666,8 @@ grid = SQLFORM.grid(db.auth_user,
      deletable = auth.has_permission('delete','auth_user'))
 ``:code
 
-The ``smartgrid`` is the only gadget in web2py that displays the table name and it need both the singular and the plural. For example one parent can have one "Child" or many "Children". Therefore a table object needs to know its own singular and plural names. web2py normally guesses them but you can set the explicitly:
+### smartgrid plurals
+The ``smartgrid`` is the only object in web2py that displays the table name and it needs both the singular and the plural. For example one parent can have one "Child" or many "Children". Therefore a table object needs to know its own singular and plural names. web2py normally guesses them but you can set them explicitly:
 
 ``
 db.define_table('child', ..., singular="Child", plural="Children")
