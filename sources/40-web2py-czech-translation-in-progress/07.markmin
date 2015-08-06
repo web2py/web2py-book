@@ -1983,33 +1983,31 @@ requires = IS_EMPTY_OR(IS_IMAGE())
 ##### ``IS_UPLOAD_FILENAME``
 ``IS_UPLOAD_FILENAME``:inxx
 
-This validator checks if the name and extension of a file uploaded through the file input matches the given criteria.
+Validátor ověří, že jméno a přípona uploadovaného souboru vyhovují zadaným kritériím.
 
-It does not ensure the file type in any way. Returns validation failure
-if no data was uploaded.
+Nijak nezjišťuje skutečný typ souboru. Validace neprojde, pokud nebyl uploadován žádný soubor.
 
-Its arguments are:
-- filename: filename (before dot) regex.
-- extension: extension (after dot) regex.
-- lastdot: which dot should be used as a filename / extension separator: ``True`` indicates last dot (e.g., "file.tar.gz" will be broken in "file.tar" + "gz") while ``False`` means first dot (e.g., "file.tar.gz" will be broken into "file" + "tar.gz").
-- case: 0 means keep the case; 1 means transform the string into lowercase (default); 2 means transform the string into uppercase.
+Argumenty jsou:
+- filename: jméno souboru (před tečkou), regulární výraz.
+- extension: přípona (za tečkou), regulární výraz.
+- lastdot: kterou tečku použít jako oddělovač přípony: ``True`` znamená poslední tečku ("file.tar.gz" se rozdělí jako "file.tar" + "gz"), ``False`` první tečku ("file" + "tar.gz").
+- case: 0 zachovat velikost písmen; 1 transformovat na malá písmena (default); 2 transformovat na velká písmena.
 
-If there is no dot present, extension checks will be done against an empty
-string and filename checks will be done against the whole value.
+Chybí-li v názvu tečka, test přípony se provede proti prázdnému řetězci a test jména proti celému textu.
 
-Examples:
+Příklady:
 
-Check if file has a pdf extension (case insensitive):
+Má soubor příponu pdf, bez ohledu na velikost písmen (case insensitive)?
 ``
 requires = IS_UPLOAD_FILENAME(extension='pdf')
 ``:code
 
-Check if file has a tar.gz extension and name starting with backup:
+Má soubor příponu tar.gz a začíná jeho jméno backup....?
 ``
 requires = IS_UPLOAD_FILENAME(filename='backup.*', extension='tar.gz', lastdot=False)
 ``:code
 
-Check if file has no extension and name matching README (case sensitive):
+Jmenuje se soubor README, přičemž velikost písmen je důležitá (case sensitive) a současně nemá žádnou příponu?
 ``
 requires = IS_UPLOAD_FILENAME(filename='^README$', extension='^$', case=0)
 ``:code
@@ -2017,76 +2015,75 @@ requires = IS_UPLOAD_FILENAME(filename='^README$', extension='^$', case=0)
 ##### ``IS_IPV4``
 ``IS_IPV4``:inxx
 
-This validator checks if a field's value is an IP version 4 address in decimal form. Can
-be set to force addresses from a certain range.
+Validátor ověří, zda hodnota pole je 4-bytová adresa IP, zapsaná pomocí desítkové soustavy. Lze nastavit i ke kontrole, zda se jedná o IP adresu ze zadaného rozsahu adres.
 
-IPv4 regex taken from ref.``regexlib``:cite
-Its arguments are:
-- ``minip`` lowest allowed address; accepts: **str**, e.g., 192.168.0.1; **iterable of numbers**, e.g., [192, 168, 0, 1]; **int**, e.g., 3232235521
-- ``maxip`` highest allowed address; same as above
+IPv4 regulární výraz byl převzat z ref.``regexlib``:cite
 
-All three example values are equal, since addresses are converted to
-integers for inclusion check with following function:
+Argumenty jsou:
+- ``minip`` nejnižší dovolená adresa; akceptuje: **str**, např. 192.168.0.1; **iterable (seznam nebo vektor) čísel**, např. [192, 168, 0, 1]; **int**, např. 3232235521
+- ``maxip`` nejvyšší dovolená adresa (ve stejném formátu)
+
+Všechny tři příklady jsou ekvivalentní vzhledem k převodu na jediné číslo pomocí vah jednotlivých bytů:
 ``
 number = 16777216 * IP[0] + 65536 * IP[1] + 256 * IP[2] + IP[3]
 ``:code
 
-Examples:
+Příklady:
 
-Check for valid IPv4 address:
+Platná IPv4 adresa?
 ``
 requires = IS_IPV4()
 ``:code
 
-Check for valid private network IPv4 address:
+Platná IPv4 adresa v privátní síti?
 ``
 requires = IS_IPV4(minip='192.168.0.1', maxip='192.168.255.255')
 ``:code
 
-#### Other validators
+#### Ostatní validátory
 ##### ``CLEANUP``
 ``CLEANUP``:inxx
 
-This is a filter. It never fails. It just removes all characters whose decimal ASCII codes are not in the list [10, 13, 32-127].
+Jedná se o filtr. Nikdy nevrací validační chybu. Z hodnoty odstraní všechny znaky, jejichž ASCII kód není ze seznamu [10, 13, 32-127].
 ``
 requires = CLEANUP()
 ``:code
 
 
-#### Database validators
+#### Databázové validátory
 
 ##### ``IS_NOT_IN_DB``
 ``IS_NOT_IN_DB``:inxx
-######Synopsis:
+######Volání:
 ``IS_NOT_IN_DB(db|set, 'table.field')``
 
-Consider the following example:
+Předpokládejme tento příklad:
 ``
 db.define_table('person', Field('name'))
 db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
 ``:code
 
-It requires that when you insert a new person, his/her name is not already in the database, ``db``, in the field ``person.name``. 
+Validátor ověří, že zadané jméno zatím ještě není v databázi ``db`` v poli ``person.name``. 
 
-A set can be used instead of ``db``.
+Místo ``db`` lze použít objekt Set (sada, množina záznamů). Připomeňme, že objekt Set vznikne voláním db s parametrem dotaz (query), tj. db(query); tím ještě nedošlo k fyzickému dotazu do databáze a načtení vyhovujících záznamů.
 
-As with all other validators this requirement is enforced at the form processing level, not at the database level. This means that there is a small probability that, if two visitors try to concurrently insert records with the same person.name, this results in a race condition and both records are accepted. It is therefore safer to also inform the database that this field should have a unique value:
+Stejně jako ostatní validátory pracuje i tento na úrovni formuláře a nikoli na úrovni databáze. Znamená to, že ve spíše hypotetickém případě, kdy dva uživatelé přidají současně osobu stejného jména by se mohlo stát, že validátor projde úspěšně v obou případech, a protože nemáme kontrolu na úrovni databáze, uloží se oba záznamy i přes duplicitu jména. Proto je jistější požadovat i po databázi, že testované pole má mít unikátní hodnoty:
 ``
 db.define_table('person', Field('name', unique=True))
 db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
 ``:code
 
-Now if a race condition occurs, the database raises an OperationalError and one of the two inserts is rejected.
+Nyní pokud by došlo ke zmíněnému hypotetickému případu, druhý Insert způsobí OperationalError a bude revertován.
 
-The first argument of ``IS_NOT_IN_DB`` can be a database connection or a Set. In the latter case, you would be checking only the set defined by the Set.
+První argument validátoru ``IS_NOT_IN_DB`` může být databázové připojení nebo objekt Set. Použijete-li objekt Set, bude duplicita testována jen vzhledem k zadané množině.
 
-A complete argument list for ``IS_NOT_IN_DB()`` is as follows:
+Úplný seznam parametrů validátoru ``IS_NOT_IN_DB()`` je následující:
 ``
 IS_NOT_IN_DB(dbset, field, error_message='value already in database or empty', allowed_override=[],
     ignore_common_filters=True)
 ``:code
 
-The following code, for example, does not allow registration of two persons with the same name within 10 days of each other:
+Např. tento kód by nedovolil registraci dvou osob se stejným jménem 10 dnů po sobě:
 ``
 import datetime
 now = datetime.datetime.today()
@@ -2100,66 +2097,65 @@ db.person.name.requires = IS_NOT_IN_DB(recent, 'person.name')
 ##### ``IS_IN_DB``
 ``IS_IN_DB``:inxx
 [[validate_IS_IN_DB]]
-######Synopsis:
-``IS_IN_DB(db|set,'table.value_field','%(representing_field)s',zero='choose one')``
-where the third and fourth arguments are optional.
+######Syntaxe:
+``IS_IN_DB(db|set, 'table.value_field', '%(zobrazene_pole)s' ,zero='choose one')``
+třetí a čtvrtý parametr jsou volitelné.
 
-``multiple=`` is also possible if the field type is a list. The default is False. It can be set to True or to a tuple (min,max) to restrict the number of values selected. So ``multiple=(1,10)`` enforces at least one and at most ten selections.
+Podobně jako v případě IS_IN_SET validátoru je také možný argument ``multiple=``, pokud typ validovaného pole je list (seznam). Default je False. Nastavení můžeme změnit na True nebo na dvojici (tuple) (min,max), ve druhém případě oemzíme počet hodnot (záznamů), které má uživatel vybrat. Např. ``multiple=(1,10)`` vynutí, že uživatel bude muset vybrat alespoň jeden záznam a nejvýše 9 záznamů.
 
-Other optional arguments are discussed below.
+Další volitelné argumenty diskutujeme níže.
 
-######Example
-Consider the following tables and requirement:
+######Příklad
 
 ``
 db.define_table('person', Field('name', unique=True))
 db.define_table('dog', Field('name'), Field('owner', db.person)
 db.dog.owner.requires = IS_IN_DB(db, 'person.id', '%(name)s',
-                                 zero=T('choose one'))
-*or using a Set*
-db.person.name.requires = IS_IN_DB(db(db.person.id>10), 'person.id', '%(name)s')
+                                 zero=T('vyber majitele'))
+*nebo s objektem Set* (povolíme jen některé majitele)
+db.dog.owner.requires = IS_IN_DB(db(db.person.id>10), 'person.id', '%(name)s')
 ``:code
 
-It is enforced at the level of dog INSERT/UPDATE/DELETE forms. This example requires that a ``dog.owner`` be a valid id in the field ``person.id`` in the database ``db``. Because of this validator, the ``dog.owner`` field is represented as a drop-down list. The third argument of the validator is a string that describes the elements in the drop-down list. In the example you want to see the person ``%(name)s`` instead of the person ``%(id)s``. ``%(...)s`` is replaced by the value of the field in brackets for each record.
+Validátor se uplatní při zpracování formuláře pro zadání údajů o psovi (dog). Kód v tomto příkladu vyžaduje, aby majitel, ``dog.owner``, byl platnou osobou v tabulce osob (aby zvolený cizí klíč ``dog.owner`` existoval jako primární klíč ``person.id`` v tabulce osob v ``db``. Tento validátor způsobí, že pole ``dog.owner`` bude vykresleno jako drop-down list. Třetí argument validátoru je řetězec, který říká, jaký text se má v položkách drop-down listu zobrazit. V příkladu chceme, aby se zobrazovalo snadno pochopitelné jméno ``%(name)s`` místo ne právě přívětivého ``%(id)s``. ``%(...)s`` se nahradí hodnotou pole, uvedeného v závorce, a to pro každý jednotlivý záznam.
 
-The ``zero`` option works very much like for the ``IS_IN_SET`` validator.
+Argument ``zero`` pracuje stejně jako u ``IS_IN_SET`` validátoru - je to text, který se zobrazí, pokud ještě není vybrána žádná možnost.
 
-The first argument of the validator can be a database connection or a DAL Set, as in ``IS_NOT_IN_DB``. This can be useful for example when wishing to limit the records in the drop-down list. In this example, we use ``IS_IN_DB`` in a controller to limit the records dynamically each time the controller is called:
+První argument může být stejně jako u ``IS_NOT_IN_DB`` buď databázové připojení nebo DAL objekt Set. To se může hodit třeba když chcete omezit počet nabídnutých záznamů v drop-down listu. V tomto příkladu nastavíme ``IS_IN_DB`` v akci kontroléru, abychom vybrali záznamy dynamicky vždy, když je akce volána:
 
 ``
 def index():
     (...)
-    query = (db.table.field == 'xyz') #in practice 'xyz' would be a variable
+    query = (db.table.field == 'xyz')  # v praxi bude 'xyz' proměnná, třeba odvozená z request.args
     db.table.field.requires=IS_IN_DB(db(query),....)
     form=SQLFORM(...)
     if form.process().accepted: ...
     (...)
 ``:code
 
-If you want the field validated, but you do not want a drop-down, you must put the validator in a list.
+Chcete-li, aby hodnota byla validována, ale zároveň chcete potlačit defaultní přiřazení widgetu (nepoužít drop-down list), uveďte validátor jako prvek seznamu:
 
 ``
 db.dog.owner.requires = [IS_IN_DB(db, 'person.id', '%(name)s')]
 ``:code
 
 ``_and``:inxx
-Occasionally you want the drop-down (so you do not want to use the list syntax above) yet you want to use additional validators. For this purpose the ``IS_IN_DB`` validator takes an extra argument ``_and`` that can point to a list of other validators applied if the validated value passes the ``IS_IN_DB`` validation. For example to validate all dog owners in db that are not in a subset:
+Jindy naopak můžete chtít drop-down list (takže výše uvedená syntaxe se vám nehodí), ale současně potřebujete aplikovat další validátory. Abyste to nemuseli řešit explicitním přiřazením widgetu, má validátor ``IS_IN_DB`` další argument ``_and``, který může přiřazovat jednotlivý (další) validátor nebo seznam (list) validátorů, které se aplikují poté, co úspěšně projde validace podle ``IS_IN_DB``. Např. nechceme aby bylo možné volit majitele psů z určité množiny:
 ``
 subset=db(db.person.id>100)
 db.dog.owner.requires = IS_IN_DB(db, 'person.id', '%(name)s',
                                  _and=IS_NOT_IN_DB(subset,'person.id'))
 ``:code
 
-``IS_IN_DB`` has a boolean ``distinct`` argument which defaults to ``False``. When set to ``True`` it prevents repeated values in the drop-down.
+``IS_IN_DB`` má dále boolean argument ``distinct`` s defaultem ``False``. Nastavení ``True`` potlačí případné duplicity v drop-down listu.
 
-``IS_IN_DB`` also takes a ``cache`` argument that works like the ``cache`` argument of select.
+``IS_IN_DB`` má také argument ``cache``, který pracuje stejně jako ``cache`` argument příkazu select.
 
 
-##### ``IS_IN_DB`` and Tagging
+##### ``IS_IN_DB`` a označování (tagging)
 ``tags``:inxx
 ``multiple``:inxx
 
-The ``IS_IN_DB`` validator has an optional attribute ``multiple=False``. If set to ``True`` multiple values can be stored in one field. This field should be of type ``list:reference`` as discussed in Chapter 6. An explicit example of tagging is discussed there. ``multiple`` references are handled automatically in create and update forms, but they are transparent to the DAL. We strongly suggest using the jQuery multiselect plugin to render multiple fields.
+``IS_IN_DB`` validátor má volitelný argument ``multiple=False``. Nastavíme-li jej na ``True``, vícenásobné hodnoty budou ukládány do jediného pole. Toto pole by mělo být typu ``list:reference``, jak rozebíráme v kapitole 6. Tam najdete příklad pro vícenásobné označování. Pro renderování polí k označení více možností (``multiple=True``) striktně doporučujeme jQuery multiselect plugin.
 
 #### Custom validators
 ``custom validator``:inxx
