@@ -2432,63 +2432,62 @@ SQLFORM.grid(
     )
 ``:code
 
-- ``fields`` is a list of fields to be fetched from the database. It is also used to determine which fields to be shown in the grid view. However, it doesn't control what is displayed in the separate form used to edit rows. For that, use the readable and writable attribute of the database fields. For example, in a editable grid, suppress updating of a field like this: before creating the SQLFORM.grid, set 
+- ``fields`` je seznam polí, která se mají načíst z databáze. Také určuje, která pole se mají v gridu zobrazit. Neovlivňuje ale pole, která se zobrazí při editaci záznamu. K nastavení polí při editaci použijte standardní atributy polí readable a writable. Např. editaci pole zaakážeme (v kódu před SQLFORM.grid) takto:
 ``
-db.my_table.a_field.writable = False
-db.my_table.a_field.readable = False
+db.tabulka.pole.writable = False
+db.tabulka.pole.readable = False
 
 ``:code
-- ``field_id`` must be the field of the table to be used as ID, for example ``db.mytable.id``.
-- ``left`` is an optional left join expressions used to build ``...select(left=...)``.
-- ``headers`` is a dictionary that maps 'tablename.fieldname' into the corresponding header label, e.g. ``{'auth_user.email' : 'Email Address'}``
-- ``orderby`` is used as default ordering for the rows. See [[DAL chapter ../06#orderby]] (multiple fields are possible).
-- ``groupby`` is used to group the set. Use the same syntax as you were passing in a simple ``select(groupby=...)``.
-- ``searchable``, ``sortable``, ``deletable``, ``editable``, ``details``, ``create`` determine whether one can search, sort, delete, edit, view details, and create new records respectively.
-- ``selectable`` can be used to call a custom function on multiple records (a checkbox will be inserted for every row) e.g.
+Pozn.: Nechcete-li pole explicitně vyjmenovat a chcete jedno z polí v gridu zakázat (často id), použijte rovněž ``.id.readable=False``.
+- ``field_id`` je pole, které se používá jako primární klíč, např. ``db.mytable.id`` (což je default).
+- ``left`` volitelný výraz pro left join, přidá se do konstrukce ``...select(left=...)``.
+- ``headers`` je slovník (dictionary), který mapuje 'tablename.fieldname' na odpovídající texty v hlavičce, např. ``{'auth_user.email' : 'Emailová adresa', ...}``
+- ``orderby`` je počáteční třídění záznamů. Viz [[DAL kapitola ../06#orderby]] (může být zadáno více polí).
+- ``groupby`` pokud se mají záznamy seskupit. Používá se stejná syntaxe jako v ``select(groupby=...)``.
+- ``searchable``, ``sortable``, ``deletable``, ``editable``, ``details``, ``create`` určuje, zda lze hledat, třídit, rušit záznamy, editovat záznamy, prohlížet záznam a vytvářet nové záznamy.
+- ``selectable`` bude přidán checkbox pro každý záznam; nad označenými záznamy pak bude zavolána zadaná akce.
   ``
    selectable = lambda ids : redirect(URL('default', 'mapping_multiple', vars=dict(id=ids)))``:code
-or for multiple action buttons, use a list of tuples: 
-`` selectable = [('button label1',lambda...),('button label2',lambda ...)]
+Pomocí zápisu jako seznam vektrorů (list of tuples) lze vytvořit více tlačítek, které volají různé akce: 
+`` selectable = [('text tlačítka 1', lambda...), ('text tlačítka 2', lambda ...)]
 ``:code
-- ``paginate`` sets the max number of rows per page.
-- ``csv`` if set to true allows to download the grid in various format (more on that later).
-- ``links`` is used to display new columns which can be links to other pages. The ``links`` argument must be a list of  ``dict(header='name',body=lambda row: A(...))`` where ``header`` is the header of the new column and ``body`` is a function that takes a row and returns a value. In the example, the value is a ``A(...)`` helper.
+- ``paginate`` zadává počet řádků na stránku.
+- ``csv`` je-li True, je zpřístupněna možnost downloadu obsahu gridu v různých formátech (více o exportu bude uvedeno níže).
+- ``links`` lze použít ke zobrazení dalších sloupců - odkazů na jiné stránky. Argument pro ``links`` musí být seznam (list) slovníků ``dict(header='name', body=lambda row: A(...))``, kde ``header`` je název sloupce a ``body`` je funkce, která jako parametr dostane záznam (Row objekt) a vrátí hodnotu. V příkladu používáme helper ``A(...)`` pro vytvoření odkazu.
 - ``links_in_grid`` if set to False, links will only be displayed in the "details" and "edit" page (so, not on the main grid)
-- ``upload`` same as SQLFORM's one. web2py uses the action at that URL to download the file
-- ``maxtextlength`` sets the maximum length of text to be displayed for each field value, in the grid view. This value can be overwritten for each field using ``maxtextlengths``, a dictionary of 'tablename.fieldname':length e.g. ``{'auth_user.email' : 50}``
-- ``onvalidation``, ``oncreate``, ``onupdate`` and ``ondelete`` are callback functions. All but ``ondelete`` take a form object as input, ondelete takes the table and the record id
-Because the edit/create form is an SQLFORM which extends FORM, these callbacks are essentially used in the same way as documented in the sections for FORM and SQLFORM.
+- ``upload``, stejně jako u SQLFORM formuláře. Web2py umožní pomocí akce na této adrese download uloženého souboru.
+- ``maxtextlength`` nastavuje maximální počet znaků, na který budou zkráceny zobrazené hodnoty (v gridu). Tato hodnota může být přepsána a nastavena individuálně pro jednotlivá pole pomocí ``maxtextlengths``, což je slovník (dictionary) 'tabulka.pole':počet_znaků např. ``{'auth_user.email' : 50}``
+- ``onvalidation``, ``oncreate``, ``onupdate`` a ``ondelete`` jsou callback funkce. Všechny kromě ``ondelete`` dostanou jako vstup (parametr) objekt formuláře, ondelete dostane jako parametry tabulku a id záznamu.
+Vzhledem k tomu, že formulář pro editaci/přidávání záznamů není nic jiného než SQLFORM (který rozšiřuje vlastnosti formuláře FORM), tyto callbacky se používají způsobem, který najdete v dokumentaci u FORM a SQLFORM.
 
-Here is skeleton code:
+Příklad:
 
 ``
 def myonvalidation(form):
-    print "In onvalidation callback"
+    print "onvalidation callback"
     print form.vars
-    form.errors= True  #this prevents the submission from completing
+    form.errors= True  # zabrání potvrzení formuláře
     
-    #...or to add messages to specific elements on the form
-    form.errors.first_name = "Do not name your child after prominent deities"	
-    form.errors.last_name = "Last names must start with a letter"
-    response.flash = "I don't like your submission" 
+    #... nebo přidáme chybový stav jednotlivým polím
+    form.errors.first_name = "Dítě nelze pojmenovat takhle hloupě."	
+    form.errors.last_name = "Příjmení musí začínat písmenem."
+    response.flash = "Tohle zadání se mi nelíbí"
 
 def myoncreate(form):
-    print 'create!'
+    print 'přidej záznam!'
     print form.vars
 
 def myonupdate(form):
-    print 'update!'
+    print 'aktualizuj!'
     print form.vars
 
 def myondelete(table, id):
-    print 'delete!'
+    print 'zruš!'
     print table, id
 ``:code
 
-onupdate and oncreate are the same callbacks available to SQLFORM.process()
-
-- ``sorter_icons`` is a list of two strings (or helpers) that will be used to represent the up and down sorting options for each field.
-- ``ui`` can be set equal to 'web2py' and will generate web2py friendly class names, can be set equal to ``jquery-ui`` and will generate jquery UI friendly class names, but it can also be its own set of class names for the various grid components:
+- ``sorter_icons`` je seznam (list) dvou řetězců (nebo helperů), které budou použity jako symboly pro vzestupné a sestupné setřídění sloupce.
+- ``ui`` může být nastaveno na 'web2py', čímž budou generována jména css tříd ve Web2py stylu, může být nastaveno na ``jquery-ui``, což vygeneruje jména css tříd ve stylu jquery UI. Může to ale být i slovník se jmény css tříd pro jednotlivé komponenty gridu:
   ``
 ui = dict(
     widget='',
@@ -2509,10 +2508,10 @@ ui = dict(
     buttonview='icon magnifier')
 ``:code
 
-- ``search_widget`` allows to override the default search widget and we refer the reader the source code in "gluon/sqlhtml.py" for details.
-- ``showbuttontext`` allows buttons without text (there will effectively be only icons)
-- ``_class`` is the class for the grid container.
-- ``exportclasses`` takes a dictionary of tuples: by default it's defined as
+- ``search_widget`` umožňuje zařadit jiný než default search widget (widget pro vyhledávání); pro podrobnosti odkazujeme čtenáře do zdrojového kódu "gluon/sqlhtml.py".
+- ``showbuttontext`` umožňuje vypnout popisný text tlačítek (takže se zobrazí jen ikony)
+- ``_class`` je třída grid kontejneru.
+- ``exportclasses`` může být slovník dvojic (dictionary of tuples), defaultně je nastaven takto:
 
 ``
 csv_with_hidden_cols=(ExporterCSV, 'CSV (hidden cols)'),
@@ -2523,32 +2522,33 @@ tsv_with_hidden_cols=(ExporterTSV, 'TSV (Excel compatible, hidden cols)'),
 tsv=(ExporterTSV, 'TSV (Excel compatible)'))
 ``:code
 
-ExporterCSV, ExporterXML, ExporterHTML and ExporterTSV are all defined in gluon/sqlhtml.py. Take a look at those for creating your own exporter. If you pass a dict like ``dict(xml=False, html=False)`` you will disable the xml and html export formats.
+ExporterCSV, ExporterXML, ExporterHTML a ExporterTSV jsou vesměs definovány v gluon/sqlhtml.py. Můžete se případně podívat do zdrojového kódu a dopsat si podle potřeby vlastní exportér. Pomocí hodnot False ve slovníku potlačíte příslušnou možnost exportu, např. ``dict(xml=False, html=False)`` zakáže xml a html export.
 
-- ``formargs`` is passed to all SQLFORM objects used by the grid, while ``createargs``, ``editargs`` and ``viewargs`` are passed only to the specific create, edit and details SQLFORMs
-- ``formname``, ``ignore_rw`` and ``formstyle`` are passed to the SQLFORM objects used by the grid for create/update forms.
-- ``buttons_placement`` and ``links_placement`` both take a parameter ('right', 'left', 'both') that will affect where on the row the buttons (or the links) will be placed
+- ``formargs`` se předá všem SQLFORM objektům, které Grid generuje, kdežto případné ``createargs``, ``editargs`` resp. ``viewargs`` se předají jen SQLFORMu pro vytvořebí záznamu, editaci a readonly zobrazení
+- ``formname``, ``ignore_rw`` a ``formstyle`` se předají pod stejným jménem SQLFORM objektům pro přidání a editaci záznamu.
+- ``buttons_placement`` a ``links_placement`` (umístění tlačítek a odkazů) mají oba možné hodnoty ('right', 'left', 'both'), čímž zadáme, kde se na řádku gridu zobrazí tlačítka (resp. odkazy)
 ------
-``deletable``, ``editable`` and ``details`` are usually boolean values but they can be functions which take the row object and decide whether to display the corresponding button or not.
+``deletable``, ``editable`` a ``details`` jsou typicky boolean hodnoty, ale mohou to být také funkce (např. lambda funkce), které vezmou Row objekt a určí, zda pro tento záznam bude nebo nebude zobrazeno příslušné tlačítko.
 -----
 
-#### Virtual fields in SQLFORM.grid and smartgrid
-In versions of web2py after 2.6, virtual fields are shown in grids like normal fields: either shown alongside all other fields by default, or by including them in the ``fields`` argument. However, virtual fields are not sortable. 
+#### Virtuální pole v SQLFORM.gridu a smartgridu
+Ve nových verzích Web2py (po 2.6) se virtuální pole zobrazují v gridu jako normální pole: buď spolu se všemi ostatními, když se zobrazují všechna pole, nebo když je explicitně uvedete při použití výčtu polí pomocí ``fields`` argumentu. V gridu ale podle nich nelze nastavovat pořadí.
 
-In older web2py versions, showing virtual fields in a grid requires use of the ``links`` argument. This is still supported for more recent versions. If table db.t1 has a field called t1.vfield which is based on the values of t1.field1 and t1.field2, do this:
+Ve starších verzích Web2py bylo možné zobrazovat virtuální pole v gridu leda pomocí argumentu ``links``. To lze i nadále v novějších verzích použít. Dejme tomu, že tabulka db.t1 má pole, nazvané t1.vfield, odvozené z hodnot t1.field1 a t1.field2, pak můžete udělat toto:
 
 ``grid = SQLFORM.grid(db.t1, ..., fields = [t1.field1, t1.field2,...], 
-   links = [dict(header='Virtual Field 1',body=lambda row:row.vfield),...] )
+   links = [dict(header='Virtuální pole 1', body=lambda row: row.vfield), ...] )
 ``:code
 
-In all cases, because t1.vfield depends on t1.field1 and t1.field2, these fields must be present in the row. In the example above, this is guaranteed by including t1.field1 and t1.field2 in the fields argument. Alternatively, showing all fields will also work. You can suppress a field from displaying by setting the readable attribute to False. 
+Ať už budete chtít zobrazit virtuální pole kterýmkoli způsobem, protože je např. t1.vfield odvozeno z t1.field1 a t1.field2, i tato pole musí být načtena a obsažena v záznamu. V příkladu výše je to zajištěno explicitním uvedením t1.field1 a t1.field2 v argumentu ``fields``. Při zobrazení všech polí to bude rovněž zajištěno a virtuální pole se zobrazí správně. Pokud některé pole nechcete zobrazovat (a musíte jej z principu věci načíst), potlačte jeho zobrazení pomocí atributu ``readable``, např. ``db.t1.field2.readable = False`` před instanciováním Gridu (stejně jako např. pro skrytí nechtěného id pole).
 
-Note that when defining the virtual field, the lambda function must qualify fields with the database name, but in the links argument, this is not necessary.
-So for the example above, the virtual field may be defined like:
+Poznamenejme, že když definujeme virtuální pole, lambda funkce musí uvádět databázové jméno, kdežto v argumentu ``links`` to není nutné.
+Takže např. definice virtuálních polí v modelu bude pro předchozí příklad vypadat takto:
 ``
-db.define_table('t1',Field('field1','string'),
-   Field('field2','string'),
-  Field.Virtual('virtual1', lambda row: row.t1.field1 + row.t1.field2),
+db.define_table('t1',
+    Field('field1', 'string'),
+    Field('field2','string'),
+    Field.Virtual('vfield', lambda row: row.t1.field1 + row.t1.field2),
   ...)
 ``:code
 
