@@ -2289,50 +2289,50 @@ def my_string_widget(field, value):
 Field('comment', 'string', widget=my_string_widget)
 ``:code
 
-Hodnoty id a class by měly dodržovat s the convention described later in this chapter. A widget may contain its own validators, but it is good practice to associate the validators to the "requires" attribute of the field and have the widget get them from there.
+Hodnoty id a class by měly dodržovat konvence, popsané v této kapitole. Widgety mohou obsahovat vlastní validátory, ale doporučený postup je asociovat validátory s atributem "requires" některého pole a vytvořit widget tak, aby je od nastavení pole převzal.
 
 #### Autocomplete widget
 ``autocomplete``:inxx
 
-There are two possible uses for the autocomplete widget: to autocomplete a field that takes a value from a list or to autocomplete a reference field (where the string to be autocompleted is a representation of the reference which is implemented as an id).
+Autocomplete widget má dvě použití: k dokončení zápisu pole, které vybírá hodnotu ze seznamu, a k dokončení výběru odkazu (reference), kde dokončovaný text je reprezentace odkazu (tedy text, zobrazený místo id).
 
-The first case is easy:
+První případ je snadný:
 ``
-db.define_table('category',Field('name'))
-db.define_table('product',Field('name'),Field('category'))
+db.define_table('category', Field('name'))
+db.define_table('product', Field('name'), Field('category'))
 db.product.category.widget = SQLFORM.widgets.autocomplete(
      request, db.category.name, limitby=(0,10), min_length=2)
 ``:code
 
-Where ``limitby`` instructs the widget to display no more than 10 suggestions at the time, and ``min_length`` instructs the widget to perform an Ajax callback to fetch suggestions only after the user has typed at least 2 characters in the search box.
+Kde ``limitby`` nastavuje widget, aby nezobrazoval více než 10 návrhů současně, a ``min_length`` nastavuje, aby se Ajax callbacky prováděly teprve poté, kdy uživatel zadá alespoň 2 znaky.
 
-The second case is more complex:
+Druhý případ je trochu složitější:
 ``
-db.define_table('category',Field('name'))
-db.define_table('product',Field('name'),Field('category'))
+db.define_table('category', Field('name'))
+db.define_table('product', Field('name'), Field('category'))
 db.product.category.widget = SQLFORM.widgets.autocomplete(
      request, db.category.name, id_field=db.category.id)
 ``:code
 
-In this case the value of ``id_field`` tells the widget that even if the value to be autocompleted is a ``db.category.name``, the value to be stored is the corresponding ``db.category.id``. An optional parameter is ``orderby`` that instructs the widget on how to sort the suggestions (alphabetical by default).
+V tomto případě argument ``id_field`` říká widgetu, aby převzal hodnotu ``db.category.id``, ačkoli dokončovaná hodnota je ``db.category.name``. Volitelný parametr je ``orderby``, který udává, jak budou návrhy setříděny (defaultně abecedně).
 
-This widget works via Ajax. Where is the Ajax callback? Some magic is going on in this widget. The callback is a method of the widget object itself. How is it exposed? In web2py any piece of code can generate a response by raising an HTTP exception. This widget exploits this possibility in the following way: the widget sends the Ajax call to the same URL that generated the widget in the first place and puts a special token in the request.vars. Should the widget get instantiated again, it finds the token and raises an HTTP exception that responds to the request. All of this is done under the hood and hidden to the developer.
+Widget pracuje pomocí Ajaxu. Kde je Ajax callback? Něco se tu děje skrytě (some magic is going on..). Callback je metoda widgetu. Jakým způsobem je zveřejněna (exposed)? Ve Web2py může kterýkoli úsek kódu generovat odezvu (response) jako vyvolání HTTP výjimky. Autocomplete widget tuto možnost využívá, a sice takto: widget vyšle Ajaxové volání na stejnou URL adresu, která vygenerovala widget napoprvé, a přidá speciální token (označení) do request.vars. Místo toho, aby se widget instancioval podruhé, najde token a vyvolá HTTP výjimku, která zajistí odpověď na požadavek. To se děje skrytě a vývojář se tím nemusí zabývat.
 
-## ``SQLFORM.grid`` and ``SQLFORM.smartgrid``
+## ``SQLFORM.grid`` a ``SQLFORM.smartgrid``
 
 -------
-Attention: grid and smartgrid were experimental prior web2py version 2.0 and were vulnerable to information leakage. The grid and smartgrid are no longer experimental, but we are still not promising backward compatibility of the presentation layer of the grid, only of its APIs.
+Pozor: grid a smartgrid byly experimentální ve starších verzích Web2py (před 2.0). To už sice neplatí, ale zatím zaručujeme zpětnou kompatibilitu jen API gridu (způsobu jeho použití/volání), kdežto v prezentační vrstvě gridu může ještě případně dojít k nějakým změnám v budoucnu.
 -------
 
-These are two high level objects that create complex CRUD controls. They provide pagination, the ability to browse, search, sort, create, update and delete records from a single object.
+Obojí jsou objekty vysoké úrovně, které generují složité CRUD prvky (prvky pro vytváření, zobrazení, editaci nebo rušení záznamů). Zajišťují stránkování, možnost prohlížení seznamu (browse), vyhledávání, třídění, vytváření, aktualizaci a rušení záznamů pomocí jediného objektu.
 
-Because web2py's HTML objects build on the underlying, simpler objects, the grids create SQLFORMs for viewing, editing and creating its rows. Many of the arguments to the grids are passed through to this SQLFORM. This means the documentation for SQLFORM (and FORM) is relevant. For example, the grid takes an ``onvalidation`` callback. The processing logic of the grid ultimately passes this through to the underlying process() method of FORM, which means you should consult the documentation of ``onvalidation`` for FORMs.
+Pro vytváření, prohlížení a editaci záznamů Grid vytváří jako objekty nižší úrovně SQLFORM formuláře. Mnoho argumentů gridu je předáváno těmto SQLFORM formulářům. Znamená to, že obvykle platí i informace z dokumentace pro SQLFORM (a FORM). Např. má Grid ``onvalidation`` callback. Logika zpracování Gridu je zajištěna na nižší úrovni metodou formuláře process(), takže více informací o ``onvalidation`` můžete nalézt v dokumentaci pro formuláře.
 
-As the grid passes through different states, such as editing a row, a new request is generated. request.args has information about which state the grid is in.
+Důležité: Vždy, když Grid prochází různými stavy (myslíme tím: zobrazení záznamů, editace záznamu, přidání záznamu, apod.), je generován nový požadavek (request) na server, na původní URL adresu. Při tom je request.args rozšířen o informaci, do jakého stavu má Grid přejít.
 
 
 ### ``SQLFORM.grid`` 
-The simplest of the two is ``SQLFORM.grid``. Here is an example of usage:
+Jednodušší z obou prvků je ``SQLFORM.grid``. Tady je příklad použití:
 
 ``
 @auth.requires_login()
@@ -2341,48 +2341,49 @@ def manage_users():
     return locals()
 ``:code
 
-which produces the following page:
+což vytvoří tuto stránku:
 
 [[image @///image/en6700.png center 480px]]
 
-The first argument of ``SQLFORM.grid`` can be a table or a query. The grid object will provide access to records matching the query.
+První argument pro ``SQLFORM.grid`` může být tabulka nebo dotaz (query). Grid objekt promítne (a zpřístupní k úpravám) záznamy, které vyhovují uvedenému dotazu.
 
-Before we dive into the long list of arguments of the grid object we need to understand how it works. The object looks at ``request.args`` in order to decide what to do (browse, search, create, update, delete, etc.). Each button created by the object links the same function (``manage_users`` in the above case) but passes different ``request.args``. 
+Jak objekt pracuje? Objekt zpracuje své ``request.args`` a tím zjistí, co má právě udělat (promítat seznam, vyhledávat, vytvářet záznamy, editovat, rušit záznam). Každé tlačítko (button), které Grid objekt vytvoří, odkazuje na stejnou akci (``manage_users`` v našem příkladu), ale předává jí různé ``request.args``.
 
-#### login required by default for data updates
-By default all the URLs generated by the grid are digitally signed and verified. This means one cannot perform certain actions (create, update, delete) without being logged-in. These restrictions can be relaxed:
+#### přihlášení uživatele (login) je defaultně vyžadováno pro změny dat
+Defaultně jsou opakované, tlačítky gridu generované, přístupy na adresu akce gridu digitálně podespány a verifikovány. Znamená to, že není možné některé akce provést (vytvářet, aktualizovat, rušit záznamy), když uživatel není přihlášen. Toto omezení můžete potlačit:
 
 ``
 def manage_users():
-    grid = SQLFORM.grid(db.auth_user,user_signature=False)
+    grid = SQLFORM.grid(db.auth_user, user_signature=False)
     return locals()
 ``:code
 
-but we do not recommend it.
+ale nedoporučujeme to.
 
 
-#### Multiple grids per controller function
+#### Více gridů v jedné akci kontroléru
 -----
-Because of the way grid works one can only have one grid per controller function, unless they are embedded as components via ``LOAD``.
-To make the default search grid work in more than one LOADed grid, please use a different ``formname`` for each one.
+S ohledem na to, jak grid pracuje, můžete mít jen jediný grid na stránce - v akci kontroléru. Toto omezení lze překonat natažením gridů jako komponent pomocí ``LOAD``.
+Aby nedošlo k záměnám funkcionality mezi gridy, vytvořenými pomocí LOAD, nastavte každému unikátní ``formname``.
 -----
 
-#### Using requests.args safely
-Because the controller function that contains the grid may itself manipulate the URL arguments (known in web2py as response.args and response.vars), the grid needs to know which args should be handled by the grid and which not. Here is an example of code that allows one to manage any table:
+#### Specifické používání requests.args
+Řekli jsme si, že Grid používá request.args pro určení, který stav je požadován (má být právě renderován). Neznamená to, že request.args nemůžete použít pro předání dat do akce k jakémukoli jinému účelu. Grid ale musí vědět, které request.args jsou určeny pro něj a které ne. Zde je příklad kódu, který dovoluje editovat kteroukoli tabulku databáze, přičemž první request.args udává jméno tabulky a případné další request.args jsou přidány a využívány Gridem samotným:
 
 ``
 @auth.requires_login()
 def manage():
     table = request.args(0)
-    if not table in db.tables(): redirect(URL('error'))
-    grid = SQLFORM.grid(db[table],args=request.args[:1])
+    if not table in db.tables():
+        redirect(URL('error'))
+    grid = SQLFORM.grid(db[table], args=request.args[:1])
     return locals()
 ``:code
 
-the ``args`` argument of the ``grid`` specifies which ``request.args`` should be passed along and ignored by the ``grid``. In our case ``request.args[:1]`` is the name of the table we want to manage and it is handled by the ``manage`` function itself, not by the ``grid``. So, ``args=request.args[:1]`` tells the grid to preserve the first URL argument in any links that it generates, appending any grid-specific arguments after that first argument.
+Argument gridu ``args`` tedy udává, které ``request.args`` má grid ignorovat. V našem případě ``request.args[:1]`` je jméno tabulky, které zpracuje přímo akce ``manage`` a nikoli ``grid``. ``args=request.args[:1]`` řekne gridu, že má zachovat první argument URL v každém odkazu, který bude (pro změny svého stavu) generovat. Argumenty specifické pro grid budou přidány až za tento první argument.
 
-#### SQLFORM.grid signature
-The complete signature for the grid is the following:
+#### Signatura SQLFORM.grid-u
+Úplná signatura gridu je následující:
 
 ``
 SQLFORM.grid(
