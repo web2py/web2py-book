@@ -141,7 +141,7 @@ If the dictionary contains other user-defined or web2py-specific objects, they m
 If you need to render a set of Rows as returned by a select in XML or JSON or another format,
 first transform the Rows object into a list of dictionaries using the ``as_list()`` method.
 
-Consider for example the following mode:
+Consider for example the following model:
 ``
 db.define_table('person', Field('name'))
 ``:code
@@ -467,6 +467,17 @@ The Python xmlrpclib module provides a client for the XMLRPC protocol. web2py ac
 
 The client connects to the server via ServerProxy and can remotely call decorated functions in the server. The data (a,b) is passed to the function(s), not via GET/POST variables, but properly encoded in the request body using the XMLPRC protocol, and thus it carries with itself type information (int or string or other). The same is true for the return value(s). Moreover, any exception raised on the server propagates back to the client.
 
+#### ServerProxy signature
+
+``a_server = ServerProxy(location,transport=None,encoding=None,verbose=False,version=None)
+``:code
+The important arguments are:
+- ``location`` is the remote URL for the server. There are examples below.
+- ``verbose=True`` activates useful diagnostics
+- ``version`` sets the jsonrpc version. It is ignored by jsonrpc. Set this to ``version='2.0'`` to support jsonrpc2. Because it is ignored by jsonrpc, setting it gains support for both versions. It is not supported by XMLRPC.
+
+#### XMLRPC Libraries
+
 There are XMLRPC libraries for many programming languages (including C, C++, Java, C#, Ruby, and Perl), and they can interoperate with each other. This is one the best methods to create applications that talk to each other independent of the programming language.
 
 The XMLRPC client can also be implemented inside a web2py action, so that one action can talk to another web2py application (even within the same installation) using XMLRPC. Beware of session deadlocks in this case. If an action calls via XMLRPC a function in the same app, the caller must release the session lock before the call:
@@ -474,9 +485,10 @@ The XMLRPC client can also be implemented inside a web2py action, so that one ac
 session.forget(response)
 ``:code
 
+[[jsonrpc]] [[jsonrpc2]]
 #### JSONRPC
-
 ``JSONRPC``:inxx
+``JSONRPC2``:inxx
 
 In this section we are going to use the same code example as for XMLRPC but we will expose the service using JSONRPC instead:
 
@@ -492,6 +504,8 @@ def call():
 
 JSONRPC is very similar to XMLRPC but uses JSON instead of XML as data serialization protocol.
 
+#### Accessing JSONRPC services from web2py
+
 Of course we can call the service from any program in any language but here we will do it in Python. web2py ships with a module "gluon/contrib/simplejsonrpc.py" created by Mariano Reingart. Here is an example of how to use to call the above service:
 
 ``
@@ -501,7 +515,11 @@ Of course we can call the service from any program in any language but here we w
 >>> print service.add(1, 2)
 ``:code
 
-Use "http://127.0.0.1:8000/app/default/call/jsonrpc2" for jsonrpc2.
+Use "http://127.0.0.1:8000/app/default/call/jsonrpc2" for jsonrpc2,
+and create the service object like this:
+``
+service = ServerProxy(URL,verbose=True,version='2.0')
+``:code
 
 #### JSONRPC and Pyjamas
 ``JSONRPC``:inxx ``Pyjamas``:inxx
@@ -947,7 +965,7 @@ In the case of web2py each request can be split into three parts:
 http://127.0.0.1/myapp/default/api/
 ``
 - The name of the resource (``person``, ``persons``, ``person/1``, etc.)
-- The communication protocol specified y the extension.
+- The communication protocol specified by the extension.
 
 Notice that we can always use the router to eliminate any unwanted prefix in the URL and for example simplify this:
 
@@ -961,7 +979,7 @@ into this:
 http://127.0.0.1/api/person/1.json
 ``
 
-yet this is a matter of test and we have already discussed it at length in chapter 4.
+yet this is a matter of taste and we have already discussed it at length in chapter 4.
 
 In our example we used an action called ``api`` but this is not a requirement. We can in fact name the action that exposes the RESTful service any way we like and we can in fact even create more than one. For the sake of argument we will continue to assume that our RESTful action is called ``api``.
 
@@ -1051,7 +1069,7 @@ There 4 types of atomic patterns:
 - Variables to be used to filter. For example "{person.id}" will apply a ``db.person.name=={person.id}`` filter.
 - Names of fields, represented by ":field"
 
-Atomic patters can be combined into complex URL patters using "/" such as in
+Atomic patterns can be combined into complex URL patterns using "/" such as in
 
 ``
 "/friend[person]/{person.id}/:field"
@@ -1104,7 +1122,7 @@ def api():
     return locals()
 ``:code
 
-Which understands the following URLs that correspond to the listed patters:
+Which understands the following URLs that correspond to the listed patterns:
 
 - GET all persons
 ``
@@ -1341,8 +1359,8 @@ def call(): return service()
 
 Notice that it also possible to instantiate multiple service objects, register the same different functions with them, and expose some of them with authentication and some not:
 ``
-public_services=Service()
-private_services=Service()
+public_service=Service()
+private_service=Service()
 
 @public_service.jsonrpc
 @private_service.jsonrpc
@@ -1357,4 +1375,14 @@ def public_call(): return public_service()
 def private_call(): return private_service()
 ``:code
 
-This assumes that the caller is passing credentials in the HTTP header (a valid session cookie or using basic authentication, as discussed in the previous section). The client must support it; not all clients do.
+This assumes that the caller is passing credentials in the HTTP header (a valid session cookie or using [[basic authentication ../09#basic_authentication]], as discussed in the previous chapter). The client must support it; not all clients do.
+
+If using ServerProxy() described above, you can pass basic authentication credentials in the URL, like so:
+``
+URL='http://user:password@127.0.0.1:8000/app/default/private_call/jsonrpc2'
+service = ServerProxy(URL, version='2.0')
+``:code
+
+where the function ``private_call`` in the controller is decorated for user authentication
+
+

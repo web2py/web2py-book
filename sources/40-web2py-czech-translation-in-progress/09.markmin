@@ -52,16 +52,22 @@ To start using ``Auth``, you need at least this code in a model file, which is a
 ``
 from gluon.tools import Auth
 auth = Auth(db)
-auth.define_tables()
+auth.define_tables(username=False,signature=False)
 ``:code
+
+By default, web2py uses email for login. If instead you want to log in using username set ``auth.define_tables(username=True)``
+
+Setting ``signature=True`` adds user and date stamping to auth tables, to track modifications.
 
 Auth has an optional ``secure=True`` argument, which will force authenticated pages to go over HTTPS. ``https``:inxx
 
+By default, Auth protects logins against cross-site request forgeries (CSRF). This is actually provided by web2py's standard CSRF protection whenever forms are generated in a session. However, under some circumstances, the overhead of creating a session for login,password request and reset attempts may be undesirable. DOS attacks are theoretically possible. CSRF protection can be disabled for Auth forms (as of v 2.6):
+``Auth = Auth(..., csrf_prevention = False)``:code 
+Note that doing this purely to avoid session overload on a busy site is not recommended because of the introduced security risk. Instead, see the Deployment chapter for advice on reducing session overheads.
 -------
-The ``password`` field of the ``db.auth_user`` table defaults to a ``CRYPT`` validator, which needs and ``hmac_key``. On legacy web2py applications you may see an extra argument passed to the Auth constructor: ``hmac_key = Auth.get_or_create_key()``. The latter is a function that read the HMAC key from a file "private/auth.key" within the application folder. If the file does not exist it creates a random ``hmac_key``. If multiple apps share the same auth database, make sure they also use the same ``hmac_key``. This is no longer necessary for new applications since passwords are salted with an individual random salt.
+The ``password`` field of the ``db.auth_user`` table defaults to a ``CRYPT`` validator, which needs an ``hmac_key``. On legacy web2py applications you may see an extra argument passed to the Auth constructor: ``hmac_key = Auth.get_or_create_key()``. The latter is a function that read the HMAC key from a file "private/auth.key" within the application folder. If the file does not exist it creates a random ``hmac_key``. If multiple apps share the same auth database, make sure they also use the same ``hmac_key``. This is no longer necessary for new applications since passwords are salted with an individual random salt.
 -------
 
-By default, web2py uses email for login. If instead you want to log in using username set ``auth.define_tables(username=True)``
 
 If multiple apps share the same auth database you may want to disable migrations: ``auth.define_tables(migrate=False)``.
 
@@ -180,7 +186,7 @@ auth.settings.actions_disabled.append('register')
 If you want to allow people to register and automatically log them in after registration but still want to send an email for verification so that they cannot login again after logout, unless they completed the instructions in the email, you can accomplish it as follows:
 
 ``
-auth.settings.registration_requires_approval = True
+auth.settings.registration_requires_verification = True
 auth.settings.login_after_registration = True
 ``:code
 
@@ -258,8 +264,10 @@ reCAPTCHA may not work if you access the web site as 'localhost' or '127.0.0.1',
 
 The ``Recaptcha`` constructor takes some optional arguments:
 ``
-Recaptcha(..., use_ssl=True, error_message='invalid', label='Verify:', options='')
+Recaptcha(..., use_ssl=False, error_message='invalid', label='Verify:', options='')
 ``:code
+
+There is an experimental argument, ``ajax=True``, which uses the ajax API to recaptcha. It can be used with any recaptcha, but it was specifically added to allow recpatcha fields to work in LOAD forms (see Chapter 12 for more about LOAD, which allows web2py to 'plugin' components of a page with ajax ). It's experimental because it may be replaced with automatic detection of when ajax is required.
 
 Notice that ``use_ssl=False`` by default.
 
@@ -354,7 +362,11 @@ If you add a field called "username", it will be used in place of "email" for lo
 auth_table.username.requires = IS_NOT_IN_DB(db, auth_table.username)
 ``:code
 
+Note that Auth caches the logged in user in the session and that's what you get in ``auth.user``, so you need to clear the sessions for the extra fields changes to be reflected in it.
+
+
 #### Renaming ``Auth`` tables
+[renaming_auth_tables]
 
 The actual names of the ``Auth`` tables are stored in
 ``
@@ -382,7 +394,17 @@ auth.settings.table_permission
 auth.settings.table_event
 ``:code
 
+Note: auth.signature gets defined when Auth is initialized, which is before you have set the custom table names. To avoid this do:
+
+``
+auth = Auth(db, signature=False)
+``
+
+In that case, auth.signature will instead be defined when you call auth.define_tables(), by which point the custom tables names will already be set.
+
+
 #### Other login methods and login forms
+
 ``LDAP``:inxx ``PAM``:inxx
 
 Auth provides multiple login methods and hooks to create new login methods. Each supported login method corresponds to a file in the folder
@@ -535,54 +557,117 @@ which stores the openid usernames for each user. If you want to display the open
 {{=auth.settings.login_form.list_user_openids()}}
 ``:code
 
-##### OAuth2.0 and Facebook
-``OAuth``:inxx ``Facebook``:inxx
+##### OAuth2.0
+``OAuth``:inxx ``Facebook``:inxx ``Google``:inxx ``Twitter``:inxx
 
-We have previously discussed integration with Janrain (which has Facebook support), yet sometimes you do not want to rely on a third party service and you want to access a OAuth2.0 provider directly; for example, Facebook. Here is how:
+We have previously discussed integration with Janrain, yet sometimes you do not want to rely on a third party service and you want to access a OAuth2.0 provider directly;
+for example, Facebook, Linkedin, Twitter, Google all of them provide an OAuth2.0 authentication service.
+web2py handles the OAuth2.0 flow transparently so that a user can be verified against any configured OAuth2.0 
+provider during login.
+Other than authentication an OAuth2.0 provider can grant to any web2py application access to user resources
+with restricted access thought a proprietary API.  Google, Twitter, Facebook and so on, all have APIs that can be
+easily accessed by a web2py application.
 
-``
-from gluon.contrib.login_methods.oauth20_account import OAuthAccount
-auth.settings.login_form=OAuthAccount(YOUR_CLIENT_ID,YOUR_CLIENT_SECRET)
-``:code
+It must be underlined that OAuth2.0 is limited only to authentication and authorization
+(for instance CAS has more functionalities), this means that each OAuth2.0 provider
+has a different way to receive a unique id from their user database through one of their APIs.
+Specific methods are well explained on respective provider documentation, they usually consist in a very
+simple REST call.  This is why for each OAuth2.0 provider there is the need to write a few lines of code. 
 
-Things get a little more complex if you want to use Facebook OAuth2.0 to login into a specific Facebook app to access its API, instead of your own app. Here is an example for accessing the Facebook Graph API.
+Before writing any instructions in the application model a first step is needed for any provider: registering a new application;  this is usually done
+on provider's site and is explained in provider's documentation.
+
+There are a few things that needs to be known once there is the need to add a new OAuth2.0 provider to your
+application:
+ 1. the Authorization URI;
+ 2. the Token request URI;
+ 3. the application identification token and secret received upon registration of the new application;
+ 4. the permissions that the provider must grant to the web2py application, i.e. the "scope" (see the provider's documentation);
+ 5. the API call to receive a UID of the authenticating user, as explained on providers documentation.
+ 
+Point 1 to 4 are used to initialize the authorization endpoint used by web2py to communicate with the OAuth2.0 provider.
+The unique id is retrieved by web2py with a call to the get_user() method when needed during the login flow; this is where
+the API call of point 5 is needed.
+
+These are the essential modification that need to be done in your model:
+ a. import OAuthAccount class;
+ b. define a derived OAuthClass implementation;
+ c. override __init__() method of that class;
+ d. override get_user() method of that class.
+ e. instantiate the class with the data of points 1-4 of the above list;
+
+Once the class is instantiated, and the user is authenticated, the web2py application
+can access the API of the provider any time by using the OAuth2.0 access token by calling the accessToken() method
+of that class.
+
+What follows is an example of what can be used with Facebook.  This is a basic example using Facebook Graph API,
+remind that, by writing a proper get_user() method, many different things can be done.  The example shows how the
+OAuth2.0 access token can be used when calling the remote API of the provider.
 
 First of all you must install the [[Facebook Python SDK https://github.com/pythonforfacebook/facebook-sdk/]].
 
 Second, you need the following code in your model:
 
 ``
+## Define oauth application id and secret.
+FB_CLIENT_ID='xxx'
+FB_CLIENT_SECRET="yyyy"
+
 ## import required modules
-from facebook import GraphAPI
+try:
+    import json
+except ImportError:
+    from gluon.contrib import simplejson as json
+from facebook import GraphAPI, GraphAPIError
 from gluon.contrib.login_methods.oauth20_account import OAuthAccount
+
+
 ## extend the OAUthAccount class
 class FaceBookAccount(OAuthAccount):
-    """OAuth impl for Facebook"""
+    """OAuth impl for FaceBook"""
     AUTH_URL="https://graph.facebook.com/oauth/authorize"
     TOKEN_URL="https://graph.facebook.com/oauth/access_token"
-    def __init__(self, g):
-        OAuthAccount.__init__(self, g,
-                              YOUR_CLIENT_ID,
-                              YOUR_CLIENT_SECRET,
-                              self.AUTH_URL,
-                              self.TOKEN_URL)
+
+    def __init__(self):
+        OAuthAccount.__init__(self, None, FB_CLIENT_ID, FB_CLIENT_SECRET,
+                              self.AUTH_URL, self.TOKEN_URL,
+                              scope='email,user_about_me,user_activities, user_birthday, user_education_history, user_groups, user_hometown, user_interests, user_likes, user_location, user_relationships, user_relationship_details, user_religion_politics, user_subscriptions, user_work_history, user_photos, user_status, user_videos, publish_actions, friends_hometown, friends_location,friends_photos',
+                              state="auth_provider=facebook",
+                              display='popup')
         self.graph = None
-    # override function that fetches user info
+
     def get_user(self):
-        "Returns the user using the Graph API"
+        '''Returns the user using the Graph API.
+        '''
         if not self.accessToken():
             return None
+
         if not self.graph:
             self.graph = GraphAPI((self.accessToken()))
+
+        user = None
         try:
             user = self.graph.get_object("me")
+        except GraphAPIError, e:
+            session.token = None
+            self.graph = None
+
+        if user:
+            if not user.has_key('username'):
+                username = user['id']
+            else:
+                username = user['username']
+                
+            if not user.has_key('email'):
+                email = '%s.fakemail' %(user['id'])
+            else:
+                email = user['email']    
+
             return dict(first_name = user['first_name'],
                         last_name = user['last_name'],
-                        username = user['id'])
-        except GraphAPIError:
-            self.session.token = None
-            self.graph = None
-            return None
+                        username = username,
+                        email = '%s' %(email) )
+
 ## use the above class to build a new login form
 auth.settings.login_form=FaceBookAccount()
 ``:code
@@ -648,7 +733,7 @@ Otherwise it will render the normal login form together with the ``other_form``.
 You can use Auth to enable full record versioning:
 
 ``
-db.enable_record_versioning(db,
+auth.enable_record_versioning(db,
     archive_db=None,
     archive_names='%(tablename)s_archive',
     current_record='current_record'):
@@ -678,9 +763,12 @@ Those functions do explicitly what ``enable_record_versioning`` does automatical
 they will be deprecated.
 
 
+[[mail_and_auth]]
 #### ``Mail`` and ``Auth``
 
-One can define a mailer with
+You can read more about web2py API for emails and email configuration in [[Chapter 8 ../08 ]]. Here we limit the discussion to the interaction between ``Mail`` and ``Auth``.
+
+Define a mailer with
 
 ``
 from gluon.tools import Mail
@@ -702,7 +790,6 @@ mail.settings.login = 'username:password'
 
 You need to replace the mail.settings with the proper parameters for your SMTP server. Set ``mail.settings.login = None`` if the SMTP server does not require authentication. If you don't want to use TLS, set ``mail.settings.tls = False``
 
-You can read more about web2py API for emails and email configuration in Chapter 8. Here we limit the discussion to the interaction between ``Mail`` and ``Auth``.
 
 In ``Auth``, by default, email verification is disabled.
 To enable email, append the following lines in the model where ``auth`` is defined:
@@ -711,17 +798,35 @@ To enable email, append the following lines in the model where ``auth`` is defin
 auth.settings.registration_requires_verification = True
 auth.settings.registration_requires_approval = False
 auth.settings.reset_password_requires_verification = True
-auth.messages.verify_email = 'Click on the link http://' + \
-    request.env.http_host + \
-    URL(r=request,c='default',f='user',args=['verify_email']) + \
-    '/%(key)s to verify your email'
-auth.messages.reset_password = 'Click on the link http://' + \
-    request.env.http_host + \
-    URL(r=request,c='default',f='user',args=['reset_password']) + \
-    '/%(key)s to reset your password'
+auth.messages.verify_email = 'Click on the link %(link)s to verify your email'
+auth.messages.reset_password = 'Click on the link %(link)s to reset your password'
 ``:code
 
 In the two ``auth.messages`` above, you may need to replace the URL portion of the string with the proper complete URL of the action. This is necessary because web2py may be installed behind a proxy, and it cannot determine its own public URLs with absolute certainty. The above examples (which are the default values) should, however, work in most cases.
+
+[[two_step_verification]]
+#### Two-step verification
+
+Two-step verification (or Two-factor authentication) is a way of improving
+authentication security. The setting adds an extra step in the login process.
+In the first step, users are shown the standard username/password form. If they
+successfully pass this challenge by submitting the correct username and password,
+and two-factor authentication is enabled for the user, the server will present
+a second form before logging them in. This form will ask users for a six-digit code
+that has been emailed to their accounts (the server emails the code if the username
+and password was correct). The user gets four attempts to enter this code correctly.
+If the code is incorrect, the second verification step is treated as having failed
+and the user must complete the first challenge (username/password) again.
+
+This functionality can be enabled on a per-user basis:
+
+- Create a group (also known as a role) for the two-step verification. In this example it will be called ``auth2step`` and the description may be ``Two-step verification``.
+- Give a user membership of this role.
+- Add the following setting in the model where you created and configured your auth object (probably in the model db.py):
+``
+auth.settings.two_factor_authentication_group = "auth2step"
+``:code
+- Don’t forget to configure the email server in db.py
 
 ### Authorization
 
@@ -984,14 +1089,15 @@ db.define_table('dog',
    Field('small_image', 'upload'),
    Field('large_image', 'upload'))
 
-db.dog.large_image.authorization = lambda record: \
+db.dog.large_image.authorize = lambda record: \
    auth.is_logged_in() and \
    auth.has_permission('read', db.dog, record.id, auth.user.id)
 ``:code
 
-The attribute ``authorization`` of upload field can be None (the default) or a function that decides whether the user is logged in and has permission to 'read' the current record. In this example, there is no restriction on downloading images linked by the "small_image" field, but we require access control on images linked by the "large_image" field.
+The attribute ``authorize`` of upload field can be None (the default) or a function that decides whether the user is logged in and has permission to 'read' the current record. In this example, there is no restriction on downloading images linked by the "small_image" field, but we require access control on images linked by the "large_image" field.
 
 
+[[basic_authentication]]
 #### Access Control and Basic Authentication
 
 Occasionally, it may be necessary to expose actions that have decorators that require access control as services; i.e., to call them from a program or script and still be able to use authentication to check for authorization.
@@ -1028,24 +1134,59 @@ def give_me_time():
 
 Basic login is often the only option for services (described in the next chapter), but it is disabled by default.
 
-#### User Management via privileged users (Experimental)
-Normally users and groups are managed by the server administrator. However, you may want a group of privileged users that can manage users and groups just for one application.
-Starting from web2py 2.5, you can do this.
+#### Application Management via privileged users (Experimental)
+Normally administrator functions such as defining users and groups are managed by the server administrator. However, you may want a group of privileged users to have administrator rights for a specific application. 
+This is possible with versions after web2py v2.5.1 
+(Upgrading an existing application requires the new appadmin controller and the new appadmin.html view, copied from the welcome app. Also, apps created prior to web2py v2.6 need the new javascript file in welcome/static/js/web2py.js)
+
+The concept allows different management settings, each of which allows a user group to edit a certain set of tables in this application.
+
+Example:
 First, create a group (also known as a role) for your privileged users. In this example, it will be called admin.
 Give a user membership of this role.
+Second, think of a name to describe this management setting, such as db_admin.
 
 Add the following setting in the model where you created and configured your auth object (probably in the model db):
 ``
-auth.settings.manager_group_role = 'admin'
+auth.settings.manager_actions = dict(db_admin=dict(role='admin',heading='Manage Database',tables = db.tables))
+
 ``:code
 
-The user and groups administration menu has this URL (for adding to a menu)
+
+A menu item has the URL like below, passing the management setting name as an arg:
 ``
-URL('appadmin','auth_manage')
+URL('appadmin','manage',args=['db_admin'])
+``:code
+This URL appears as /appadmin/manage/auth.
+
+##### Advanced use
+This mechanism allows multiple management settings; each additional management setting is just another key defined in auth.settings.manager_actions.
+
+For example, you may want a group of users (such as 'Super') to have access to every table in a management setting called "db_admin", and another group (such as 'Content Manager') to have admin access to tables relating to content in a management setting called "content_admin". 
+
+This can be set up like this:
+``
+auth.settings.manager_actions = dict(
+    db_admin=dict(role='Super', heading='Manage Database', tables=db.tables),
+    content_admin=dict(role='Content Manager', tables=[content_db.articles, content_db.recipes, content_db.comments])
+    content_mgr_group_v2 = dict(role='Content Manager v2', db=content_db,
+        tables=['articles','recipes','comments'],
+        smartgrid_args=dict(
+           DEFAULT=dict(maxtextlength=50,paginate=30), 
+           comments=dict(maxtextlength=100,editable=False)
+        )
+     )
 ``:code
 
-Upgrading an existing application requires a new appadmin controller (copied from the welcome app) and the new appadmin.html view.
+(The heading key is optional. If missing, a smart default will be used)
 
+You could then make two new menu items with these URLs:
+``
+URL('appadmin','manage',args=['db_admin'])
+URL('appadmin','manage',args=['content_admin'])
+``:code
+
+The management setting called "content_mgr_group_v2" shows some more advanced possibilities. The key smartgrid_args is passed to the smartgrid used to edit or view the tables. Apart from the special key DEFAULT, table names are passed as keys (such as the table called "comments"). The syntax in this example names the tables as a list of strings, using the key db=content_db to specify the database.
 
 #### Manual Authentication
 
@@ -1058,7 +1199,7 @@ user = auth.login_bare(username,password)
 
 ``login_bare`` returns user if the user exists and the password is valid, else it returns False. ``username`` is the email if the "auth_user" table does not have a "username" field.
 
-#### Settings and messages
+#### Auth Settings and messages
 
 Here is a list of all parameters that can be customized for **Auth**
 
@@ -1068,26 +1209,28 @@ The following must point to a ``gluon.tools.Mail`` object to allow ``auth`` to s
 auth.settings.mailer = None
 ``:code
 
+Read more about setting up mail here: [[Mail and Auth #mail_and_auth]]
+
 The following must be the name of the controller that defined the ``user`` action:
 
 ``
 auth.settings.controller = 'default'
 ``:code
 
-The following is a very important setting:
+The following was a very important setting in older web2py versions:
 
 ``
 auth.settings.hmac_key = None
 ``:code
 
-It must be set to something like "sha512:a-pass-phrase" and it will be passed to the CRYPT validator for the "password" field of the ``auth_user`` table. It will be the algorithm and a-pass-phrase used to hash the passwords.
+Where it was set to something like "sha512:a-pass-phrase" and passed to the CRYPT validator for the "password" field of the ``auth_user`` table, providing the algorithm and a-pass-phrase used to hash the passwords. However, web2py no longers needs this setting because it handles this automatically.
 
 By default, auth also requires a minimum password length of 4. This can be changed:
 ``
 auth.settings.password_min_length = 4
 ``:code
 
-To disabled an action append its name to this list:
+To disable an action append its name to this list:
 ``
 auth.settings.actions_disabled = []
 ``:code
@@ -1159,6 +1302,19 @@ auth.settings.download_url = URL('download')
 ``:code
 
 These must point to the URL you want to redirect your users to after the various possible ``auth`` actions (in case there is no referrer):
+
+Note: If your app is based on the standard scaffold app Welcome, you use the auth.navbar. 
+To get the settings below to take effect, you need to edit layout.html and set argument referrer_actions = None. 
+auth.navbar(mode='dropdown',referrer_actions=None)
+
+It is also possible to keep referrer_actions for some auth events. 
+For example
+``
+auth.navbar(referrer_actions=['login', 'profile'])
+``:code
+
+If the default behavior is left unchanged, auth.navbar uses the _next URL parameter, and uses that to send the user back to the referring page.
+However, if navbar's default auto-referring behavior is changed, the settings below will take effect.
 
 ``
 auth.settings.login_next = URL('index')
