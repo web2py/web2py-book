@@ -2554,98 +2554,99 @@ db.define_table('t1',
 
 ### SQLFORM.smartgrid
 
-A ``SQLFORM.smartgrid`` looks a lot like a ``grid``, in fact it contains a grid but it is designed to take as input not a query but only one table and to browse said table and selected referencing tables.
+``SQLFORM.smartgrid`` se podobá Gridu, který také ve skutečnosti obsahuje. Je ale konstruován tak, že jeho vstupem nemůže být dotaz (query), ale pouze tabulka. Tato tabulka se ve Smartgridu zobrazí a proti Gridu navíc je umožněno zobrazit také obsah odkazovaných (relačně spřažených) tabulek.
 
-For example consider the following table structure:
+Předpokládejme např. následující strukturu tabulek:
 
 ``
-db.define_table('parent',Field('name'))
-db.define_table('child',Field('name'),Field('parent','reference parent'))
+db.define_table('parent', Field('name'))    # rodiče
+db.define_table('child', Field('name'), Field('parent', 'reference parent'))  # děti
 ``:code
 
-With SQLFORM.grid you can list all parents:
+Pomocí SQLFORM.grid můžete zobrazit všechny rodiče:
 
 ``
 SQLFORM.grid(db.parent)
 ``:code
-all children:
+všechny děti:
 ``
 SQLFORM.grid(db.child)
 ``:code
-and all parents and children in one table:
+a všechny rodiče a děti v jedné (prezentační) tabulce:
 ``
-SQLFORM.grid(db.parent,left=db.child.on(db.child.parent==db.parent.id))
+SQLFORM.grid(db.parent, left=db.child.on(db.child.parent==db.parent.id))
 ``:code
 
-With SQLFORM.smartgrid you can put all the data in one object that spawns both tables:
+Pomocí SQLFORM.smartgrid můžete všechna data zahrnout do jednoho objektu, který obsluhuje obě uvedené tabulky:
 
 ``
 @auth.requires_login()
 def manage():
-    grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'])
+    grid = SQLFORM.smartgrid(db.parent, linked_tables=['child'])
     return locals()
 ``:code
 
-which looks like this:
+což bude vypadat takto:
 
 [[image @///image/en6800.png center 480px]]
 
-Notice the extra "children" links. One could create the extra ``links`` using a regular ``grid`` but they would point to a different action. With a ``smartgrid`` they are created automatically and handled by the same object.
+Všimněte si extra odkazu na "děti". Při použití Gridu můžete také udělat extra odkazy na "děti", ale ty povedou na jinou akci. Kdežto v případě Smartgridu budou vytvořeny automaticky a zpracovány stejnou akcí a stejným objektem.
 
-Also notice that when clicking on the "children" link for a given parent one only gets the list of children for that parent (and that is obvious) but also notice that if one now tried to add a new child, the parent value for the new child is automatically set to the selected parent (displayed in the breadcrumbs associated to the object). The value of this field can be overwritten. We can prevent this by making it readonly:
+Také si všimneme, že při použití odkazu na "děti" dostaneme seznam dětí daného rodiče (což jsme čekali), ale jestliže nyní přidáme nové dítě, odkaz na rodiče bude automaticky vyplněn podle dříve vybraného rodiče (který se zobrazuje v breadcrumbs prvku objektu Smartgrid, což je prvek, který ukazuje pozici aktuálně vygenerované stránky v logice celého Smartgridu). Tuto hodnotu lze přepsat, pokud tomu ovšem nezabráníme tak, že uděláme odkaz readonly (jen pro čtení):
 
 ``
 @auth.requires_login():
 def manage():
     db.child.parent.writable = False
-    grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'])
+    grid = SQLFORM.smartgrid(db.parent, linked_tables=['child'])
     return locals()
 ``:code
 
-If the ``linked_tables`` argument is not specified all referencing tables are automatically linked. Anyway, to avoid accidentally exposing data we recommend explicitly listing tables that should be linked.
+Jestliže argument ``linked_tables`` neuvedete, propojí se a vytvoří se odkazy na všechny relačně spřažené tabulky. Ale s ohledem na to, abychom nezveřejnili něco, co nechceme, raději doporučujeme explicitně uvádět odkazované tabulky, které chceme zpřístupnit.
 
-The following code creates a very powerful management interface for all tables in the system:
+Následující kód vytvoří docela mocné rozhraní pro správu všech tabulek v databázi:
 
 ``
 @auth.requires_membership('managers'):
 def manage():
     table = request.args(0) or 'auth_user'
-    if not table in db.tables(): redirect(URL('error'))
-    grid = SQLFORM.smartgrid(db[table],args=request.args[:1])
+    if not table in db.tables():
+        redirect(URL('error'))
+    grid = SQLFORM.smartgrid(db[table], args=request.args[:1])
     return locals()
 ``:code
 
-#### smartgrid signature
+#### Signatura Smartgridu
 
-The ``smartgrid`` takes the same arguments as a ``grid`` and some more with some caveats:
+``smartgrid`` má stejné argumenty jako ``grid``, s několika odlišnostmi, a několik navíc:
 
-- The first argument is a table, not a query
-- There is an extra argument ``constraints`` which is a dictionary of 'tablename':query which can be used to further restrict access to the records displayed in the 'tablename' grid.
-- There is an extra argument ``linked_tables`` which is a list of tablenames of tables that should be accessible via the smartgrid.
-- ``divider`` allows to specify a character to use in the breadcrumb navigator, ``breadcrumbs_class`` will apply the class to the breadcrumb element
-- All the arguments but the table, ``args``, ``linked_tables`` and ``user_signatures`` can be dictionaries as explained below.
+- První argument je vždy tabulka, nemůže to být dotaz (query)
+- Navíc je k dispozici argument ``constraints``, což je slovník (dictionary) prvků ``'jmenotabulky':dotaz``, kterým lze dodatečně omezit přístup k záznamům, které se zobrazí v gridu pro zadanou tabulku 'jmenotabulky'.
+- Navíc je argument ``linked_tables``, což je seznam jmen tabulek, které budou (kromě hlavní tabulky) ve Smartgridu přístupné.
+- ``divider`` umožňuje zadat oddělovací znak v breadcrumb navigaci, ``breadcrumbs_class`` přidá css třídu breadcrumb prvku.
+- Všechny argumenty, s výjimkou tabulky (hlavní tabulky), ``args``, ``linked_tables`` a ``user_signature`` mohou být slovníky (dictionaries), jak vysvětlujeme dále.
 
-Consider the previous grid:
+Uvažujme předchozí grid:
 ``
-grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'])
+grid = SQLFORM.smartgrid(db.parent, linked_tables=['child'])
 ``:code
-It allows one to access both a ``db.parent`` and a ``db.child``. Apart for navigation controls, for each one table, a smarttable is nothing but a grid. This means that, in this case, one smartgrid can create a grid for parent and one grid for child. We may want to pass different sets of parameters to these grids. For example different sets of ``searchable`` parameters.
+Umožňuje zobrazit záznamy jak ``db.parent`` tak i ``db.child`` tabulky. S výjimkou prvku pro navigaci, pro jednotlivou tabulku to, co se zobrazí, je totéž, co dříve popisovaný Grid. To znamená, že v našem příkladu Smartgrid vytváří dva Gridy, jeden pro tabulku rodičů, druhý pro tabulku dětí. A můžeme chtít předat každému z těchot dílčích Gridů odlišné parametry. Např. budeme chtít, aby ``searchable`` bylo v jednotlivých dílčích Gridech nastaveno jinak.
 
-While for a grid we would pass a boolean:
+Tam, kde pro obyčejný Grid předáváme boolean:
 ``
-grid = SQLFORM.grid(db.parent,searchable=True)
+grid = SQLFORM.grid(db.parent, searchable=True)
 ``:code
 
-For a smartgrid we would pass a dictionary of booleans:
+tam pro Smartgrid můžeme předat slovník (dictionary) s boolean prvky:
 ``
-grid = SQLFORM.smartgrid(db.parent,linked_tables=['child'],
+grid = SQLFORM.smartgrid(db.parent, linked_tables=['child'],
      searchable= dict(parent=True, child=False))
 ``:code
 
-In this way we made parents searchable but children for each parent not searchable (there should not be that many to need the search widget).
+Tím umožníme prohledávání v seznamu rodičů, kdežto v seznamu dětí se widget pro vyhledávání nezobrazí (jsou totiž zobrazeny pro jednotlivého rodiče a tak jich nebude až tak mnoho).
 
-### grid and smartgrid access control
-``grid`` and ``smartgrid`` do not automatically enforce access control like crud does but you can integrate it with ``auth`` using explicit permission checking:
+### řízení oprávnění přístupu v Gridu a Smartgridu
+``grid`` a ``smartgrid`` nezajišťují automatické řízení přístupu jako Crud, ale můžete je propojit s ``auth`` takto:
 
 ``
 grid = SQLFORM.grid(db.auth_user,
@@ -2653,30 +2654,29 @@ grid = SQLFORM.grid(db.auth_user,
      deletable = auth.has_membership('managers'))
 ``:code
 
-or
+nebo
 
 ``
 grid = SQLFORM.grid(db.auth_user,
-     editable = auth.has_permission('edit','auth_user'),
-     deletable = auth.has_permission('delete','auth_user'))
+     editable = auth.has_permission('edit', 'auth_user'),
+     deletable = auth.has_permission('delete', 'auth_user'))
 ``:code
 
-### smartgrid plurals
-The ``smartgrid`` is the only object in web2py that displays the table name and it needs both the singular and the plural. For example one parent can have one "Child" or many "Children". Therefore a table object needs to know its own singular and plural names. web2py normally guesses them but you can set them explicitly:
+### Smartgrid a množné číslo
+``smartgrid`` je objekt, který zobrazuje jméno tabulky a při tom je vhodné, aby ho zobrazoval (v různém kontextu) v jednotném (singular) i množném čísle (plural). Web2py množné číslo odvodí (i když pro češtinu asi příliš neuspějete), můžete ale oba tvary zadat v modelu explicitně:
 
 ``
-db.define_table('child', ..., singular="Child", plural="Children")
+db.define_table('child', ..., singular="Dítě", plural="Děti")
 ``:code
 
-or with: ``singular``:inxx ``plural``:inxx
+nebo takto: ``singular``:inxx ``plural``:inxx
 
 ``
 db.define_table('child', ...)
-db.child._singular = "Child"
-db.child._plural = "Children"
+db.child._singular = "Dítě"
+db.child._plural = "Děti"
 ``:code
 
-They should also be internationalized using the ``T`` operator.
+Vhodné je internacionalizovat pomocí ``T`` operátoru, např. singular=T("Child").
 
-The plural and singular values are then used by ``smartgrid``
-to provide correct names for headers and links.
+``smartgrid`` pak obě hodnoty využije ke zobrazení vhodných textů hlaviček a odkazů.
