@@ -11,9 +11,9 @@ Web2py intends the private directory for storing information which is not replic
 The contributed module ``AppConfig`` allows the private directory to store a simple configuration text file to define settings which vary between dev and production, such as database connections. By default it is a text file which is pythonesque, but json is also supported.
 
 The welcome app now uses this module in ``db.py`` to read configuration from a file in the application's private directory. By default the path to this file is 
-``private/app_config.ini``
+``private/appconfig.ini``
 
-By default, ``app_config.ini`` allows you to define a database connection and smtp configuration. When the application is stable, the module can be set to cached mode to reduce overhead.
+By default, ``appconfig.ini`` allows you to define a database connection and smtp configuration. When the application is stable, the module can be set to cached mode to reduce overhead.
 ``
 from gluon.contrib.appconfig import AppConfig
 ...
@@ -1414,11 +1414,11 @@ An alternative to Memcache is use Redis. ``Redis``:inxx
 Assuming we have Redis installed and running on localhost at port 6379, we can connect to it using the following code (in a model):
 
 ``
+from gluon.contrib.redis_utils import RConn
 from gluon.contrib.redis_cache import RedisCache
-cache.redis = RedisCache('localhost:6379',db=None, debug=True)
+rconn = RConn('localhost', 6379)
+cache.redis = RedisCache(redis_conn=rconn, debug=True)
 ``
-
-where 'localhost:6379' is the connection string and ``db`` is not a DAL object but a Redis database name.
 
 We can now use ``cache.redis`` in place of (or along with) ``cache.ram`` and ``cache.disk``.
 
@@ -1435,8 +1435,10 @@ You can also enable the behaviour "on-demand" with ``value = cache.redis('mykey'
 #### Sessions in Redis
 If you have Redis in your stack, why not use it for sessions ?
 ``
+from gluon.contrib.redis_utils import RConn
 from gluon.contrib.redis_session import RedisSession
-sessiondb = RedisSession('localhost:6379',db=0, session_expiry=False)
+rconn = RConn()
+sessiondb = RedisSession(redis_conn=rconn, session_expiry=False)
 session.connect(request, response, db = sessiondb)
 ``
 The code has been tested with ~1M sessions. As long as Redis can fit in memory, the time taken to handle
@@ -1450,7 +1452,7 @@ sessions generated (so for 1000 sessions, 1002 keys).
 If ``session_expiry`` is not set, sessions will be handled as usual, you'd need to [[cleanup sessions as usual @///chapter/13#Cleaning-up-sessions]] once a while.
 
 However, when ``session_expiry`` is set will delete automatically sessions after n seconds
-(e.g. if set to 3600, session will expire exactly one hour later having been updated the last time), 
+(e.g. if set to 3600, session will expire exactly one hour later having been updated the last time),
 you should occasionally run sessions2trash.py just to clean the key holding the set of all
 the sessions previously issued (for ~1M sessions, cleaning up requires 3 seconds)
 The redis backend for sessions is the only one that can prevent concurrent modifications to the same session: this is especially true
