@@ -106,7 +106,7 @@ def convert2html(book_id, text):
     extra['inxx'] = lambda code: '<div class="inxx">' + code + '</div>'
     extra['ref'] = lambda code: '[ref:' + code + ']'
     # extra['code'] = lambda code: CODE(code,language='web2py').xml()
-    rtn = MARKMIN(text.replace('\r', ''), extra=extra, url=url2, heading_anchor=True)
+    rtn = MARKMIN(text.replace('\r', ''), extra=extra, url=url2)
     return rtn
 
 
