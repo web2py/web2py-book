@@ -105,7 +105,19 @@ def convert2html(book_id, text):
                _target='_blank'), ']').xml()
     extra['inxx'] = lambda code: '<div class="inxx">' + code + '</div>'
     extra['ref'] = lambda code: '[ref:' + code + ']'
-    # extra['code'] = lambda code: CODE(code,language='web2py').xml()
+    # extra['code'] = lambda code: CODE(code, language='web2py').xml()
+    # The comment above line could be replaced by this
+    from pygments import highlight as pygments_highlight
+    from pygments.lexers import PythonLexer as pygments_PythonLexer
+    from pygments.formatters import HtmlFormatter as pygments_HtmlFormatter
+
+    extra['code'] = lambda code: '<div class="highlight_wrapper">' + \
+                                 pygments_highlight(code,
+                                                    pygments_PythonLexer(),
+                                                    pygments_HtmlFormatter(style='friendly',
+                                                                           linenos=True
+                                                                           )) + \
+                                 '</div>'
     rtn = MARKMIN(text.replace('\r', ''), extra=extra, url=url2)
     return rtn
 
