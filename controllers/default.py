@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-import os, datetime
+import os
+import datetime  # Not used
+import re
+
 from gluon.validators import urlify
 from w2p_book_cidr import CIDRConv
 from gluon.serializers import loads_json
-import re
 
 session.forget()
 
@@ -97,7 +99,8 @@ def convert2html(book_id, text):
         b['args'] = [book_id] + b.get('args', [])
         return URL(*a, **b)
 
-    def truncate(x): return x[:70] + '...' if len(x) > 70 else x
+    def truncate(x):
+        return x[:70] + '...' if len(x) > 70 else x
 
     extra['verbatim'] = lambda code: cgi.escape(code)
     extra['cite'] = lambda key: TAG.sup(
@@ -166,8 +169,10 @@ def chapter():
 
 def search():
     def fix_relative_link(match):
-        return "%s%s%s%s" % (
-        match.group(1), '../chapter/', book_id, match.group(3))  # link rewritten to be relative to the search URL
+        return "%s%s%s%s" % (match.group(1),
+                             '../chapter/',
+                             book_id,
+                             match.group(3))  # link rewritten to be relative to the search URL
 
     book_id = request.args(0) or redirect(URL('index'))
     search = request.vars.search or redirect(URL('chapter', args=book_id))
@@ -258,6 +263,7 @@ def batch_static_chaps():
     if request.is_local:
         # override replace_at_urls of gluon.contrib.markmin.markmin2html
         import gluon.contrib.markmin.markmin2html
+
         def replace_at_urls(text, url):
             def u1(match, url=url):
                 a, c, f, args = match.group('a', 'c', 'f', 'args')
