@@ -339,7 +339,7 @@ This approach is better also because the name of the visitor stays in the sessio
 Note that if the "second" action is ever called before a visitor name is set, it will display "Hello anonymous" because  ``session.visitor_name`` returns ``None``. Alternatively we could have added the following code in the controller (inside the ``second`` function):
 
 ``
-if not request.function=='first' and not session.visitor_name:
+if request.function != 'first' and not session.visitor_name:
     redirect(URL('first'))
 ``:code
 
@@ -353,7 +353,7 @@ For example, here is one possible way to rewrite the first action:
 ``
 def first():
     form = FORM(INPUT(_name='visitor_name', requires=IS_NOT_EMPTY()),
-              INPUT(_type='submit'))
+                INPUT(_type='submit'))
     if form.process().accepted:
         session.visitor_name = form.vars.visitor_name
         redirect(URL('second'))
@@ -394,7 +394,7 @@ def first():
     form = SQLFORM.factory(Field('visitor_name', requires=IS_NOT_EMPTY()))
     if form.process().accepted:
         name = form.vars.visitor_name
-        redirect(URL('second',vars=dict(name=name)))
+        redirect(URL('second', vars=dict(name=name)))
     return dict(form=form)
 
 def second():
@@ -465,15 +465,15 @@ and enter the following:
 db = DAL("sqlite://storage.sqlite")
 
 db.define_table('image',
-   Field('title', unique=True),
-   Field('file', 'upload'),
-   format = '%(title)s')
+                Field('title', unique=True),
+                Field('file', 'upload'),
+                format = '%(title)s')
 
 db.define_table('post',
-   Field('image_id', 'reference image'),
-   Field('author'),
-   Field('email'),
-   Field('body', 'text'))
+                Field('image_id', 'reference image'),
+                Field('author'),
+                Field('email'),
+                Field('body', 'text'))
 
 db.image.title.requires = IS_NOT_IN_DB(db, db.image.title)
 db.post.image_id.requires = IS_IN_DB(db, db.image.id, '%(title)s')
@@ -679,12 +679,12 @@ def index():
     return dict(images=images)
 
 def show():
-    image = db.image(request.args(0,cast=int)) or redirect(URL('index'))
+    image = db.image(request.args(0, cast=int)) or redirect(URL('index'))
     db.post.image_id.default = image.id
     form = SQLFORM(db.post)
     if form.process().accepted:
         response.flash = 'your comment is posted'
-    comments = db(db.post.image_id==image.id).select()
+    comments = db(db.post.image_id == image.id).select()
     return dict(image=image, comments=comments, form=form)
 
 def download():
@@ -701,7 +701,7 @@ URL('show', args=image.id)
 
 in "default/index.html", can be accessed as:
 
-``request.args(0,cast=int)``
+``request.args(0, cast=int)``
 
 from the "show" action. The ``cast=int`` argument is optional but very important. It attempts to cast the string value passed in the PATH_INFO into an int. On failure it raises a proper exception instead of causing a ticket. One can also specify a redirect in case of failure to cast:
 
@@ -710,7 +710,7 @@ from the "show" action. The ``cast=int`` argument is optional but very important
 Moreover ``db.image(...)`` is a shortcut for
 
 ``
-db(db.image.id==...).select().first()
+db(db.image.id == ...).select().first()
 ``:code
 
 The "download" action expects a filename in ``request.args(0)``, builds a path to the location where that file is supposed to be, and sends it back to the client. If the file is too large, it streams the file without incurring any memory overhead.
@@ -824,7 +824,7 @@ We can improve this further using the ``SQLFORM.grid`` and ``SQLFORM.smartgrid``
 ``
 @auth.requires_membership('manager')
 def manage():
-    grid = SQLFORM.smartgrid(db.image,linked_tables=['post'])
+    grid = SQLFORM.smartgrid(db.image, linked_tables=['post'])
     return dict(grid=grid)
 ``:code
 
@@ -884,25 +884,25 @@ auth.define_tables()
 crud = Crud(db)
 
 db.define_table('page',
-    Field('title'),
-    Field('body', 'text'),
-    Field('created_on', 'datetime', default=request.now),
-    Field('created_by', 'reference auth_user', default=auth.user_id),
-    format='%(title)s')
+                Field('title'),
+                Field('body', 'text'),
+                Field('created_on', 'datetime', default=request.now),
+                Field('created_by', 'reference auth_user', default=auth.user_id),
+                format='%(title)s')
 
 db.define_table('post',
-    Field('page_id', 'reference page'),
-    Field('body', 'text'),
-    Field('created_on', 'datetime', default=request.now),
-    Field('created_by', 'reference auth_user', default=auth.user_id))
+                Field('page_id', 'reference page'),
+                Field('body', 'text'),
+                Field('created_on', 'datetime', default=request.now),
+                Field('created_by', 'reference auth_user', default=auth.user_id))
 
 db.define_table('document',
-    Field('page_id', 'reference page'),
-    Field('name'),
-    Field('file', 'upload'),
-    Field('created_on', 'datetime', default=request.now),
-    Field('created_by', 'reference auth_user', default=auth.user_id),
-    format='%(name)s')
+                Field('page_id', 'reference page'),
+                Field('name'),
+                Field('file', 'upload'),
+                Field('created_on', 'datetime', default=request.now),
+                Field('created_by', 'reference auth_user', default=auth.user_id),
+                format='%(name)s')
 
 db.page.title.requires = IS_NOT_IN_DB(db, 'page.title')
 db.page.body.requires = IS_NOT_EMPTY()
@@ -933,64 +933,65 @@ Edit the controller "default.py" and create the following actions:
 Here is the "default.py" controller:
 ``
 def index():
-     """ this controller returns a dictionary rendered by the view
-         it lists all wiki pages
-     >>> index().has_key('pages')
-     True
-     """
-     pages = db().select(db.page.id,db.page.title,orderby=db.page.title)
-     return dict(pages=pages)
+    """ this controller returns a dictionary rendered by the view
+        it lists all wiki pages
+    >>> index().has_key('pages')
+    True
+    """
+    pages = db().select(db.page.id, db.page.title, orderby=db.page.title)
+    return dict(pages=pages)
 
 @auth.requires_login()
 def create():
-     """creates a new empty wiki page"""
-     form = SQLFORM(db.page).process(next=URL('index'))
-     return dict(form=form)
+    """creates a new empty wiki page"""
+    form = SQLFORM(db.page).process(next=URL('index'))
+    return dict(form=form)
 
 def show():
-     """shows a wiki page"""
-     this_page = db.page(request.args(0,cast=int)) or redirect(URL('index'))
-     db.post.page_id.default = this_page.id
-     form = SQLFORM(db.post).process() if auth.user else None
-     pagecomments = db(db.post.page_id==this_page.id).select()
-     return dict(page=this_page, comments=pagecomments, form=form)
+    """shows a wiki page"""
+    this_page = db.page(request.args(0, cast=int)) or redirect(URL('index'))
+    db.post.page_id.default = this_page.id
+    form = SQLFORM(db.post).process() if auth.user else None
+    pagecomments = db(db.post.page_id == this_page.id).select()
+    return dict(page=this_page, comments=pagecomments, form=form)
 
 @auth.requires_login()
 def edit():
-     """edit an existing wiki page"""
-     this_page = db.page(request.args(0,cast=int)) or redirect(URL('index'))
-     form = SQLFORM(db.page, this_page).process(
-         next = URL('show',args=request.args))
-     return dict(form=form)
+    """edit an existing wiki page"""
+    this_page = db.page(request.args(0, cast=int)) or redirect(URL('index'))
+    form = SQLFORM(db.page, this_page).process(
+        next = URL('show', args=request.args))
+    return dict(form=form)
 
 @auth.requires_login()
 def documents():
-     """browser, edit all documents attached to a certain page"""
-     page = db.page(request.args(0,cast=int)) or redirect(URL('index'))
-     db.document.page_id.default = page.id
-     db.document.page_id.writable = False
-     grid = SQLFORM.grid(db.document.page_id==page.id,args=[page.id])
-     return dict(page=page, grid=grid)
+    """browser, edit all documents attached to a certain page"""
+    page = db.page(request.args(0, cast=int)) or redirect(URL('index'))
+    db.document.page_id.default = page.id
+    db.document.page_id.writable = False
+    grid = SQLFORM.grid(db.document.page_id == page.id, args=[page.id])
+    return dict(page=page, grid=grid)
 
 def user():
-     return dict(form=auth())
+    return dict(form=auth())
 
 def download():
-     """allows downloading of documents"""
-     return response.download(request, db)
+    """allows downloading of documents"""
+    return response.download(request, db)
 
 def search():
-     """an ajax wiki search page"""
-     return dict(form=FORM(INPUT(_id='keyword',_name='keyword',
-              _onkeyup="ajax('callback', ['keyword'], 'target');")),
-              target_div=DIV(_id='target'))
+    """an ajax wiki search page"""
+    return dict(form=FORM(INPUT(_id='keyword',
+                                _name='keyword',
+                                _onkeyup="ajax('callback', ['keyword'], 'target');")),
+                                target_div=DIV(_id='target'))
 
 def callback():
-     """an ajax callback that returns a <ul> of links to wiki pages"""
-     query = db.page.title.contains(request.vars.keyword)
-     pages = db(query).select(orderby=db.page.title)
-     links = [A(p.title, _href=URL('show',args=p.id)) for p in pages]
-     return UL(*links)
+    """an ajax callback that returns a <ul> of links to wiki pages"""
+    query = db.page.title.contains(request.vars.keyword)
+    pages = db(query).select(orderby=db.page.title)
+    links = [A(p.title, _href=URL('show', args=p.id)) for p in pages]
+    return UL(*links)
 ``:code
 
 
@@ -1142,18 +1143,14 @@ def news():
     """generates rss feed from the wiki pages"""
     response.generic_patterns = ['.rss']
     pages = db().select(db.page.ALL, orderby=db.page.title)
-    return dict(
-       title = 'mywiki rss feed',
-       link = 'http://127.0.0.1:8000/mywiki/default/index',
-       description = 'mywiki news',
-       created_on = request.now,
-       items = [
-          dict(title = row.title,
-               link = URL('show', args=row.id, scheme=True,
-	                  host=True, extension=False),
-               description = MARKMIN(row.body).xml(),
-               created_on = row.created_on
-               ) for row in pages])
+    return dict(title='mywiki rss feed',
+                link='http://127.0.0.1:8000/mywiki/default/index',
+                description='mywiki news',
+                created_on=request.now,
+                items=[dict(title=row.title,
+                            link=URL('show', args=row.id, scheme=True, host=True, extension=False),
+                            description=MARKMIN(row.body).xml(),
+                            created_on=row.created_on) for row in pages])
 ``:code
 
 and when you visit the page
@@ -1182,8 +1179,8 @@ service = Service()
 
 @service.xmlrpc
 def find_by(keyword):
-     """finds pages that contain keyword for XML-RPC"""
-     return db(db.page.title.contains(keyword)).select().as_list()
+    """finds pages that contain keyword for XML-RPC"""
+    return db(db.page.title.contains(keyword)).select().as_list()
 
 def call():
     """exposes all registered services, including XML-RPC"""
@@ -1196,8 +1193,7 @@ Here is an example of how to access the XML-RPC handler from an external
 Python program.
 ``
 >>> import xmlrpclib
->>> server = xmlrpclib.ServerProxy(
-    'http://127.0.0.1:8000/mywiki/default/call/xmlrpc')
+>>> server = xmlrpclib.ServerProxy('http://127.0.0.1:8000/mywiki/default/call/xmlrpc')
 >>> for item in server.find_by('wiki'):
         print item['created_on'], item['title']
 ``:code
@@ -1516,7 +1512,7 @@ One of the most powerful functions of the new web2py consists in the ability of 
 Consider the following model:
 
 ``
-db.define_table('thing',Field('name',requires=IS_NOT_EMPTY()))
+db.define_table('thing', Field('name', requires=IS_NOT_EMPTY()))
 ``:code
 
 and the following action:
@@ -1530,7 +1526,7 @@ def manage_things():
 This action is special because it returns a widget/helper not a dict of objects. Now we can embed this ``manage_things`` action into any view, with
 
 ``
-{{=LOAD('default','manage_things',ajax=True)}}
+{{=LOAD('default', 'manage_things', ajax=True)}}
 ``:code
 
 This allows the visitor interact with the component via Ajax without reloading the host page that embeds the widget. The action is called via Ajax, inherits the style of the host page, and captures all form submissions and flash messages so that they are handled within the current page. On top of this the ``SQLFORM.grid`` widget uses digitally signed URLs to restrict access. More information about components can be found in chapter 13.
@@ -1712,7 +1708,7 @@ When programming web2py, you will inevitably make mistakes and introduce bugs. w
 Intentionally introduce an error in the images application as shown below:
 ``
 def index():
-    images = db().select(db.image.ALL,orderby=db.image.title)
+    images = db().select(db.image.ALL, orderby=db.image.title)
     1/0
     return dict(images=images)
 ``:code
