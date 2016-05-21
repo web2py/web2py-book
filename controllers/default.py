@@ -119,7 +119,7 @@ def convert2html(book_id, text):
                                                     pygments_PythonLexer(),
                                                     pygments_HtmlFormatter(style='friendly',
                                                                            linenos=True
-                                                                           )) + \
+                                                                           )).encode('utf8') + \
                                  '</div>'
     rtn = MARKMIN(text.replace('\r', ''), extra=extra, url=url2)
     return rtn
