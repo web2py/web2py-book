@@ -161,40 +161,44 @@ LOAD(c=None, f='index', args=[], vars={},
 
 Если ваш компонент LOAD имеет расширение ``.load`` и соответствующая функция контроллера перенаправляет к другому действию (например, форму входа), то расширение ``.load``  распространяется и на новый URL-адрес (и на другие перенаправления тоже), который также загружаются с расширением ``.load``.
 
-#### Redirect from a component
-To redirect from a component, use this:
+#### Перенаправление из компонента
+
+Для перенаправления из компонента, используйте это:
 ``
 redirect(URL(...),client_side=True)
 ``:code
-but note that the redirected URL will default to the extension of the component. See notes about the argument ``extension`` in [[the URL function in Chapter 4 ../04#URL]]
+Но обратите внимание, что перенаправленные URL будет по умолчанию иметь расширение компонента. Смотрите примечания по аргументу ``extension`` [[функции URL в Главе 4 ../04#URL]]
 
-#### Reload page via redirect after component submission
-If you call an action via Ajax and you want the action to force a redirect of the parent page you can do it with a redirect from the LOADed controller function. 
-If you want to reload the parent page, you can redirect to it. The parent URL is known (see [[Client-Server component communications #client_server_coms]] )
+#### Перезагрузка страницы через перенаправление после представления компонента
 
-so after processing the form submit, the controller function reloads the parent page via redirect:
+Если вы вызываете действие с помощью Ajax и вы хотите, чтобы действие принудительно перенаправило родительскую страницу, то вы можете сделать это с помощью перенаправления из функции LOAD контроллера.
+Если вы хотите перезагрузить родительскую страницу, то вы можете перенаправить на него. Родительский URL известен (смотрите [[Клиент-серверный компонент коммуникации #client_server_coms]])
+
+поэтому после обработки отправки формы, функция контроллера перезагружает родительскую страницу через перенаправление:
 ``
 if form.process().accepted: 
     ...
     redirect( request.env.http_web2py_component_location,client_side=True)
 ``:code
 
-Note that the section below, [[Client-Server component communications #client_server_coms]], describes how the component can return javascript, which could be used for more sophisticated actions when the component is submitted. The specific case of reloading another component is described next.
+Обратите внимание, что в разделе ниже, [[Клиент-серверный компонент коммуникации #client_server_coms]], описывается, как компонент может возвращать JavaScript, который может быть использован для более сложных действий, когда компонент представлен. Конкретный случай перезагрузки другого компонента описан далее.
 
 
-#### Reload another component 
-If you use multiple components on a page, you may want the submission of one component to reload another.
-You do this by getting the submitted component to return some javascript.
+#### Перезагрузка другого компонента
 
-It's possible to hard-code the target DIV, but in this recipe we use a query-string variable to inform the submitting-controller which component we want to reload. It's identified by the id of the DIV containing the target component. In this case, the DIV has id 'map'. Note that it is necessary to use ``target='map'`` in the LOAD of the target; without this, the target id is randomised and reload() won't work. See LOAD signature above.
+При использовании нескольких компонентов на странице, вы можете поручить одному компоненту перезагрузить другой.
+Вы можете сделать это путем выдачи поручения компоненту вернуть некий JavaScript.
 
-In the view, do this:
+Можно жестко прописать целевой DIV, но в этом рецепте мы используем переменную строки запроса, чтобы сообщить подавшему заявку контроллеру, какой компонент мы хотим перезагрузить. Он идентифицируется через id блока DIV, содержащего целевой компонент. В этом случае, DIV имеет id равный 'map'. Обратите внимание, что необходимо использовать ``target='map'`` внутри цели LOAD; без этого, целевой идентификатор будет выбран случайным образом и метод reload() не будет работать. Смотрите подпись LOAD выше.
+
+В представлении, сделайте это:
 ``
 {{=LOAD('default','submitting_component.load',ajax=True,vars={'reload_div':'map'})}}
 
 ``:code
 
-The controller belonging to the submitting component needs to send javascript back, so just add this to the existing controller code when processing the submit:
+Контроллеру, принадлежащему к предоставленному компоненту, необходимо отправить обратно JavaScript, так что просто добавьте в существующий код контроллера при обработке отправки:
+
 ``
 if form.process().accepted:
 ...
@@ -202,70 +206,71 @@ if form.process().accepted:
         response.js =  "jQuery('#%s').get(0).reload()" % request.vars.reload_div
 ``:code
 
-(Of course, remove the redirect if you were using the approach of the previous section.)
+(Ко всему прочему, удалите перенаправление, если вы использовали подход предыдущего раздела.)
  
-That's it. web2py's javascript libraries look after the reload. This could be generalised to handle multiple components with javascript looking like:
+Вот именно. JavaScript библиотеки web2py смотрятся после перезагрузки. Это может быть обобщено для обработки нескольких компонентов с Javascript, что выглядит как:
+
 ``
 jQuery('#div1,#div2,#div3').get(0).reload()
 ``:code
 
-For more information about response.js see [[Client-Server component communications #client_server_coms]] (below).
+Для получения дополнительной информации о response.js смотрите [[Клиент-серверный компонент коммуникации #client_server_coms]] (below).
 
-#### Ajax post does not support multipart forms
+#### Ajax post не поддерживает многоэлементные формы
 
-Because Ajax post does not support multipart forms, i.e. file uploads, upload fields will not work with the LOAD component. You could be fooled into thinking it would work because upload fields will function normally if POST is done from the individual component's .load view. Instead, uploads are done with ajax-compatible 3rd-party widgets and web2py manual upload store commands.
+Поскольку Ajax post не поддерживает многоэлементные формы, т.е. загрузка файлов, поля загрузки не будет работать с компонентом LOAD. Вы можете обмануть себя думая, что это будет работать, потому что поля загрузки будут нормально функционировать если POST выполняется из индивидуального компонента в .load представлении. Вместо этого, загрузки выполняются с помощью AJAX-совместимых сторонних виджетов и web2py вручную загруженных команд хранения.
 
 [[client_server_coms]]
-### LOAD and Client-Server component communications 
+### LOAD и Клиент-серверный компонент коммуникации
 
-When the action of a component is called via Ajax, web2py passes two HTTP headers with the request:
+Когда действие компонента вызывается через Ajax, web2py передает два HTTP-заголовка вместе с запросом:
 
 ``
 web2py-component-location
 web2py-component-element
 ``:code
 
-which can be accessed by the action via the variables:
+которые могут быть доступны действию через переменные:
 
 ``
 request.env.http_web2py_component_location
 request.env.http_web2py_component_element
 ``:code
 
-The latter is also accessible via: ``request.cid``:inxx
+Последний также доступен через: ``request.cid``:inxx
 
 ``
 request.cid
 ``:code
 
-The former contains the URL of the page that called the component action.
-The latter contains the ``id`` of the DIV that will contain the response.
+Первый содержит URL-адрес страницы, который вызывается действием компонента.
+Последний содержит ``id`` компонента DIV, который будет содержать ответ.
 
-The component action can also store data in two special HTTP response headers that will be interpreted by the full page upon response. They are:
+Действие компонента может также хранить данные в двух специальных заголовках ответа HTTP, которые будут интерпретированы на всю страницу после ответа. Ими являются:
 
 ``
 web2py-component-flash
 web2py-component-command
 ``:code
 
-and they can be set via:
+и они могут быть установлены через:
 
 ``
 response.headers['web2py-component-flash']='....'
 response.headers['web2py-component-command']='...'
 ``:code
 
-or (if the action is called by a component) automatically via:
+или (если действие вызывается через компонент) автоматически через:
 
 ``
 response.flash='...'
 response.js='...'
 ``:code
 
-The former contains text that you want to be flashed upon response.
-The latter contains JavaScript code that you want to be executed upon response. It cannot contain newlines.
+Первый содержит текст, который вы хотите высветить после ответа.
+Последний содержит JavaScript код, который вы хотите выполнить после ответа. Он не может содержать символы новой строки.
 
-As an example, let's define a contact form component in "controllers/contact/ask.py" that allows the user to ask a question. The component will email the question to the system administrator, flash a "thank you" message, and remove the component from the page:
+В качестве примера, давайте определим форму contact компонента в "controllers/contact/ask.py" что позволяет пользователю задать вопрос. Компонент будет отправлять по электронной почте вопрос к системному администратору, высвечивать сообщение "thank you" и удалять компонент со страницы:
 
 ``
 def ask():
@@ -283,25 +288,25 @@ def ask():
     return dict(form=form)
 ``:code
 
-The first four lines define the form and accept it. The mail object used for sending is defined in the default scaffolding application. The last four lines implement all the component-specific logic by getting data from the HTTP request headers and setting the HTTP response headers.
+Первые четыре строки определяют форму и принимают ее. Почтовый объект, используемый для отправки определяется в скаффолдинг-приложении по умолчанию. Последние четыре строки реализуют всю логику конкретного компонента посредством получения данных из заголовков HTTP запроса и настройки заголовков HTTP ответа.
 
-Now you can embed this contact form in any page via
+Теперь вы можете внедрить эту контактную форму на любой странице через
 
 ``
 {{=LOAD('contact','ask.load',ajax=True)}}
 ``:code
 
-Notice that we did not define a ``.load`` view for our ``ask`` component. We do not have to because it returns a single object (form) and therefore the "generic.load" will do just fine. Remember that generic views are a development tool. In production you should copy "views/generic.load" into "views/contact/ask.load".
+Обратите внимание на то, что мы не определяем ``.load`` представление для нашего ``ask`` компонента. Нам это не нужно, потому что он возвращает один объект (форму) и, следовательно, "generic.load" сделает это просто прекрасно. Помните, что общие представления являются средством разработки. В производстве вы должны скопировать "views/generic.load" в "views/contact/ask.load".
 
 ``user_signature``:inxx ``requires_signature``:inxx
-We can block access to a function called via Ajax by digitally signing the URL using the ``user_signature`` argument:
+Мы можем блокировать доступ к функции, вызываемой через Ajax, посредством цифровой подписи URL, используя аргумент ``user_signature``:
 
 ``
 {{=LOAD('contact','ask.load',ajax=True,user_signature=True)}}
 ``:code
 
-which add a digital signature to the URL.
-The digital signature must then be validated using a decorator in the callback function:
+который добавить цифровую подпись к URL.
+Цифровая подпись должна быть затем проверена с помощью декоратора в функции обратного вызова:
 
 ``
 @auth.requires_signature()
@@ -310,119 +315,125 @@ def ask(): ...
 
 
 [[trapped_ajax_links]]
-#### Trapped Ajax links and the A Helper
+#### Захваченные Ajax ссылки и помощник A
 ``A``:inxx
 ``Ajax links``:inxx
 
-Normally a link is not trapped, and by clicking in a link inside a component, the entire linked page is loaded. Sometimes you want the linked page to be loaded inside the component. This can be achieved using the ``A`` helper:
+Как правило, ссылка не захватывается, и нажав на ссылку внутри компонента, вся связанная страница загружается. Иногда вам необходимо, чтобы связанная страница была загружена внутри компонента. Это может быть достигнуто с помощью ``A`` помощника:
 
 ``
 {{=A('linked page',_href='http://example.com',cid=request.cid)}}
 ``:code
 
-If ``cid`` is specified, the linked page is loaded via Ajax.
-The ``cid`` is the ``id`` of the html element where to place the loaded page content.
-In this case we set it to ``request.cid``, i.e. the ``id`` of the component that generates the link. The linked page can be and usually is an internal URL generated using the [[URL helper ../04#URL]] .
+Если ``cid`` указан, то связанная страница загружается через Ajax.
+``cid`` является ``id`` HTML-элемента, где размещается загруженный контент страницы.
+В этом случае мы устанавливаем его в ``request.cid``, т.е ``id`` компонента, который генерирует ссылку. Связанная страница может быть и, как правило, является внутренним URL, генерируемым с использованием [[URL помощника ../04#URL]] .
 
-## Plugins
+## Плагины
 
 -------
-A **plugin** is any subset of the files of an application.
+A **плагин** является любым подмножеством файлов приложения.
 -------
 
-and we really mean ''any'':
+и мы действительно имели в виду ''любое'':
 
-- A plugin is not a module, is not a model, it is not a controller, is not a view, yet it may contain modules, models, controllers and/or views.
-- A plugin does not need to be functionally autonomous and it may depend on other plugins or specific user code.
-- A ''plugin'' is not a ''plugins system'' and therefore has no concept of registration nor isolation, although we will give rules to try to achieve some isolation.
-- We are talking about a plugin for your app, not a plugin for web2py.
+- Плагин не является модулем, не является моделью, это и не контроллер и не представление, но он может содержать модули, модели, контроллеры и/или представления.
+- Плагин не должен быть функционально автономным и может зависеть от других плагинов или конкретного пользовательского кода.
+- ''Плагин'' не является ''системой плагинов'' и, следовательно, не имеет ни малейшего понятия о регистрации, ни об изоляции, хотя мы дадим правила, чтобы попытаться достичь некоторой изоляции.
+- Мы говорим о плагине для вашего приложения, а не о плагине для web2py.
 
-So why is it called a ''plugin''? Because it provides a mechanism for packing a subset of an app and unpacking it over another app (i.e. ''plug-in''). Under this definition, any file in your app can be treated as a plugin.
+Так почему же он называется ''плагин''? Потому что он обеспечивает механизм для упаковки подмножества приложения и распаковки его на другом приложении (т.е. ''вставной (plug-in)''). Согласно этому определению, любой файл в приложении можно рассматривать как плагин.
 
-When the app is distributed, its plugins are packed and distributed with it.
+Когда приложение распространяется, то его плагины упакованы и распространяются вместе с ним.
 
-In practice, the **admin** provides an interface for packing and unpacking plugins separately from your app. Files and folder of your application that have names with the prefix ``plugin_``''name'' can be packed together into a file called:
+На практике, **admin** предоставляет интерфейс для упаковки и распаковки плагинов отдельно от вашего приложения. Файлы и папки вашего приложения, которые имеют имена с префиксом ``plugin_``''имя'' могут быть упакованы вместе в файл с именем:
 
-``web2py.plugin.``''name''``.w2p``
+``web2py.plugin.``''имя''``.w2p``
 
-and distributed together.
+и распространяться вместе.
 
 [[image @///image/en8200.png center 480px]]
 
-Any file can be made part of a plugin and these files are not treated by web2py any differently than other files. Except that files and folder in that have a ``plugin_`` prefix are recognized by **admin** and grouper together by **admin** according to their postfix name. **admin** treats them differently, not web2py.
+Любой файл может быть частью плагина и эти файлы не обрабатываются web2py иначе, чем другие файлы. Кроме того, файлы и папки, которые имеют префикс ``plugin_`` распознаются в **admin** и группируются вместе в **admin** в соответствии с их постфиксом наименования. **admin** относится к ним по-другому, не как web2py.
 
 [[image @///image/en8300.png center 480px]]
 
-In practice we will only be concerned with two types of plugins:
+На практике мы будем иметь дело только с двумя типами плагинов:
 
-- ''Component Plugins''. These are plugins that contain components as defined in the previous section. A component plugin can contain one or more components. We can think for example of a ``plugin_comments`` that contains the ''comments'' component proposed above. Another example could be ``plugin_tagging`` that contains a ''tagging'' component and a ''tag-cloud'' component that share some database tables also defined by the plugin.
-- ''Layout Plugins''. These are plugins that contain a layout view and the static files required by such layout. When the plugin is applied it gives the app a new look and feel.
+- ''Плагины компонента''. Эти плагины, которые содержат компоненты, как определено в предыдущем разделе. Плагин компонента может содержать один или несколько компонентов. Мы можем рассмотреть, например предложенный выше ``plugin_comments``, который содержит компонент ''comments''. Другим примером может быть ``plugin_tagging``, который содержит компонент  ''tagging'' и компонент ''tag-cloud'', который опубликовывает некоторые таблицы базы данных, также подходит под определение плагина.
+- ''Плагины макета''. Это плагины, которые содержат макет представления и статические файлы, необходимые для данного макета. Когда  плагин применяется, он придает приложению новый внешний вид и ощущения.
 
-By the above definitions, the components created in the previous section, for example "controllers/contact.py", are already plugins. We can move them from one app to another and use the components they define. Yet they are not recognized as such by **admin** because there is nothing that labels them as plugins. So there are two problems we need to solve:
+В приведенных выше определениях, компоненты, созданные в предыдущем разделе, например, "controllers/contact.py", уже являются плагинами. Мы можем перемещать их из одного приложения к другому и использовать компоненты, которые они определяют. Тем не менее, они не признаются в качестве таковых в интерфейсе **admin**, потому что нет ничего, что помечает их как плагины. Таким образом, существуют две проблемы, которые мы должны решить:
 
-- Name the plugin files using a convention, so that **admin** can recognize them as belonging to the same plugin
-- If the plugin has model files, establish a convention so that the objects it defines do not pollute the namespace and do not conflict with each other.
+- Именовать файлы плагина, используя соглашение, с тем чтобы **admin** смог признать их принадлежность к одному и тому же плагину.
+- Если плагин имеет файлы модели, то необходимо разработать соглашение, с тем чтобы объекты, которые он определяет не загрязняли пространство имен и не вступали в противоречие друг с другом.
 
-Let's assume a plugin is called ''name''. Here are the rules that should be followed:
+Давайте предположим, что плагин называется ''name''. Вот правила, которые следует соблюдать:
 
-**Rule 1**:
-Plugin models and controllers should be called, respectively
+**Правило 1**:
+
+Модели и контроллеры лагина должны называться, соответственно
 
 - ``models/plugin_``''name''``.py``
 - ``controllers/plugin_``''name''``.py``
 
-and plugin views, modules, static, and private files should be in folders called, respectively:
+и представления, модули, статические и частные файлы плагин должны быть в папках с названием, соответственно:
 
 - ``views/plugin_``''name''``/``
 - ``modules/plugin_``''name''``/``
 - ``static/plugin_``''name''``/``
 - ``private/plugin_``''name''``/``
 
-**Rule 2**:
-Plugin models can only define objects with names that start with
+**Правило 2**:
+
+В моделях плагина можно определить только те объекты, имена которых начинаются с
 - ``plugin_``''name''
 - ``Plugin``''Name''
 - ``_``
 
-**Rule 3**:
-Plugin models can only define session variables with names that start with
+**Правило 3**:
+
+В моделях плагина можно определить только те переменные сессии, имена которых начинаются с
 - ``session.plugin_``''name''
 - ``session.Plugin``''Name''
 
-**Rule 4**:
-Plugins should include license and documentation. These should be placed in:
+**Правило 4**:
+
+Плагины должны включать в себя лицензию и документацию. Они должны быть помещены в:
 - ``static/plugin_``''name''``/license.html``
 - ``static/plugin_``''name''``/about.html``
 
-**Rule 5**:
-The plugin can only rely on the existence of the global objects defined in scaffolding "db.py", i.e.
+**Правило 5**:
 
-- a database connection called ``db``
-- an ``Auth`` instance called ``auth``
-- a ``Crud`` instance called ``crud``
-- a ``Service`` instance called ``service``
+Плагин может полагаться только на существование глобальных объектов, определенных в скаффолдинге "db.py", т.е.
 
-Some plugins may be more sophisticated and have a configuration parameter in case more than one db instance exists.
+- подключение к базе данных под названием ``db``
+- Экземпляр ``Auth`` под названием ``auth``
+- Экземпляр ``Crud`` под названием ``crud``
+- Экземпляр ``Service`` под названием ``service``
 
-**Rule 6**:
-If a plugin needs configuration parameters, these should be set via a PluginManager as described below.
+Некоторые плагины могут быть более сложными и иметь параметр конфигурации в случае существования более одного экземпляра db.
+
+**Правило 6**:
+
+Если плагин требует параметры конфигурации, то они должны быть установлены через PluginManager, как описано ниже.
 ``PluginManager``:inxx
 
-By following the above rules we can make sure that:
-- **admin** recognizes all the ``plugin_``''name'' files and folder as part of a single entity.
-- plugins do not interfere with each other.
+Следуя приведенным выше правилам, мы можем быть убеждены, что:
+- **admin** признает все ``plugin_``''name'' файлы и папки как часть единого целого.
+- плагины не мешают друг другу.
 
-The rules above do not solve the problem of plugin versions and dependencies. That is beyond our scope.
+Правила выше, не решают проблему версий плагинов и зависимостей. Это выходит за наши рамки.
 
 
-### Component plugins
+### Плагины компонента
 ``component plugin``:inxx
 
-Component plugins are plugins that define components. Components usually access the database and define with their own models.
+Плагина компонента являются плагинами, которые определяют компоненты. Компонентам, как правило, доступна база данных и определения свох собственных моделей.
 
-Here we turn the previous ``comments`` component into a ``comments_plugin`` by using the same code we wrote before, but following all of the previous rules.
+Здесь мы вернемся к предыдущему компоненту ``comments`` внутри ``comments_plugin`` используя тот же самый код, который мы писали ранее, но придерживаясь всех предыдущих правил.
 
-First, we create a model called "models/plugin_comments.py":
+Во-первых, мы создаем модель под названием "models/plugin_comments.py":
 
 ``
 db.define_table('plugin_comments_comment',
@@ -434,7 +445,7 @@ def plugin_comments():
 ``:code
 (notice the last two lines define a function that will simplify the embedding of the plugin)
 
-Second, we define a "controllers/plugin_comments.py"
+Во-вторых, мы определим "controllers/plugin_comments.py"
 
 ``
 def post():
@@ -445,7 +456,7 @@ def post():
                 comments=db(comment).select())
 ``:code
 
-Third, we create a view called "views/plugin_comments/post.load":
+В-третьих, мы создаем представление под названием "views/plugin_comments/post.load":
 
 ``
 {{for comment in comments:}}
@@ -457,35 +468,35 @@ Third, we create a view called "views/plugin_comments/post.load":
 {{=form}}
 ``:code
 
-Now we can use **admin** to pack the plugin for distribution. Admin will save this plugin as:
+Теперь мы можем использовать **admin** чтобы упаковать плагин для распределения. Администратор сохранит этот плагин как:
 
 ``
 web2py.plugin.comments.w2p
 ``:code
 
-We can use the plugin in any view by simply installing the plugin via the **edit** page in **admin** and adding this to our own views
+Мы можем использовать плагин в любом представлении, просто установив плагин через страницу **Правка** в **admin** и добавив в наши собственные представления
 
 ``
 {{=plugin_comments()}}
 ``:code
 
-Of course we can make the plugin more sophisticated by having components that take parameters and configuration options. The more complex the components, the more difficult it becomes to avoid name collisions. The Plugin Manager described below is designed to avoid this problem.
+Конечно, мы можем сделать плагин более сложным при наличии компонентов, которые принимают параметры и параметры конфигурации. Чем сложнее компоненты, тем труднее становится избегать конфликта имён. Менеджер плагинов, описанный ниже, позволяет избежать этой проблемы.
 
-### Plugin manager
+### Менеджер плагинов
 
-The ``PluginManager`` is a class defined in ``gluon.tools``. Before we explain how it works inside, we will explain how to use it.
+``PluginManager`` является классом, определенном в``gluon.tools``. Перед тем, как объяснить, как он работает изнутри, мы объясним, как использовать его.
 
-Here we consider the previous ``plugin_comments`` and we make it better. We want to be able to customize:
+Здесь мы рассмотрим предыдущий ``plugin_comments`` и сделаем его лучше. Мы хотим иметь возможность индивидуальной настройки:
 
 ``
 db.plugin_comments_comment.body.label
 ``:code
 
-without having to edit the plugin code itself.
+без необходимости редактирования собственного кода плагина.
 
-Here is how we can do it:
+Вот как мы можем это сделать:
 
-First, rewrite the plugin "models/plugin_comments.py" in this way:
+Во-первых, перепишем плагин "models/plugin_comments.py" следующим образом:
 
 ``
 def _():
@@ -499,9 +510,9 @@ def _():
 plugin_comments = _()
 ``:code
 
-Notice how all the code except the table definition is encapsulated in a single function called ``_`` so that it does not pollute the global namespace. Also notice how the function creates an instance of a ``PluginManager``.
+Обратите внимание на то, как весь код, за исключением определения таблицы инкапсулируется в одной функции, называемой ``_`` с тем чтобы он не загрязнял глобальное пространство имен. Также обратите внимание, как функция создает экземпляр ``PluginManager``.
 
-Now in any other model in your app, for example in "models/db.py", you can configure this plugin as follows:
+Теперь в любой другой модели в вашем приложении, например, в "models/db.py", Вы можете настроить этот плагин следующим образом:
 
 ``
 from gluon.tools import PluginManager
@@ -510,25 +521,25 @@ plugins.comments.body_label = T('Post a comment')
 ``:code
 
 -----
-The ``plugins`` object is already instantiated in the default scaffolding app in "models/db.py"
+Объект ``plugins`` уже создал экземпляр в скаффолдинг приложении по умолчанию "models/db.py"
 -----
 
-The PluginManager object is a thread-level singleton Storage object of Storage objects. That means you can instantiate as many as you like within the same application but (whether they have the same name or not) they act as if there were a single PluginManager instance.
+Объект PluginManager является одиночным объектом Storage уровня потока из объектов Storage. Это означает, что в одном приложении вы можете создать столько экземпляров, сколько вам нравится, но (неважно имеют ли они тоже самое имя или нет) они действуют так, как если бы они были одним экземпляром PluginManager.
 
-In particular each plugin file can make its own PluginManager object and register itself and its default parameters with it:
+В частности, каждый файл плагина может сделать свой собственный объект PluginManager и зарегистрировать себя и свои параметры по умолчанию с ним:
 
 ``
 plugins = PluginManager('name', param1='value', param2='value')
 ``:code
 
-You can override these parameters elsewhere (for example in "models/db.py") with the code:
+Вы можете изменить эти параметры в другом месте (например, в "models/db.py") с кодом:
 
 ``
 plugins = PluginManager()
 plugins.name.param1 = 'other value'
 ``:code
 
-You can configure multiple plugins in one place.
+Можно настроить несколько плагинов в одном месте.
 
 ``
 plugins = PluginManager()
@@ -540,43 +551,43 @@ plugins.name3.param5 = '...'
 ``:code
 
 -----
-When the plugin is defined, the PluginManager must take arguments: the plugin name and optional named arguments which are default parameters. However, when the plugins are configured, the PluginManager constructor must take no arguments. The configuration must precede the definition of the plugin (i.e. it must be in a model file that comes first alphabetically).
+Когда плагин определен, PluginManager должен принимать аргументы: имя плагина и дополнительные именованные аргументы, которые являются параметрами по умолчанию. Тем не менее, когда плагины сконфигурированы, конструктор PluginManager не должен принимать никаких аргументов. Конфигурация должна предшествовать определению плагина (т.е. она должна быть в файле модели, который приходит первым по алфавиту).
 -----
 
-### Layout plugins
+### Плагины макета
 ``layout plugin``:inxx
 
-Layout plugins are simpler than component plugins because usually they do not contain code, but only views and static files. Yet you should still follow  good practice:
+Плагины макета проще, чем плагины компонента, потому что они, как правило, не содержат код, а только представления и статические файлы. Тем не менее, вы все равно должны следовать хорошей практике:
 
-First, create a folder called "static/plugin_layout_''name''/" (where name is the name of your layout) and place all your static files there.
+Во-первых, создайте папку с именем "static/plugin_layout_''name''/" (где имя это имя вашего макета) и поместите все ваши статические файлы там.
 
-Second, create a layout file called "views/plugin_layout_''name''/layout.html" that contains your layout and links the images, CSS and JavaScript files in "static/plugin_layout_''name''/"
+Во-вторых, создайте файл макета с именем "views/plugin_layout_''name''/layout.html" который содержит ваш макет и ссылки на изображения, CSS и файлы JavaScript в "static/plugin_layout_''name''/"
 
-Third, modify the "views/layout.html" so that it simply reads:
+В-третьих, модифицируйте "views/layout.html" так, чтобы он просто читался:
 
 ``
 {{extend 'plugin_layout_name/layout.html'}}
 {{include}}
 ``:code
 
-The benefit of this design is that users of this plugin can install multiple layouts and choose which one to apply simply by editing "views/layout.html". Moreover, "views/layout.html" will not be packed by **admin** together with the plugin, so there is no risk that the plugin will override the user's code in the previously installed layout.
+Преимущество этой конструкции состоит в том, что пользователям этого плагина можно установить несколько макетов и выбрать, какой из них применять путем простого редактирования "views/layout.html". Кроме того, "views/layout.html" не будет упакован **admin** вместе с плагином, так что нет никакого риска, что плагин будет перекрывать код пользователя в ранее установленном макете.
 
-### Plugin repositories, plugin install via admin
+### Репозиторий плагина, установка плагина через администратора
 
-While there is no single repository of web2py plugins you can find many of them at one of the following URLs:
+В то время как не существует единого репозитория web2py плагинов вы можете найти многие из них на одном из следующих URL-адресов:
 
 ``
-http://web2pyslices.com (this is the leading repository and is integrated to the web2py admin application for one-click installs)
+http://web2pyslices.com (это ведущий репозиторий и интегрируется в приложение администратора web2py всего одним нажатием кнопки установки)
 
 http://web2py.com/plugins
 http://web2py.com/layouts
 ``:code
 
-Recent versions of web2py admin allow automatic fetch and install of plugins from web2pyslices. To add a plugin to an app, edit it via the admin application, and choose Download Plugins, currently at the bottom of the screen. 
+Последние версии web2py администратора позволяют автоматически получать и устанавливать плагины от web2pyslices. Добавление плагина к приложению, редактирование его через приложение администратора, и выбор Загрузки Плагинов, доступно в настоящее время в нижней части экрана. 
 
-To publish your own plugins, make an account at web2pyslices.
+Чтобы опубликовать свои собственные плагины, создайте учетную запись на web2pyslices.
 
-Here is a screenshot showing some of the auto-installable plugins:
+Вот скриншот, показывающий некоторые из авто-устанавливаемых плагинов:
 
 [[image @///image/web2py_slices_plugins.png center 480px]]
 
