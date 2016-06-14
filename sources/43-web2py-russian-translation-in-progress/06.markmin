@@ -545,7 +545,7 @@ db.mytable.some_uploadfield.represent = lambda value, row: A('get it', _href=URL
 **Тип поля** | **Валидаторы поля по умолчанию**| **Описание**
 ``string`` | ``IS_LENGTH(length)``| Строка (длина по умолчанию 512)
 ``text`` | ``IS_LENGTH(65536)``| Текст
-``blob`` | ``None``| Бинарный объект
+``blob`` | ``None``| Большой двочный объект (big large object)
 ``boolean`` | ``None``| Булевое значение
 ``integer`` | ``IS_INT_IN_RANGE(-1e100, 1e100)``| Целое число
 ``double`` | ``IS_FLOAT_IN_RANGE(-1e100, 1e100)``| Действительное число
@@ -575,7 +575,7 @@ db.mytable.some_uploadfield.represent = lambda value, row: A('get it', _href=URL
 
 
 ``blob``:inxx
-Поля ``blob`` также являются специальными. По умолчанию, двоичные данные кодируются в base64 перед сохранением в фактическое поле базы данных и декодируются при извлечении. Это оказывает негативное влияние, используя на 33% больше места для хранения, чем это необходимо в blob  полях, но имеет преимущество в создании связи независимо от определенных соглашений по экранированию конечных баз данных.
+Поля ``blob``(big large object) также являются специальными. По умолчанию, двоичные данные кодируются в base64 перед сохранением в фактическое поле базы данных и декодируются при извлечении. Это оказывает негативное влияние, используя на 33% больше места для хранения, чем это необходимо в blob  полях, но имеет преимущество в создании связи независимо от определенных соглашений по экранированию конечных баз данных.
 
 #### Поле времени выполнения и таблица модификации
 
@@ -757,7 +757,7 @@ if DAL.migrate_enabled and table.migrate:
 2
 ``:code
 
-Вставить возвращает уникальные значения "id" для каждой из вставленной записи.
+при вставке возвращаются уникальные значения "id" для каждой из вставленной записи.
 
 Вы можете обрезать (truncate) таблицу, то есть, удалить все записи и сбросить счетчик id.
 
@@ -766,85 +766,86 @@ if DAL.migrate_enabled and table.migrate:
 >>> db.person.truncate()
 ``:code
 
-Now, if you insert a record again, the counter starts again at 1 (this is back-end specific and does not apply to Google NoSQL):
+Теперь, если вы вставите запись снова, то отсчет начнется с 1 (это зависит от конкретной базы данных и не относится к Google NoSQL):
 ``
 >>> db.person.insert(name="Alex")
 1
 ``:code
 
-Notice you can pass parameters to ``truncate``, for example you can tell SQLITE to restart the id counter.
+Обратите внимание, вы можете передать некоторые параметры ``truncate``, например, чтобы соотщить SQLITE перезапустить счетчик id.
 
 ``
 db.person.truncate('RESTART IDENTITY CASCADE')
 ``:code
 
-The argument is in raw SQL and therefore engine specific.
+Аргумент является необработанным SQL-кодом и поэтому зависит от конкретного движка базы данных.
 
 ``bulk_insert``:inxx
-web2py also provides a bulk_insert method
+web2py также предоставляет метод массовой вставки bulk_insert
 ``
 >>> db.person.bulk_insert([{'name': 'Alex'}, {'name': 'John'}, {'name': 'Tim'}])
 [3, 4, 5]
 ``:code
 
-It takes a list of dictionaries of fields to be inserted and performs multiple inserts at once. It returns the IDs of the inserted records. On the supported relational databases there is no advantage in using this function as opposed to looping and performing individual inserts but on Google App Engine NoSQL, there is a major speed advantage.
+Она принимает список из словарей с именами полей и их значениями, которые подлежат вставке, и выполняет несколько вставок одновременно. Он возвращает идентификаторы вставленных записей. На поддерживаемых реляционных базах данных не существует каких-либо преимуществ в использовании этой функции в отличие от цикла и выполнения отдельных вставок, а вот на Google App Engine NoSQL, это дает основное преимущество в скорости.
 
-### ``commit`` and ``rollback``
+### Фиксация ``commit`` и откат ``rollback`` изменений
 
-No create, drop, insert, truncate, delete, or update operation is actually committed until web2py issues the commit command. In models, views and controllers, web2py does this for you, but in modules you are required to do the commit.
+Операции создания, отбрасывания, вставки, обрезания, удаления или обновления фактически не фиксируются до тех пор, пока web2py выдаст команду фиксировать. В моделях, представлениях и контроллерах, web2py делает это за вас, но в модулях вам потребуется делать фиксации самостоятельно.
 
 ``commit``:inxx
 ``
 >>> db.commit()
 ``:code
 
-To check it let's insert a new record:
+Чтобы проверить это, давайте вставим новую запись:
 ``
 >>> db.person.insert(name="Bob")
 2
 ``:code
 
-and roll back, i.e., ignore all operations since the last commit:
+и откатим, т.е. проигнорируем все операции после последней фиксации:
 
 ``rollback``:inxx
 ``
 >>> db.rollback()
 ``:code
 
-If you now insert again, the counter will again be set to 2, since the previous insert was rolled back.
+Если вы теперь вставите снова, то счетчик вновь будет установлен на 2, так как предыдущая вставка откатывается.
 ``
 >>> db.person.insert(name="Bob")
 2
 ``:code
 
-Code in models, views and controllers is enclosed in web2py code that looks like this (pseudo code) :
+Код в моделях, представлениях и контроллерах заключен в web2py код, который выглядит следующим образом (псевдокод):
 ``
 try:
-    execute models, controller function and view
+    выполнение моделей, функции контроллера и представления
 except:
-    rollback all connections
-    log the traceback
-    send a ticket to the visitor
+    откат всех подключений
+    запись трэйсбэка (отслеживания ошибки) в лог
+    отправка билета (страницы с кодом ошибки) посетителю
 else:
-    commit all connections
-    save cookies, sessions and return the page
+    фиксация всех подключений
+    сохранение куки, сессий и возврат страницы
 ``:code
 
-So in models, views and controllers there is no need to ever call ``commit``  or ``rollback`` explicitly in web2py unless you need more granular control.
-However, in modules you will need to use ``commit()``.
-### Raw SQL
+Таким образом, в моделях, представлениях и контроллерах web2py нет необходимости в явном вызове ``commit``  или ``rollback``, если вам не требуется более детальный контроль.
+Тем не менее, в модулях вам нужно будет использовать ``commit()``.
 
-#### Timing queries
+### Сырой SQL
 
-All queries are automatically timed by web2py. The variable ``db._timings`` is a list of tuples. Each tuple contains the raw SQL query as passed to the database driver and the time it took to execute in seconds. This variable can be displayed in views using the toolbar:
+#### Расчет времени запросов
+
+Все запросы автоматически просчитываются по времени web2py. Переменная ``db._timings`` является списком кортежей. Каждый кортеж содержит необработанный запрос SQL, который передается драйверу базы данных и время выполнения запроса в секундах. Эта переменная может быть отображена в представлениях с помощью панели инструментов:
 
 ``
 {{=response.toolbar()}}
 ``
 
-#### ``executesql``
+#### Метод ``executesql``
 
-The DAL allows you to explicitly issue SQL statements.
+DAL позволяет явно выдавать SQL операторы.
 
 ``executesql``:inxx
 ``
@@ -852,47 +853,28 @@ The DAL allows you to explicitly issue SQL statements.
 [(1, u'Massimo'), (2, u'Massimo')]
 ``:code
 
-In this case, the return values are not parsed or transformed by the DAL, and the format depends on the specific database driver. This usage with selects is normally not needed, but it is more common with indexes.
-``executesql`` takes four optional arguments: ``placeholders``, ``as_dict``, ``fields`` and ``colnames``.
-``placeholders`` is an optional
-sequence of values to be substituted in
-or, if supported by the DB driver, a dictionary with keys
-matching named placeholders in your SQL.
+В этом случае возвращаемые значения не разбираются или преобразуются через DAL, и формат зависит от конкретного драйвера базы данных. Такое использование с выборкой данных, как правило, не требуется, но чаще встречается с индексами.
+Метод ``executesql`` принимает четыре необязательных аргумента: ``placeholders``, ``as_dict``, ``fields`` и ``colnames``.
+``placeholders`` является необязательной последовательностью значений, которые будут замещены, или, если эта функция поддерживается драйвером базы данных, словарем с ключами, соответствующими именованным местозаполнителям в вашем SQL.
 
-If ``as_dict`` is set to True, the results cursor returned by the DB driver will be converted to a sequence of dictionaries keyed with the db field names.  Results returned with ``as_dict = True`` are the same as those returned when applying **.as_list()** to a normal select.
+Если ``as_dict`` установлен на True, то результирующий курсор, возвращаемый драйвером базы данных будет преобразован в последовательность словарей, ключированных именами полей базы данных. Результаты возвращенные с ``as_dict = True`` являются теми же самыми, которые возвращается при применении **. as_list()** для нормального выбора.
 ``
 [{field1: value1, field2: value2}, {field1: value1b, field2: value2b}]
 ``:code
 
-The ``fields`` argument is a list of DAL Field objects that match the
-fields returned from the DB. The Field objects should be part of one or
-more Table objects defined on the DAL object. The ``fields`` list can
-include one or more DAL Table objects in addition to or instead of
-including Field objects, or it can be just a single table (not in a
-list). In that case, the Field objects will be extracted from the
-table(s).
+аргумент ``fields`` явялется списком объектов DAL Field, которые соответствуют возвращаемым из базы данных полям. Объекты Field должны быть частью одного или нескольких объектов Table, определенных в объекте DAL. Список ``fields`` может включать в себя один или несколько объектов DAL Table в дополнение или взамен включения объектов Field, или он может быть только одной таблицей (нет в списке). В этом случае объекты Field будут извлечены из таблиц(ы).
 
-Instead of specifying the ``fields`` argument, the ``colnames`` argument
-can be specified as a list of field names in tablename.fieldname format.
-Again, these should represent tables and fields defined on the DAL
-object.
+Вместо уточнения аргумента ``fields``, аргумент ``colnames``  может быть указан в виде списка имен полей в следующем формате tablename.fieldname. Опять же, они должны представлять таблицы и поля, определенные в объекте DAL.
 
-It is also possible to specify both ``fields`` and the associated
-``colnames``. In that case, ``fields`` can also include DAL Expression
-objects in addition to Field objects. For Field objects in "fields",
-the associated ``colnames`` must still be in tablename.fieldname format.
-For Expression objects in ``fields``, the associated ``colnames`` can
-be any arbitrary labels.
+Кроме того, можно указать оба ``fields`` и связанный с ним ``colnames``. В этом случае, ``fields`` может также включать в себя объекты DAL Expression в дополнение к объектам Field. Для объектов Field в "полях", связанный с ним `` colnames`` должны еще быть в tablename.fieldname формате.
+Для Expression объектов в ``fields``, связанные с ним ``colnames`` могут быть любыми произвольными метками.
 
-Notice, the DAL Table objects referred to by ``fields`` or ``colnames`` can
-be dummy tables and do not have to represent any real tables in the
-database. Also, note that the ``fields`` and ``colnames`` must be in the
-same order as the fields in the results cursor returned from the DB.
+Обратите внимание, объекты DAL Table ссылаемые через ``fields`` или ``colnames`` могут быть фиктивными таблицами и не должны представлять какие-либо реальные таблицы в базе данных. Кроме того, обратите внимание, что ``fields`` и ``colnames`` должны идти в том же порядке, что и поля в курсоре результатов, возвращаемых из базы данных.
 
 
-#### ``_lastsql``
+#### Атрибут ``_lastsql``
 
-Whether SQL was executed manually using executesql or was SQL generated by the DAL, you can always find the SQL code in ``db._lastsql``. This is useful for debugging purposes:
+Если SQL был выполнен вручную с помощью executesql или SQL-код был сгенерирован через DAL, то вы всегда можете найти код SQL в атрибуте ``db._lastsql``. Это полезно для целей отладки:
 
 ``_lastdb``:inxx
 ``
@@ -902,49 +884,50 @@ SELECT person.id, person.name FROM person;
 ``:code
 
 -------
-web2py never generates queries using the "*" operator. web2py is always explicit when selecting fields.
+web2py никогда не генерирует запросы, используя оператор "*". web2py всегда явно указывает при выборе полей.
 -------
 
-### ``drop``
+### Метод ``drop``
 
-Finally, you can drop tables and all data will be lost:
+Наконец, вы можете отбрасывать таблицы и все данные будут потеряны:
 
 ``drop``:inxx
 ``
 >>> db.person.drop()
 ``:code
 
-Note for sqlite: web2py will not re-create the dropped table until you navigate the file system to the databases directory of your app, and delete the file associated with the dropped table. 
+Примечание для SQLite: web2py не будет заново создавать отброшенную таблицу, пока вы не перейдете по файловой системе в каталог баз данных вашего приложения, и не удалите файл, связанный с отброшенной таблицей. 
 
-### Indexes
+### Индексы
 
-Currently the DAL API does not provide a command to create indexes on tables, but this can be done using the ``executesql`` command. This is because the existence of indexes can make migrations complex, and it is better to deal with them explicitly. Indexes may be needed for those fields that are used in recurrent queries.
+В настоящее время DAL API не предоставляет команду для создания индексов таблиц, но это можно сделать с помощью команды ``executesql``. Это происходит потому, что существование индексов может сделать миграции сложным, и лучше иметь дело с ними в явном виде. Индексы могут быть необходимы для тех полей, которые используются в повторяющихся запросах.
 
-Here is an example of how to [[create an index using SQL in SQLite http://www.sqlite.org/lang_createindex.html]]:
+Ниже приведен пример того, как [[создать индекс с помощью SQL в SQLite http://www.sqlite.org/lang_createindex.html]]:
 ``
 >>> db = DAL('sqlite://storage.sqlite')
 >>> db.define_table('person', Field('name'))
 >>> db.executesql('CREATE INDEX IF NOT EXISTS myidx ON person (name);')
 ``:code
 
-Other database dialects have very similar syntaxes but may not support the optional "IF NOT EXISTS" directive.
+Другие диалекты базы данных имеют очень похожие синтаксисы, но могут не поддерживать необязательную "IF NOT EXISTS" директиву.
 
 [[LegacyDatabases]]
-### Legacy databases and keyed tables
+### Унаследованные базы данных и ключированные таблицы
 
-web2py can connect to legacy databases under some conditions.
+web2py может подключаться к унаследованным базам данных при некоторых условиях.
 
-The easiest way is when these conditions are met:
-- Each table must have a unique auto-increment integer field called "id"
-- Records must be referenced exclusively using the "id" field.
+Самый простой способ, когда будут выполнены эти условия:
+- Каждая таблица должена иметь уникальное автоприращаемое целочисленное поле, называемое "id"
+- Записи должны быть привязаны исключительно с помощью "id" поля.
 
-When accessing an existing table, i.e., a table not created by web2py in the current application, always set ``migrate=False``.
+При обращении к существующей таблице, то есть к таблица не созданной web2py в текущем приложении, всегда устанавливается ``migrate=False``.
 
-If the legacy table has an auto-increment integer field but it is not called "id", web2py can still access it but the table definition must contain explicitly as ``Field('....','id')`` where ... is the name of the auto-increment integer field.
+Если унаследованная таблица имеет автоприращаемое целочисленное поле, но оно не называется "id", то web2py по-прежнему может получить доступ к нему, но определение таблицы должно содержать в явном виде ``Field('....','id')``, где вместо точек ... подставляется имя автоприращаемого целочисленного поля.
 
 ``keyed table``:inxx
 
-Finally if the legacy table uses a primary key that is not an auto-increment id field it is possible to use a "keyed table", for example:
+И, наконец, если унаследованная таблица использует первичный ключ, который не является автоприращаемым id полем, то существует возможность использовать "ключированную таблицу", например:
+
 ``
 db.define_table('account',
                 Field('accnum','integer'),
@@ -954,71 +937,70 @@ db.define_table('account',
                 migrate=False)
 ``:code
 
-- ``primarykey`` is a list of the field names that make up the primary key.
-- All primarykey fields have a ``NOT NULL`` set even if not specified.
-- Keyed tables can only reference other keyed tables.
-- Referencing fields must use the ``reference tablename.fieldname`` format.
-- The ``update_record`` function is not available for Rows of keyed tables.
+- ``primarykey`` список имен полей, которые составляют первичный ключ.
+- Все первичные ключевые поля имеют установку ``NOT NULL``, даже если это не указано.
+- Ключированные таблицы могут ссылаться только на другие ключированные таблицы.
+- Ссылочные поля должны использовать формат ``reference tablename.fieldname``.
+- Функция ``update_record`` недоступна для Строк ключированных таблиц.
 
 -------
-Currently keyed tables are only supported for DB2, MS-SQL, Ingres and Informix, but others engines will be added.
+В настоящее время ключированные таблицы поддерживаются только для DB2, MS-SQL, Ingres и Informix, но будут добавлены другие движки.
 -------
 
-At the time of writing, we cannot guarantee that the ``primarykey`` attribute works with every existing legacy table and every supported database backend.
-For simplicity, we recommend, if possible, creating a database view that has an auto-increment id field.
+На момент написания, мы не можем гарантировать, что атрибут ``primarykey`` работает с каждой существующей унаследованной таблицей и каждой поддерживаемой конечной базой данных.
+Для простоты, мы рекомендуем, если это возможно, создать представление базы данных, которое имеет автоприращаемое id поле.
 
 
-### Distributed transaction
+### Распределенные транзакции
 ``distributed transactions``:inxx
 
 ------
-At the time of writing this feature is only supported
-by PostgreSQL, MySQL and Firebird, since they expose API for two-phase commits.
+На момент написания эта возвожность поддерживается только PostgreSQL, MySQL и Firebird, так как они предоставляют API для двухфазных фиксаций.
 ------
 
-Assuming you have two (or more) connections to distinct PostgreSQL databases, for example:
+Если у вас есть два (или более) подключений к отдельным базам данных PostgreSQL, например:
 ``
 db_a = DAL('postgres://...')
 db_b = DAL('postgres://...')
 ``:code
 
-In your models or controllers, you can commit them concurrently with:
+В ваших моделях или контроллерах, вы можете зафиксировать их одновременно:
 ``
 DAL.distributed_transaction_commit(db_a, db_b)
 ``:code
 
-On failure, this function rolls back and raises an ``Exception``.
+В случае неудачи, эта функция выполняет откат и поднимает исключение (``Exception``).
 
-In controllers, when one action returns, if you have two distinct connections and you do not call the above function, web2py commits them separately. This means there is a possibility that one of the commits succeeds and one fails. The distributed transaction prevents this from happening.
+В контроллерах, когда действие возвращает результат, если у вас есть два различных соединения и вы не вызывали вышеприведенную функцию, то web2py фиксирует их по отдельности. Это означает, что существует вероятность того, что одна из фиксаций может завершиться успешно, а другая потерпеть неудачу. Распределенная транзакция предотвращает от такого происшествия.
 
-### More on uploads
+### Дополнительная информация по загрузкам
 
-Consider the following model:
+Рассмотрим следующую модель:
 ``
 >>> db.define_table('myfile',
                     Field('image', 'upload', default='path/'))
 ``:code
 
-In the case of an 'upload' field, the default value can optionally be set to a path (an absolute path or a path relative to the current app folder) and the default image will be set to a copy of the file at the path. A new copy is made for each new record that does not specify an image.
+В случае поля 'загрузки', значение атрибута default при необходимости может быть задано как путь (абсолютный путь или относительный путь к текущей папке приложения) и файл изображения по умолчанию будет копироваться по заданному пути. Новая копия делается для каждой новой записи, которая не определяет изображение.
 
-Normally an insert is handled automatically via a SQLFORM or a crud form (which is a SQLFORM) but occasionally you already have the file on the filesystem and want to upload it programmatically. This can be done in this way:
+Обычно вставка выполняется автоматически с помощью SQLFORM или формы crud (которая представляет собой SQLFORM), но иногда у вас уже есть файл в файловой системе и вы хотите загрузить его программно. Это может быть сделано таким образом:
 ``
 >>> stream = open(filename, 'rb')
 >>> db.myfile.insert(image=db.myfile.image.store(stream, filename))
 ``:code
 
-It is also possible to insert a file in a simpler way and have the insert method call store automatically:
+Кроме того, можно вставить файл более простым способом и иметь автоматически вызываемый хранилищем метод вставки:
 
 ``
 >>> stream = open(filename, 'rb')
 >>> db.myfile.insert(image=stream)
 ``:code
 
-In this case the filename is obtained from the stream object if available.
+В этом случае имя файла получается из объекта stream, если таковой имеется.
 
-The ``store`` method of the upload field object takes a file stream and a filename. It uses the filename to determine the extension (type) of the file, creates a new temp name for the file (according to web2py upload mechanism) and loads the file content in this new temp file (under the uploads folder unless specified otherwise). It returns the new temp name, which is then stored in the ``image`` field of the ``db.myfile`` table.
+Метод ``store`` объекта поля загрузки принимает stream файла и имя файла. Он использует имя файла, чтобы определить расширение (тип) файла, создает новое временное имя для файла (в соответствии с web2py механизмом загрузки) и загружает содержимое файла в этот новый временный файл (в папку uploads, если не указано иное). Он возвращает новое временное имя, которое затем хранится в поле ``image`` из таблицы ``db.myfile``.
 
-Note, if the file is to be stored in an associated blob field rather than the file system, the ``store()`` method will not insert the file in the blob field (because ``store()`` is called before the insert), so the file must be explicitly inserted into the blob field:
+Обратите внимание, если файл должен быть сохранен в соответствующем blob поле, а не в файловой системе, метод ``store()`` не будет вставлять файл в blob поле (потому что ``store()`` вызывается перед вставкой), поэтому файл должен явно вставляться в blob поле:
 ``
 >>> db.define_table('myfile',
                     Field('image', 'upload', uploadfield='image_file'),
@@ -1029,7 +1011,7 @@ Note, if the file is to be stored in an associated blob field rather than the fi
 ``:code
 
 
-The opposite of ``.store`` is ``.retrieve``:
+Противоположностью ``.store`` является ``.retrieve``:
 
 ``
 >>> row = db(db.myfile).select().first()
@@ -1038,9 +1020,9 @@ The opposite of ``.store`` is ``.retrieve``:
 >>> shutil.copyfileobj(stream, open(filename, 'wb'))
 ``
 
-### ``Query``, ``Set``, ``Rows``
+### Объекты ``Query``, ``Set``, ``Rows``
 
-Let's consider again the table defined (and dropped) previously and insert three records:
+Давайте снова рассмотрим ранее определенные таблицы (и сброшенные) и вставим три записи:
 ``
 >>> db.define_table('person', Field('name'))
 >>> db.person.insert(name="Alex")
@@ -1051,40 +1033,40 @@ Let's consider again the table defined (and dropped) previously and insert three
 3
 ``:code
 
-You can store the table in a variable. For example, with variable ``person``, you could do:
+Вы можете сохранить таблицу в переменной. Например, в переменной ``person``, вы могли бы сделать:
 
 ``Table``:inxx
 ``
 >>> person = db.person
 ``:code
 
-You can also store a field in a variable such as ``name``.  For example, you could also do:
+Вы также можете сохранить поля в такую переменную как ``name``.  Например, вы могли бы также сделать:
 
 ``Field``:inxx
 ``
 >>> name = person.name
 ``:code
 
-You can even build a query (using operators like ==, !=, <, >, <=, >=, like, belongs) and store the query in a variable ``q`` such as in:
+Вы даже можете построить запрос (используя операторы вроде ==, !=, <, >, <=, >=, like, belongs) и сохранить запрос в переменной ``q``:
 
 ``Query``:inxx
 ``
 >>> q = name == 'Alex'
 ``:code
 
-When you call ``db`` with a query, you define a set of records. You can store it in a variable ``s`` and write:
+Когда вы вызываете ``db`` с запросом, вы определяете набор (Set) записей. Вы можете сохранить его в переменной ``s`` и написать:
 
 ``Set``:inxx
 ``
 >>> s = db(q)
 ``:code
 
-Notice that no database query has been performed so far. DAL + Query simply define a set of records in this db that match the query.
-web2py determines from the query which table (or tables) are involved and, in fact, there is no need to specify that.
+Обратите внимание на то, что до сих пор ни один запрос к базе данных еще не был выполнен. DAL + Query просто определяют набор записей в этой базе данных, который соответствуют запросу.
+web2py из запроса определяет какая таблица (или таблицы) вовлечены и, по факту, нет необходимости указывать что-либо еще.
 
-### ``select``
+### Метод ``select``
 
-Given a Set, ``s``, you can fetch the records with the command ``select``:
+Допустим задан объект Set, в переменной``s``, тогда вы можете получить записи с помощью команды ``select``:
 
 ``Rows``:inxx ``select``:inxx
 ``
@@ -1092,7 +1074,7 @@ Given a Set, ``s``, you can fetch the records with the command ``select``:
 ``:code
 
 ``Row``:inxx
-It returns an iterable object of class ``gluon.sql.Rows`` whose elements are Row objects. ``gluon.sql.Row`` objects act like dictionaries, but their elements can also be accessed as attributes, like ``gluon.storage.Storage``.The former differ from the latter because its values are read-only.
+Она возвращает итерируемый объект класса ``gluon.sql.Rows`` элементы которого являются объектами Row. ``gluon.sql.Row`` объекты действуют как словари, но их элементы также могут быть доступны в качестве атрибутов, как в ``gluon.storage.Storage``. Объекты класса Row отличаются от объектов класса Storage тем, что их значения предназначены только для чтения.
 
 The Rows object allows looping over the result of the select and printing the selected field values for each row:
 ``
