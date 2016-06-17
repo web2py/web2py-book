@@ -3234,7 +3234,7 @@ db.define_table('stored_item',
 db.stored_item._enable_record_versioning()
 ``:code
 
-or in a more verbose syntax:
+или в более развернутом синтаксисе:
 
 ``
 db.stored_item._enable_record_versioning(archive_db=db,
@@ -3247,20 +3247,20 @@ db.stored_item._enable_record_versioning(archive_db=db,
 
 Когда записи удаляются, то они на самом деле не удаляются. Удаленная запись копируется в ``stored_item_archive`` таблицу (также как, и когда она изменяется) и ``is_active`` полю задается значение False. Включив версионность записи web2py устанавливает ``custom_filter`` фильтр для этой таблицы, который скрывает все записи в таблице ``stored_item``, где ``is_active`` поле содержит значение False. Параметр ``is_active`` метода ``_enable_record_versioning`` позволяет указать имя поля, используемого фильтром ``custom_filter`` для определения удалено ли было поле или нет.
 
-Филтр ``custom_filter`` игнорируются интерфейсом appadmin.
+Фильтр ``custom_filter`` игнорируются интерфейсом appadmin.
 
 #### Общие поля и мульти-владение
 ``common fields``:inxx
 ``multi tenancy``:inxx
 
-``db._common_fields`` is a list of fields that should belong to all the tables. This list can also contain tables and it is understood as all fields from the table. Например occasionally you find yourself in need to add a signature to all your tables but the ```auth`` tables. In this case, after you ``db.define_tables()`` but before defining any other table, insert
+``db._common_fields`` это список полей, которые должны принадлежать всем таблицам. Этот список может также содержать таблицы и они подразумеваются, как все поля из таблицы. Например, изредка вы оказываетесь в необходимости добавить подпись ко всем вашим таблицам, используя таблицу ``auth``. В этом случае, после вашего ``db.define_tables()``, но перед определением любой другой таблицы, вставьте
 
 ``
 db._common_fields.append(auth.signature)
 ``
 
-One field is special: "request_tenant".
-This field does not exist but you can create it and add it to any of your tables (or all of them):
+Одно поле является специальным: "request_tenant".
+Это поле не существует, но вы можете создать и добавить его в любую из таблиц (или во все из них):
 
 ``
 db._common_fields.append(Field('request_tenant',
@@ -3268,34 +3268,37 @@ db._common_fields.append(Field('request_tenant',
                                writable=False))
 ``
 
-For every table with a field called ``db._request_tenant``, all records for all queries are always automatically filtered by:
+Для каждой таблицы с полем под названием `` db._request_tenant``, все записи для всех запросов всегда автоматически фильтруются по:
 
 ``
 db.table.request_tenant == db.table.request_tenant.default
 ``:code
 
-and for every record inserted, this field is set to the default value.
-In the example above we have chosen
+и для каждой вставленой записи, это поле устанавливается в значение по умолчанию.
+В приведенном выше примере мы выбрали
+
 ``
 default = request.env.http_host
 ``
-i.e. we have chose to ask our app to filter all tables in all queries with
+
+т.е. мы решили попросить наше приложение фильтровать все таблицы во всех запросах с
+
 ``
 db.table.request_tenant == request.env.http_host
 ``
 
-This simple trick allow us to turn any application into a multi-tenant application. i.e. even if we run one instance of the app and we use one single database, if the app is accessed under two or more domains (in the example the domain name is retrieved from ``request.env.http_host``) the visitors will see different data depending on the domain. Think of running multiple web stores under different domains with one app and one database.
+Этот простой трюк позволяет превратить любое приложение в мульти-владельческое приложение, то есть даже если мы запустим один экземпляр приложения, используем одну базу данных и если приложение доступно по двум или более доменам (в данном примере имя домена извлекается из ``request.env.http_host``), то посетители смогут увидеть различные данные в зависимости от домена. Подумайте о запуске нескольких веб-хранилищ в различных доменах с одним приложением и одной базой данных.
 
-You can turn off multi tenancy filters using: ``ignore_common_filters``:inxx
+Вы можете отключить мультивладельческие фильтры используя: ``ignore_common_filters``:inxx
 ``
 rows = db(query, ignore_common_filters=True).select()
 ``:code
 
-#### Common filters
+#### Общие фильтры
 
-A common filter is a generalization of the above multi-tenancy idea.
-It provides an easy way to prevent repeating of the same query.
-Consider for example the following table:
+Общий фильтр представляет собой обобщение вышеуказанной мульти-владельческой идеи.
+Он предоставляет простой способ предотвратить повторение того же самого запроса.
+Рассмотрим для примера следующую таблицу:
 
 ``
 db.define_table('blog_post',
@@ -3305,29 +3308,29 @@ db.define_table('blog_post',
                 common_filter = lambda query: db.blog_post.is_public==True)
 ``
 
-Any select, delete or update in this table, will include only public blog posts. The attribute can also be changed in controllers:
+Любой выбор, удаление или обновление в этой таблице, будет включать в себя только сообщения публичного блога. Атрибут может быть также изменен в контроллерах:
 
 ``
 db.blog_post._common_filter = lambda query: db.blog_post.is_public == True
 ``
 
-It serves both as a way to avoid repeating the "db.blog_post.is_public==True" phrase in each blog post search, and also as a security enhancement, that prevents you from forgetting to disallow viewing of non-public posts.
+Он подается также как способ избежать повторения "db.blog_post.is_public==True" фразы в каждом сообщении блога поиска, и также как способ повышения безопасности, который ограждает вас от забывания установить запрет на просмотр непубличных сообщений.
 
-In case you actually do want items left out by the common filter (for example, allowing the admin to see non-public posts), you can either remove the filter:
+В случае, если вы фактически хотите пропускать элементы вне общего фильтра (например, позволяя администратору видеть непубличные сообщения), то вы можете либо удалить фильтр:
 ``
 db.blog_post._common_filter = None
 ``
-or ignore it:
+или игнорировать его:
 ``
 db(query, ignore_common_filters=True).select(...)
 ``
 
-#### Custom ``Field`` types (experimental)
+#### Пользовательские типы ``Field``(экспериментальный)
 
 ``SQLCustomType``:inxx
 
-Aside for using ``filter_in`` and ``filter_out``, it is possible to define new/custom field types.
-Например we consider here a field that contains binary data in compressed form:
+Помимо использования ``filter_in`` и ``filter_out``, можно определить новые/пользовательские типы полей.
+Например, мы рассмотрим здесь поле, содержащее двоичные данные в сжатой форме:
 
 ``
 from gluon.dal import SQLCustomType
@@ -3341,40 +3344,40 @@ compressed = SQLCustomType(type ='text',
 db.define_table('example', Field('data', type=compressed))
 ``:code
 
-``SQLCustomType`` is a field type factory. Its ``type`` argument must be one of the standard web2py types. It tells web2py how to treat the field values at the web2py level. ``native`` is the type of the field as far as the database is concerned. Allowed names depend on the database engine. ``encoder`` is an optional transformation function applied when the data is stored and ``decoder`` is the optional reversed transformation function.
+``SQLCustomType`` это фабрика типа поля. Его ``type`` аргумент должен быть одним из стандартных типов web2py. Это сообщает web2py как трактовать значения полей на уровне web2py. ``native`` является типом поля, насколько база данных обеспокоена. Допустимые имена зависят от движка базы данных. ``encoder`` является дополнительной функцией преобразования, применяемой при сохранинии данных, и ``decoder`` является необязательно обратной функцией преобразования.
 
-This feature is marked as experimental. In practice it has been in web2py for a long time and it works but it can make the code not portable, for example when the native type is database specific. It does not work on Google App Engine NoSQL.
+Эта возможность отмечена как экспериментальная. На практике она была опробована в web2py в течение длительного времени, и она работает, но она может сделать код не переносимым, например, когда родной тип поля определеяетя конкретной базой данных. Она не работает на Google App Engine NoSQL.
 
-#### Using DAL without define tables
+#### Использование DAL без определения таблиц
 
-The DAL can be used from any Python program simply by doing this:
+DAL можно использовать из любой программы Python просто делая это:
 
 ``
 from gluon import DAL, Field
 db = DAL('sqlite://storage.sqlite',folder='path/to/app/databases')
 ``:code
 
-i.e. import the DAL, Field, connect and specify the folder which contains the .table files (the app/databases folder).
+то есть импортировать DAL, Field, подключиться и указать папку, содержащую .table файлы (папка app/databases).
 
-To access the data and its attributes we still have to define all the tables we are going to access with ``db.define_tables(...)``.
+Для того, чтобы получить доступ к данным и их атрибутам нам еще предстоит определить все таблицы к которым мы собираемся иметь доступ с помощью ``db.define_tables(...)``.
 
-If we just need access to the data but not to the web2py table attributes, we get away without re-defining the tables but simply asking web2py to read the necessary info from the metadata in the .table files:
+Если нам просто нужен доступ к данным, а не к атрибутам web2py таблицы, то мы можем обойтись без повторного определения таблиц, просто попросив web2py прочитать необходимую информацию из метаданных в файлах .table:
 
 ``
 from gluon import DAL, Field
 db = DAL('sqlite://storage.sqlite', folder='path/to/app/databases', auto_import=True))
 ``:code
 
-This allows us to access any ``db.table`` without need to re-define it.
+Это позволяет получить доступ к любой ``db.table`` без необходимости повторного определения ее.
 
-#### PostGIS, SpatiaLite, and MS Geo (experimental)
+#### PostGIS, SpatiaLite и MS Geo (экспериментальный)
 
 ``PostGIS``:inxx ``StatiaLite``:inxx ``Geo Extensions``:inxx
 ``geometry``:inxx ``geoPoint``:inxx ``geoLine``:inxx ``geoPolygon``:inxx
 
-The DAL supports geographical APIs using PostGIS (for PostgreSQL), spatialite (for SQLite), and MSSQL and Spatial Extensions. This is a feature that was sponsored by the Sahana project and implemented by Denes Lengyel.
+DAL поддерживает географические API-интерфейсы с использованием PostGIS (для PostgreSQL), SpatiaLite (для SQLite), и MSSQL и Spatial Extensions. Это функция, которая была спонсирована в рамках проекта Сахана и реализована Денес Лендьел.
 
-DAL provides geometry and geography fields types and the following functions:
+DAL предоставляет поля геометрического и географического типа и следующие функции:
 
 ``st_asgeojson``:inxx ``st_astext``:inxx ``st_contains``:inxx
 ``st_distance``:inxx ``st_equals``:inxx ``st_intersects``:inxx ``st_overlaps``:inxx
@@ -3403,20 +3406,21 @@ db = DAL("mssql://user:pass@host:db")
 sp = db.define_table('spatial', Field('loc', 'geometry()'))
 ``:code
 
-Below we insert a point, a line, and a polygon:
+Ниже мы вставим точку, линию, и многоугольник:
 ``
 sp.insert(loc=geoPoint(1, 1))
 sp.insert(loc=geoLine((100, 100), (20, 180), (180, 180)))
 sp.insert(loc=geoPolygon((0, 0), (150, 0), (150, 150), (0, 150), (0, 0)))
 ``:code
 
-Notice that
+Заметьте, что
+
 ``
 rows = db(sp.id > 0).select()
 ``:code
 
-Always returns the geometry data serialized as text.
-You can also do the same more explicitly using ``st_astext()``:
+Всегда возвращает сериализованные в виде текста геометрические данные.
+Вы можете сделать то же самое более явно с помощью ``st_astext()``:
 
 ``
 print db(sp.id>0).select(sp.id, sp.loc.st_astext())
@@ -3426,7 +3430,7 @@ spatial.id,spatial.loc.STAsText()
 3, "POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))"
 ``:code
 
-You can ask for the native representation by using ``st_asgeojson()`` (in PostGIS only):
+Вы можете запросить родное представление путем использования ``st_asgeojson()`` (в PostGIS только):
 
 ``
 print db(sp.id>0).select(sp.id, sp.loc.st_asgeojson().with_alias('loc'))
@@ -3436,9 +3440,9 @@ spatial.id,loc
 3, [[[0, 0], [150, 0], [150, 150], [0, 150], [0, 0]]]
 ``:code
 
-(notice an array is a point, an array of arrays is a line, and an array of array of arrays is a polygon).
+(заметьте массив является точкой, массив из массивов является линией, а массив из массива массивов представляет собой многоугольник).
 
-Here are example of how to use geographical functions:
+Вот пример того, как использовать географические функции:
 
 ``
 query = sp.loc.st_intersects(geoLine((20, 120), (60, 160)))
@@ -3449,7 +3453,7 @@ spatial.id, spatial.loc
 3,"POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))"
 ``:code
 
-Computed distances can also be retrieved as floating point numbers:
+Вычисленные расстояния также могут быть получены в виде чисел с плавающей точкой:
 
 ``
 dist = sp.loc.st_distance(geoPoint(-1,2)).with_alias('dist')
@@ -3460,23 +3464,23 @@ spatial.id, dist
 3 1.0
 ``:code
 
-#### Copy data from one db into another
+#### Копирование данных из одной базы данных в другую
 
-Consider the situation in which you have been using the following database:
+Рассмотрим ситуацию, в которой вы используете следующую базу данных:
 
 ``
 db = DAL('sqlite://storage.sqlite')
 ``
 
-and you wish to move to another database using a different connection string:
+и вы хотите перейти на другую базу данных, используя другую строку подключения:
 
 ``
 db = DAL('postgres://username:password@localhost/mydb')
 ``
 
-Before you switch, you want to move the data and rebuild all the metadata for the new database. We assume the new database to exist but we also assume it is empty.
+Перед тем, как переключиться, вы хотите переместить данные и восстановить все метаданные для новой базы данных. Мы предполагаем, что новая база данных существует, но мы также предполагаем, что она пустая.
 
-Web2py provides a script that does this work for you:
+Web2py предоставляет скрипт, который делает эту работу за вас:
 
 ``
 cd web2py
@@ -3487,19 +3491,20 @@ python scripts/cpdb.py \\
    -d ../gluon
 ``
 
-After running the script you can simply switch the connection string in the model and everything should work out of the box. The new data should be there.
+После запуска скрипта вы можете просто переключить строку подключения в модели, и все должно работать из коробки. Новые данные должны быть там.
 
-This script provides various command line options that allows you to move data from one application to another, move all tables or only some tables, clear the data in the tables. For more info try:
+Этот скрипт предоставляет различные параметры командной строки, что позволяет перемещать данные из одного приложения в другое, переместить все таблицы или только некоторые таблицы, очистить данные в таблицах. Для получения дополнительной информации попробуйте:
 
 ``
 python scripts/cpdb.py -h
 ``
 
-#### Note on new DAL and adapters
+#### Заметки по новому DAL и адаптерам
 
-The source code of the Database Abstraction Layer was completely rewritten in 2010. While it stays backward compatible, the rewrite made it more modular and easier to extend. Here we explain the main logic.
+Исходный код базы данных абстрактного уровня был полностью переписан в 2010 году.
+В то время как он оставил обратную совместимость, перезапись сделало его более модульным и легко расширяемым. Здесь мы объясним основную логику.
 
-The file "gluon/dal.py" defines, among other, the following classes.
+Файл "gluon/dal.py" определяются, среди прочего, следующие классы.
 
 ``
 ConnectionPool
@@ -3515,7 +3520,8 @@ Set
 Rows
 ``
 
-Their use has been explained in the previous sections, except for ``BaseAdapter``. When the methods of a ``Table`` or ``Set`` object need to communicate with the database they delegate to methods of the adapter the task to generate the SQL and or the function call.
+Их использование было объяснено в предыдущих разделах, исключение для ``BaseAdapter``.
+Когда методам ``Table`` или ``Set`` объекта необходимо взаимодействовать с базой данных, то они делегируют задачи к методам адаптера для генерации SQL и/или вызова функции.
 
 Например:
 
@@ -3523,30 +3529,30 @@ Their use has been explained in the previous sections, except for ``BaseAdapter`
 db.mytable.insert(myfield='myvalue')
 ``
 
-calls
+вызывает
 
 ``
 Table.insert(myfield='myvalue')
 ``
 
-which delegates the adapter by returning:
+который делегирует адаптер, возвращая:
 
 ``
 db._adapter.insert(db.mytable, db.mytable._listify(dict(myfield='myvalue')))
 ``
 
-Here ``db.mytable._listify`` converts the dict of arguments into a list of ``(field,value)`` and calls the ``insert`` method of the ``adapter``. ``db._adapter`` does more or less the following:
+Здесь ``db.mytable._listify`` преобразует словарь из аргументов в список из ``(field,value)`` и вызывает ``insert`` метод адаптера ``adapter``. ``db._adapter`` делает более или менее следующее:
 
 ``
 query = db._adapter._insert(db.mytable, list_of_fields)
 db._adapter.execute(query)
 ``
 
-where the first line builds the query and the second executes it.
+где первая строка создает запрос, а вторая выполняет его.
 
-``BaseAdapter`` defines the interface for all adapters.
+``BaseAdapter`` определяет интерфейс для всех адаптеров.
 
-"gluon/dal.py" at the moment of writing this book, contains the following adapters:
+"gluon/dal.py" на момент написания этой книги, содержит следующие адаптеры:
 
 ``
 SQLiteAdapter extends BaseAdapter
@@ -3578,17 +3584,17 @@ VerticaAdapter extends MSSQLAdapter (experimental)
 SybaseAdapter extends MSSQLAdapter (experimental)
 ``
 
-which override the behavior of the ``BaseAdapter``.
+которые переопределяют поведение ``BaseAdapter``.
 
-Each adapter has more or less this structure:
+Каждый адаптер имеет более или менее эту структуру:
 
 ``
 class MySQLAdapter(BaseAdapter):
 
-    # specify a diver to use
+    # Укажем драйвер для использования
     driver = globals().get('pymysql', None)
 
-    # map web2py types into database types
+    # Сопоставим типы web2py с типами базы данных
     types = {
         'boolean': 'CHAR(1)',
         'string': 'VARCHAR(%(length)s)',
@@ -3596,37 +3602,37 @@ class MySQLAdapter(BaseAdapter):
         ...
         }
 
-    # connect to the database using driver
+    # подключимся к базе данных с помощью драйвера
     def __init__(self, db, uri, pool_size=0, folder=None, db_codec ='UTF-8',
                  credential_decoder=lambda x:x, driver_args={},
                  adapter_args={}):
-        # parse uri string and store parameters in driver_args
+        # разберем строку uri  и сохраним параметры в driver_args
         ...
-        # define a connection function
+        # Определим функцию подключения
         def connect(driver_args=driver_args):
             return self.driver.connect(**driver_args)
-        # place it in the pool
+        # поместим её в пул
         self.pool_connection(connect)
-        # set optional parameters (after connection)
+        # установим необязательные параметры (после подключения)
         self.execute('SET FOREIGN_KEY_CHECKS=1;')
         self.execute("SET sql_mode='NO_BACKSLASH_ESCAPES';")
 
-   # override BaseAdapter methods as needed
+   # переопределим методы BaseAdapter по мере необходимости
    def lastrowid(self, table):
         self.execute('select last_insert_id();')
         return int(self.cursor.fetchone()[0])
 
 ``:code
 
-Looking at the various adapters as example should be easy to write new ones.
+Если посмотреть на различные адаптеры, как в примере, то это должно облегчить написание новых.
 
-When ``db`` instance is created:
+Когда создается экземпляр ``db``:
 
 ``
 db = DAL('mysql://...')
 ``
 
-the prefix in the uri string defines the adapter. The mapping is defined in the following dictionary also in "gluon/dal.py":
+префикс в uri строке определяет адаптер. Сопоставление также определяется в следующем словаре из файла "gluon/dal.py":
 
 ``
 ADAPTERS = {
@@ -3670,17 +3676,17 @@ ADAPTERS = {
 }
 ``:code
 
-the uri string is then parsed in more detail by the adapter itself.
+Значение URI строки затем анализируется более подробно с помощью самого адаптера.
 
-For any adapter you can replace the driver with a different one:
+Для любого адаптера вы можете заменить драйвер на другой:
 
 ``
 import MySQLdb as mysqldb
 from gluon.dal import MySQLAdapter
 MySQLAdapter.driver = mysqldb
 ``
-i.e. ``mysqldb`` has to be ''that module'' with a .connect() method.
-You can specify optional driver arguments and adapter arguments:
+то есть ``mysqldb`` должен быть ''как модуль'' с .connect() методом.
+Можно указать необязательные аргументы драйвера и аргументы адаптера:
 
 ``
 db =DAL(..., driver_args={}, adapter_args={})
