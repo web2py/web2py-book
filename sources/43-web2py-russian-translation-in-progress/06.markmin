@@ -3693,30 +3693,32 @@ db =DAL(..., driver_args={}, adapter_args={})
 ``
 
 
-### Gotchas
+### Существующие ограничения
 
 #### SQLite
-SQLite does not support dropping and altering columns. That means that web2py migrations will work up to a point. If you delete a field from a table, the column will remain in the database but will be invisible to web2py. If you decide to reinstate the column, web2py will try re-create it and fail. In this case you must set ``fake_migrate=True`` so that metadata is rebuilt without attempting to add the column again. Also, for the same reason, **SQLite** is not aware of any change of column type. If you insert a number in a string field, it will be stored as string. If you later change the model and replace the type "string" with type "integer", SQLite will continue to keep the number as a string and this may cause problem when you try to extract the data.
+SQLite не поддерживает отбрасывание и изменение столбцов. Это означает, что web2py миграции будут работать до точки. При удалении поля из таблицы, столбец будет оставаться в базе данных, но будет невидимым для web2py. Если вы решите восстановить столбец, то web2py попробует заново создать его и потерпит неудачу. В этом случае вы должны установить ``fake_migrate=True`` с тем, чтобы метаданные перестраивались без попытки повторного добавления столбца. Кроме того, по той же причине, **SQLite** не известно о любом изменении типа столбца. Если вставить число в строковое поле, то оно будет храниться в виде строки. Если позже изменить модель и заменить тип "string" на тип "integer", то SQLite будет продолжать держать число в виде строки, и это может вызвать проблемы при попытке извлечь данные.
 
-SQLite doesn't have a boolean type. web2py internally maps booleans to a 1 character string, with 'T' and 'F' representing True and False. The DAL handles this completely; the abstraction of a true boolean value works well.
-But if you are updating the SQLite table with SQL directly, be aware of the web2py implementation, and avoid using 0 and 1 values.
+SQLite не имеет булевого типа. web2py внутренне сопоставляет булевый типв в строку из 1 символа, с 'T' и 'F', представляющие True и False. DAL обрабатывает это полностью; абстракция истинного логического значения хорошо работает.
+Но если вы обновляете таблицу SQLite с помощью SQL непосредственно, то учитывайте реализацию web2py и избегайте использования значений 0 и 1.
 
 #### MySQL
 
-MySQL does not support multiple ALTER TABLE within a single transaction. This means that any migration process is broken into multiple commits. If something happens that causes a failure it is possible to break a migration (the web2py metadata are no longer in sync with the actual table structure in the database). This is unfortunate but it can be prevented (migrate one table at the time) or it can be fixed a posteriori (revert the web2py model to what corresponds to the table structure in database, set ``fake_migrate=True`` and after the metadata has been rebuilt, set ``fake_migrate=False`` and migrate the table again).
+MySQL не поддерживает множественные изменения таблицы (ALTER TABLE) в рамках одной транзакции. Это означает, что любой процесс миграции разбивается на несколько фиксаций. Если так случится, что произойтет сбой, то можно нарушить миграцию (метаданные web2py не будут синхронизированы с фактической структурой таблицы в базе данных). Это невезение, но его можно предотвратить (мигрировать одну таблицу за раз) или оно может быть зафиксировано в последнюю очередь(вернуть модель web2py к тому, что соответствует структуре таблицы в базе данных, установить ``fake_migrate=True`` и после того, как метаданные будут перестроены, установить ``fake_migrate=False`` и мигрировать таблицу снова).
 
 #### Google SQL
 
-Google SQL has the same problems as MySQL and more. In particular table metadata itself must be stored in the database in a table that is not migrated by web2py. This is because Google App Engine has a read-only file system. Web2py migrations in Google:SQL combined with the MySQL issue described above can result in metadata corruption. Again, this can be prevented (by migrating the table at once and then setting migrate=False so that the metadata table is not accessed any more) or it can fixed a posteriori (by accessing the database using the Google dashboard and deleting any corrupted entry from the table called ``web2py_filesystem``.
+Google SQL имеет те же самые проблемы, как MySQL и многие другие. В частности метаданные таблицы сами по себе должны храниться в базе данных в таблице, которая не мигрируется через web2py. Это потому, что Google App Engine имеет файловую систему только для чтения. Web2py миграции в Google: SQL в сочетании с вышеописанной проблемой MySQL может привести к повреждению метаданных. Опять же, это может быть предотвращено (за счет миграции таблицы за один раз и последущей установкой migrate=False так, чтобы больше не обращаться к таблице метаданных) или она может фиксироваться в последнюю очередь (путем доступа к базе данных с помощью панели управления Google, и удалением любой поврежденной записи из таблицы под названием ``web2py_filesystem``.
 
 #### MSSQL (Microsoft SQL Server)
 ``limitby``:inxx
-MSSQL < 2012 does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
-If you're using MSSQL >= 2005, the recommended prefix to use is ``mssql3://`` which provides a method to avoid the issue of fetching the entire non-paginated resultset. If you're on MSSQL >= 2012, use ``mssql4://`` that uses the ``OFFSET ... ROWS ... FETCH NEXT ... ROWS ONLY`` construct to support natively pagination without performance hits like other backends.
-The ``mssql://`` uri also enforces (for historical reasons) the use of ``text`` columns, that are superseeded in more recent versions (from 2005 onwards) by ``varchar(max)``. ``mssql3://`` and ``mssql4://`` should be used if you don't want to face some limitations of the - officially deprecated - ``text`` columns
 
-MSSQL has problems with circular references in tables that have ONDELETE CASCADE. This is an MSSQL bug and you work around it by setting the ondelete attribute for all reference fields to "NO ACTION". 
-You can also do it once and for all before you define tables:
+MSSQL < 2012 не поддерживает SQL ключевое слово OFFSET. Поэтому база данных не может сделать разбиение на страницы (пагинацию). При выполнении ``limitby=(a,b)`` web2py получит первые ``b`` строк и отбросит первые ``a``. Это может привести к значительным накладным расходам по сравнению с другими движками баз данных.
+Если вы используете MSSQL >= 2005, то рекомендуемым префиксом для использования является ``mssql3://``, который предоставляет метод избежать проблем при извлечения всего неразбитого на страницы набора результатов. Если у вас MSSQL >= 2012, используйте ``mssql4://``, который уже использует ``OFFSET ... ROWS ... FETCH NEXT ... ROWS ONLY`` конструкцию для поддержки родной пагинации без ударов по производительности подобно другим движкам баз данных.
+``mssql://`` uri также навязывает (по историческим причинам) использование ``text`` столбцов, которые вытесняются в более поздних версиях (начиная с 2005 года) через ``varchar(max)``. ``mssql3://`` и ``mssql4://`` следует использовать, если вы не хотите столкнуться с некоторыми ограничениями официально нерекомендуемых ``text`` столбцов.
+
+MSSQL имеет проблемы с циклическими ссылками в таблицах, которые имеют ONDELETE CASCADE. Это ошибка MSSQL и вы можете обойти ее, установив ondelete атрибут для всех ссылочных полей на "NO ACTION".
+
+Вы также можете сделать это один раз и навсегда, для этого прежде чем определить таблицы сделайте следующее:
 
 ``
 db = DAL('mssql://....')
@@ -3724,14 +3726,13 @@ for key in ['reference', 'reference FK']:
     db._adapter.types[key]=db._adapter.types[key].replace('%(on_delete_action)s', 'NO ACTION')
 ``:code
 
-MSSQL also has problems with arguments passed to the DISTINCT keyword and therefore
- while this works,
+MSSQL также имеет проблемы с аргументами, передаваемыми в ключевое слово DISTINCT, и, следовательно, в то время как нижеследующее выражение работает,
 
 ``
 db(query).select(distinct=True)
 ``
 
-this does not
+то это выражение уже не будет работать
 
 ``
 db(query).select(distinct=db.mytable.myfield)
@@ -3739,13 +3740,15 @@ db(query).select(distinct=db.mytable.myfield)
 
 #### Oracle
 
-Oracle also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). 
-This works for simple select but may break for complex selects involving aliased fields and or joins.
+Oracle также не поддерживает пагинацию. Он не поддерживает ни OFFSET, ни LIMIT ключевых слов. Web2py достигает пагинации путем перевода ``db(...).select(limitby=(a,b))`` в комплексную трехходовую вложенную выборку (three-way nested select) (как это было предложено официальной документацией Oracle).
+
+Это работает для простой выборки, но может сломаться для сложных выборок с участием псевдонимов полей и/или сцепок
 
 #### Google NoSQL (Datastore)
-Google NoSQL (Datastore) does not allow joins, left joins, aggregates, expression, OR involving more than one table, the ‘like’ operator searches in "text" fields. 
+Google NoSQL (Datastore) не допускает сцепки, левые сцепки, агрегацию, выражения, OR  с участием более чем одной таблицы, ‘like’ оператор поиска в "text" полях.
 
-Transactions are limited and not provided automatically by web2py (you need to use the Google API ``run_in_transaction`` which you can look up in the Google App Engine documentation online). 
+Транзакции ограничены и не предоставляются автоматически web2py (вам нужно использовать Google API ``run_in_transaction``, которые вы можете посмотреть в документации Google App Engine, в Интернете).
 
-Google also limits the number of records you can retrieve in each one query (1000 at the time of writing). On the Google datastore record IDs are integer but they are not sequential. 
-While on SQL the "list:string" type is mapped into a "text" type, on the Google Datastore it is mapped into a ``ListStringProperty``. Similarly "list:integer" and "list:reference" are mapped into "ListProperty". This makes searches for content inside these fields types are more efficient on Google NoSQL than on SQL databases.
+Google также ограничивает количество записей, которое вы можете получить в каждом одном запросе (1000 на момент написания). Идентификаторы Google Datastore являются целыми числами, но они не являются последовательными.
+
+В то время как на SQL "list:string" тип преобразуется в тип "text", на Google Datastore он сопоставляется в ``ListStringProperty``. Аналогично "list:integer" и "list:reference" сопоставляются в "ListProperty". Это делает поиск контента внутри данных типов полей более эффективным на Google NoSQL, чем в базах данных SQL.
