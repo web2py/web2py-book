@@ -7,9 +7,9 @@ web2py включает в себя мощный и настраиваемый �
 
 "Управление доступом на основе ролей RBAC) это способ ограничению доступа к системе для авторизованных пользователей. Это новый альтернативный подход к обязательному контролю доступа mandatory access control (MAC) и избирательному контролю доступа discretionary access control (DAC). RBAC иногда называют безопасностью на основе ролей.
 
-RBAC is a policy neutral and flexible access control technology sufficiently powerful to simulate DAC and MAC. Conversely, MAC can simulate RBAC if the role graph is restricted to a tree rather than a partially ordered set.
+RBAC обладает нейтральной и гибкой политикой и достаточно мощной технологией управления доступом для моделирования DAC и MAC. С другой стороны, MAC может моделировать RBAC, если роль графа ограничивается деревом, а не частично упорядоченным множеством.
 
-Prior to the development of RBAC, MAC and DAC were considered to be the only known models for access control: if a model was not MAC, it was considered to be a DAC model, and vice versa. Research in the late 1990s demonstrated that RBAC falls in neither category.
+До разработки RBAC, MAC и DAC рассматривались как единственные известные модели контроля доступа: если модель была не MAC, то она считалась моделью DAC, и наоборот. Исследования, проведенные в конце 1990-х годов показали, что RBAC не относится ни к одной из этих категорий.
 
 Within an organization, roles are created for various job functions. The permissions to perform certain operations are assigned to specific roles. Members of staff (or other system users) are assigned particular roles, and through those role assignments acquire the permissions to perform particular system functions. Unlike context-based access control (CBAC), RBAC does not look at the message context (such as a connection's source).
 
@@ -17,71 +17,72 @@ Since users are not assigned permissions directly, but only acquire them through
 
 RBAC differs from access control lists (ACLs) used in traditional discretionary access control systems in that it assigns permissions to specific operations with meaning in the organization, rather than to low level data objects. For example, an access control list could be used to grant or deny write access to a particular system file, but it would not dictate how that file could be changed."
 
-The web2py class that implements RBAC is called **Auth**.
+Класс web2py, который реализует RBAC называется **Auth**.
 
-**Auth** needs (and defines) the following tables:
-- ``auth_user`` stores users' name, email address, password, and status (registration pending, accepted, blocked)
-- ``auth_group`` stores groups or roles for users in a many-to-many structure. By default, each user is in its own group, but a user can be in multiple groups, and each group can contain multiple users. A group is identified by a role and a description.
-- ``auth_membership`` links users and groups in a many-to-many structure.
-- ``auth_permission`` links groups and permissions. A permission is identified by a name and, optionally, a table and a record. For example, members of a certain group can have "update" permissions on a specific record of a specific table.
-- ``auth_event`` logs changes in the other tables and successful access via CRUD to objects controlled by the RBAC.
-- ``auth_cas`` is used for Central Authentication Service (CAS). Every web2py application is a CAS provider and can optionally be a CAS consumer.
+**Auth** требует (и определяет) следующие таблицы:
+- ``auth_user`` хранит имена пользователей, адреса электронной почты, пароль и статус (в ожидании регистрация, принят, заблокирован)
+- ``auth_group`` хранит группы или роли для пользователей в многие-ко-многим структуре. По умолчанию каждый пользователь находится в своей группе, но пользователь может находиться в нескольких группах, и каждая группа может содержать несколько пользователей. Группа идентифицируется через роль и описание.
+- ``auth_membership`` связывает пользователей и группы в многие-ко-многим структуре.
+- ``auth_permission`` связывает группы и разрешения. Разрешение идентифицируется по имени и, необязательно, таблицы и записи. Например, члены определенной группы могут иметь "update" разрешения на конкретной записи конкретной таблицы.
+- ``auth_event`` журналы изменений в других таблицах и успешный доступ через CRUD к объектам, контролирумым через RBAC.
+- ``auth_cas`` используется для Центральной службы аутентификации Central Authentication Service (CAS). Каждое web2py приложение является поставщиком CAS и опционально может быть CAS-потребителем.
 
-The schema is reproduced graphically in the image below:
+Схема воспроизводится графически на изображении ниже:
 
 [[image @///image/schema_auth.png center 300px]]
 
 
 
-In principle, there is no restriction on the names of the roles and the names of the permissions; the developer can create them to fix the roles and permissions in the organization. Once they have been created, web2py provides an API to check if a user is logged in, if a user is a member of a given group, and/or if the user is a member of any group that has a given required permission.
+В принципе, нет никаких ограничений на имена функций и имена разрешений; разработчик может создать их, чтобы установить роли и разрешения в организации. После того, как они будут созданы, web2py предоставляет API для проверки, если пользователь вошел в систему, если пользователь является членом данной группы, и/или если пользователь является членом какой-либо группы, имеющей заданное необходимое разрешение.
 
-web2py also provides decorators to restrict access to any function based on login, membership and permissions.
+web2py также предоставляет декораторы, чтобы ограничить доступ к любой функции на основе логина, членства и разрешений.
 
-web2py also understands some specific permissions, i.e., those that have a name that correspond to the CRUD methods (create, read, update, delete) and can enforce them automatically without the need to use decorators.
+web2py также понимает некоторые специфические разрешения, то есть те, которые имеют имя, которое соответствуют методам CRUD (создание, чтение, обновление, удаление) и может обеспечить их соблюдение в автоматическом режиме без необходимости использования декораторов.
 
-In this chapter, we are going to discuss different parts of RBAC one by one.
+В этой главе мы будем обсуждать различные части RBAC один за другим.
 
-### Authentication
+### Аутентификация
 
-In order to use RBAC, users need to be identified. This means that they need to register (or be registered) and log in.
+Для того, чтобы использовать RBAC, пользователи должны быть идентифицированы. Это означает, что они должны зарегистрировать (или быть зарегистрированы) и войти в систему.
 
-**Auth** provides multiple login methods. The default one consists of identifying users based on the local ``auth_user`` table.
-Alternatively, it can log in users against third-party authentication systems and single sign on providers such as Google, PAM, LDAP, Facebook, LinkedIn, Dropbox, OpenID, OAuth, etc..
+**Auth** предоставляет несколько методов авторизации. По умолчанию первый состоит из идентификации пользователей на основе локальной ``auth_user`` таблицы.
+В качестве альтернативы, он может войти под пользователем от систем аутентификации и единого входа сторонних производителей таких поставщиков, как Google, PAM, LDAP, Facebook, LinkedIn, Dropbox, OpenID, OAuth и т.д..
 
-To start using ``Auth``, you need at least this code in a model file, which is also provided with the web2py "welcome" application and assumes a ``db`` connection object:
+Чтобы начать использовать ``Auth``, вам необходим, по крайней мере этот код в файле модели, который также предоставляется с web2py приложением "welcome" и предполагает наличие объекта подключения ``db``:
 ``
 from gluon.tools import Auth
 auth = Auth(db)
 auth.define_tables(username=False,signature=False)
 ``:code
 
-By default, web2py uses email for login. If instead you want to log in using username set ``auth.define_tables(username=True)``
+По умолчанию, web2py использует электронную почту для входа в систему. Если вместо этого вы хотите использовать имя пользователя для входа в систему, то задайте ``auth.define_tables(username=True)``
 
-Setting ``signature=True`` adds user and date stamping to auth tables, to track modifications.
+Настройка ``signature = True`` добавляет пользователя и проставляет штамп даты для auth таблицы, чтобы отслеживать изменения.
 
-Auth has an optional ``secure=True`` argument, which will force authenticated pages to go over HTTPS. ``https``:inxx
+Auth имеет необязательный ``secure=True`` аргумент, который заставит аутентифицируемые страницы перейти на HTTPS. ``https``:inxx
 
-By default, Auth protects logins against cross-site request forgeries (CSRF). This is actually provided by web2py's standard CSRF protection whenever forms are generated in a session. However, under some circumstances, the overhead of creating a session for login,password request and reset attempts may be undesirable. DOS attacks are theoretically possible. CSRF protection can be disabled for Auth forms (as of v 2.6):
+По умолчанию, Auth защищает логины против кросс-сайтовых подделок запросов (CSRF). Это на самом деле обеспечивается стандартной защитой от CSRF web2py всякий раз, когда формы генерируются в сессии. Тем не менее, при определенных обстоятельствах, накладные расходы на создание сессии для входа в систему, запроса пароля и сброса попыток могут быть нежелательными. DOS атаки теоретически возможны. Защиту CSRF можно отключить для Auth форм (по состоянию на v 2.6):
+
 ``Auth = Auth(..., csrf_prevention = False)``:code 
-Note that doing this purely to avoid session overload on a busy site is not recommended because of the introduced security risk. Instead, see the Deployment chapter for advice on reducing session overheads.
+
+Обратите внимание, что делать это исключительно во избежание излишней перегрузки сессии на занятом сайте не рекомендуется из-за введенной угрозы безопасности. Вместо этого обратитесь к главе рецепты развертывания и прочтите советы по сокращению накладных расходов сессии.
 -------
-The ``password`` field of the ``db.auth_user`` table defaults to a ``CRYPT`` validator, which needs an ``hmac_key``. On legacy web2py applications you may see an extra argument passed to the Auth constructor: ``hmac_key = Auth.get_or_create_key()``. The latter is a function that read the HMAC key from a file "private/auth.key" within the application folder. If the file does not exist it creates a random ``hmac_key``. If multiple apps share the same auth database, make sure they also use the same ``hmac_key``. This is no longer necessary for new applications since passwords are salted with an individual random salt.
+Поле ``password`` из таблицы ``db.auth_user`` по умолчанию имеет ``CRYPT`` валидатор, который нуждается в ``hmac_key``. На устаревших web2py приложениях вы можете увидеть дополнительный аргумент, передаваемый в конструктор Auth: ``hmac_key = Auth.get_or_create_key()``. Последнее является функцией, которая читает ключ HMAC из файла "private/auth.key" в папке приложения. Если файл не существует, она создает случайный ``hmac_key``. Если несколько приложений совместно используют одни и те же базы данных аутентификации, то убедитесь, что они также используют один и тот же ``hmac_key``. Это больше не является необходимым для новых приложений, так как пароли засаливаются с индивидуальной случайной солью.
 -------
 
 
-If multiple apps share the same auth database you may want to disable migrations: ``auth.define_tables(migrate=False)``.
+Если несколько приложений совместно используют одни и те же базы данных авторизации вы можете отключить миграции: ``auth.define_tables(migrate=False)``.
 
-To expose **Auth**, you also need the following function in a controller (for example in "default.py"):
+Чтобы выставить **Auth**, вам также необходима следующая функция в контроллере (например, в "default.py"):
 ``
 def user(): return dict(form=auth())
 ``:code
 
 -------
-The ``auth`` object and the ``user`` action are already defined in the
-scaffolding application.
+Объект ``auth`` и действие ``user`` уже определены в скаффолдинг-приложении.
 -------
 
-web2py also includes a sample view "welcome/views/default/user.html" to render this function properly that looks like this:
+web2py также включает в себя образец представления "welcome/views/default/user.html" для визуализации данной функции должным образом, которое выглядит следующим образом:
 ``
 {{extend 'layout.html'}}
 <h2>{{=T( request.args(0).replace('_',' ').capitalize() )}}</h2>
@@ -99,14 +100,15 @@ web2py also includes a sample view "welcome/views/default/user.html" to render t
 </div>
 ``:code
 
-Notice that this function simply displays a ``form`` and therefore it can be customized using normal custom form syntax. The only caveat is that the form displayed by ``form=auth()`` depends on ``request.args(0)``; therefore, if you replace the default ``auth()`` login form with a custom login form, you may need an ``if`` statement like this in the view:
+Обратите внимание на то, что эта функция просто отображает ``form`` и, следовательно, она может быть настроена с помощью обычного синтаксиса пользовательской формы. Единственное ограничение в том, что отображаемая через ``form=auth()`` форма зависит от ``request.args(0)``; Поэтому, если вы замените по умолчанию ``auth()`` логин форму на пользовательскую логин форму, то вам потребуется оператор ``if`` в представлении вроде такого:
 ``
 {{if request.args(0)=='login':}}...custom login form...{{pass}}
 ``:code
 
 ``auth.impersonate``:inxx ``auth.is_impersonating``:inxx
 
-The controller above exposes multiple actions:
+Контроллер выше выставляет несколько действий:
+
 ``
 http://.../[app]/default/user/register
 http://.../[app]/default/user/login
@@ -121,35 +123,46 @@ http://.../[app]/default/user/impersonate
 http://.../[app]/default/user/groups
 http://.../[app]/default/user/not_authorized
 ``:code
-- **register** allows users to register. It is integrated with CAPTCHA, although this is disabled by default. This is also integrated with a client-side entropy calculator defined in "web2py.js". The calculator indicates the strength of the new password. You can use the ``IS_STRONG`` validator to prevent web2py from accepting weak passwords.
-- **login** allows users who are registered to log in (if the registration is verified or does not require verification, if it has been approved or does not require approval, and if it has not been blocked).
-- **logout** does what you would expect but also, as the other methods, logs the event and can be used to trigger some event.
-- **profile** allows users to edit their profile, i.e. the content of the ``auth_user`` table. Notice that this table does not have a fixed structure and can be customized.
-- **change_password** allows users to change their password in a fail-safe way.
-- **verify_email**. If email verification is turned on, then visitors, upon registration, receive an email with a link to verify their email information. The link points to this action.
-- **retrieve_username**. By default, **Auth** uses email and password for login, but it can, optionally, use username instead of email. In this latter case, if a user forgets his/her username, the ``retrieve_username`` method allows the user to type the email address and retrieve the username by email.
-- **request_reset_password**. Allows users who forgot their password to request a new password. They will get a confirmation email pointing to **reset_password**.
-- **impersonate** allows a user to "impersonate" another user. This is important for debugging and for support purposes. ``request.args[0]`` is the id of the user to be impersonated. This is only allowed if the logged in user ``has_permission('impersonate', db.auth_user, user_id)``. You can use ``auth.is_impersonating()`` to check is the current user is impersonating somebody else.
-- **groups** lists the groups of which the current logged in user is a member.
-- **not_authorized** displays an error message when the visitor tried to do something that he/she is not authorized to do
-- **navbar** is a helper that generates a bar with login/register/etc. links.
 
-Logout, profile, change_password, impersonate, and groups require login.
+- **register** позволяет пользователям регистрироваться. Действие интегрировано с CAPTCHA, хотя эта возможность по умолчанию отключена. Действие также интегрировано с калькулятором энтропии на стороне клиента, определенного в "web2py.js". Калькулятор указывает на силу нового пароля. Вы можете использовать ``IS_STRONG`` валидатор, чтобы предотвратить web2py от принятия слабых паролей.
 
-By default they are all exposed, but it is possible to restrict access to only some of these actions.
+- **login** позволяет зарегистрированым пользователям войти в систему (если регистрация проверена и не требует проверки, если она была одобрена или не требует одобрения, и если он не был заблокирован).
 
-All of the methods above can be extended or replaced by subclassing **Auth**.
+- **logout** делает то, что можно было бы ожидать, но также, как и другие методы, регистрирует событие и может быть использован для вызова какого-либо события.
 
-All of the methods above can be used in separate actions. For example:
+- **profile** позволяет пользователям редактировать свой профиль, то есть содержимое ``auth_user`` таблицы. Обратите внимание на то, что эта таблица не имеет фиксированную структуру и может быть настроена.
+- **change_password** позволяет пользователям изменять свой пароль отказобезопасным способом.
+- **verify_email**. Если проверка электронной почты включена, то посетители, при регистрации, получат электронное письмо с ссылкой для подтверждения информации об адресе электронной почты. Ссылка указывает на это действие.
+
+- **retrieve_username**. По умолчанию ** ** Auth использует электронную почту и пароль для логина, но он может, при необходимости, использовать имя пользователя, а не электронную почту. В этом последнем случае, если пользователь забудет свое имя, то ``retrieve_username`` метод позволяет пользователю ввести адрес электронной почты и получить имя пользователя по электронной почте.
+
+- **request_reset_password**. Позволяет пользователям, которые забыли свой пароль запросить новый пароль. Они получат подтверждение по электронной почте, указывая на **reset_password**.
+
+- **impersonate** позволяет пользователю "выдавать себя" за другого пользователя. Это важно для отладки и для целей поддержки. ``request.args[0]`` это id выдаваемого пользователя. Это допускается только в случае входа в систему пользователя имеющего разрешение ``has_permission('impersonate', db.auth_user, user_id)``. Вы можете использовать ``auth.is_impersonating()``, чтобы проверить, является выдает ли себя текущий пользователь за кого-то другого.
+
+- **groups** перечислены группы, членом которых является текущий вошедший в систему пользователь.
+
+- **not_authorized** отображает сообщение об ошибке, когда посетитель пытается сделать что-то, на что он/она не имеет права делать
+
+- **navbar** является помощником, который генерирует бар с login/register/и т.д. ссылками.
+
+Logout, profile, change_password, impersonate и groups требуют логина.
+
+По умолчанию все они выставляются, но можно ограничить доступ лишь к некоторым из этих действий.
+
+Все методы выше, могут быть расширены или заменены через подклассы **Auth**.
+
+Все вышеприведенные методы могут быть использованы в отдельных действиях. Например:
 
 ``
 def mylogin(): return dict(form=auth.login())
 def myregister(): return dict(form=auth.register())
 def myprofile(): return dict(form=auth.profile())
 ...
-``
+``:code
 
-To restrict access to functions to only logged in visitors, decorate the function as in the following example
+Чтобы открыть доступ к функциям только для зарегистрированных посетителей, декорируйте функцию, как в следующем примере
+
 ``
 @auth.requires_login()
 def hello():
