@@ -2096,76 +2096,76 @@ requires = IS_UPLOAD_FILENAME(filename='^README$', extension='^$', case=0)
 ##### Валидатор ``IS_IPV4``
 ``IS_IPV4``:inxx
 
-This validator checks if a field's value is an IP version 4 address in decimal form. Can
-be set to force addresses from a certain range.
+Этот валидатор проверяет, является ли значение в поле IP-адресом версии 4 в десятичной форме. Возможно задать адреса из определенного диапазона.
 
-IPv4 regex taken from ref.``regexlib``:cite
-Its arguments are:
-- ``minip`` lowest allowed address; accepts: **str**, e.g., 192.168.0.1; **iterable of numbers**, e.g., [192, 168, 0, 1]; **int**, e.g., 3232235521
-- ``maxip`` highest allowed address; same as above
+IPv4 регулярное выражение взято из ``regexlib``:cite
+Его аргументы:
+- ``minip`` самый низкий разрешенный адрес; принимает: **Строку**, например, 192.168.0.1; **Перечисление цифр**, например, [192, 168, 0, 1]; **целое**, e.g., 3232235521
+- ``maxip`` самый высокий разрешенный адрес; то же самое, что и выше
 
-All three example values are equal, since addresses are converted to
-integers for inclusion check with following function:
+Все три примера значений равны, так как адреса преобразуются в целые числа для проверки включения со следующей функцией:
 ``
 number = 16777216 * IP[0] + 65536 * IP[1] + 256 * IP[2] + IP[3]
 ``:code
 
-Examples:
+Примеры:
 
-Check for valid IPv4 address:
+Проверка на допустимый адрес IPv4:
 ``
 requires = IS_IPV4()
 ``:code
 
-Check for valid private network IPv4 address:
+Проверка на IPv4 адрес принадлежность частной сети:
 ``
 requires = IS_IPV4(minip='192.168.0.1', maxip='192.168.255.255')
 ``:code
 
-#### Other validators
-##### ``CLEANUP``
+#### Другие валидаторы
+
+##### Валидатор ``CLEANUP``
 ``CLEANUP``:inxx
 
-This is a filter. It never fails. It just removes all characters whose decimal ASCII codes are not in the list [10, 13, 32-127].
+Это фильтр. Он никогда не выдает сбой. Она просто удаляет все символы, чьи десятичные ASCII коды не принадлежат списку [10, 13, 32-127].
 ``
 requires = CLEANUP()
 ``:code
 
 
-#### Database validators
+#### Валидаторы базы данных
 
-##### ``IS_NOT_IN_DB``
+##### Валидатор ``IS_NOT_IN_DB``
 ``IS_NOT_IN_DB``:inxx
-######Synopsis:
+
+###### Краткий обзор:
 ``IS_NOT_IN_DB(db|set, 'table.field')``
 
-Consider the following example:
+Рассмотрим следующий пример:
 ``
 db.define_table('person', Field('name'))
 db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
 ``:code
 
-It requires that when you insert a new person, his/her name is not already in the database, ``db``, in the field ``person.name``. 
+Он требует, чтобы при вставке нового человека, его/ее имя не было в базе данных, ``db``, в поле ``person.name``. 
 
-A set can be used instead of ``db``.
+Набор может быть использован вместо ``db``.
 
-As with all other validators this requirement is enforced at the form processing level, not at the database level. This means that there is a small probability that, if two visitors try to concurrently insert records with the same person.name, this results in a race condition and both records are accepted. It is therefore safer to also inform the database that this field should have a unique value:
+Как и во всех других валидаторов это требование соблюдается на уровне обработки формы, а не на уровне базы данных. Это означает, что существует небольшая вероятность того, что, если два посетителя попытаются одновременно вставить записи с тем же самым person.name, это приводит к состоянию гонки и обе записи принимаются. В связи с этим безопаснее также информировать базу данных, что это поле должно иметь уникальное значение:
 ``
 db.define_table('person', Field('name', unique=True))
 db.person.name.requires = IS_NOT_IN_DB(db, 'person.name')
 ``:code
 
-Now if a race condition occurs, the database raises an OperationalError and one of the two inserts is rejected.
+Теперь, если имеет место условие гонки, база данных поднимает OperationalError и одна из двух вставок отклоняется.
 
-The first argument of ``IS_NOT_IN_DB`` can be a database connection or a Set. In the latter case, you would be checking only the set defined by the Set.
+Первый аргумент ``IS_NOT_IN_DB`` может быть соединением с базой данных или Set. В последнем случае, проверяется только множество, определяемое Set.
 
-A complete argument list for ``IS_NOT_IN_DB()`` is as follows:
+Полный список аргументов для ``IS_NOT_IN_DB()`` выглядит следующим образом:
 ``
 IS_NOT_IN_DB(dbset, field, error_message='value already in database or empty', allowed_override=[],
     ignore_common_filters=True)
 ``:code
 
-The following code, for example, does not allow registration of two persons with the same name within 10 days of each other:
+Следующий код, например, не допускает регистрацию двух лиц с тем же именем в течение 10 дней друг от друга:
 ``
 import datetime
 now = datetime.datetime.today()
@@ -2176,74 +2176,76 @@ recent = db(db.person.registration_stamp>now-datetime.timedelta(10))
 db.person.name.requires = IS_NOT_IN_DB(recent, 'person.name')
 ``:code
 
-##### ``IS_IN_DB``
+##### Валидатор ``IS_IN_DB``
 ``IS_IN_DB``:inxx
 [[validate_IS_IN_DB]]
-######Synopsis:
+###### Краткий обзор:
+
 ``IS_IN_DB(db|set,'table.value_field','%(representing_field)s',zero='choose one')``
-where the third and fourth arguments are optional.
+где третий и четвертый аргументы не являются обязательными.
 
-``multiple=`` is also possible if the field type is a list. The default is False. It can be set to True or to a tuple (min,max) to restrict the number of values selected. So ``multiple=(1,10)`` enforces at least one and at most ten selections.
+``multiple=`` также возможен, если тип поля является списком. По умолчанию значение False. Он может быть установлен на True или кортеж (мин, макс), чтобы ограничить количество выбранных значений. Таким образом, ``multiple=(1,10)`` обеспечивает соблюдение по крайней мере, один и не более десяти выбранных элементов.
 
-Other optional arguments are discussed below.
+Другие необязательные аргументы обсуждаются ниже.
 
-######Example
-Consider the following tables and requirement:
+###### Пример
 
+Рассмотрим следующие таблицы и требования:
 ``
 db.define_table('person', Field('name', unique=True))
 db.define_table('dog', Field('name'), Field('owner', db.person)
 db.dog.owner.requires = IS_IN_DB(db, 'person.id', '%(name)s',
                                  zero=T('choose one'))
-*or using a Set*
+*или используем Set*
 db.person.name.requires = IS_IN_DB(db(db.person.id>10), 'person.id', '%(name)s')
 ``:code
 
-It is enforced at the level of dog INSERT/UPDATE/DELETE forms. This example requires that a ``dog.owner`` be a valid id in the field ``person.id`` in the database ``db``. Because of this validator, the ``dog.owner`` field is represented as a drop-down list. The third argument of the validator is a string that describes the elements in the drop-down list. In the example you want to see the person ``%(name)s`` instead of the person ``%(id)s``. ``%(...)s`` is replaced by the value of the field in brackets for each record.
+Это обеспечивается на уровне INSERT/UPDATE/DELETE формы dog. Этот пример требует, чтобы ``dog.owner`` был действительным идентификатором id  из поле ``person.id`` в базе данных ``db``. Благодаря этому валидатору, поле ``dog.owner`` представлено в виде раскрывающегося списка. Третий аргумент валидатора является строкой, которая описывает элементы в раскрывающемся списке. В данном примере вы хотите видеть человека person как ``%(name)s`` вместо person ``%(id)s``. ``%(...)s`` для каждой записи заменяется значением поля, имя которого указано в скобках.
 
-The ``zero`` option works very much like for the ``IS_IN_SET`` validator.
+Опция ``zero`` работает очень похоже на ``IS_IN_SET`` валидатор.
 
-The first argument of the validator can be a database connection or a DAL Set, as in ``IS_NOT_IN_DB``. This can be useful for example when wishing to limit the records in the drop-down list. In this example, we use ``IS_IN_DB`` in a controller to limit the records dynamically each time the controller is called:
+Первый аргумент валидатор может быть подключением базы данных или DAL Set, как в ``IS_NOT_IN_DB``. Это может быть полезно, например, при желании ограничить записи в раскрывающемся списке. В этом примере мы используем ``IS_IN_DB`` в контроллере, чтобы динамически ограничить записи каждый раз, когда контроллер вызывается:
 
 ``
 def index():
     (...)
-    query = (db.table.field == 'xyz') #in practice 'xyz' would be a variable
+    query = (db.table.field == 'xyz') #на практике "xyz" будет переменной
     db.table.field.requires=IS_IN_DB(db(query),....)
     form=SQLFORM(...)
     if form.process().accepted: ...
     (...)
 ``:code
 
-If you want the field validated, but you do not want a drop-down, you must put the validator in a list.
+Если вы хотите проверить поле, но вы не хотите, выпадающий список, вы должны поместить валидатор в списке.
 
 ``
 db.dog.owner.requires = [IS_IN_DB(db, 'person.id', '%(name)s')]
 ``:code
 
 ``_and``:inxx
-Occasionally you want the drop-down (so you do not want to use the list syntax above) yet you want to use additional validators. For this purpose the ``IS_IN_DB`` validator takes an extra argument ``_and`` that can point to a list of other validators applied if the validated value passes the ``IS_IN_DB`` validation. For example to validate all dog owners in db that are not in a subset:
+
+Иногда вы хотите раскрывающийся список (поскольку вы не хотите использовать синтаксис списка выше), а также вы хотите использовать дополнительные валидаторы. Для этой цели ``IS_IN_DB`` валидатор принимает дополнительный аргумент ``_and``, который может указывать на список других валидаторов и применяется, если проверенное значение передает ``IS_IN_DB`` валидацию. Например, для проверки всех владельцев собак в базе данных, которых нет в подмножестве subset:
 ``
 subset=db(db.person.id>100)
 db.dog.owner.requires = IS_IN_DB(db, 'person.id', '%(name)s',
                                  _and=IS_NOT_IN_DB(subset,'person.id'))
 ``:code
 
-``IS_IN_DB`` has a boolean ``distinct`` argument which defaults to ``False``. When set to ``True`` it prevents repeated values in the drop-down.
+``IS_IN_DB`` имеет булевый ``distinct`` аргумент, который по умолчанию ``False``. При установке в `` True`` он не допускает повторяющиеся значения в раскрывающемся списке.
 
-``IS_IN_DB`` also takes a ``cache`` argument that works like the ``cache`` argument of select.
+``IS_IN_DB`` также принимает ``cache`` аргумент, который работает как ``cache`` аргумент select.
 
 
-##### ``IS_IN_DB`` and Tagging
+##### Валидатор ``IS_IN_DB`` и Добавление тегов
 ``tags``:inxx
 ``multiple``:inxx
 
-The ``IS_IN_DB`` validator has an optional attribute ``multiple=False``. If set to ``True`` multiple values can be stored in one field. This field should be of type ``list:reference`` as discussed in Chapter 6. An explicit example of tagging is discussed there. ``multiple`` references are handled automatically in create and update forms, but they are transparent to the DAL. We strongly suggest using the jQuery multiselect plugin to render multiple fields.
+Валидатор ``IS_IN_DB`` имеет необязательный атрибут ``multiple = False``. Если установлено значение ``True``, то несколько значений могут быть сохранены в одном поле. Это поле должно быть типа ``list:reference`` как описано в Главе 6. Явный пример добавления тегов обсуждается здесь. ``multiple`` ссылки обрабатываются автоматически в формах создания и обновления, но они являются прозрачными для DAL. Мы настоятельно рекомендуем использовать multiselect плагин jQuery для отображения нескольких полей.
 
-#### Custom validators
+#### Пользовательские валидаторы
 ``custom validator``:inxx
 
-All validators follow the prototype below:
+Все валидаторы придерживаются прототипу ниже:
 ``
 class sample_validator:
     def __init__(self, *a, error_message='error'):
@@ -2257,9 +2259,9 @@ class sample_validator:
         return format(value)
 ``:code
 
-i.e., when called to validate a value, a validator returns a tuple ``(x, y)``. If ``y`` is ``None``, then the value passed validation and ``x`` contains a parsed value. For example, if the validator requires the value to be an integer, ``x`` is converted to ``int(value)``. If the value did not pass validation, then ``x`` contains the input value and ``y`` contains an error message that explains the failed validation. This error message is used to report the error in forms that do not validate.
+то есть, при вызове для проверки значения, валидатор возвращает кортеж ``(x, y)``. Если ``y`` равен ``None``, то значение проходит валидацию и ``x`` содержит разобранное значение. Например, если валидатор требует, чтобы значение было целым числом, то ``x`` преобразуется через ``int(value)``. Если значение не проходит проверку, то ``x`` содержит значение ввода, а ``y`` содержит сообщение об ошибке, которое объясняет сбой валидации. Это сообщение об ошибке используется для отчета об ошибке в формах, которые не проходят валидацию.
 
-The validator may also contain a ``formatter`` method. It must perform the opposite conversion to the one the ``__call__`` does. For example, consider the source code for ``IS_DATE``:
+Валидатор может также содержать метод ``formatter``. Он должен выполнить противоположное преобразование в функции ``__call__``. Например, рассмотрим исходный код для ``IS_DATE``:
 ``
 class IS_DATE(object):
     def __init__(self, format='%Y-%m-%d', error_message='must be YYYY-MM-DD!'):
@@ -2276,7 +2278,7 @@ class IS_DATE(object):
         return value.strftime(str(self.format))
 ``:code
 
-On success, the ``__call__`` method reads a date string from the form and converts it into a datetime.date object using the format string specified in the constructor. The ``formatter`` object takes a datetime.date object and converts it to a string representation using the same format. The ``formatter`` is called automatically in forms, but you can also call it explicitly to convert objects into their proper representation. For example:
+В случае успеха, ``__call__`` метод считывает строку даты из формы и преобразует ее в datetime.date объект, используя строку формата, указанную в конструкторе. Объект ``formatter`` принимает объект datetime.date и преобразует его в строковое представление, используя тот же самый формат. Метод ``formatter`` вызывается автоматически в формах, но вы также можете вызвать его явно, чтобы преобразовать объекты в их надлежащий вид. Например:
 ``
 >>> db = DAL()
 >>> db.define_table('atable',
@@ -2287,22 +2289,22 @@ On success, the ``__call__`` method reads a date string from the form and conver
 01/01/2008
 ``:code
 
-When multiple validators are required (and stored in a list), they are executed in order and the output of one is passed as input to the next. The chain breaks when one of the validators fails.
+Когда несколько валидаторов требуются (и хранятся в списке), то они будут выполнены в порядке, и выход одного передается в качестве входа для следующего. Цепь разрывается, когда один из валидаторов выдает сбой.
 
-Conversely, when we call the ``formatter`` method of a field, the formatters of the associated validators are also chained, but in reverse order.
+И наоборот, когда мы вызываем ``formatter`` метод поля, форматеры ассоциированных валидаторов также прикованы, но в обратном порядке.
 
 ------
-Notice that as alternative to custom validators, you can also use the ``onvalidate`` argument of ``form.accepts(...)``, ``form.process(...)`` and ``form.validate(...)``.
+Заметьте, что в качестве альтернативы пользовательских валидаторов, вы можете также использовать ``onvalidate`` аргумент методов ``form.accepts(...)``, ``form.process(...)`` и ``form.validate(...)``.
 ------
 
 
-#### Validators with dependencies
+#### Валидаторы с зависимостями
 
-Usually validators are set once for all in models.
+Обычно валидаторы устанавливаются один раз для всех в моделях.
 
-Occasionally, you need to validate a field and the validator depends on the value of another field. This can be done in various ways. It can be done in the model or in the controller.
+Иногда вам нужно проверить поле и валидатор зависит от значения другого поля. Это может быть сделано различными способами. Это может быть сделано в модели или в контроллере.
 
-For example, here is a page that generates a registration form that asks for username and password twice. None of the fields can be empty, and both passwords must match:
+Например, вот страница, которая генерирует регистрационную форму, которая запрашивает имя пользователя и пароль дважды. Ни одно из полей не может быть пустым, и оба пароля должны совпадать:
 ``
 def index():
     form = SQLFORM.factory(
@@ -2311,15 +2313,15 @@ def index():
         Field('password_again',
               requires=IS_EQUAL_TO(request.vars.password)))
     if form.process().accepted:
-        pass # or take some action
+        pass # или предпринимаем какие-то действия
     return dict(form=form)
 ``:code
 
-The same mechanism can be applied to FORM and SQLFORM objects.
+Тот же самый механизм может быть применен для объектов FORM и SQLFORM.
 
-### Widgets
+### Виджеты
 
-Here is a list of available web2py widgets:
+Ниже приведен список доступных виджетов web2py:
 ``
 SQLFORM.widgets.string.widget
 SQLFORM.widgets.text.widget
@@ -2338,31 +2340,31 @@ SQLFORM.widgets.checkboxes.widget
 SQLFORM.widgets.autocomplete
 ``:code
 
-The first ten of them are the defaults for the corresponding field types. The "options" widget is used when a field's requires is ``IS_IN_SET`` or ``IS_IN_DB`` with ``multiple=False`` (default behavior). The "multiple" widget is used when a field's requires is ``IS_IN_SET`` or ``IS_IN_DB`` with ``multiple=True``. The "radio" and "checkboxes" widgets are never used by default, but can be set manually. The autocomplete widget is special and discussed in its own section.
+Первые десять из них это значения по умолчанию для соответствующих типов полей. Виджет "options" используется, когда от поля требуется ``IS_IN_SET`` или ``IS_IN_DB`` с ``multiple = False`` (поведение по умолчанию). Виджет "multiple" используется, когда от поля требуется ``IS_IN_SET`` или ``IS_IN_DB`` с ``multiple=True``. Виджетам "radio" и "checkboxes" никогда не используются по умолчанию, но могут быть установлены вручную. Виджет автозаполнения "autocomplete"" является особенным и обсуждается в отдельном разделе.
 
-For example, to have a "string" field represented by a textarea:
+Например, имеется поле "string", представленное через текстовую область:
 ``
 Field('comment', 'string', widget=SQLFORM.widgets.text.widget)
 ``:code
 
-Widgets can also be assigned to fields ''a posteriori'':
+Виджеты также могут быть назначены на поля ''апостериори'':
 
 ``
 db.mytable.myfield.widget = SQLFORM.widgets.string.widget
 ``
 
-Sometimes widgets take additional arguments and one needs to specify their values. In this case one can use ``lambda``
+Иногда виджеты принимают дополнительные аргументы и нужно указать их значения. В этом случае можно использовать ``lambda``
 
 ``
 db.mytable.myfield.widget = lambda field,value: \
     SQLFORM.widgets.string.widget(field,value,_style='color:blue')
 ``
 
-Widgets are helper factories and their first two arguments are always ``field`` and ``value``. The other arguments can include normal helper attributes such as ``_style``, ``_class``, etc. Some widgets also take special arguments. In particular ``SQLFORM.widgets.radio`` and ``SQLFORM.widgets.checkboxes`` take a ``style`` argument (not to be confused with ``_style``) which can be set to "table", "ul", or "divs" in order to match the ``formstyle`` of the containing form.
+Виджеты это фабрика помощников и их первые два аргумента всегда ``field`` и ``value``. Остальные аргументы могут включать нормальные атрибуты помощника, такие как ``_style``, ``_class``, и т.д. Некоторые виджеты также принимают специальные аргументы. В частности ``SQLFORM.widgets.radio`` и ``SQLFORM.widgets.checkboxes`` принимают ``style`` аргумент (не следует путать со ``_style``), который может быть установлен в "table", "ul", или "divs" для того, чтобы соответствовать ``formstyle`` вмещающей в себя формы.
 
-You can create new widgets or extend existing widgets.
+Вы можете создавать новые виджеты или расширить существующие виджеты.
 
-``SQLFORM.widgets[type]`` is a class and ``SQLFORM.widgets[type].widget`` is a static member function of the corresponding class. Each widget function takes two arguments: the field object, and the current value of that field. It returns a representation of the widget. As an example, the string widget could be re-coded as follows:
+``SQLFORM.widgets[type]`` это класс и ``SQLFORM.widgets[type].widget`` является статическим членом соответствующего класса. Каждая функция виджета принимает два аргумента: объект field и текущее значение этого поля. Она возвращает представление виджета. В качестве примера, string виджет может быть повторно закодирован следующим образом:
 ``
 def my_string_widget(field, value):
     return INPUT(_name=field.name,
@@ -2374,14 +2376,14 @@ def my_string_widget(field, value):
 Field('comment', 'string', widget=my_string_widget)
 ``:code
 
-The id and class values must follow the convention described later in this chapter. A widget may contain its own validators, but it is good practice to associate the validators to the "requires" attribute of the field and have the widget get them from there.
+Значения id и классов должны следовать соглашению, описанному далее в этой главе. Виджет может содержать свои собственные валидаторы, но хорошая практика заключается в том, чтобы привязать валидаторы к "requires" атрибуту поля и иметь виджет получающий их оттуда.
 
-#### Autocomplete widget
+#### Виджет автозаполнения
 ``autocomplete``:inxx
 
-There are two possible uses for the autocomplete widget: to autocomplete a field that takes a value from a list or to autocomplete a reference field (where the string to be autocompleted is a representation of the reference which is implemented as an id).
+Есть два возможных использования для виджета автозаполнения: для автозаполнения поля, которое принимает значение из списка или для автозаполнения ссылочного поля (где строка для автозаполнения является представлением этой ссылки, которая реализуется в качестве идентификатора id).
 
-The first case is easy:
+Первый случай легкий:
 ``
 db.define_table('category',Field('name'))
 db.define_table('product',Field('name'),Field('category'))
@@ -2389,9 +2391,9 @@ db.product.category.widget = SQLFORM.widgets.autocomplete(
      request, db.category.name, limitby=(0,10), min_length=2)
 ``:code
 
-Where ``limitby`` instructs the widget to display no more than 10 suggestions at the time, and ``min_length`` instructs the widget to perform an Ajax callback to fetch suggestions only after the user has typed at least 2 characters in the search box.
+Где ``limitby`` инструктирует виджет отображать не более 10 предположений за раз, и ``min_length`` инструктирует виджет выполнить обратный вызов Ajax, чтобы вытащить предположения только после того, как пользователь набрал не менее 2 символов в поле поиска.
 
-The second case is more complex:
+Второй случай является более сложным:
 ``
 db.define_table('category',Field('name'))
 db.define_table('product',Field('name'),Field('category'))
@@ -2399,14 +2401,14 @@ db.product.category.widget = SQLFORM.widgets.autocomplete(
      request, db.category.name, id_field=db.category.id)
 ``:code
 
-In this case the value of ``id_field`` tells the widget that even if the value to be autocompleted is a ``db.category.name``, the value to be stored is the corresponding ``db.category.id``. An optional parameter is ``orderby`` that instructs the widget on how to sort the suggestions (alphabetical by default).
+В этом случае значение ``id_field`` говорит виджету, что если автозаполняемое значение берется из ``db.category.name``, то сохраняемое значение должно быть взято из ``db.category.id``. Необязательным параметром является ``orderby``, который указывает виджету, как сортировать предположения (алфавитный по умолчанию).
 
-This widget works via Ajax. Where is the Ajax callback? Some magic is going on in this widget. The callback is a method of the widget object itself. How is it exposed? In web2py any piece of code can generate a response by raising an HTTP exception. This widget exploits this possibility in the following way: the widget sends the Ajax call to the same URL that generated the widget in the first place and puts a special token in the request.vars. Should the widget get instantiated again, it finds the token and raises an HTTP exception that responds to the request. All of this is done under the hood and hidden to the developer.
+Этот виджет работает через Ajax. Где обратный вызов Ajax? Некоторая магия происходит в этом виджете. Обратный вызов является методом самого виджета объекта. Как он выставлен? В web2py любой кусок кода может сгенерировать ответ через поднятие исключения HTTP. Этот виджет эксплуатирует эту возможность следующим образом: виджету отправляет вызов Ajax на тот же самый URL, который сгенерировал виджет в первое место и помещает специальный токен в request.vars. Если виджет получает экземпляр еще раз, он находит токен и вызывает исключение HTTP, которое отвечает на запрос. Все это делается под капотом и скрыто от разработчика.
 
-## ``SQLFORM.grid`` and ``SQLFORM.smartgrid``
+## Объекты ``SQLFORM.grid`` и ``SQLFORM.smartgrid``
 
 -------
-Attention: grid and smartgrid were experimental prior web2py version 2.0 and were vulnerable to information leakage. The grid and smartgrid are no longer experimental, but we are still not promising backward compatibility of the presentation layer of the grid, only of its APIs.
+Внимание: grid и smartgrid были экспериментальными до web2py версии 2.0 и были уязвимы для утечек информации. Объекты grid и smartgrid больше не являются экспериментальными, но мы все еще не обещаем обратную совместимость презентационного слоя grid, только его API.
 -------
 
 These are two high level objects that create complex CRUD controls. They provide pagination, the ability to browse, search, sort, create, update and delete records from a single object.
