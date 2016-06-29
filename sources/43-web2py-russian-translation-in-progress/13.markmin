@@ -76,67 +76,65 @@ web2py предоставляет файл ``fcgihandler.py`` для взаим�
 
 web2py также включает в себя ``gaehandler.py`` для взаимодействия с Google App Engine (GAE). На GAE, веб-приложения работают "в облаке". Это означает, что фреймворк полностью абстрагирует любые аппаратные детали. Веб-приложение автоматически реплицируется столько раз, сколько необходимо для обслуживания всех одновременных запросов. Репликация в данном случае означает более чем несколько потоков на одном сервере; он также означает несколько процессов на различных серверах. GAE достигает такого уровня масштабируемости путем блокирования доступа на запись к файловой системе, и вся постоянная информация должна храниться в хранилище данных Google BigTable или в кэше памяти.
 
-On non-GAE platforms, scalability is an issue that needs to be addressed, and it may require some tweaks in the web2py applications. The most common way to achieve scalability is by using multiple web servers behind a load-balancer (a simple round robin, or something more sophisticated, receiving heartbeat feedback from the servers).
+На не-GAE платформах, масштабируемость является вопросом, который необходимо решить, и это может потребовать некоторых настроек в приложениях web2py. Наиболее распространенным способом для достижения масштабируемости является использование нескольких веб-серверов позади балансера нагрузки (простой round-robin, или что-то более сложное, получая обратную связь от сердцебиения серверов).
 
-Even if there are multiple web servers, there must be one, and only one, database server. By default, web2py uses the file system for storing sessions, error tickets, uploaded files, and the cache. This means that in the default configuration, the corresponding folders have to be shared folders.
+Даже если есть несколько веб-серверов, должен быть один, и только один сервер баз данных. По умолчанию, web2py использует файловую систему для хранения сессий, билетов ошибок, загруженных файлов и кэша. Это означает, что в конфигурации по умолчанию, соответствующие папки должны быть общим папкам.
 
 [[image @///image/en9100.png center 300px]]
 
-In the rest of the chapter, we consider various recipes that may provide an improvement over this naive approach, including:
-- Store sessions in the database, in cache or do not store sessions at all.
-- Store tickets on local filesystem and move them into the database in batches.
-- Use memcache instead of cache.ram and cache.disk.
-- Store uploaded files in the database instead of the shared filesystem.
+В оставшейся части главы мы рассмотрим различные рецепты, которые помогут обеспечить улучшение по сравнению с этим наивным подходом, в том числе:
+- Хранить сессии в базе данных, в кэше или не хранить сессии вообще.
+- Хранить билеты на локальной файловой системе и переместить их в базу данных в пакетном режиме.
+- Использовать memcache вместо cache.ram и cache.disk.
+- Хранить загруженные файлы в базе данных вместо общей файловой системы.
 
-While we recommend following the first three recipes, the fourth recipe may provide an advantage mainly in the case of small files, but may be counterproductive for large files.
+В то время как мы рекомендуем следующие три первые рецепта, четвертый рецепт может обеспечить преимущество в основном в случае небольших файлов, но может быть контрпродуктивным для больших файлов.
 
-### ``anyserver.py``
+### Файл ``anyserver.py``
 
 ``anyserver``:inxx ``bjoern``:inxx ``cgi``:inxx ``cherrypy``:inxx ``diesel``:inxx ``eventlet``:inxx ``fapws``:inxx ``flup``:inxx ``gevent``:inxx ``gunicorn``:inxx ``mongrel2``:inxx ``paste``:inxx ``tornado``:inxx ``twisted``:inxx ``wsgiref``:inxx
 
-Web2py comes with a file called ``anyserver.py`` that implements WSGI interfaces to the following popular servers: bjoern, cgi, cherrypy, diesel, eventlet,
-fapws, flup, gevent, gunicorn, mongrel2, paste,
-rocket, tornado,  twisted, wsgiref
+Web2py поставляется с файлом под названием ``anyserver.py``, который реализует WSGI интерфейсы к следующим популярным серверам: bjoern, cgi, cherrypy, diesel, eventlet, fapws, flup, gevent, gunicorn, mongrel2, paste, rocket, tornado,  twisted, wsgiref
 
-You can use any of these servers, for example Tornado, simply by doing:
+Вы можете использовать любой из этих серверов, например, Tornado, просто сделав:
 
 ``
 python anyserver.py -s tornado -i 127.0.0.1 -p 8000 -l -P
 ``
 
-Here ``-l`` is for logging and ``-P`` is for the profiler.
-For information on all the command line options use "-h":
+Здесь ``-l`` для регистрации и ``-P`` для профайлера.
+Для информации обо всех опциях командной строки наберите "-h":
 
 ``
 python anyserver.py -h
 ``:code
 
-### Linux and Unix
+### Linux и Unix
 
-#### One step production deployment
+#### Развертывание производства в Один шаг
 
-Here are some steps to install apache+python+mod_wsgi+web2py+postgresql from scratch.
+Вот некоторые шаги, чтобы установить apache+python+mod_wsgi+web2py+postgresql с нуля.
 
-On Ubuntu:
+На Ubuntu:
 ``
 wget http://web2py.googlecode.com/hg/scripts/setup-web2py-ubuntu.sh
 chmod +x setup-web2py-ubuntu.sh
 sudo ./setup-web2py-ubuntu.sh
 ``
-On Fedora:
+На Fedora:
 ``
 wget http://web2py.googlecode.com/hg/scripts/setup-web2py-fedora.sh
 chmod +x setup-web2py-fedora.sh
 sudo ./setup-web2py-fedora.sh
 ``
-Both of these scripts should run out of the box, but every Linux installation is a bit different, so make sure you check the source code of these scripts before you run them. In the case of Ubuntu, most of what they do is explained below. They do not implement the scalability optimizations discussed below.
+Оба из этих скриптов должны работать из коробки, но каждая установка Linux немного отличается, поэтому убедитесь, что вы проверили исходный код этих скриптов, прежде чем запускать их. В случае Ubuntu, большая часть того, что они делают это объяснено ниже. Они не реализуют оптимизаций масштабируемости, обсуждаемые ниже.
 
-#### Apache setup
+#### Установка Apache
 
-In this section, we use Ubuntu Server Edition as the reference platform. The configuration commands are very similar on other Debian-based Linux distribution, but they may differ for Fedora-based systems (which uses ``yum`` instead of ``apt-get``).
-You can use either 2.2.x or 2.4.x
+В этом разделе мы используем Ubuntu Server Edition в качестве эталонной платформы. Команды конфигурации очень похожи на другой Debian-основанный дистрибутив Linux, но они могут отличаться для Fedora-основанных систем (который использует ``yum`` вместо ``apt-get``).
+Вы можете использовать 2.2.x или 2.4.x
 
-First, make sure all the necessary Python and Apache packages are installed by typing the following shell commands:
+Во-первых, убедитесь, что все необходимые пакеты Python и Apache установлены, введя следующие команды оболочки:
 ``
 sudo apt-get update
 sudo apt-get -y upgrade
@@ -148,7 +146,7 @@ sudo apt-get -y install libapache2-mod-wsgi
 sudo apt-get -y install libapache2-mod-proxy-html
 ``:code
 
-Then, enable the SSL module, the proxy module, and the WSGI module in Apache:
+Затем включите модуль SSL, модуль proxy, и модуль WSGI в Apache:
 ``
 sudo ln -s /etc/apache2/mods-available/proxy_http.load \
            /etc/apache2/mods-enabled/proxy_http.load
@@ -158,33 +156,33 @@ sudo a2enmod proxy_http
 sudo a2enmod wsgi
 ``:code
 
-Create the SSL folder, and put the SSL certificates inside it:
+Создайте папку SSL и поместите SSL сертификаты внутри нее:
 ``
 sudo mkdir /etc/apache2/ssl
 ``:code
 
-You should obtain your SSL certificates from a trusted Certificate Authority such as verisign.com, but, for testing purposes, you can generate your own self-signed certificates following the instructions in ref.``openssl``:cite
+Вы должны получить свои SSL сертификаты от доверенного центра сертификации, такие как verisign.com, но, для целей тестирования, вы можете создавать свои собственные самозаверенные сертификаты, следуя инструкциям в ``openssl``:cite
 
-Then restart the web server:
+Затем перезапустите веб-сервер:
 ``
 sudo /etc/init.d/apache2 restart
 ``:code
 
-The Apache configuration file is:
+Файл конфигурации Apache:
 ``
 /etc/apache2/sites-available/default
 ``:code
 
-The Apache logs are in:
+Журналы (logs) Apache находятся в:
 ``
 /var/log/apache2/
 ``:code
 
 #### mod_wsgi
 
-Download and unzip web2py source on the machine where you installed the web server above.
+Скачайте и распакуйте web2py исходник на машине, где установлен вышеуказанный веб-сервер.
 
-Install web2py under ``/home/www-data/``, for example, and give ownership to user www-data and group www-data. These steps can be performed with the following shell commands:
+Установите web2py под ``/home/www-data/``, например, и дайте права владельца пользователю www-data и group www-data. Эти шаги могут быть выполнены с помощью следующих команд оболочки:
 ``
 cd /home/www-data/
 sudo wget http://web2py.com/examples/static/web2py_src.zip
@@ -192,12 +190,12 @@ sudo unzip web2py_src.zip
 sudo chown -R www-data:www-data /home/www-data/web2py
 ``:code
 
-To set up web2py with mod_wsgi, create a new Apache configuration file:
+Чтобы настроить web2py с mod_wsgi, создайте новый конфигурационный файл Apache:
 ``
 /etc/apache2/sites-available/web2py
 ``:code
 
-and include the following code:
+и включите следующий код:
 ``
 <VirtualHost *:80>
   ServerName web2py.example.com
@@ -237,40 +235,30 @@ and include the following code:
 </VirtualHost>
 ``:code
 
-When you restart Apache, it should pass all the requests to web2py without going through the Rocket wsgiserver.
+При перезагрузке Apache, он должен передать все запросы к web2py без прохождения через Rocket wsgiserver.
 
-##### Move the handler script
+##### Перемещение обработчика скрипта
 
-Finally, you need to relocate the handler script ``web2py/handlers/wsgihandler.py``. As documented in the handlers directory, the script you want should be moved or copied to the parent directory (i.e. the same directory as the ``web2py.py`` script). symlinking may cause apache permission problems.
+И, наконец, необходимо переместить обработчика скрипта ``web2py/handlers/wsgihandler.py``. Как указано в каталоге handlers, скрипт, который вы хотите, должен быть перемещен или скопирован в родительский каталог (т.е. тот же каталог, как ``web2py.py`` скрипта). Символические ссылки могут вызывать проблемы с разрешениями apache.
 
-##### Some wsgi background
-Here are some explanations:
+##### Некоторые WSGI в фоне
+
+Вот некоторые пояснения:
 ``
 WSGIDaemonProcess web2py user=www-data group=www-data display-name=%{GROUP}
 ``:code
 
-defines a daemon process group in context of "web2py.example.com". By
-defining this inside of the virtual host, only this virtual host can access this using WSGIProcessGroup, including any virtual host with the same server name but on a different
-port. The "user" and "group"
-options should be set to the user who has write access to the
-directory where web2py was setup. You do not need to set "user" and
-"group" if you made the web2py installation directory writable by
-the default user that Apache runs as. The "display-name" option
-makes the process name appears in ``ps`` output as "(wsgi-web2py)"
-instead of as name of Apache web server executable. As no "processes"
-or "threads" options are specified, the daemon process group will have a
-single process with 15 threads running within that process. This is
-usually more than adequate for most sites and should be left as is.
-If overriding it, do not use "processes=1" as doing so will disable
-any in-browser WSGI debugging tools that check the "wsgi.multiprocess"
-flag. This is because any use of the "processes" option will cause
-that flag to be set to true, even a single process, and such tools
-expect that it be set to false. Note: if your application code
-or third party extension module is not
-thread safe, use options "processes=5 threads=1" instead. This will
-create five processes in the daemon process group where each process
-is single threaded. You might consider using "maximum-requests=1000"
-if your application leaks Python objects because it is unable to garbage collect properly.
+defines a daemon process group in context of "web2py.example.com". By defining this inside of the virtual host, only this virtual host can access this using WSGIProcessGroup, including any virtual host with the same server name but on a different port. 
+
+The "user" and "group" options should be set to the user who has write access to the directory where web2py was setup. You do not need to set "user" and "group" if you made the web2py installation directory writable by the default user that Apache runs as. 
+
+The "display-name" option makes the process name appears in ``ps`` output as "(wsgi-web2py)" instead of as name of Apache web server executable. As no "processes" or "threads" options are specified, the daemon process group will have a single process with 15 threads running within that process. 
+
+This is usually more than adequate for most sites and should be left as is. If overriding it, do not use "processes=1" as doing so will disable any in-browser WSGI debugging tools that check the "wsgi.multiprocess" flag. This is because any use of the "processes" option will cause
+that flag to be set to true, even a single process, and such tools expect that it be set to false. Note: if your application code or third party extension module is not thread safe, use options "processes=5 threads=1" instead. 
+
+This will create five processes in the daemon process group where each process is single threaded. You might consider using "maximum-requests=1000" if your application leaks Python objects because it is unable to garbage collect properly.
+
 ``
 WSGIProcessGroup web2py
 ``:code
@@ -313,16 +301,12 @@ and
 
 blocks public access to **admin** and **appadmin**
 
-Normally we would just allow permission to the whole directory where the WSGI
-script file is located, but web2py places
-the WSGI script file in a directory which contains other source code,
-including the admin interface password. Opening up
-the whole directory would cause security issues, because technically
-Apache would be given permission to serve all the files up to any user
-who traversed to that directory via a mapped URL.
-To avoid security problems, explicitly deny access to the contents of
-the directory, except for the WSGI script file, and prohibit a user
-from doing any overrides from a .htaccess file to be extra safe.
+Normally we would just allow permission to the whole directory where the WSGI script file is located, but web2py places the WSGI script file in a directory which contains other source code,
+including the admin interface password. 
+
+Opening up the whole directory would cause security issues, because technically Apache would be given permission to serve all the files up to any user who traversed to that directory via a mapped URL.
+
+To avoid security problems, explicitly deny access to the contents of the directory, except for the WSGI script file, and prohibit a user from doing any overrides from a .htaccess file to be extra safe.
 
 You can find a completed, commented, Apache wsgi configuration file in:
 ``
