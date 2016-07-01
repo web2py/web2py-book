@@ -1828,27 +1828,27 @@ session.connect(request,response,db=MEMDB(cache.memcache.client))
 
 Обратите внимание на то, что на GAE cache.ram и cache.disk не должны использоваться, поэтому мы делаем им указывать на cache.memcache.
 
-#### Datastore issues
+#### Вопросы Datastore
 
-While the Google Clould SQL functions as a regular SQL database, and is indeed based at the time of writing on mysql, Google Datastore presents significant differences. 
+В то время как функции Google Clould SQL как регулярная база данных SQL, и на самом деле основана на момент написания на MySQL, Google Datastore представляет существенные различия. 
 
-##### Eventual consistency
+##### Возможная согласованность
 
-The ''eventual consistency'' offered by Google Datastore deserves special attention. 
-In the Datastore, transactions that rely on primary Datastore keys, or a shared entity group, offer a strong consistency: every subsequent transaction or query will see the result of any prior transaction for the same key or entity group.
-On the other hand, queries that do not rely on primary keys or shared entity groups offer only ''eventual consistency'': new or modified data will be eventually made available to queries, after an unspecified delay that is typically up to a few seconds. 
+''Возможная согласованность'' предлагаемая Google Datastore заслуживает особого внимания. 
+В Datastore, транзакции, которые полагаются на первичные ключи Datastore, или общую группу сущностей, предлагают сильную согласованность: каждая последующая транзакция или запрос будет видеть результат какой-либо предварительной транзакции для того же ключа или группы сущностей.
+С другой стороны, запросы, которые не зависят от первичных ключей или общих групп сущностей предлагают только ''возможную согласованность'': новые или измененные данные будут в конечном счете доступными для запросов, после неопределенной задержки, которая обычно составляет до нескольких секунд. 
 
-web2py does not rely on primary Datastore keys, nor shared entity groups.  The statement:
+web2py не полагается на первичные ключи Datastore, ни на общие группы сущностей. Выражение:
 
 ``
 id = db.table.insert(field1=value1, field2=value2)
 ``:code
 
-has the following effect:
-- A new row is inserted in the table ``db.table``; the row has a field ``id`` whose value is assigned by web2py.  The row also has a primary Datastore key, but this primary key is ''not'' ``id``, and is not exposed.
-- The indices on ``db.table`` are updated.  In particular, the index over ``id`` is updated, so the new row is ''eventually'' available to queries over ``db.table.id``. 
-Only after these two steps terminate, is the new data available for queries by ``id``. 
-In particular, the following common web2py paradigm will ''fail'':
+имеет следующий эффект:
+- Новая строка вставляется в таблицу ``db.table``; строка имеет поле ``id``, значение которому присваивается web2py.  Строка также имеет первичный ключ Datastore, но ``id`` ''не'' является этим первичным ключом, и не выставляется.
+- Индексы на ``db.table`` обновляются. В частности, обновляется индекс по полю ``id``, поэтому новая строка ''в конце концов'' доступна для запросов через ``db.table.id``.
+Только после этих двух шагов выполняется завершение, и новые данные становятся доступными для запросов через ``id``. 
+В частности, следующая общая парадигма web2py будет ''неудачой'':
 
 ``
 def insert():
@@ -1867,15 +1867,15 @@ def view():
     return dict(form=form)
 ``:code
 
-Once a user visits the ``insert`` page and inserts data, the user is redirected to the ``view`` page. When using the Google Datastore, often the data just inserted is not found in the ``view`` controller.  Why?
+После того, как пользователь посетит страницу ``insert`` и вставит данные, пользователь перенаправляется на ``view`` страницу. При использовании Google Datastore, зачастую данные, которые только что вставили, не могут быть найдены во `` view`` контроллере. Почему?
 
-What happens is this.  In the ``insert`` controller, the data is inserted in the database, and the transaction is completed.  Then, asynchronously and after the transaction completes, Google Datastore rebuilds the indices, including the index on the ``id`` field of ``db.table``.  When the user accesses the ``view`` controller, there is no guarantee that the index on ``db.table.id`` already includes the new data item, and thus, the user is often presented with the "Data not found" message.
+Как это происходит. В ``insert`` контроллере, данные вставляются в базу данных, и транзакция завершается.  Затем, асинхронно и после завершения транзакции, Google Datastore перестраивает индексы, в том числе индекс на ``id`` поле ``db.table``.  Когда пользователь обращается к ``view`` контроллеру, то нет никакой гарантии, что индекс на ``db.table.id`` уже включает в себя новый элемент данных, и, таким образом, пользователю часто преподносится сообщение "Данные не найдены ".
 
-##### Lack of JOINs
+##### Отсутствие сцепок
 
-The lack of JOIN operations and typical relational functionality of the Datastore requires removing JOINs from web2py queries and de-normalizing the database.
+Отсутствие JOIN операций и типичной реляционной функциональности Datastore требует удаления сцепок из web2py запросов и де-нормализации базы данных.
 
-Google App Engine supports some special field types, such as ``ListProperty`` and ``StringListProperty``. You can use these types with web2py using the following old syntax:
+Google App Engine поддерживает некоторые специальные типы полей, такие как ``ListProperty`` и ``StringListProperty``. Вы можете использовать эти типы с web2py, используя следующий старый синтаксис:
 
 ``
 from gluon.dal import gae
@@ -1892,17 +1892,17 @@ db.define_table('product',
     Field('tags', 'list:string')
 ``:code
 
-In both cases the "tags" field is a ``StringListProperty`` therefore its values must be lists of strings, compatibly with the GAE documentation. The second notation is to be preferred because web2py will treat the field in a smarter way in the context of forms and because it will work with relational databases too.
+В обоих случаях поле "tags" является ``StringListProperty`` поэтому его значениями должны быть списки из строк, совместимые с документацией GAE. Вторая нотация является более предпочтительной, поскольку web2py относится к полу более разумным способом в контексте форм и потому что он будет работать с реляционными базами данных тоже.
 
-Similarly, web2py supports ``list:integer`` and ``list:reference`` which map into a ``ListProperty(int)``.
+Аналогичным образом, web2py поддерживает``list:integer`` и ``list:reference``, которые сопоставляются с ``ListProperty(int)``.
 
-``list`` types are discussed in more detail in Chapter 6.
+``list`` типы обсуждаются более подробно в главе 6.
 
-#### Database migrations
+#### Миграции базы данных
 
-A good practice for migrations using Google AppEngine is the following.  
-AppEngine supports multiple code versions. 
-Use one code version (e.g., version 1) for the user-visible site, and another code version (e.g., version 2) for the admin code.  In ``app.yaml`` for version 2, declare the handler as follows (assuming Python 2.7 is used):
+Хорошая практика для миграции с помощью Google AppEngine заключается в следующем.  
+AppEngine поддерживает несколько версий кода. 
+Используется одна версия кода (например, версия 1) для видимого пользователя сайта, и другая версия кода (например, версия 2) для кода администратора.  В `` app.yaml`` для версии 2, объявите обработчик следующим образом (предполагается, что используется Python 2.7):
 
 ``
 - url: .*
@@ -1911,29 +1911,33 @@ Use one code version (e.g., version 1) for the user-visible site, and another co
   login: admin
 ``:code
 
-The ``login: admin`` clause ensures that only admins can use version 2.
-In the database connection string, specify ``migrate_enabled=False``. 
-To perform a migration, it is best to disable database access concurrent to the migration.
-Proceed as follows:
-- Add a file named ``DISABLED`` to the top directory of your version 1 application (the parent directory of the ``/controllers``, ``/views``, etc. directories), and upload the new version to GAE. This will disable version 1, and display a message ''"The site is temporarily down for maintenance"''. 
-- Upload to version 2 code with ``migrate_enabled=True`` in the db connection string, and visit it from an admin account, triggering the migration.
-- Upload to version 2 code with ``migrate_enabled=False``, to disable further migrations.
-- Remove the file named ``DISABLED`` from version 1, and upload the code to version 1.  This makes the site again visible to all.
+Пункт ``login:admin`` гарантирует, что только администраторы могут использовать версию 2.
+В строке подключения база данных, укажите ``migrate_enabled=False``. 
+Чтобы выполнить миграцию, то лучше отключить доступ к базе данных одновременно с миграцией.
 
-#### GAE and https
+Выполните следующие действия:
+- Добавьте файл с именем ``DISABLED`` в корневой каталог вашего приложения версии 1 (родительский каталог из ``/controllers``, ``/views``, и т.д. директорий), и загрузите новую версию на GAE. Это приведет к отключению версии 1, и выведет на экран сообщение ''"Сайт временно закрыт на техническое обслуживание"''. 
 
-If you application has id "myapp" your GAE domain is
+- Загрузите до версии 2 кода с ``migrate_enabled=True`` в строке подключения db, и посетите его из учетной записи администратора, запустите миграцию.
+
+- Загрузите до версии 2 кода с ``migrate_enabled=False``, отключите дальнейшие миграции.
+
+- Удалите файл с именем ``DISABLED`` от версии 1, и загрузите код до версии 1.  Это делает сайт снова видимым для всех.
+
+#### GAE и https
+
+Если ваше приложение имеет id "myapp", то вашим доменом GAE является
 
 ``
 http://myapp.appspot.com/
 ``:code
 
-and it can also be accessed via HTTPS
+и к нему также можно получить доступ через HTTPS
 
 ``
 https://myapp.appspot.com/
 ``:code
 
-In this case it will use an "appspot.com" certificate provided by Google.
+В этом случае он будет использовать "appspot.com" сертификат, предоставленный Google.
 
-You can register a DNS entry and use any other domain name you own for your app but you will not be able to use HTTPS on it. At the time of writing, this is a GAE limitation.
+Вы можете зарегистрировать ввод DNS и использовать любое другое доменное имя, вы владелец для вашего приложения, но вы не будете иметь возможность использовать HTTPS на нем. На момент написания статьи, это ограничение GAE.
