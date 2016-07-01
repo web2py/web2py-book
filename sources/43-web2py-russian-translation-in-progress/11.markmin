@@ -1,0 +1,590 @@
+## jQuery и Ajax
+``Ajax``:inxx
+
+В то время как web2py в основном предназначен для разработки серверных приложений, скаффолдинг-приложение **welcome** идет с базовой jQuery библиотекой``jquery``:cite, jQuery календарями (date picker, datetime picker и clock), и некоторыми дополнительными JavaScript функциями, основанными на jQuery.
+
+Ничто в web2py не мешает вам использовать другие библиотеки Ajax, такие как Prototype, ExtJS, или YUI, но мы решили упаковать JQuery, потому что мы находим ее более простой в использовании и более мощной, чем другие эквивалентные библиотеки. Мы также считаем, что она отражает дух функциональности и лаконичности web2py.
+
+### web2py_ajax.html
+
+Скаффолдинг-приложение web2py "welcome" включает в себя файл с именем
+``
+views/web2py_ajax.html
+``:code
+
+который выглядит следующим образом:
+
+``
+{{
+response.files.insert(0,URL('static','js/jquery.js'))
+response.files.insert(1,URL('static','css/calenadar.css'))
+response.files.insert(2,URL('static','js/calendar.js'))
+response.include_meta()
+response.include_files()
+}}
+<script type="text/javascript"><!--
+    // These variables are used by the web2py_ajax_init
+        // function in web2py.js (which is loaded below).
+    var w2p_ajax_confirm_message =
+        "{{=T('Are you sure you want to delete this object?')}}";
+    var w2p_ajax_date_format = "{{=T('%Y-%m-%d')}}";
+    var w2p_ajax_datetime_format = "{{=T('%Y-%m-%d %H:%M:%S')}}";
+//--></script>
+<script src="{{=URL('static','js/web2py.js')}}"
+        type="text/javascript"></script>
+``:code
+
+Данный файл входит в HEAD "layout.html" по умолчанию и предоставляет следующие сервисы:
+- Включает "static/jquery.js".
+- Включает "static/calendar.js" and "static/calendar.css", which are used for the popup calendar.
+- Включает все ``response.meta`` заголовки
+- Включает все ``response.files`` (требуемые CSS и JS, мере их объявления в коде)
+- Задает переменные формы и включения "static/js/web2y.js"
+
+"web2py.js" выполняет следующее:
+- Определяет ``ajax`` функцию (на основе JQuery $.ajax).
+- Делает любой DIV из класса "error" или любой тег объект из класса "flash" сдвигающимся вниз.
+- Предотвращает набор недействительных целых чисел в полях INPUT класса "integer".
+- Предотвращает набор недопустимых чисел с плавающей точкой в полях INPUT класса "double".
+- Подключает поля INPUT типа "date" со всплывающим окном выбора даты.
+- Подключает поля INPUT типа "datetime" со всплывающим окном выбора даты и времени.
+- Подключает поля INPUT типа "time" со всплывающим окном выбора времени.
+- Определяет ``web2py_ajax_component``, очень важный инструмент, который будет описан в Главе 12.
+- Определяет ``web2py_websocket``, функция, которая может быть использована для HTML5 WebSockets (не описано в этой книге, но вы можете прочитать примеры в источнике "gluon/contrib/websocket__messaging.py"). ``Websockets``:inxx
+- Определяет функции для вычисления энтропии и проверки входных данных в поле ввода пароля.
+
+Он также включает ``popup``, ``collapse``, и ``fade`` функции для обеспечения обратной совместимости.
+
+Ниже приведен пример того, как другие эффекты хорошо играют вместе.
+
+Рассмотрим **test** приложение со следующей моделью:
+``
+db = DAL("sqlite://storage.sqlite")
+db.define_table('child',
+     Field('name'),
+     Field('weight', 'double'),
+     Field('birth_date', 'date'),
+     Field('time_of_birth', 'time'))
+
+db.child.name.requires=IS_NOT_EMPTY()
+db.child.weight.requires=IS_FLOAT_IN_RANGE(0,100)
+db.child.birth_date.requires=IS_DATE()
+db.child.time_of_birth.requires=IS_TIME()
+``:code
+
+с этим "default.py" контроллером:
+``
+def index():
+    form = SQLFORM(db.child)
+    if form.process().accepted:
+        response.flash = 'record inserted'
+    return dict(form=form)
+``:code
+
+и следующим "default/index.html" представлением:
+``
+{{extend 'layout.html'}}
+{{=form}}
+``:code
+
+Действие "index" порождает следующую форму:
+
+[[image @///image/en7000.png center 480px]]
+
+Если недопустимая форма была отправлена, то сервер возвращает страницу с модифицированной формой, содержащей сообщения об ошибках. Сообщения об ошибках являются контейнерами DIV класса "error", и благодаря вышеприведенному коду web2py.js, ошибки появляется с эффектом сдвига-вниз:
+
+[[image @///image/en7100.png center 480px]]
+
+Цвет ошибок дается в коде CSS из "layout.html".
+
+Код web2py.js позволяет предотвратить набор недопустимого значения в поле ввода. Это делается до и в дополнение к, а не в качестве замены, проверки на стороне сервера.
+
+Код web2py.js отображает окно выбора даты при вводе в поле INPUT класса "date", и он отображает окно выбора даты-времени при вводе в поле INPUT класса "datetime". Вот пример:
+
+[[image @///image/en7200.png center 480px]]
+
+Код web2py.js также отображает следующее окно выбора времени при попытке редактирования поля INPUT класса "time":
+
+[[image @///image/en7300.png center 480px]]
+
+По представлению, действие контроллера устанавливает флеш ответ в сообщение "Запись вставлена". По умолчанию макет делает это сообщение в DIV с id = "flash". Код web2py.js несет ответственность за появление данного DIV и исчезновение при нажатии на него:
+
+[[image @///image/en7400.png center 480px]]
+
+Эти и другие эффекты доступны программно в представлениях и с помощью помощников в контроллерах.
+
+### jQuery эффекты
+``effects``:inxx
+
+Основные эффекты, описанные здесь, не требует каких-либо дополнительных файлов; все, что нужно уже включено в web2py_ajax.html.
+
+Объекты HTML/XHTML могут быть идентифицированы по их типу (например, DIV), их классам, или их id. Например:
+
+``
+<div class="one" id="a">Hello</div>
+<div class="two" id="b">World</div>
+``:code
+
+Они принадлежат к классу "one" и "two" соответственно. Они имеют идентификаторы равные "a" и "b", соответственно.
+
+В jQuery вы можете обратиться к первому со следующей CSS-подобной эквивалентной нотацией
+``
+jQuery('.one')    // адрес объекта по классу "one"
+jQuery('#a')      // адрес объекта по id "a"
+jQuery('DIV.one') // адрес по объекту типа "DIV" с классом "one"
+jQuery('DIV #a')  // адрес по объекту типа "DIV" с id "a"
+``:code
+
+и ко второму с
+``
+jQuery('.two')
+jQuery('#b')
+jQuery('DIV.two')
+jQuery('DIV #b')
+``:code
+
+или вы можете обратиться к обоим с
+``
+jQuery('DIV')
+``:code
+
+Объекты Tag связаны с событиями, такими как "onclick". jQuery позволяет связать эти события с эффектами, например "slideToggle":
+``
+<div class="one" id="a" onclick="jQuery('.two').slideToggle()">Hello</div>
+<div class="two" id="b">World</div>
+``:code
+
+Теперь, если вы нажмете на "Hello", то "World" исчезает. Если вы повторно нажмете, то "World" появляется вновь. Вы можете сделать тег по умолчанию скрытым, придавая ему скрытый класс:
+
+``
+<div class="one" id="a" onclick="jQuery('.two').slideToggle()">Hello</div>
+<div class="two hidden" id="b">World</div>
+``:code
+
+Вы также можете связать действия с событиями за пределами самого тега. Предыдущий код можно переписать следующим образом:
+``
+<div class="one" id="a">Hello</div>
+<div class="two" id="b">World</div>
+<script>
+jQuery('.one').click(function(){jQuery('.two').slideToggle()});
+</script>
+``:code
+
+Эффекты возвращают вызывающий объект, так что они могут быть сцеплены.
+
+Когда событию ``click`` задана функция обратного вызова, то она вызывается по щелчку. Точно так же для ``change``, ``keyup``, ``keydown``, ``mouseover`` и т.д.
+
+Распространенной ситуацией является необходимость выполнить некоторый JavaScript код только после того, как был загружен весь документ. Обычно это делается через атрибут ``onload`` тега BODY, но jQuery обеспечивает альтернативный способ, который не требует редактирования макета:
+``
+<div class="one" id="a">Hello</div>
+<div class="two" id="b">World</div>
+<script>
+jQuery(document).ready(function(){
+   jQuery('.one').click(function(){jQuery('.two').slideToggle()});
+});
+</script>
+``:code
+
+Тело безымянной функции выполняется только тогда, когда документ будет готов, то есть после того, как он был полностью загружен.
+
+Вот список полезных имен событий:
+
+##### События формы
+- ``onchange``:   Скрипт выполняется, когда элемент изменяется
+- ``onsubmit``:   Скрипт выполняется, когда форма отправлена
+- ``onreset``:    Скрипт выполняется, когда форма сброшена
+- ``onselect``:   Скрипт выполняется, когда элемент выбран
+- ``onblur``:     Скрипт выполняется, когда элемент теряет фокус
+- ``onfocus``:    Скрипт выполняется, когда элемент получает фокус
+
+##### События клавиатуры
+- ``onkeydown``:  Скрипт выполняется, когда клавиша нажата
+- ``onkeypress``: Скрипт выполняется, когда клавиша нажата и отпущена
+- ``onkeyup``:    Скрипт выполняется, когда клавиша отпущена
+
+##### События мыши
+- ``onclick``:     Скрипт выполняется на щелчок мыши
+- ``ondblclick``:  Скрипт выполняется на двойной щелчок мыши
+- ``onmousedown``: Скрипт выполняется, когда кнопка мыши нажата
+- ``onmouseup``:   Скрипт выполняется, когда кнопка мыши отпущена
+- ``onmousemove``: Скрипт выполняется, когда указатель мыши перемещается
+- ``onmouseout``:  Скрипт выполняется, когда указатель мыши перемещается из элемента
+- ``onmouseover``: Скрипт выполняется, когда указатель мыши перемещается на элемент
+
+Вот список полезных эффектов, определяемых через jQuery:
+
+##### Эффекты
+- ``jQuery(...).show()``: Делает объект видимым
+- ``jQuery(...).hide()``: Делает объект скрытым
+- ``jQuery(...).slideToggle(speed, callback)``: Заставляет объект скользить вверх или вниз
+- ``jQuery(...).slideUp(speed, callback)``: Заставляет объект скользить вверх
+- ``jQuery(...).slideDown(speed, callback)``: Заставляет объект скользить вниз
+- ``jQuery(...).fadeIn(speed, callback)``: Заставляет объект постепенно появляться
+- ``jQuery(...).fadeOut(speed, callback)``: Заставляет объект постепенно исчезать
+
+Аргумент speed обычно "slow", "fast" или пропущен (по умолчанию). Аргумент callback является необязательной функцией, которая вызывается когда эффект будет завершен.
+
+Эффекты jQuery также могут быть легко встроены в помощники, например, в представлении:
+``
+{{=DIV('click me!', _onclick="jQuery(this).fadeOut()")}}
+``:code
+
+Другие полезные методы и атрибуты для обработки выбранных элементов
+
+##### Методы и атрибуты
+- ``jQuery(...).prop(name)``: Возвращает имя значения атрибута
+- ``jQuery(...).prop(name, value)``: Задает имя атрибута к значению
+- ``jQuery(...).html()``: Без аргументов, он возвращает внутренний HTML из выбранных элементов, он принимает строку в качестве аргумента для замены содержимого тега.
+- ``jQuery(...).text()``: Без аргументов, он возвращает внутренний текст выбранного элемента (без тегов), если строка передается в качестве аргумента, то она заменяет внутренний текст на новые данные.
+- ``jQuery(...).val()``: Без аргументов, он возвращает текущее значение первого элемента из выбранных элементов, если строка передается в качестве аргумента, то она заменяет значение каждого элемента.
+- ``jQuery(...).css(name, value)``: С одним параметром, он возвращает значение CSS атрибута стиля, заданного для выбранных элементов. С двумя параметрами, он устанавливает новое значение для указанного атрибута CSS.
+- ``jQuery(...).each(function)``: Он перебирает выбранные элементы, задает и вызывает функцию с каждым элементом в качестве аргумента.
+- ``jQuery(...).index()``: Без аргументов, он возвращает значение индекса для первого элемента, выбранного и связанного с его братьями и сестрами. (То есть, индекс элемента LI). Если элемент передается в качестве аргумента, то он возвращает позицию элемента, относящуюся к набору выбранных элементов.
+- ``jQuery(...).length``: Этот атрибут возвращает количество выбранных элементов.
+
+jQuery очень компактная и лаконичная библиотека Ajax; Поэтому web2py не нужен дополнительный уровень абстракции поверх jQuery (за исключением ``ajax`` функций, рассмотренных ниже). API-интерфейсы jQuery являются доступными и готовы к употреблению в их нативной форме, когда это необходимо.
+
+Обратитесь к документации для получения дополнительной информации об этих эффектах и других API интерфейсах jQuery.
+
+Библиотека jQuery также может быть расширена с помощью плагинов и Виджетов Пользовательского Интерфейса. Эта тема здесь не рассматривается; смотрите подробности по ссылке ``jquery-ui``:cite.
+
+#### Условные поля в формах
+
+Типичной областью применения эффектов jQuery являются формы, которые изменяют свой внешний вид на основе значения их полей.
+
+Это очень просто в web2py, потому что помощник SQLFORM генерирует формы, которые являются "CSS дружественными". Форма содержит таблицу со строками. Каждая строка содержит метку, поле ввода, а также необязательный третий столбец. Элементы имеют идентификаторы, полученные строго от имени таблицы и имен полей.
+
+Соглашение состоит в том, что каждое поле INPUT имеет id ``tablename_fieldname`` и содержится в строке с id ``tablename_fieldname__row``.
+
+В качестве примера, создадим форму ввода, которая запрашивает имя налогоплательщика и имя супруга налогоплательщика, но только если он/она замужем.
+
+Создайте test приложение со следующей моделью:
+``
+db = DAL('sqlite://storage.sqlite')
+db.define_table('taxpayer',
+    Field('spouse_name'))
+``:code
+
+следующим "default.py" контроллером:
+``
+def index():
+    form = SQLFORM(db.taxpayer)
+    if form.process().accepted:
+        response.flash = 'record inserted'
+    return dict(form=form)
+``:code
+
+и следующим "default/index.html" представлением:
+``
+{{extend 'layout.html'}}
+{{=form}}
+<script>
+jQuery(document).ready(function(){
+   if(jQuery('#taxpayer_married').prop('checked'))
+        jQuery('#taxpayer_spouse_name__row').show();
+   else jQuery('#taxpayer_spouse_name__row').hide();
+   jQuery('#taxpayer_married').change(function(){
+        if(jQuery('#taxpayer_married').prop('checked'))
+            jQuery('#taxpayer_spouse_name__row').show();
+        else jQuery('#taxpayer_spouse_name__row').hide();});
+});
+</script>
+``:code
+
+Скрипт в представлении имеет эффект скрытия строки, содержащей имя супруга:
+
+[[image @///image/en7500.png center 480px]]
+
+Когда налогоплательщик проверяет "married" флажок, поле имя супруга вновь появляется:
+
+[[image @///image/en7600.png center 480px]]
+
+Здесь "taxpayer_married" это флажок, связанный с "boolean" полем "married" таблицы "taxpayer". "taxpayer_spouse_name__row" является строкой, содержащей поле ввода для "spouse_name" таблицы "taxpayer".
+
+#### Подтверждение на удаление
+``confirmation``:inxx
+
+Другим полезным применением является требование подтверждения при проверке флажка "delete", например, флажка удаления, который появляется в формах редактирования.
+
+Рассмотрим приведенный выше пример и добавим следующие действия контроллера:
+``
+def edit():
+    row = db.taxpayer[request.args(0)]
+    form = SQLFORM(db.taxpayer, row, deletable=True)
+    if form.process().accepted:
+        response.flash = 'record updated'
+    return dict(form=form)
+``:code
+
+и соответствующее представление "default/edit.html"
+``
+{{extend 'layout.html'}}
+{{=form}}
+``:code
+
+``deletable``:inxx
+Аргумент ``deletable=True`` в конструкторе SQLFORM инструктирует web2py отображать "delete" флажок в форме редактирования. Он ``False`` по умолчанию.
+
+Файл "web2py.js" в web2py включает в себя следующий код:
+``
+jQuery(document).ready(function(){
+   jQuery('input.delete').prop('onclick',
+     'if(this.checked) if(!confirm(
+        "{{=T('Sure you want to delete this object?')}}"))
+      this.checked=False;');
+});
+``:code
+
+По соглашению этот флажок имеет класс, равный "delete". Код jQuery выше соединяет событие onclick этого флажка с диалоговым окном подтверждения (стандарт в JavaScript) и выключает флажок, если налогоплательщик не подтверждает:
+
+[[image @///image/en7700.png center 480px]]
+
+### Функция ``ajax``
+
+В web2py.js, web2py определяет функцию с именем ``ajax``, которая основана на, но не следует путать с, функцией jQuery ``$ .ajax``. Последнее является гораздо более мощным, чем первый, а для его использования, мы направляем вас по адресу ``jquery``:cite и ``jquery-b``:cite. Тем не менее, первой функции достаточно для многих сложных задач, и она проще в использовании.
+
+Функция ``ajax`` является функцией JavaScript, которая имеет следующий синтаксис:
+``
+ajax(url, [name1, name2, ...], target)
+``:code
+
+она асинхронно вызывает URL (первый аргумент), передает значения поля вводов с именем, равным одному из имен в списке (второй аргумент), а затем сохраняет ответ в innerHTML тега с идентификатором равным целевому (третий аргумент).
+
+Здесь приведен пример ``default`` контроллера:
+``
+def one():
+    return dict()
+
+def echo():
+    return request.vars.name
+``:code
+
+и связанного с ним "default/one.html" представления:
+``
+{{extend 'layout.html'}}
+<form>
+   <input name="name" onkeyup="ajax('{{=URL('default', 'echo')}}', ['name'], 'target')" />
+</form>
+<div id="target"></div>
+``:code
+
+Когда вы печатаете что-то в поле ввода, и как только вы отпустите клавишу (onkeyup), то вызывается функция ``ajax``, и значение поля ``name="name"`` передается к действию "echo", которое посылает текст обратно к представлению. Функция ``ajax`` получает ответ и выводит эхо-отклик (echo response) в "целевой" ("target") DIV.
+
+#### Eval target
+
+В третьем аргументе ``ajax`` функции может быть строка ":eval". Это означает, что строка, возвращаемая сервером не будет встроена в документ, а вместо этого она будет оцениваться.
+
+Здесь приведен пример ``default`` контроллера:
+``
+def one():
+    return dict()
+
+def echo():
+    return "jQuery('#target').html(%s);" % repr(request.vars.name)
+``:code
+
+и связанное с ним "default/one.html" представление:
+``
+{{extend 'layout.html'}}
+<form>
+   <input name="name" onkeyup="ajax('{{=URL('default', 'echo')}}', ['name'], ':eval')" />
+</form>
+<div id="target"></div>
+``:code
+
+Это применяется для более сложных ответов, которые могут обновить несколько целей.
+
+#### Автозавершение
+
+Web2py содержит встроенный виджет автозавершения, описанный в главе Формы. Здесь мы построим более простое с нуля.
+
+Другое применение вышеприведенной ``ajax`` функции автозавершения. Здесь мы хотим создать поле ввода, которое ожидает название месяца и, когда посетитель вводит неполное название, выполняет автозавершение с помощью запроса Ajax. В ответ под полем ввода появляется выпадающее меню (drop-box) автозавершения.
+
+Это может быть достигнуто с помощью следующего ``default`` контроллера:
+``
+def month_input():
+    return dict()
+
+def month_selector():
+    if not request.vars.month: return ''
+    months = ['January', 'February', 'March', 'April', 'May',
+              'June', 'July', 'August', 'September' ,'October',
+              'November', 'December']
+    month_start = request.vars.month.capitalize()
+    selected = [m for m in months if m.startswith(month_start)]
+    return DIV(*[DIV(k,
+                     _onclick="jQuery('#month').val('%s')" % k,
+                     _onmouseover="this.style.backgroundColor='yellow'",
+                     _onmouseout="this.style.backgroundColor='white'"
+                     ) for k in selected])
+``:code
+
+и соответствующим "default/month_input.html" представлением:
+``
+{{extend 'layout.html'}}
+<style>
+#suggestions { position: relative; }
+.suggestions { background: white; border: solid 1px #55A6C8; }
+.suggestions DIV { padding: 2px 4px 2px 4px; }
+</style>
+
+<form>
+ <input type="text" id="month" name="month" style="width: 250px" /><br />
+ <div style="position: absolute;" id="suggestions"
+      class="suggestions"></div>
+</form>
+<script>
+jQuery("#month").keyup(function(){
+      ajax('{{=URL('default', 'month_selector')}}', ['month'], 'suggestions')});
+</script>
+``:code
+
+Скрипт jQuery в представлении вызывает запрос Ajax каждый раз, когда посетитель что-то вводит в поле ввода "месяц". Значение поля ввода подается вместе с запросом Ajax на действие "month_selector". Это действие составляет список из название месяцев, которые начинаются с представленного текста (выборочно), строит список из DIV-ов (каждый из которых содержит предложенное название месяца), и возвращает строку с сериализованными DIV-ами. Представление отображает HTML ответ в DIV "suggestions"("предложения"). Действие "month_selector" генерирует предложения и код JavaScript, встраиваемый в DIV-ы и который должен выполняться, когда посетитель нажимает на каждое предложение. Например, когда посетитель вводит "M", то возвращается действие обратного вызова:
+``
+<div>
+     <div onclick="jQuery('#month').val('March')"
+          onmouseout="this.style.backgroundColor='white'"
+          onmouseover="this.style.backgroundColor='yellow'">March</div>
+     <div onclick="jQuery('#month').val('May')"
+          onmouseout="this.style.backgroundColor='white'"
+          onmouseover="this.style.backgroundColor='yellow'">May</div>
+</div>
+``:code
+
+Вот окончательный эффект:
+
+[[image @///image/en7800.png center 480px]]
+
+Если месяцы хранятся в таблице базы данных, такой как:
+``
+db.define_table('month', Field('name'))
+``:code
+
+то просто замените ``month_selector`` действие на:
+``
+def month_input():
+    return dict()
+
+def month_selector():
+    if not request.vars.month:
+        return ''
+    pattern = request.vars.month.capitalize() + '%'
+    selected = [row.name for row in db(db.month.name.like(pattern)).select()]
+    return ''.join([DIV(k,
+                 _onclick="jQuery('#month').val('%s')" % k,
+                 _onmouseover="this.style.backgroundColor='yellow'",
+                 _onmouseout="this.style.backgroundColor='white'"
+                 ).xml() for k in selected])
+``:code
+
+jQuery предоставляет необязательный плагин автозавершения (Auto-complete Plugin) с дополнительными функциональными возможностями, но это не обсуждается здесь.
+
+#### Ajax отправка формы
+``asynchronous``:inxx
+
+Здесь мы рассмотрим страницу, которая позволяет посетителю отправлять сообщения с помощью Ajax без перезагрузки всей страницы. Используя помощника LOAD, web2py предоставляет еще лучший механизм чтобы сделать это, чем описанный здесь, который будет описан в главе 12. Здесь мы хотим показать вам, как просто это сделать с помощью jQuery.
+
+Он содержит форму "myform" и "target" DIV. Когда форма отправлена, то сервер может принять ее (и выполнить вставку базы данных) или отклонить ее (так как она не прошла проверку). Соответствующее уведомление возвращается с ответом Ajax и отображаются в "target" DIV.
+
+Постройте ``test`` приложение со следующей моделью:
+``
+db = DAL('sqlite://storage.sqlite')
+db.define_table('post', Field('your_message', 'text'))
+db.post.your_message.requires = IS_NOT_EMPTY()
+``:code
+
+Заметьте, что каждое сообщение имеет одно поле "your_message", которое не должно быть пустым.
+
+Отредактируйте контроллер ``default.py`` и напишите два действия:
+``
+def index():
+    return dict()
+
+def new_post():
+    form = SQLFORM(db.post)
+    if form.accepts(request, formname=None):
+        return DIV("Message posted")
+    elif form.errors:
+        return TABLE(*[TR(k, v) for k, v in form.errors.items()])
+``:code
+
+Первое действие не делает ничего, кроме возврата представлении.
+
+Второе действие является обратным вызовом Ajax. Оно ожидает переменные формы в ``request.vars``, обрабатывает их и возвращает ``DIV ("Сообщение отправлено")`` в случае успеха или ``TABLE`` сообщений об ошибках в случае неудачи.
+
+Теперь отредактируйте "default/index.html" представление:
+``
+{{extend 'layout.html'}}
+
+<div id="target"></div>
+
+<form id="myform">
+  <input name="your_message" id="your_message" />
+  <input type="submit" />
+</form>
+
+<script>
+jQuery('#myform').submit(function() {
+  ajax('{{=URL('new_post')}}',
+       ['your_message'], 'target');
+  return false;
+});
+</script>
+``:code
+
+Заметьте, как в этом примере, форма создается вручную с помощью HTML, но она обрабатывается SQLFORM в другом действии, чем то, которое отображает форму. Объект SQLFORM никогда не сериализуется в HTML. ``SQLFORM.accepts`` в этом случае не принимает сессию и устанавливает ``formname = None``, потому что мы решили не задавать имя формы и ключ формы в ручной HTML форме.
+
+Скрипт в нижней части представления соединяет кнопку отправки "myform" со встроенной функцией, которая отправляет INPUT с ``id="your_message"`` используя web2py ``ajax`` функцию, и отображает ответ внутри DIV с ``id="target"``.
+
+#### Голосование и рейтинг
+
+Другим применением Ajax являются элементы голосования или рейтинга на странице. Здесь мы рассмотрим приложение, которое позволяет посетителям голосовать за опубликованные изображения. Приложение состоит из одной страницы, которая отображает изображения, отсортированные в соответствии с их голосами. Мы позволим посетителям голосовать несколько раз, хотя это поведение можно легко изменить, если посетители проходят проверку подлинности, путем отслеживания отдельных голосов в базе данных и ассоциируя их с ``request.env.remote_addr`` голосующего.
+
+Здесь пример модели:
+``
+db = DAL('sqlite://images.db')
+db.define_table('item',
+    Field('image', 'upload'),
+    Field('votes', 'integer', default=0))
+``:code
+
+Здесь ``default`` контроллер:
+``
+def list_items():
+    items = db().select(db.item.ALL, orderby=db.item.votes)
+    return dict(items=items)
+
+def download():
+    return response.download(request, db)
+
+def vote():
+    item = db.item[request.vars.id]
+    new_votes = item.votes + 1
+    item.update_record(votes=new_votes)
+    return str(new_votes)
+``:code
+
+Действие download необходимо, чтобы дать возможность list_items представлению скачивать изображения, хранящиеся в папке uploads". Действие vote используется для обратного вызова Ajax.
+
+Здесь "default/list_items.html" представление:
+``
+{{extend 'layout.html'}}
+
+<form><input type="hidden" id="id" name="id" value="" /></form>
+{{for item in items:}}
+<p>
+<img src="{{=URL('download', args=item.image)}}"
+     width="200px" />
+<br />
+Votes=<span id="item{{=item.id}}">{{=item.votes}}</span>
+[<span onclick="jQuery('#id').val('{{=item.id}}');
+       ajax('{{=URL('default', 'vote')}}', ['id'], 'item{{=item.id}}');">vote up</span>]
+</p>
+{{pass}}
+``:code
+
+Когда посетитель нажимает на "[vote up]", код JavaScript сохраняет item.id в скрытое "id" поле INPUT и передает это значение на сервер посредством запроса Ajax. Сервер увеличивает счетчик голосов для соответствующей записи и возвращает новый счетчик голосов в виде строки. Это значение затем вставляется в мишени (target) ``item{{=item.id}}`` SPAN.
+
+-------
+Ajax обратные вызовы можно использовать для выполнения вычислений в фоновом режиме, но мы рекомендуем использовать вместо этого **cron** или фоновый процесс (обсуждается в главе 4), так как веб-сервер принудительно выставляет время ожидания на потоках. Если вычисление занимает слишком много времени, то веб-сервер убивает его. Обратитесь к параметрам веб-сервера, чтобы установить значение времени ожидания.
+-------

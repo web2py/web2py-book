@@ -1,0 +1,1893 @@
+## Представления
+``views``:inxx ``template language``:inxx ``HTML``:inxx
+
+web2py использует Python для своих моделей, контроллеров и представлений, хотя он и использует слегка измененный синтаксис Python в представлениях, но тем самым обеспечивается более читаемый код без наложения каких-либо ограничений на правильное использование Python.
+
+Назначением представления является внедрение кода (Python) в HTML-документ. В целом, это создает некоторые проблемы:
+- Каким образом встроенный код должен быть экранирован?
+- Отступы должны быть основаны на правилах Python или HTML?
+
+web2py использует ``{{ ... }}`` чтобы выделить Python код, внедренный в HTML. Преимуществом использования фигурных скобок вместо угловых скобок является то, что они прозрачны для всех распространенных HTML-редакторов. Это позволяет разработчику использовать эти редакторы для создания web2py представлений. Данные разделители могут быть изменены, например:
+
+``
+response.delimiters = ('<?','?>')
+``:code
+
+Если эта строка в модели, то они будут применяться везде, если в контроллере, то только в представлениях для действий контроллера, если внутри действия, то только в представлении для этого действия..
+
+Так как разработчик встраивает код Python в HTML, то отступы в документе должны быть в соответствии с правилами HTML, а не с правилами Python. Поэтому, мы допускаем Python код без отступов внутри ``{{...}}`` тегов. Поскольку Python обычно использует отступы для разделения блоков кода, то нам нужен другой способ разграничить их; именно поэтому язык шаблонов web2py использует ключевое слово Python ``pass``.
+
+-------
+Блок кода начинается со строки, которая заканчивается двоеточием, и заканчивается строкой, которая начинается с ``pass``. Ключевое слово ``pass`` не является обязательным, когда конец блока очевиден из контекста.
+-------
+
+Вот пример:
+
+``
+{{
+if i == 0:
+response.write('i is 0')
+else:
+response.write('i is not 0')
+pass
+}}
+``:code
+
+Обратите внимание, что ``pass`` является ключевым словом Python, а не ключевым словом web2py. Некоторые редакторы Python, такие как Emacs, используют ключевое слово ``pass`` для обозначения разделения блоков и используют его для повторного отступа кода автоматически.
+
+Язык шаблонов web2py делает то же самое. Когда он находит что-то вроде:
+
+``
+<html><body>
+{{for x in range(10):}}{{=x}}hello<br />{{pass}}
+</body></html>
+``:code
+
+он переводит его в программу:
+``
+response.write("""<html><body>""", escape=False)
+for x in range(10):
+    response.write(x)
+    response.write("""hello<br />""", escape=False)
+response.write("""</body></html>""", escape=False)
+``:code
+``response.write`` writes to the ``response.body``.
+
+При возникновении ошибки в представлении web2py, в отчете об ошибке показывается сгенерированный код представления, а не фактическое представление, написанное разработчиком. Это помогает разработчику отлаживать код путем выделения фактического кода, который выполняется (то, что может быть отлажено с помощью редактора HTML или инспектора DOM браузера).
+
+Также отметим, что:
+``
+{{=x}}
+``:code
+
+генерирует
+``response.write``:inxx ``escape``:inxx
+``
+response.write(x)
+``:code
+
+Переменные впрыскивается в HTML код и таким спосбом экранируются (escaped) по умолчанию.
+Экранирование игнорируется, если ``x`` является объектом ``XML``, даже если экранирование escape установлено на ``True``.
+
+Ниже приведен пример, который вводит ``H1`` помощника:
+``
+{{=H1(i)}}
+``:code
+
+который переводится в:
+``
+response.write(H1(i))
+``:code
+
+при оценке, объект ``H1`` и его компоненты рекурсивно сериализуются, экранируются и записываются в тело ответа. Теги, сгенерированные ``H1`` и внутренний HTML не экранируется. Данные механизм гарантирует, что весь текст --- и только текст ---, отображенный на веб-странице является всегда экранированным, таким образом предотвращаются XSS уязвимости. В то же время, код прост и удобен для отладки.
+
+Метод ``response.write(obj, escape=True)`` принимает два аргумента, объект для записи и разрешение на экранирование (установлено на ``True`` по умолчанию). Если ``obj`` имеет метод ``.xml()``, то он вызывается и результат записывается в тело ответа (``escape`` аргумент игнорируется). В противном случае он использует метод объекта ``__str__`` для его сериализации и, если аргумент escape установлен на ``True``, экранировании его. Все встроенные вспомогательные объекты (``H1`` в примере) являются объектами, которые знают, как сериализовать себя через ``.xml()`` метод.
+
+Это все делается прозрачно. Вам никогда не понадобиться (и не следует) вызывать метод ``response.write`` в явном виде.
+
+### Основной синтаксис
+
+Язык шаблонов web2py поддерживает все управляющие структуры Python. Здесь мы приводим некоторые примеры каждой из них. Они могут быть вложены в соответствии с обычной практикой программирования.
+
+#### ``for...in``
+``for``:inxx
+
+В шаблонах вы сможете циклически перебрать итерируемый объект:
+``
+{{items = ['a', 'b', 'c']}}
+<ul>
+{{for item in items:}}<li>{{=item}}</li>{{pass}}
+</ul>
+``:code
+
+который производит:
+``
+<ul>
+<li>a</li>
+<li>b</li>
+<li>c</li>
+</ul>
+``:code
+
+Здесь ``item`` является любым итерируемым объектом, таким как список Python, кортеж Python, объект Rows или любой другой объект, который реализуется в качестве итератора. Элементы, выводимые на экран, сперва сериализуются и экранируются.
+
+#### ``while``
+``while``:inxx
+
+Вы можете создать цикл, используя ключевое слово while:
+``
+{{k = 3}}
+<ul>
+{{while k > 0:}}<li>{{=k}}{{k = k - 1}}</li>{{pass}}
+</ul>
+``:code
+
+который производит:
+``
+<ul>
+<li>3</li>
+<li>2</li>
+<li>1</li>
+</ul>
+``:code
+
+#### ``if...elif...else``
+``if``:inxx ``elif``:inxx ``else``:inxx
+
+Вы можете использовать условные операторы:
+``
+{{
+import random
+k = random.randint(0, 100)
+}}
+<h2>
+{{=k}}
+{{if k % 2:}}is odd{{else:}}is even{{pass}}
+</h2>
+``:code
+
+который производит:
+``
+<h2>
+45 is odd
+</h2>
+``:code
+
+Поскольку очевидно, что ``else`` закрывает первый ``if`` блок, то нет никакой необходимости в объявлении ``pass``, использованием которого было бы неправильным. Тем не менее, вы должны явно закрыть ``else`` блок с ``pass``.
+
+Напомним, что в Python "else if" пишется ``elif``, как в следующем примере:
+``
+{{
+import random
+k = random.randint(0, 100)
+}}
+<h2>
+{{=k}}
+{{if k % 4 == 0:}}is divisible by 4
+{{elif k % 2 == 0:}}is even
+{{else:}}is odd
+{{pass}}
+</h2>
+``:code
+
+Она производит:
+``
+<h2>
+64 is divisible by 4
+</h2>
+``:code
+
+#### ``try...except...else...finally``
+``try``:inxx ``except``:inxx ``else``:inxx ``finally``:inxx
+
+Кроме того, можно использовать ``try...except`` операторы в представлениях с одной оговоркой. Рассмотрим следующий пример:
+``
+{{try:}}
+Hello {{= 1 / 0}}
+{{except:}}
+division by zero
+{{else:}}
+no division by zero
+{{finally}}
+<br />
+{{pass}}
+``:code
+
+Он будет производить следующий вывод:
+``
+Hello
+division by zero
+<br />
+``:code
+
+Этот пример показывает, что все выходные данные, генерируемые до возникновения исключения, визуализируются (в том числе выводные данные, которые предшествовали исключению) внутри блока try. "Hello" пишется, потому что он предшествует исключению.
+
+#### Оператор ``def...return``
+``def``:inxx ``return``:inxx
+
+Язык шаблонов web2py позволяет разработчику определять и реализовывать функции, которые могут возвращать любой объект Python или text/html строку. Здесь мы рассмотрим два примера:
+``
+{{def itemize1(link): return LI(A(link, _href="http://" + link))}}
+<ul>
+{{=itemize1('www.google.com')}}
+</ul>
+``:code
+
+производит следующий вывод:
+``
+<ul>
+<li><a href="http:/www.google.com">www.google.com</a></li>
+</ul>
+``:code
+
+Функция ``itemize1`` возвращает вспомогательный объект, который вставляется в том месте, где вызывается функция.
+
+Рассмотрим теперь следующий код:
+``
+{{def itemize2(link):}}
+<li><a href="http://{{=link}}">{{=link}}</a></li>
+{{return}}
+<ul>
+{{itemize2('www.google.com')}}
+</ul>
+``:code
+
+Она производит точно такой же результат, как описано выше. В этом случае функция ``itemize2`` представляет собой кусок HTML, который идет на замену web2py тега, где вызывается функция. Заметьте, что нет '=' перед вызовом ``itemize2``, так как функция не возвращает текст, но он записывает его непосредственно в ответ.
+
+Существует один нюанс: функции, определенные внутри представления должны завершаться с оператором return, или автоматическая расстановка отступов потерпит неудачу.
+
+### HTML Помощники
+``helpers``:inxx
+
+Рассмотрим следующий код в представлении:
+``
+{{=DIV('this', 'is', 'a', 'test', _id='123', _class='myclass')}}
+``:code
+
+он визуализируется как:
+``
+<div id="123" class="myclass">thisisatest</div>
+``:code
+``DIV`` является классом помощника, то есть классом, который может быть использован для программного построения HTML кода. Он соответствует HTML тегу ``<div>``.
+
+Позиционные аргументы интерпретируются как объекты, содержащиеся между открывающим и закрывающим тегами. Именованные аргументы, которые начинаются с символа подчеркивания интерпретируются как HTML атрибуты тега (без подчеркивания). Некоторые помощники также имеют именованные аргументы, которые не начинаются с подчеркивания; эти аргументы специфичных тегов.
+
+Вместо множества безымянных аргументов, помощник может также принимать один список или кортеж в качестве своего набора компонентов с использованием ``*`` обозначения и он может принимать единичный словарь в качестве своего набора атрибутов с помощью ``**``, например:
+``
+{{
+contents = ['this','is','a','test']
+attributes = {'_id':'123', '_class':'myclass'}
+=DIV(*contents,**attributes)
+}}
+``:code
+(производит такой же результат, как и раньше).
+
+Следующий набор помощников:
+
+``A``,  ``B``,  ``BEAUTIFY``,  ``BODY``,  ``BR``,  ``CAT``,  ``CENTER``,  ``CODE``,  ``COL``, ``COLGROUP``, ``DIV``,  ``EM``,  ``EMBED``,  ``FIELDSET``,  ``FORM``,  ``H1``,  ``H2``,  ``H3``,  ``H4``,  ``H5``,  ``H6``,  ``HEAD``,  ``HR``,  ``HTML``,  ``I``,  ``IFRAME``,  ``IMG``,  ``INPUT``,  ``LABEL``,  ``LEGEND``,  ``LI``,  ``LINK``,  ``MARKMIN``,  ``MENU``,  ``META``,  ``OBJECT``,  ``ON``,  ``OL``,  ``OPTGROUP``,  ``OPTION``,  ``P``,  ``PRE``,  ``SCRIPT``,  ``SELECT``,  ``SPAN``,  ``STYLE``,  ``TABLE``,  ``TAG``,  ``TBODY``,  ``TD``,  ``TEXTAREA``,  ``TFOOT``,  ``TH``,  ``THEAD``,  ``TITLE``,  ``TR``,  ``TT``, ``UL``,   ``URL``,  ``XHTML``,  ``XML``,  ``embed64``,  ``xmlescape``
+
+может быть использован для построения сложных выражений, которые затем могут быть сериализованы в XML ``xml-w``:cite ``xml-o``:cite. Например:
+``
+{{=DIV(B(I("hello ", "<world>")), _class="myclass")}}
+``:code
+
+визуализируется:
+``
+<div class="myclass"><b><i>hello &lt;world&gt;</i></b></div>
+``:code
+
+Помощники также могут быть сериализованы в строки, также как и с ``__str__`` и ``xml`` методами:
+
+``
+>>> print str(DIV("hello world"))
+<div>hello world</div>
+>>> print DIV("hello world").xml()
+<div>hello world</div>
+``
+
+``Объектная Модель Документа (DOM)``:inxx
+Механизм помощников в web2py больше, чем система для генерации HTML без конкатенации строк. Он обеспечивает на стороне сервера представление объектной модели документа (DOM).
+
+К компонентам внутри помощников можно обращаться по номеру их позиции, и помощники действуют как списки в отношении своих компонентов:
+``
+>>> a = DIV(SPAN('a', 'b'), 'c')
+>>> print a
+<div><span>ab</span>c</div>
+>>> del a[1]
+>>> a.append(B('x'))
+>>> a[0][0] = 'y'
+>>> print a
+<div><span>yb</span><b>x</b></div>
+``:code
+
+К атрибутам помощников можно обращаться по имени, и помощники действуют как словари в отношении своих атрибутов:
+``
+>>> a = DIV(SPAN('a', 'b'), 'c')
+>>> a['_class'] = 's'
+>>> a[0]['_class'] = 't'
+>>> print a
+<div class="s"><span class="t">ab</span>c</div>
+``:code
+
+Обратите внимание, что полный набор компонентов, может быть доступен через список, вызываемый через ``a.components``, и полный набор атрибутов может быть доступен через словарь, вызываемый через ``a.attributes``. Таким образом, ``a[i]`` эквивалентно ``a.components[i]``, когда ``i`` является целым, и ``a[s]`` эквивалентно ``a.attributes[s]``, когда ``s`` является строкой.
+
+Обратите внимание на то, что атрибуты HTML-тега передаются как ключевые слова в аргументах помощника. В некоторых случаях, имена атрибутов HTML-тега могут включать в себя специальные символы, которые не разрешены в идентификаторах Python (например, дефис) и, следовательно, не могут быть использованы в качестве ключевых слов именованных аргументов. Например:
+
+``
+DIV('text', _data-role='collapsible')
+``:code
+
+не будет работать, потому что "_data-role" включает в себя дефис, который будет производить ошибку синтаксиса Python.
+
+В таких случаях у вас есть несколько вариантов.
+Вы можете использовать ``data`` аргумент (на этот раз без знака подчеркивания), чтобы передать словарь связанных атрибутов без их ведущего дефиса, и выход будет иметь желаемые комбинацию, например:
+
+``
+>>> print DIV('text', data={'role': 'collapsible'})
+<div data-role="collapsible">text</div>
+``:code
+
+или вы можете взамен этого передать атрибуты в виде словаря и использовать Python обозначение ``**`` для аргументов функции, что сопоставит словарь: пары (ключ:значение) в множество ключевых аргументов:
+
+``
+>>> print DIV('text', **{'_data-role': 'collapsible'})
+<div data-role="collapsible">text</div>
+``:code
+
+Обратите внимание, что более сложные записи будут вводить символьные сущности HTML, но они, тем не менее, будут работать, например
+
+``
+>>> print DIV('text', data={'options':'{"mode":"calbox", "useNewStyle":true}'})
+<div data-options="{&quot;mode&quot;:&quot;calbox&quot;, &quot;useNewStyle&quot;:true}">text</div>
+``:code
+
+Кроме того, можно динамически создавать специальные тэги:
+
+``
+>>> print TAG['soap:Body']('whatever',**{'_xmlns:m':'http://www.example.org'})
+<soap:Body xmlns:m="http://www.example.org">whatever</soap:Body>
+``:code
+
+#### ``XML``
+``XML``:inxx
+``XML`` это объект, используемый для инкапсуляции текста, который не должен экранироваться. Текст может содержать или не содержать допустимый XML. Например, он может содержать JavaScript.
+
+Текст в этом примере экранируется:
+``
+>>> print DIV("<b>hello</b>")
+&lt;b&gt;hello&lt;/b&gt;
+``:code
+
+используя ``XML`` вы можете предотвратить экранирование:
+``
+>>> print DIV(XML("<b>hello</b>"))
+<b>hello</b>
+``:code
+
+Иногда очень хочется визуализировать HTML, хранимый в переменной, но HTML может содержать небезопасные теги, такие как сценарии:
+``
+>>> print XML('<script>alert("unsafe!")</script>')
+<script>alert("unsafe!")</script>
+``:code
+
+Неэкранированный исполняемый ввод, такой как этот (например, введенный в тело комментария к блогу) является небезопасным, так как он может быть использован для создания Cross Site Scripting (XSS) атак против других посетителей страницы.
+
+``sanitize``:inxx
+Web2py ``XML`` помощник может санировать (sanitize) наш текст, чтобы предотвратить инъекции и экранировать все теги, за исключением тех, которые вы явно разрешили. Вот пример:
+``
+>>> print XML('<script>alert("unsafe!")</script>', sanitize=True)
+&lt;script&gt;alert(&quot;unsafe!&quot;)&lt;/script&gt;
+``:code
+
+Конструкторы ``XML`` по умолчанию, безопасным способом рассматривают содержание некоторых тегов и некоторые из их атрибутов. Вы можете переопределить значения по умолчанию, используя дополнительные аргументы ``permitted_tags`` и ``allowed_attributes``. Вот значения по умолчанию необязательных аргументов ``XML`` помощника.
+``
+XML(text, sanitize=False,
+    permitted_tags=['a', 'b', 'blockquote', 'br/', 'i', 'li',
+       'ol', 'ul', 'p', 'cite', 'code', 'pre', 'img/'],
+    allowed_attributes={'a':['href', 'title'],
+       'img':['src', 'alt'], 'blockquote':['type']})
+``:code
+
+### Встроенные помощники
+
+#### ``A``
+
+Этот помощник используется для построения ссылок.
+
+``A``:inxx
+``
+>>> print A('<click>', XML('<b>me</b>'),
+            _href='http://www.web2py.com')
+<a href='http://www.web2py.com'>&lt;click&gt;<b>me/b></a>
+``:code
+
+Вместо ``_href`` вы можете передать URL с помощью ``callback`` аргумента. Например, в представлении:
+
+``
+{{=A('click me', callback=URL('myaction'))}}
+``
+
+и эффектом нажатия на ссылку будет Ajax вызов "myaction" вместо перенаправления.
+В этом случае при необходимости можно указать еще два аргумента: ``target`` и ``delete``:
+``
+{{=A('click me', callback=URL('myaction'), target="t")}}
+<div id="t"><div>
+``
+и ответ на обратный вызов Ajax будет храниться в DIV с идентификатором, равным "t".
+
+``
+<div id="b">{{=A('click me', callback=URL('myaction'), delete='div#b")}}</div>
+``
+и после ответа, наиболее подходящий тег "div#b" будет удален. В этом случае кнопка будет удалена.
+Типичным применением является:
+
+``
+{{=A('click me', callback=URL('myaction'), delete='tr")}}
+``
+
+в таблице. При нажатии кнопки будет выполнять обратный вызов и удаление строки таблицы.
+
+``callback`` и ``delete`` могут быть скомбинированы.
+
+Помощник А принимает специальный аргумент с именем ``cid``. Он работает следующим образом:
+
+``
+{{=A('linked page', _href='http://example.com', cid='myid')}}
+<div id="myid"></div>
+``:code
+
+и нажатие на ссылку заставляет содержание загрузиться в div. Это аналогичный, но более мощный, чем предыдущий вариант синтаксиса, так как он предназначен для обновления компонентов страницы. Мы обсудим применение ``cid`` более подробно в [[главе 12 ../12#trapped_ajax_links]], в контексте компонентов.
+
+Эти функции требуют Ajax и JQuery "static/js/web2py_ajax.js", которые автоматически включаются путем размещения ``{{include 'web2py_ajax.html'}}`` в заголовке макета. "views/web2py_ajax.html" определяет некоторые переменные на основе ``request`` и включает в себя все необходимые JS и CSS файлы.
+
+
+#### ``B``
+``B``:inxx
+
+Этот помощник делает свое содержимое жирным шрифтом.
+``
+>>> print B('<hello>', XML('<i>world</i>'), _class='test', _id=0)
+<b id="0" class="test">&lt;hello&gt;<i>world</i></b>
+``:code
+
+#### ``BODY``
+``BODY``:inxx
+Этот помощник делает тело страницы.
+``
+>>> print BODY('<hello>', XML('<b>world</b>'), _bgcolor='red')
+<body bgcolor="red">&lt;hello&gt;<b>world</b></body>
+``:code
+
+#### ``BR``
+``BR``:inxx
+
+Этот помощник создает разрыв строки.
+``
+>>> print BR()
+<br />
+``:code
+
+Обратите внимание на то, что помощники могут быть повторены с помощью оператора умножения:
+
+``
+>>> print BR()*5
+<br /><br /><br /><br /><br />
+``:code
+
+#### ``CAT``
+``CAT``:inxx
+
+Этот помощник сцепляет других помощников, так же как TAG[\'\'].
+
+``
+>>> print CAT('Here is a ', A('link',_href=URL()), ', and here is some ', B('bold text'), '.')
+Here is a <a href="/app/default/index">link</a>, and here is some <b>bold text</b>.
+``:code
+
+#### ``CENTER``
+``CENTER``:inxx
+
+Этот помощник центрует свое содержание.
+``
+>>> print CENTER('<hello>', XML('<b>world</b>'),
+>>>              _class='test', _id=0)
+<center id="0" class="test">&lt;hello&gt;<b>world</b></center>
+``:code
+
+#### ``CODE``
+``CODE``:inxx
+
+Этот помощник выполняет подсветку синтаксиса для кода Python, C, C++, HTML и web2py, и является предпочтительнее чем ``PRE`` для листинга программного кода. `` CODE`` также имеет возможность создавать ссылки на документацию API web2py.
+
+Ниже приведен пример подсветки разделов кода Python.
+``
+>>> print CODE('print "hello"', language='python').xml()
+<table><tr valign="top"><td style="width:40px; text-align: right;"><pre style="
+        font-size: 11px;
+        font-family: Bitstream Vera Sans Mono,monospace;
+        background-color: transparent;
+            margin: 0;
+            padding: 5px;
+            border: none;
+        background-color: #E0E0E0;
+        color: #A0A0A0;
+    ">1.</pre></td><td><pre style="
+        font-size: 11px;
+        font-family: Bitstream Vera Sans Mono,monospace;
+        background-color: transparent;
+            margin: 0;
+            padding: 5px;
+            border: none;
+            overflow: auto;
+    "><span style="color:#185369; font-weight: bold">print </span>
+    <span style="color: #FF9966">"hello"</span></pre></td></tr>
+</table>
+``:code
+
+Вот подобный пример для HTML
+``
+>>> print CODE(
+>>>   '<html><body>{{=request.env.remote_add}}</body></html>',
+>>>   language='html')
+``:code
+``
+<table>...<code>...
+<html><body>{{=request.env.remote_add}}</body></html>
+...</code>...</table>
+``:code
+
+Эти аргументы по умолчанию для помощника ``CODE``:
+``
+CODE("print 'hello world'", language='python', link=None, counter=1, styles={})
+``:code
+
+Поддерживаемыми значениями для аргумента ``language`` являются "python", "html_plain", "c", "cpp", "web2py" и "html". В "html" язык интерпретирует {{ и }} теги, как "web2py" код, в то время как "html_plain" нет.
+
+Если задано значение ``link``, например "/examples/global/vars/", то web2py API ссылки в коде связываются с документацией по URL ссылке. Например "request" будет связан с "/examples/global/vars/request". В приведенном выше примере, ссылка URL обрабатывается через "vars" действием в контроллере "global.py", который распространяется как часть web2py приложения "examples".
+
+Аргумент ``counter`` используется для нумерации строк. Он может быть установлен в любом из трех различных значений. Это может быть ``None`` при отсутствии номеров строки, числовым значением, определяющим начальный номер или строку. Если счетчик установлен в string, то он интерпретируется как подсказка, и нет имеет номеров строки.
+
+Аргумент ``styles`` немного сложнее. Если вы посмотрите на сгенерированный выше HTML-код, то он содержит таблицу с двумя столбцами, и каждый столбец имеет свой собственный стиль, объявленный внутри строк с помощью CSS. Атрибуты ``styles`` позволяют переопределить эти два стиля CSS. Например:
+
+``
+{{=CODE(...,styles={'CODE':'margin: 0;padding: 5px;border: none;'})}}
+``:code
+
+Атрибут ``styles`` должен быть словарем, и он допускает два возможных ключа: ``CODE`` для стиля актуального кода, и ``LINENUMBERS`` для стиля в левой колонке, которая содержит номера строк. Имейте ввиду, что эти стили полностью заменяют стандартные стили, а не просто добавляются к ним.
+
+#### ``COL``
+``COL``:inxx
+
+``
+>>> print COL('a','b')
+<col>ab</col>
+``:code
+
+#### ``COLGROUP``
+``COLGROUP``:inxx
+
+``
+>>> print COLGROUP('a','b')
+<colgroup>ab</colgroup>
+``:code
+
+#### ``DIV``
+Все помощники, кроме ``XML``, являются производными от ``DIV`` и наследуют его основные методы.
+
+``DIV``:inxx
+``
+>>> print DIV('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<div id="0" class="test">&lt;hello&gt;<b>world</b></div>
+``:code
+
+#### ``EM``
+
+Подчеркивает свое содержимое.
+
+``EM``:inxx
+``
+>>> print EM('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<em id="0" class="test">&lt;hello&gt;<b>world</b></em>
+``:code
+
+#### ``FIELDSET``
+``FIELDSET``:inxx
+
+Используется для создания поля ввода вместе с пометкой (label).
+``
+>>> print FIELDSET('Height:', INPUT(_name='height'), _class='test')
+<fieldset class="test">Height:<input name="height" /></fieldset>
+``:code
+
+#### ``FORM``
+``FORM``:inxx
+
+Это один из наиболее важных помощников. В простой форме, он просто создает тэг ``<form>...</form>``, но поскольку помощники являются объектами и имеют знания о том, что они содержат, то они могут обрабатывать предоставленные формы (например, выполнить проверку полей). Этот вопрос будет обсуждаться подробно в Главе 7.
+``
+>>> print FORM(INPUT(_type='submit'), _action='', _method='post')
+<form enctype="multipart/form-data" action="" method="post">
+<input type="submit" /></form>
+``:code
+
+Атрибут "enctype" явялется "multipart/form-data" по умолчанию.
+
+``hidden``:inxx
+Конструктор от ``FORM``, и от ``SQLFORM``, также может принимать специальный аргумент с именем ``hidden``. Когда словарь передается как ``hidden``, то его элементы переводятся в "скрытые" поля ввода (INPUT fields). Например:
+``
+>>> print FORM(hidden=dict(a='b'))
+<form enctype="multipart/form-data" action="" method="post">
+<input value="b" type="hidden" name="a" /></form>
+``:code
+
+#### ``H1``, ``H2``, ``H3``, ``H4``, ``H5``, ``H6``
+``H1``:inxx
+
+Это помощники для заголовков и подзаголовков параграфа:
+``
+>>> print H1('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<h1 id="0" class="test">&lt;hello&gt;<b>world</b></h1>
+``:code
+
+#### ``HEAD``
+
+Для тэга HEAD в HTML странице.
+
+``HEAD``:inxx
+``
+>>> print HEAD(TITLE('<hello>', XML('<b>world</b>')))
+<head><title>&lt;hello&gt;<b>world</b></title></head>
+``:code
+
+#### ``HTML``
+``HTML``:inxx ``XHTML``:inxx
+
+Этот помощник немного отличается. В дополнение к созданию ``<HTML>`` тегов, он помещает тэг со строкой типа документа doctype ``xhtml-w,xhtml-o,xhtml-school``:cite .
+``
+>>> print HTML(BODY('<hello>', XML('<b>world</b>')))
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                      "http://www.w3.org/TR/html4/loose.dtd">
+<html><body>&lt;hello&gt;<b>world</b></body></html>
+``:code
+
+Помощник HTML также принимает некоторые дополнительные необязательные аргументы, которые имеют следующие значения по умолчанию:
+``
+HTML(..., lang='en', doctype='transitional')
+``:code
+
+где doctype может быть 'strict', 'transitional', 'frameset', 'html5', или полная строка doctype.
+
+#### ``XHTML``
+``XHTML``:inxx
+
+XHTML похож на HTML, но он создает XHTML doctype  вместо этого.
+``
+XHTML(..., lang='en', doctype='transitional', xmlns='http://www.w3.org/1999/xhtml')
+``:code
+
+где doctype может быть 'strict', 'transitional', 'frameset', или полная строка doctype.
+
+#### ``HR``
+``HR``:inxx
+
+Этот помощник создает горизонтальную строку в HTML-странице
+``
+>>> print HR()
+<hr />
+``:code
+
+#### ``I``
+``I``:inxx
+
+Этот помощник делает свое содержимое курсивом.
+``
+>>> print I('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<i id="0" class="test">&lt;hello&gt;<b>world</b></i>
+``:code
+
+#### ``IFRAME``
+
+Этот помощник включает в себя другую веб-страницу, на текущей странице. URL-адрес на другую страницу задается с помощью атрибута "_src".
+
+``IFRAME``:inxx
+``
+>>> print IFRAME(_src='http://www.web2py.com')
+<iframe src="http://www.web2py.com"></iframe>
+``:code
+
+#### ``IMG``
+``IMG``:inxx
+
+Он может быть использован для встраивания изображений в HTML:
+
+``
+>>> IMG(_src='http://example.com/image.png',_alt='test')
+<img src="http://example.com/image.ong" alt="rest" />
+``:code
+
+Здесь сочетание из A, IMG и URL-помощников для включения статического изображения со ссылкой:
+
+``
+>>> A(IMG(_src=URL('static','logo.png'), _alt="My Logo"),
+      _href=URL('default','index'))
+<a href="/myapp/default/index">
+  <img src="/myapp/static/logo.png" alt="My Logo" />
+</a>
+``:code
+
+#### ``INPUT``
+``INPUT``:inxx
+
+Создает тег ``<input.../>``. Тег ввода input не может содержать другие вложенные теги и поэтому закрывается через ``/>`` вместо ``>``. Тег ввода input имеет необязательный атрибут ``_type`` который может быть установлен в "text" (по умолчанию), "submit", "checkbox", или "radio".
+``
+>>> print INPUT(_name='test', _value='a')
+<input value="a" name="test" />
+``:code
+
+Он также принимает необязательный специальный аргумент с именем "value", который отличается от "_value". "_value" устанавливает значение по умолчанию для поля ввода; "value" устанавливает текущее значение поля ввода. Для ввода типа "text", "value" переопределяет "_value" (тип "text" используется по умолчанию):
+``
+>>> print INPUT(_name='test', _value='a', value='b')
+<input value="b" name="test" />
+``:code
+
+Для радио-кнопок, ``INPUT`` выборочно устанавливает атрибут "checked" (т.е. если его текущее значение "value" равно значению по умолчанию "_value"):
+
+``radio``:inxx
+``
+>>> for v in ['a', 'b', 'c']:
+>>>     print INPUT(_type='radio', _name='test', _value=v, value='b'), v
+<input value="a" type="radio" name="test" /> a
+<input value="b" type="radio" checked="checked" name="test" /> b
+<input value="c" type="radio" name="test" /> c
+``:code
+
+а так же для флажков:
+
+``checkbox``:inxx
+``
+>>> print INPUT(_type='checkbox', _name='test', _value='a', value=True)
+<input value="a" type="checkbox" checked="checked" name="test" />
+>>> print INPUT(_type='checkbox', _name='test', _value='a', value=False)
+<input value="a" type="checkbox" name="test" />
+``:code
+
+#### ``LABEL``
+
+Используется для создания тега пометки LABEL для INPUT поля.
+
+``LABEL``:inxx
+``
+>>> print LABEL('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<label id="0" class="test">&lt;hello&gt;<b>world</b></label>
+``:code
+
+#### ``LEGEND``
+
+Он используется для создания тега легенды legend для поля в форме.
+
+``LEGEND``:inxx
+``
+>>> print LEGEND('Name', _for='myfield')
+<legend for="myfield">Name</legend>
+``:code
+
+#### ``LI``
+
+Он создает элемент списка и должен содержаться в ``UL`` или ``OL`` тегах.
+
+``LI``:inxx
+``
+>>> print LI('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<li id="0" class="test">&lt;hello&gt;<b>world</b></li>
+``:code
+
+#### ``META``
+
+Используется для построения ``META`` тегов в ``HTML`` заголовке. Например:
+
+``META``:inxx
+``
+>>> print META(_name='security', _content='high')
+<meta name="security" content="high" />
+``:code
+
+[[markmin_syntax]]
+#### ``MARKMIN``
+
+Реализует синтаксис markmin вики. Он преобразует входной текст в выходной HTML в соответствии с правилами, описанными в примере markmin ниже:
+
+``MARKMIN``:inxx
+``
+>>> print MARKMIN("это **жирный** или ''курсивом'', а это [[ссылка http://web2py.com]]")
+<p>это <b>жирный</b> или <i>курсивом</i>, а это <a href="http://web2py.com">ссылка</a></p>
+``:code
+
+Синтаксис markmin описан в этом файле, который поставляется с web2py:
+``
+http://127.0.0.1:8000/examples/static/markmin.html
+``:code
+
+Вы можете использовать markmin для генерации HTML, LaTeX и PDF-документов:
+
+``
+m = "Hello **world** [[link http://web2py.com]]"
+from gluon.contrib.markmin.markmin2html import markmin2html
+print markmin2html(m)
+from gluon.contrib.markmin.markmin2latex import markmin2latex
+print markmin2latex(m)
+from gluon.contrib.markmin.markmin2pdf import markmin2pdf
+print markmin2pdf(m) # requires pdflatex
+``
+
+(помощник ``MARKMIN`` является сокращением для ``markmin2html``)
+
+Вот основной синтаксис праймера:
+
+--------------------------------------------------
+**Источник**                 | **Вывод**
+``# Оглавление``                | **Оглавление**
+``## Раздел``             | **Раздел**
+``### Подраздел``         | **Подраздел**
+``**Жирный**``               | **Жирный**
+``''Курсив''``             | ''Курсив''
+``!`!`дословный`!`!``       | ``дословный``
+``http://google.com``      | http://google.com
+``http://...`` | ``<a href="http://...">http:...</a>``
+``http://...png`` | ``<img src="http://...png" />``
+``http://...mp3`` | ``<audio src="http://...mp3"></audio>``
+``http://...mp4`` | ``<video src="http://...mp4"></video>``
+``qr:http://...`` | ``<a href="http://..."><img src="qr code"/></a>``
+``embed:http://...`` | ``<iframe src="http://..."></iframe>``
+``[[нажми меня #мойякорь]]`` | [[нажми меня #мойякорь]]
+``[[мойякорь]]`` | Создание якоря для ссылки
+``$````$\int_a^b sin(x)dx$````$``  | $$\int_a^b sin(x)dx$$
+---------------------------------------------------
+
+##### MARKMIN ссылки
+
+Ссылки принимают эту форму: ``[[link display text <link>]]``
+<link> может быть якорем, например ``#мойякорь``
+или URI, например ``http://www.web2py.com``
+или относительная ссылка, например ``[[Смотри главу ../08]]`` или ``[[Смотри главу 8 ../08#мойякорь]]``
+
+Просто включаются ссылки на изображение, видео или аудио файлы без необходимости разметки результата в соответствующем изображения, видео или аудио файле, которая включается автоматически (для аудио и видео он использует HTML <audio> и <video> теги).
+
+Добавление ссылки с префиксом ``qr:``, такой как
+
+``
+qr:http://web2py.com
+``
+
+Результаты в соответствующем QR-коде встраивают и связывают указанный URL.
+
+Добавление ссылки с префиксом ``embed:``, такой как
+
+``
+embed:http://www.youtube.com/embed/x1w8hKTJ2Co
+``
+
+Результаты на странице будут внедрены, в этом случае видео YouTube является внедренным.
+
+Изображения также могут быть внедрены со следующим синтаксисом:
+
+``
+[[image-description http://.../image.png right 200px]]
+``
+
+##### MARKMIN списки и таблицы
+
+Неупорядоченные списки с:
+``
+- one
+- two
+- three
+``
+
+Упорядоченные списки с:
+``
++ one
++ two
++ three
+``
+
+и таблицы с:
+``
+----------
+ X | 0 | 0
+ 0 | X | 0
+ 0 | 0 | 1
+----------
+``
+
+##### MARKMIN расширение
+Синтаксис MARKMIN также поддерживает блоки цитат, аудио и видео теги HTML5, выравнивание изображения, пользовательские CSS, и он может быть расширен:
+
+``
+MARKMIN("!`!!`!abab!`!!`!:custom", extra=dict(custom=lambda text: text.replace('a','c'))
+``:code
+
+генерирует
+
+``'cbcb'``:code
+
+Пользовательские блоки разделяются ``!`!!`!...!`!!`!:<key>`` и они визуализируются через функцию, переданную в качестве значения соответствующего ключа в дополнительном словаре  аргумента MARKMIN. Имейте в виду, что может понадобиться экранирование вывода функции, чтобы предотвратить XSS.
+
+#### ``OBJECT``
+
+Используется для внедрения объектов (например, Flash Player) в HTML.
+
+``OBJECT``:inxx
+``
+>>> print OBJECT('<hello>', XML('<b>world</b>'),
+>>>              _src='http://www.web2py.com')
+<object src="http://www.web2py.com">&lt;hello&gt;<b>world</b></object>
+``:code
+
+#### ``OL``
+
+Это стойка для упорядоченных списков. Список должен содержать LI теги. Аргументы ``OL``, которые не являются ``LI`` объектами автоматически заключаются в ``<li>...</li>`` теги.
+
+``OL``:inxx
+``
+>>> print OL('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<ol id="0" class="test"><li>&lt;hello&gt;</li><li><b>world</b></li></ol>
+``:code
+
+#### ``ON``
+
+Используется для обратной совместимости, и является просто псевдонимом для ``True``. Он используется исключительно для флажков и является устаревшим, использование ``True`` является более Питоновским.
+
+``ON``:inxx
+``
+>>> print INPUT(_type='checkbox', _name='test', _checked=ON)
+<input checked="checked" type="checkbox" name="test" />
+``:code
+
+#### ``OPTGROUP``
+
+Позволяет сгруппировать несколько опций в SELECT и пригодится для настройки полей с помощью CSS.
+
+``OPTGROUP``:inxx
+``
+>>> print SELECT('a', OPTGROUP('b', 'c'))
+<select>
+  <option value="a">a</option>
+  <optgroup>
+    <option value="b">b</option>
+    <option value="c">c</option>
+  </optgroup>
+</select>
+``:code
+
+#### ``OPTION``
+
+Используется только как часть SELECT/OPTION комбинации.
+
+``OPTION``:inxx
+``
+>>> print OPTION('<hello>', XML('<b>world</b>'), _value='a')
+<option value="a">&lt;hello&gt;<b>world</b></option>
+``:code
+
+Как и в случае ``INPUT``, web2py проводить различие между "_value" (значением из OPTION), и "value" (текущим значением, заключенным в выборе). Если они равны, то опция помечается как выбранная "selected".
+
+``selected``:inxx
+``
+>>> print SELECT('a', 'b', value='b'):
+<select>
+<option value="a">a</option>
+<option value="b" selected="selected">b</option>
+</select>
+``:code
+
+#### ``P``
+``P``:inxx
+
+Используется для маркировки параграфа.
+``
+>>> print P('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<p id="0" class="test">&lt;hello&gt;<b>world</b></p>
+``:code
+
+#### ``PRE``
+``PRE``:inxx
+
+Генерирует тег ``<pre>...</pre>`` для отображения предварительно отформатированного текста. Помощник ``CODE``, как правило, предпочтительнее для листингов кода.
+``
+>>> print PRE('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<pre id="0" class="test">&lt;hello&gt;<b>world</b></pre>
+``:code
+
+#### ``SCRIPT``
+``SCRIPT``:inxx
+
+Включает или ссылается на скрипт, такой как JavaScript. Содержание между тегами отображается в виде HTML-комментария, в пользу действительно старых браузеров.
+``
+>>> print SCRIPT('alert("hello world");', _type='text/javascript')
+<script type="text/javascript"><!--
+alert("hello world");
+//--></script>
+``:code
+
+#### ``SELECT``
+``SELECT``:inxx
+
+Создает тег ``<select>...</select>``. Это используется с ``OPTION`` помощником. Аргументы``SELECT``, которые не являются объектами ``OPTION`` автоматически преобразуются в параметры.
+``
+>>> print SELECT('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<select id="0" class="test">
+   <option value="&lt;hello&gt;">&lt;hello&gt;</option>
+   <option value="&lt;b&gt;world&lt;/b&gt;"><b>world</b></option>
+</select>
+``:code
+
+#### ``SPAN``
+``SPAN``:inxx
+
+Подобно ``DIV``, но используется для обозначения содержания в строке (а не в блоке).
+``
+>>> print SPAN('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<span id="0" class="test">&lt;hello&gt;<b>world</b></span>
+``:code
+
+#### ``STYLE``
+``STYLE``:inxx
+
+Похож на скрипт, но используется чтобы либо включить код CSS, либо сослаться на код CSS.
+Здесь CSS включается:
+``
+>>> print STYLE(XML('body {color: white}'))
+<style><!--
+body { color: white }
+//--></style>
+``:code
+
+а здесь он ссылается:
+``
+>>> print STYLE(_src='style.css')
+<style src="style.css"><!--
+//--></style>
+``:code
+
+#### ``TABLE``, ``TR``, ``TD``
+``TABLE``:inxx ``TR``:inxx ``TD``:inxx
+
+Эти теги (наряду с дополнительным ``THEAD``, ``TBODY`` и ``TFOOTER`` помощниками) используются для создания HTML-таблиц.
+``
+>>> print TABLE(TR(TD('a'), TD('b')), TR(TD('c'), TD('d')))
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+``TR`` ожидает ``TD`` содержимое; аргументы, которые не являются ``TD`` объектами, автоматически преобразуются.
+``
+>>> print TABLE(TR('a', 'b'), TR('c', 'd'))
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+
+Легко преобразовать массив Python в HTML-таблицу с помощью обозначения ``*`` перед аргументом функции Python, которое сопоставляет элементы в списке с позициями аргументов функции.
+
+Здесь, мы преобразуем построчно:
+``
+>>> table = [['a', 'b'], ['c', 'd']]
+>>> print TABLE(TR(*table[0]), TR(*table[1]))
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+
+Здесь мы преобразуем все строки сразу:
+``
+>>> table = [['a', 'b'], ['c', 'd']]
+>>> print TABLE(*[TR(*rows) for rows in table])
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+``:code
+
+#### ``TBODY``
+``TBODY``:inxx
+
+Используется для разметки строк, содержащихся в теле таблицы, в отличие от строк верхнего или нижнего колонтитула. Это является необязательным.
+``
+>>> print TBODY(TR('<hello>'), _class='test', _id=0)
+<tbody id="0" class="test"><tr><td>&lt;hello&gt;</td></tr></tbody>
+``:code
+
+#### ``TEXTAREA``
+``TEXTAREA``:inxx
+
+Этот помощник делает тег ``<textarea>...</textarea>``.
+``
+>>> print TEXTAREA('<hello>', XML('<b>world</b>'), _class='test')
+<textarea class="test" cols="40" rows="10">&lt;hello&gt;<b>world</b></textarea>
+``:code
+
+Единственное ограничение в том, что его необязательный аргумент "value" перекрывает его содержимое (inner HTML)
+``
+>>> print TEXTAREA(value="<hello world>", _class="test")
+<textarea class="test" cols="40" rows="10">&lt;hello world&gt;</textarea>
+``:code
+
+#### ``TFOOT``
+``TFOOT``:inxx
+
+Используется для разметки строк нижнего колонтитула таблицы.
+``
+>>> print TFOOT(TR(TD('<hello>')), _class='test', _id=0)
+<tfoot id="0" class="test"><tr><td>&lt;hello&gt;</td></tr></tfoot>
+``:code
+
+#### ``TH``
+``TH``:inxx
+
+Используется вместо ``TD`` в заголовке таблицы.
+``
+>>> print TH('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<th id="0" class="test">&lt;hello&gt;<b>world</b></th>
+``:code
+
+#### ``THEAD``
+``THEAD``:inxx
+
+Используется для разметки строк заголовка таблицы.
+``
+>>> print THEAD(TR(TH('<hello>')), _class='test', _id=0)
+<thead id="0" class="test"><tr><th>&lt;hello&gt;</th></tr></thead>
+``:code
+
+#### ``TITLE``
+``TITLE``:inxx
+
+Используется для разметки оглавления страницы в заголовке HTML.
+``
+>>> print TITLE('<hello>', XML('<b>world</b>'))
+<title>&lt;hello&gt;<b>world</b></title>
+``:code
+
+#### ``TR``
+``TR``:inxx
+
+Метки строк таблицы. Они должны отображаться внутри таблицы и содержать теги ``<td>...</td>``. Аргументы ``TR``, которые не являются ``TD`` объектами автоматически преобразуются.
+``
+>>> print TR('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<tr id="0" class="test"><td>&lt;hello&gt;</td><td><b>world</b></td></tr>
+``:code
+
+#### ``TT``
+``TT``:inxx
+
+Теги текста пишущей машинки (моноширинный).
+``
+>>> print TT('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<tt id="0" class="test">&lt;hello&gt;<b>world</b></tt>
+``:code
+
+#### ``UL``
+
+Обозначает неупорядоченный список и должен содержать элементы LI. Если его содержание не помечено как LI, то UL делает это автоматически.
+
+``UL``:inxx
+``
+>>> print UL('<hello>', XML('<b>world</b>'), _class='test', _id=0)
+<ul id="0" class="test"><li>&lt;hello&gt;</li><li><b>world</b></li></ul>
+``:code
+
+
+#### ``URL``
+Помощник URL описан в [[главе 4 URL ../04#URL]]
+
+#### ``embed64``
+
+``embed64(filename=None, file=None, data=None, extension='image/gif')`` кодирует предоставленные (двоичные) данные в base64.
+
+filename: если имеется, открывает и читает файл в режиме 'rb'.
+file: если имеется, читает этот файл.
+data: если имеется, использует указанные данные.
+
+``embed64``:inxx
+
+#### ``xmlescape``
+
+``xmlescape(data, quote=True)`` возвращает экранированную строку из предоставленных данных.
+
+``xmlescape``:inxx
+``
+>>> print xmlescape('<hello>')
+&lt;hello&gt;
+``:code
+
+### Пользовательские помощники
+
+#### ``TAG``
+``TAG``:inxx
+
+Иногда вам нужно создать пользовательские теги XML. web2py предоставляет ``TAG``, который является универсальным генератором тегов.
+``
+{{=TAG.name('a', 'b', _c='d')}}
+``:code
+
+генерирует следующий XML
+``
+<name c="d">ab</name>
+``:code
+
+Аргументы "a", "b", и "d" автоматически экранируются; используйте ``XML`` помощник, чтобы подавить это поведение. Используя ``TAG`` вы можете сгенерировать HTML/XML теги, которые не предоставляются API. Теги могут быть вложенными и сериализованы через ``str().``
+Эквивалентный синтаксис:
+``
+{{=TAG['name']('a', 'b', c='d')}}
+``:code
+
+Если объект TAG создается с пустым именем, то он может быть использован для объединения вместе нескольких строк и HTML-помощников без вставки их в окружающий тег, но это использование не рекомендуется. Используйте вместо этого ``CAT`` помощника.
+
+Самозакрывающиеся теги могут быть сгенерированы с помощником TAG. Имя тега должен заканчиваться символом "/".
+``
+{{=TAG['link/'](_href='http://web2py.com')}}
+``:code
+генерирует следующий XML:
+``
+<link ref="http://web2py.com"/>
+``:code
+Обратите внимание на то, что ``TAG`` является объектом, и ``TAG.name`` или ``TAG['name']`` это функция, которая возвращает временный класс помощника.
+
+#### ``MENU``
+``MENU``:inxx
+
+Помощник MENU принимает список из списков или кортежей из формы ``response.menu`` (как описано в главе 4) и создает древовидную структуру с использованием неупорядоченных списков, представляющих меню. Например:
+``
+>>> print MENU([['One', False, 'link1'], ['Two', False, 'link2']])
+<ul class="web2py-menu web2py-menu-vertical">
+  <li><a href="link1">One</a></li>
+  <li><a href="link2">Two</a></li>
+</ul>
+``:code
+
+------
+Первый элемент в каждом списке/кортеже является текстом, который будет отображаться для данного пункта меню.
+
+Второй элемент в каждом списке/кортеже является логическим значением, указывающим, активен ли этот конкретный пункт меню или нет (т.е. текущий выбранный элемент). При установке на True, то помощник MENU() добавит "web2py-menu-active" класс к <li> для этого элемента (вы можете изменить название этого класса через "li_active" аргумент MENU()). Другим способом указать активный URL является непосредственная передача его MENU() через аргумент "active_url".
+
+Третьим элементом в каждом списке/кортеже может быть HTML-помощник (который может включать в себя вложенные помощники), и помощник ``MENU`` будет просто оказывать ему помощь, а не создавать его собственный ``<a>`` тег.
+------
+
+Каждый элемент меню может иметь четвертый аргумент, которым является вложенное подменю (и так далее рекурсивно):
+``
+>>> print MENU([['One', False, 'link1', [['Two', False, 'link2']]]])
+<ul class="web2py-menu web2py-menu-vertical">
+  <li class="web2py-menu-expand">
+     <a href="link1">One</a>
+     <ul class="web2py-menu-vertical">
+        <li><a href="link2">Two</a></li>
+     </ul>
+  </li>
+</ul>
+``:code
+
+Элемент меню может также иметь дополнительный 5-ый элемент, который является логическим. Когда false, то пункт меню игнорируется помощником MENU.
+
+Помощник MENU принимает следующие необязательные параметры:
+- ``_class``: по умолчанию "web2py-menu web2py-menu-vertical" и устанавливает класс внешних элементов UL.
+- ``ul_class``: по умолчанию "web2py-menu-vertical" и устанавливает класс внутренних элементов UL.
+- ``li_class``: по умолчанию "web2py-menu-expand" и устанавливает класс внутренних элементов LI.
+- ``li_first``: позволяет добавить класс к первому элементу списка.
+- ``li_last``: позволяет добавить класс к последнему элементу списка.
+
+``mobile``:inxx
+
+``MENU`` принимает необязательный аргумент ``mobile``. При установке на ``True`` вместо построения рекурсивной  структуры меню ``UL`` она возвращает выпадающий ``SELECT`` со всеми параметрами меню и атрибутом ``onchange``, который перенаправляет на страницу, соответствующую выбранной опции. Это спроектировано для использования в качестве представления альтернативного меню, что увеличивает удобство использования на небольших мобильных устройствах, таких как телефоны.
+
+Обычно меню используется в макете со следующим синтаксисом:
+
+``
+{{=MENU(response.menu, mobile=request.user_agent().is_mobile)}}
+``
+
+Таким образом, мобильное устройство распознается автоматически и меню визуализируется соответствующим образом.
+
+### ``BEAUTIFY``
+``BEAUTIFY`` используется для создания HTML-представления составных объектов, в том числе списки, кортежи и словари:
+``
+{{=BEAUTIFY({"a": ["hello", XML("world")], "b": (1, 2)})}}
+``:code
+``BEAUTIFY`` возвращает XML-подобный объект сериализованный в XML, с хорошим выглядящим представлением его аргумента конструктора. В этом случае XML-представление:
+``
+{"a": ["hello", XML("world")], "b": (1, 2)}
+``:code
+
+будет отображаться как:
+``
+<table>
+<tr><td>a</td><td>:</td><td>hello<br />world</td></tr>
+<tr><td>b</td><td>:</td><td>1<br />2</td></tr>
+</table>
+``:code
+
+### ''DOM'' и синтаксический анализ на стороне сервера 
+``element``:inxx ``elements``:inxx
+
+#### Элементы ``elements``
+
+Помощник DIV и все производные помощники обеспечивают методы поиска ``element`` и ``elements``.
+
+``element`` возвращает первый дочерний элемент, соответствующий заданному условию (или None, если нет соответствия).
+
+``elements`` возвращает список всех соответствующих детей (children).
+
+**element** и **elements** используют тот же самый синтаксис, чтобы указать условие соответствия, что допускает три возможности, которые могут быть смешаны и подобраны: JQuery подобные выражения, совпадение по точному значению атрибута, совпадение с использованием регулярных выражений.
+
+Вот простой пример:
+``
+>>> a = DIV(DIV(DIV('a', _id='target',_class='abc')))
+>>> d = a.elements('div#target')
+>>> d[0][0] = 'changed'
+>>> print a
+<div><div><div id="target" class="abc">changed</div></div></div>
+``:code
+
+Безымянный аргумент ``elements`` является строкой, которая может содержать: имя тега, id тега с предшествующим символом решетки, класс (class) с предшествующей точкой, явное значение атрибута в квадратных скобках.
+
+Вот 4 эквивалентных способа поиска предыдущего тега по id:
+``
+>>> d = a.elements('#target')
+>>> d = a.elements('div#target')
+>>> d = a.elements('div[id=target]')
+>>> d = a.elements('div',_id='target')
+``:code
+
+Вот 4 эквивалентных способа поиска предыдущего тега по class:
+``
+>>> d = a.elements('.abc')
+>>> d = a.elements('div.abc')
+>>> d = a.elements('div[class=abc]')
+>>> d = a.elements('div',_class='abc')
+``:code
+
+Любой атрибут может использоваться, чтобы определить местонахождение элемента (не просто ``id`` и ``class``), в том числе несколько атрибутов (функция element может принимать несколько именованных аргументов), но только будет возвращен первый соответствующий элемент.
+
+Используя синтаксис jQuery "div#target" можно указать несколько критериев поиска, разделенных запятой:
+``
+>>> a = DIV(SPAN('a', _id='t1'), DIV('b', _class='c2'))
+>>> d = a.elements('span#t1, div.c2')
+``:code
+
+или, что эквивалентно
+``
+>>> a = DIV(SPAN('a', _id='t1'), DIV('b', _class='c2'))
+>>> d = a.elements('span#t1', 'div.c2')
+``:code
+
+Если значение атрибута задается с помощью имени аргумента, то это может быть строка или регулярное выражение:
+
+``
+>>> a = DIV(SPAN('a', _id='test123'), DIV('b', _class='c2'))
+>>> d = a.elements('span', _id=re.compile('test\d{3}')
+``:code
+
+Специальным именованным аргументом DIV (и производных) помощников является ``find``. Он может быть использован для указания значения поиска или регулярного выражения поиска в текстовом содержимом тега. Например:
+
+``
+>>> a = DIV(SPAN('abcde'), DIV('fghij'))
+>>> d = a.elements(find='bcd')
+>>> print d[0]
+<span>abcde</span>
+``:code
+
+или
+
+``
+>>> a = DIV(SPAN('abcde'), DIV('fghij'))
+>>> d = a.elements(find=re.compile('fg\w{3}'))
+>>> print d[0]
+<div>fghij</div>
+``:code
+
+``components``:inxx
+#### Компоненты ``components`` 
+
+Вот пример листинга всех элементов в HTML строке:
+``
+html = TAG('<a>xxx</a><b>yyy</b>')
+for item in html.components: print item
+``:code
+
+``parent``:inxx ``sibling``:inxx
+#### Родитель и дети (``parent`` и ``siblings``)
+``parent`` возвращает родительский элемент текущего элемента.
+``
+>>> a = DIV(SPAN('a'),DIV('b'))
+>>> s = a.element('span')
+>>> d = s.parent
+>>> d['_class']='abc'
+>>> print a
+<div class="abc"><span>a</span><div>b</div></div>
+>>> for e in s.siblings(): print e
+<div>b</div>
+``:code
+
+#### Замена элементов
+
+Элементы, которые подбираются также могут быть заменены или удалены путем указания ``replace`` аргумента. Обратите внимание на то, что список оригинальных совпадающих элементов по-прежнему возвращается как обычно.
+
+``
+>>> a = DIV(SPAN('x'), DIV(SPAN('y'))
+>>> b = a.elements('span', replace=P('z')
+>>> print a
+<div><p>z</p><div><p>z</p></div>
+``:code
+
+``replace`` может быть вызываемым. В этом случае он будет передан в исходный элемент, и, как ожидается, возвращает элемент замены:
+
+``
+>>> a = DIV(SPAN('x'), DIV(SPAN('y'))
+>>> b = a.elements('span', replace=lambda t: P(t[0])
+>>> print a
+<div><p>x</p><div><p>y</p></div>
+``:code
+
+Если ``replace=None``, совпадающие элементы будут полностью удалены.
+
+``
+>>> a = DIV(SPAN('x'), DIV(SPAN('y'))
+>>> b = a.elements('span', replace=None)
+>>> print a
+<div></div>
+``:code
+
+``flatten``:inxx
+#### Сплющивание ``flatten`` 
+
+Метод Flatten рекурсивно сериализует содержание детей данного элемента в обычный текст (без тегов):
+``
+>>> a = DIV(SPAN('this', DIV('is', B('a'))), SPAN('test'))
+>>> print a.flatten()
+thisisatest
+``:code
+
+Flatten может быть передан необязательный аргумент, ``render``, т.е. функция, которая визуализирует/сплющивает содержание, используя другой протокол. Вот пример сериализации некоторых тегов в синтаксис Markmin вики:
+``
+>>> a = DIV(H1('title'), P('example of a ', A('link', _href='#test')))
+>>> from gluon.html import markmin_serializer
+>>> print a.flatten(render=markmin_serializer)
+# titles
+
+example of [[a link #test]]
+``:code
+
+На момент написания мы предоставляем ``markmin_serializer`` и ``markdown_serializer``.
+
+#### Разбор (Parsing)
+
+Объект TAG является также XML/HTML парсером. Он может читать текст и конвертировать в древовидную структуру помощников. Это позволяет осуществлять манипуляции с использованием вышеуказанного API:
+``
+>>> html = '<h1>Title</h1><p>this is a <span>test</span></p>'
+>>> parsed_html = TAG(html)
+>>> parsed_html.element('span')[0]='TEST'
+>>> print parsed_html
+<h1>Title</h1><p>this is a <span>TEST</span></p>
+``:code
+
+
+``page layout``:inxx ``layout.html``:inxx ``extent``:inxx ``include``:inxx
+### Макет страницы
+
+Представления могут расширяться и включать в себя другие представления в виде древовидной структуры.
+
+Например, мы можем придумать представление "index.html", которое расширяет "layout.html" и включает "body.html".
+В то же время,  "layout.html" может включать "header.html" и "footer.html".
+
+Корнем дерева является то, что мы называем макетом. Так же, как и любой другой файл шаблона HTML, вы можете редактировать его с помощью web2py интерфейса администратора. Имя файла "layout.html" это просто соглашение.
+
+Вот минималистическая страница, которая расширяет "layout.html" макет и включает в себя "page.html" представление:
+
+``
+{{extend 'layout.html'}}
+<h1>Hello World</h1>
+{{include 'page.html'}}
+``:code
+
+Расширяемый файл макета должен содержать ``{{include}}`` директиву, что-то вроде:
+
+``
+<html>
+  <head>
+    <title>Page Title</title>
+  </head>
+  <body>
+    {{include}}
+  </body>
+</html>
+``:code
+
+Когда представление вызывается, то загружается расширяемое (макет) представление, и вызывающее представление заменяет ``{{include}}`` директиву внутри макета. Обработка продолжается рекурсивно до тех пор, пока все ``extend`` и ``include`` директивы не будут обработаны. Полученный шаблон затем преобразуется в код Python. Обратите внимание, когда приложение компилируется в байткод, то именно этот Python код будет скомпилирован, а не оригинальное представление самих файлов. Таким образом, скомпилированная в байткод версия данного представления является единственным .pyc файлом, который включает в себя код Python не только для исходного файла представления, но и для всех его деревьев расширенных и включенных представлений.
+
+-------
+``extend``, ``include``, ``block`` и ``super`` это специальные директивы шаблона,
+не команды Python.
+-------
+
+Любое содержание или код, который предшествует ``{{extend ...}}`` директиве будет вставлен (и, следовательно, выполнен) перед началом содержимого/кода расширяемого представления. Несмотря на то, что это, как правило, не используется для вставки фактического содержания HTML перед содержимым расширяемого представления, он может быть полезен в качестве средства для определения переменных или функций, которые вы хотите сделать доступными для расширяемого представления. Например, рассмотрим представление "index.html":
+
+``
+{{sidebar_enabled=True}}
+{{extend 'layout.html'}}
+<h1>Home Page</h1>
+``:code
+
+и выдержку из "layout.html":
+``
+{{if sidebar_enabled:}}
+    <div id="sidebar">
+        Sidebar Content
+    </div>
+{{pass}}
+``:code
+
+Так как ``sidebar_enabled`` присвоению в "index.html" предшествует ``extend``, эта строка вставляется перед началом "layout.html", делая ``sidebar_enabled`` доступным в любом месте в пределах "layout.html" кода (несколько более сложный вариант этого используется в **welcome** приложении).
+
+Стоит также отметить, что переменные, возвращаемые функцией контроллера доступны не только в главном представлении функции, но также во всех его расширяемых и включенных представлениях.
+
+Аргументом``extend`` или ``include`` (т.е. имя расширенного или включенного представления) может быть переменная python (однако не выражение python). Тем не менее, это накладывает ограничение -- представлениям, которые используют переменные в ``extend`` или ``include`` операторы не могут быть скомпилированы в байткод. Как было отмечено выше, скомпилированные в байткод представления включают в себя все дерево расширенных и включенных представлений, поэтому конкретные расширяемые и включенные представления должны быть известны во время компиляции, что невозможно, если имена являются переменными представления (значения которых пока не определены до момента выполнения). Поскольку скомпилированные в байткод представления могут обеспечить значительный прирост скорости, то использование переменных в ``extend`` и ``include`` как правило, следует избегать, если это возможно.
+
+В некоторых случаях альтернативой использованию переменной в ``include`` является простое размещение регулярных ``{{include ...}}`` директив внутри ``if...else`` блока.
+
+``
+{{if some_condition:}}
+{{include 'this_view.html'}}
+{{else:}}
+{{include 'that_view.html'}}
+{{pass}}
+``:code
+
+Приведенный выше код не представляет никакой проблемы для компиляции в байткод, поскольку переменные не участвуют. Однако следует отметить, что байткод скомпилированные представления на самом деле будет включать в себя код Python для обоих "this_view.html" и "that_view.html", хотя только код для одного из этих представлений будет выполняться, в зависимости от значения ``some_condition``.
+
+Имейте в виду, это работает только для ``include`` -- вы не можете поместить ``{{extend ...}}`` директивы внутри ``if...else`` блоков.
+
+``response.menu``:inxx ``menu``:inxx ``response.meta``:inxx ``meta``:inxx
+
+Макеты используются для инкапсуляции общих элементов страницы (заголовки, нижние колонтитулы, меню), и хотя они не являются обязательными, они сделают ваше приложение проще при написании и поддержке.  В частности, мы предлагаем написание макетов с использованием следующих переменных, которые могут быть заданы в контроллере. Использование этих хорошо известных переменных поможет сделать ваши макеты взаимозаменяемыми:
+``
+response.title
+response.subtitle
+response.meta.author
+response.meta.keywords
+response.meta.description
+response.flash
+response.menu
+response.files
+``:code
+
+За исключением ``menu`` и ``files``, все эти строки и их смысл должен быть очевиден.
+
+Меню ``response.menu`` представляет собой список из 3-х кортежей или 4-х кортежей. Эти три элемента: название ссылки, логическое значение, представляющее активна ли эта ссылка (является текущей ссылкой) и URL связанной страницы. Например:
+``
+response.menu = [('Google', False, 'http://www.google.com',[]),
+                 ('Index',  True,  URL('index'), [])]
+``:code
+
+``sub-menu``:inxx
+
+Четвертый элемент кортежа является необязательным подменю.
+
+``response.files`` список CSS и JS файлов, которые необходимы вашей странице.
+
+Мы также рекомендуем использовать:
+
+``
+{{include 'web2py_ajax.html'}}
+``:code
+
+в заголовке HTML, так как это включить библиотеки JQuery и определяет некоторую обратную совместимость функций JavaScript для специальных эффектов и Ajax. "web2py_ajax.html" включает в себя ``response.meta`` теги в представлении, jQuery  база, календарь DatePicker, и все необходимые CSS и JS ``response.files``.
+
+#### Макет страницы по умолчанию 
+
+``Twitter Bootstrap``:inxx
+
+Макет "views/layout.html", который поставляется со скаффолдинг-приложением web2py **welcome** (отрезаны некоторые дополнительные части) является довольно сложным, но оно имеет следующую структуру:
+
+``
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8" />
+  <title>{{=response.title or request.application}}</title>
+  ...
+  <script src="{{=URL('static','js/modernizr.custom.js')}}"></script>
+
+  {{
+  response.files.append(URL('static','css/web2py.css'))
+  response.files.append(URL('static','css/bootstrap.min.css'))
+  response.files.append(URL('static','css/bootstrap-responsive.min.css'))
+  response.files.append(URL('static','css/web2py_bootstrap.css'))
+  }}
+
+  {{include 'web2py_ajax.html'}}
+
+  {{
+  # используя боковые панели необходимо знать, какую боковую панель вы хотите использовать
+  left_sidebar_enabled = globals().get('left_sidebar_enabled',False)
+  right_sidebar_enabled = globals().get('right_sidebar_enabled',False)
+  middle_columns = {0:'span12',1:'span9',2:'span6'}[
+    (left_sidebar_enabled and 1 or 0)+(right_sidebar_enabled and 1 or 0)]
+  }}
+
+  {{block head}}{{end}}
+</head>
+
+<body>
+  <!-- Панель навигации ================================================== -->
+  <div class="navbar navbar-inverse navbar-fixed-top">
+    <div class="flash">{{=response.flash or ''}}</div>
+    <div class="navbar-inner">
+      <div class="container">
+        {{=response.logo or ''}}
+        <ul id="navbar" class="nav pull-right">
+          {{='auth' in globals() and auth.navbar(mode="dropdown") or ''}}
+        </ul>
+        <div class="nav-collapse">
+          {{if response.menu:}}
+          {{=MENU(response.menu)}}
+          {{pass}}
+        </div><!--/.nav-collapse -->
+      </div>
+    </div>
+  </div><!--/top navbar -->
+
+  <div class="container">
+    <!-- топ мачта ================================================== -->
+    <header class="mastheader row" id="header">
+        <div class="span12">
+            <div class="page-header">
+                <h1>
+                    {{=response.title or request.application}}
+                    <small>{{=response.subtitle or ''}}</small>
+                </h1>
+            </div>
+        </div>
+    </header>
+
+    <section id="main" class="main row">
+        {{if left_sidebar_enabled:}}
+        <div class="span3 left-sidebar">
+            {{block left_sidebar}}
+            <h3>Left Sidebar</h3>
+            <p></p>
+            {{end}}
+        </div>
+        {{pass}}
+
+        <div class="{{=middle_columns}}">
+            {{block center}}
+            {{include}}
+            {{end}}
+        </div>
+
+        {{if right_sidebar_enabled:}}
+        <div class="span3">
+            {{block right_sidebar}}
+            <h3>Right Sidebar</h3>
+            <p></p>
+            {{end}}
+        </div>
+        {{pass}}
+    </section><!--/main-->
+
+    <!-- нижний колонтитул ================================================== -->
+    <div class="row">
+        <footer class="footer span12" id="footer">
+            <div class="footer-content">
+                {{block footer}} <!-- this is default footer -->
+                ...
+                {{end}}
+            </div>
+        </footer>
+    </div>
+
+  </div> <!-- /container -->
+
+  <!-- The javascript =============================================
+       (Placed at the end of the document so the pages load faster) -->
+  <script src="{{=URL('static','js/bootstrap.min.js')}}"></script>
+  <script src="{{=URL('static','js/web2py_bootstrap.js')}}"></script>
+  {{if response.google_analytics_id:}}
+    <script src="{{=URL('static','js/analytics.js')}}"></script>
+    <script type="text/javascript">
+    analytics.initialize({
+      'Google Analytics':{trackingId:'{{=response.google_analytics_id}}'}
+    });</script>
+  {{pass}}
+</body>
+</html>
+``:code
+
+Есть несколько особенностей этого макета по умолчанию, которые делают его очень простым в использовании и настройке:
+
+- Он написан на HTML5 и использует "modernizr" ``modernizr``:cite библиотеку для обеспечения обратной совместимости. Фактический макет включает в себя некоторые дополнительные условные операторы, необходимые для IE и они опущены для краткости.
+- Он показывает оба ``response.title`` и ``response.subtitle`` которые могут быть установлены в модели. Если они не установлены, то он принимает имя приложения как заголовок
+- Он включает в себя ``web2py_ajax.html`` файл в заголовке, который генерирует все операторы импорта ссылок и сценариев.
+- Он использует модифицированную версию Twitter Bootstrap для гибких макетов, которые работают на мобильных устройствах и повторно упорядочивают столбцы, чтобы соответствовать маленьким экранам.
+- Он использует "analytics.js" для подключения к Google Analytics.
+- ``{{=auth.navbar(...)}}`` отображает welcome  текущему пользователю и ссылки на функции auth вроде вход, выход, регистрация, изменение пароля и т.д. в зависимости от контекста. Это помощник фабрики и его выходом можно манипулировать, как и любым другим помощником. Он расположен в ``{{try:}}...{{except:pass}}`` в случае, если auth не определено.
+- ``{{=MENU(response.menu)}}`` отображает структуру меню, как ``<ul>...</ul>``.
+- ``{{include}}`` заменяется содержимое расширяемого представления, когда отображается страница.
+- По умолчанию он использует условно три столбца (левую и правую боковые панели можно отключить с помощью расширяемого представления)
+- Он использует следующие классы: header, main, footer
+- Он содержит следующие блоки: statusbar, left_sidebar, center, right_sidebar, footer.
+
+Во представлениях, можно включить и настроить боковые панели следующим образом:
+
+``
+{{left_sidebar_enable=True}}
+{{extend 'layout.html'}}
+
+Этот текст идет по центру
+
+{{block left_sidebar}}
+This text goes in sidebar
+{{end}}
+``:code
+
+#### Настройка макета по умолчанию
+
+``CSS``:inxx
+
+Пользовательская настройка макета по умолчанию без редактирования является легкой, потому что welcome приложение основано на Twitter Bootstrap, которое хорошо документировано и поддерживает темы. В web2py четырех статических файла, которые имеют отношение к стилю:
+
+- "css/web2py.css" содержит web2py определенные стили
+- "css/bootstrap.min.css" содержит стиль CSS Twitter Bootstrap ``bootstrap``:cite ``Bootstrap``:inxx
+- "css/web2py_bootstrap.css" содержит с переопределением некоторые стили Bootstrap для соответствия потребностям web2py.
+- "js/bootstrap.min.js" которая включает в себя библиотеки для эффектов, модальности, панелей меню.
+
+Для изменения цвета и фоновых изображений, попробуйте добавить следующий код в заголовок layout.html:
+
+``
+<style>
+body { background: url('images/background.png') repeat-x #3A3A3A; }
+a { color: #349C01; }
+.header h1 { color: #349C01; }
+.header h2 { color: white; font-style: italic; font-size: 14px;}
+.statusbar { background: #333333; border-bottom: 5px #349C01 solid; }
+.statusbar a { color: white; }
+.footer { border-top: 5px #349C01 solid; }
+</style>
+``:code
+
+Конечно, вы можете также полностью заменить "layout.html" и "web2py.css" файлы на ваши собственные.
+
+#### Мобильная разработка
+
+По умолчанию макету layout.html велено быть дружественным к мобильным устройствам, но этого недостаточно. Однажды может потребоваться использование различных представлений, когда страницу посещает мобильное устройство.
+
+Для того, чтобы разработка для настольных и мобильных устройств была проще, web2py включает в себя декоратор ``@mobilize``. Этот декоратор применяется к действиям, которые должны иметь нормальное представление и мобильное представление. Это демонстрируется здесь:
+
+``
+from gluon.contrib.user_agent_parser import mobilize
+@mobilize
+def index():
+   return dict()
+``
+
+Обратите внимание на то, что декоратор должен быть импортирован перед использованием его в контроллере.
+Когда функция "index" вызывается из обычного браузера (настольный компьютер), web2py визуализирует возвращаемый словарь, используя представление "[controller]/index.html". Однако, когда он вызывается мобильным устройством, словарь визуализируется через "[controller]/index.mobile.html". Обратите внимание на то, что мобильные представления имеют расширение "mobile.html".
+
+В качестве альтернативы можно применить следующую логику создания всех представлений, дружественной к мобильным устройствам:
+
+``
+if request.user_agent().is_mobile:
+    response.view.replace('.html','.mobile.html')
+``
+
+Задача создания "*.mobile.html" представлений остается за разработчиком, но мы настоятельно рекомендуем использовать "JQuery Mobile" плагин, который делает эту задачу очень легкой.
+
+### Функции в представлениях
+
+Рассмотрим этот макет "layout.html":
+
+``
+<html>
+  <body>
+    {{include}}
+    <div class="sidebar">
+      {{if 'mysidebar' in globals():}}{{mysidebar()}}{{else:}}
+        my default sidebar
+      {{pass}}
+    </div>
+  </body>
+</html>
+``:code
+
+и это расширяющее представление
+
+``
+{{def mysidebar():}}
+my new sidebar!!!
+{{return}}
+{{extend 'layout.html'}}
+Hello World!!!
+``:code
+
+Обратите внимание, функция определена перед ``{{extend...}}`` оператором -- это приводит к созданию функции перед тем как код "layout.html" будет выполнен, так что функция может быть вызвана в любом месте в пределах "layout.html", и даже до оператора ``{{include}}``. Также обратите внимание, функции включена в расширяющее представление без ``=`` префикса.
+
+Код генерирует следующий вывод:
+
+``
+<html>
+  <body>
+    Hello World!!!
+    <div class="sidebar">
+        my new sidebar!!!
+    </div>
+  </body>
+</html>
+``:code
+
+Обратите внимание на то, что функция определена в HTML (хотя он также может содержать код Python) так что ``response.write`` используется для записи его содержимого (функции не возвращает содержимое). Именно поэтому макет вызывает функцию представления используя ``{{mysidebar()}}`` раньше, чем ``{{=mysidebar()}}``. Функции, определенные таким образом, могут принимать аргументы.
+
+``block``:inxx
+### Блоки в представлениях
+
+Основной способ сделать представление более модульным является использование ``{{block...}}s``, и этот механизм является альтернативой механизму, рассмотренному в предыдущем разделе.
+
+Для того, чтобы понять, как это работает, рассмотрим приложения на основе скаффолдинг-приложения Welcome, которое имеет макет layout.html. Этот макет включается в представление ``default/index.html`` через ``{{extend 'layout.html'}}``. В макете layout.html предварительно заданы определенные блоки с определенным содержанием по умолчанию, и они, таким образом, включаются в default/index.html.
+
+Вы можете переопределить содержимое этих блоков по умолчанию, заключив свой новый контент внутри блока с тем же именем. Расположение блока внутри layout.html не изменяется, но изменяется содержимое. 
+
+Вот упрощенная версия. Представьте себе, что это "layout.html":
+
+``
+<html>
+  <body>
+    {{include}}
+    <div class="sidebar">
+      {{block mysidebar}}
+        my default sidebar (this content to be replaced)
+      {{end}}
+    </div>
+  </body>
+</html>
+``:code
+
+и он является простым расширением представления ``default/index.html``:
+
+``
+{{extend 'layout.html'}}
+Hello World!!!
+{{block mysidebar}}
+my new sidebar!!!
+{{end}}
+``:code
+
+Он генерирует следующий вывод, в котором содержание обеспечено с помощью верховного блока в расширяемом представлении, но заключенного в DIV и класс происходит от layout.html. Это обеспечивает согласованность между представлениями:
+
+``
+<html>
+  <body>
+    Hello World!!!
+    <div class="sidebar">
+        my new sidebar!!!
+    </div>
+  </body>
+</html>
+``:code
+
+Реальный layout.html определяет ряд полезных блоков, и вы можете легко добавить больше, чтобы макет соответствовал вашим желаниям. 
+
+Вы можете иметь много блоков, и если блок присутствует в расширенном представлении, но не в расширяемом представлении, то используется содержание расширенного представления. Кроме того, обратите внимание, что в отличие от функций, блоки не обязательно определять перед``{{extend ...}}`` -- даже если они определены после ``extend``, они могут быть использованы для выполнения замены в любом месте расширенного представления.
+
+``super``:inxx
+
+Внутри блока, вы можете использовать выражение ``{{super}}``, чтобы включить содержимое родителя. Например, если мы заменим вышеуказанное расширяемое представление:
+
+``
+{{extend 'layout.html'}}
+Hello World!!!
+{{block mysidebar}}
+{{super}}
+my new sidebar!!!
+{{end}}
+``:code
+
+мы получаем:
+
+``
+<html>
+  <body>
+    Hello World!!!
+    <div class="sidebar">
+        my default sidebar
+        my new sidebar!!!
+    </div>
+  </body>
+</html>
+``:code
