@@ -1865,45 +1865,6 @@ Notice that on GAE cache.ram and cache.disk should not be used, so we make them 
 
 While the Google Clould SQL functions as a regular SQL database, and is indeed based at the time of writing on mysql, Google Datastore presents significant differences. 
 
-##### Eventual consistency
-
-The ''eventual consistency'' offered by Google Datastore deserves special attention. 
-In the Datastore, transactions that rely on primary Datastore keys, or a shared entity group, offer a strong consistency: every subsequent transaction or query will see the result of any prior transaction for the same key or entity group.
-On the other hand, queries that do not rely on primary keys or shared entity groups offer only ''eventual consistency'': new or modified data will be eventually made available to queries, after an unspecified delay that is typically up to a few seconds. 
-
-web2py does not rely on primary Datastore keys, nor shared entity groups.  The statement:
-
-``
-id = db.table.insert(field1=value1, field2=value2)
-``:code
-
-has the following effect:
-- A new row is inserted in the table ``db.table``; the row has a field ``id`` whose value is assigned by web2py.  The row also has a primary Datastore key, but this primary key is ''not'' ``id``, and is not exposed.
-- The indices on ``db.table`` are updated.  In particular, the index over ``id`` is updated, so the new row is ''eventually'' available to queries over ``db.table.id``. 
-Only after these two steps terminate, is the new data available for queries by ``id``. 
-In particular, the following common web2py paradigm will ''fail'':
-
-``
-def insert():
-    form = SQLFORM(db.table)
-    if form.process().accepted:
-        session.flash = T('The data has been inserted.')
-        redirect(URL('view', args=[form.vars.id]))
-    return dict(form=form)
-
-def view():
-    row = db.table(request.args(0))
-    if row is None:
-        session.flash = T('Data not found')
-        redirect(URL(index))
-    form = SQLFORM(db.table, record=row, readonly=True)
-    return dict(form=form)
-``:code
-
-Once a user visits the ``insert`` page and inserts data, the user is redirected to the ``view`` page. When using the Google Datastore, often the data just inserted is not found in the ``view`` controller.  Why?
-
-What happens is this.  In the ``insert`` controller, the data is inserted in the database, and the transaction is completed.  Then, asynchronously and after the transaction completes, Google Datastore rebuilds the indices, including the index on the ``id`` field of ``db.table``.  When the user accesses the ``view`` controller, there is no guarantee that the index on ``db.table.id`` already includes the new data item, and thus, the user is often presented with the "Data not found" message.
-
 ##### Lack of JOINs
 
 The lack of JOIN operations and typical relational functionality of the Datastore requires removing JOINs from web2py queries and de-normalizing the database.
