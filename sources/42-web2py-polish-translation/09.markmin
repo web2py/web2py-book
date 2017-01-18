@@ -89,7 +89,9 @@ egzekwować je automatycznie, bez potrzeby używania dekoratorów.
 
 W tym rozdziale omawiamy różne części mechanizmu RBAC, jedną po drugiej.
 
+[[Authentication]]
 ### Uwierzytelnianie
+``uwierzytelnianie``:inxx
 
 Użycia RBAC wymaga zidentyfikowania użytkownika. Oznacza to, że użytkownicy
 muszą zostać zarejestrowni (lub być zarejestrowanymi) i zalogować się.
@@ -284,6 +286,8 @@ pobiera opcjonalny argument ``otherwise``. Można go ustawić na łańcuch wskaz
 miejsce przekierowania odwiedzającego po nieudanej rejestracji.
 
 #### Ograniczenia dotyczące rejestracji
+``rejestracja użytkowników``:inxx
+
 
 Jeśli chce się zezwolić odwiedzającym rejestrowanie się ale bez możliwości zalogowania
 do czasu zatwierdzenia rejestracji przez administratora, trzeba zrobić tak:
@@ -321,6 +325,7 @@ auth.settings.login_after_registration = True
 
 Inne metody **Auth** można ograniczyć w ten sam sposób.
 
+[[#Integration-with-OpenID-Facebook-etc]]
 #### Integracja z OpenID, Facebook itd.
 ``Janrain``:inxx ``OpenID``:inxx ``Facebook``:inxx ``LinkedIn``:inxx ``Google``:inxx ``MySpace``:inxx ``Flickr``:inxx
 
@@ -405,7 +410,7 @@ API do realizacji tego jest opisane w dalszej części tego rozdziału.
 
 ``CAPTCHA``:inxx ``reCAPTCHA``:inxx ``PIL``:inxx
 W celu uniemożliwienia spamerom i botom rejestrowanie się na witrynie, można
-wymagać przy rejestracji kod CAPTCHA. W web2py umożłiwia się obsługę reCAPTCHA``recaptcha``:cite
+wymagać przy rejestracji kod CAPTCHA. W web2py umożliwia się obsługę reCAPTCHA``recaptcha``:cite
 zaraz od uruchomienia. Powodem wyboru reCAPTCHA jest to, że jest to program bardzo
 dobrze zaprojektowany, darmowy, dostępny (może odczytywać słowo za odwiedzającego),
 łatwy w konfiguracji i nie wymagający instalacji oraz bibliotek zewnętrznych.
@@ -462,6 +467,7 @@ form.element('table').insert(-1,TR('',Recaptcha(...),''))
 ``:code
 
 #### Dostosowywanie klasy ``Auth``
+``klasa Auth``:inxx
 
 Wywołanie:
 ``
@@ -568,7 +574,7 @@ nazw, przez:
 ``
 auth.settings.table_user
 auth.settings.table_group
-auth.settings.table_membership
+----auth.settings.table_membership
 auth.settings.table_permission
 auth.settings.table_event
 ``:code
@@ -1024,6 +1030,7 @@ i zostaną wkrótce zdeprecjonowane.
 
 [[mail_and_auth]]
 #### Interakcja klas ``Mail`` i ``Auth``
+``klasa Mail``:inxx ``klasa Auth``:inxx
 
 Informacje o API web2py dla poczty elektronicznej i o jej konfigurowaniu
 można znaleźć w [[rozdziale 8 ../08 ]]. Tutaj ograniczamy się do omówienia
@@ -1063,24 +1070,212 @@ modelu, w którym zdefiniowyny jest obiekt ``auth``:
 auth.settings.registration_requires_verification = True
 auth.settings.registration_requires_approval = False
 auth.settings.reset_password_requires_verification = True
-auth.messages.verify_email = 'Click on the link http://' + \
-    request.env.http_host + \
-    URL(r=request,c='default',f='user',args=['verify_email']) + \
-    '/%(key)s to verify your email'
-auth.messages.reset_password = 'Click on the link http://' + \
-    request.env.http_host + \
-    URL(r=request,c='default',f='user',args=['reset_password']) + \
-    '/%(key)s to reset your password'
+auth.messages.verify_email = 'Click on the link  %(link)s to verify your email'
+auth.messages.reset_password = 'Click on the link %(link)s to reset your password'
 ``:code
 
 W dwóch powyższych liniach ``auth.messages``, może zajść konieczność zamiany
 częściowego adresu URL na właściwy pełny adres URL akcji. Jest to niezbędne,
 ponieważ web2py może być instalowany za serwerem pośredniczącym, co powoduje, że
-nie będzie można ustalić ustalić jego publicznych adresów URL z absolutną pewnością.
+nie będzie można ustalić jego publicznych adresów URL z absolutną pewnością.
 Powyższe przykłady (które mają domyślne wartości) powinny działać w większości
 przypadków.
 
+[[two-step-verification]]
+#### Weryfikacja dwuetapowa
+``weryfikacja dwuetapowa``:inxx
+``uwierzytelnianie dwuskładnikowe``:inxx
+
+**Weryfikacja dwuetpowa** (zwana też **uwierzytelnianiem dwuskładnikowym**) jest
+sposobem zwiększenia bezpieczeństwa uwierzytelniania i polega na dodaniu dodatkowego
+etapu w procesie logowania. W pierwszym etapie użytkownikowi jest wyświetlany
+standardowy formularz logowania z nazwą użytkownika i hasłem. Jeśli użytkownik
+pomyślnie przejdzie przez ten etap logowania, wprowadzając prawidłową nazwę użytkownika
+i hasło i włączone jest dwuskładnikowe uwierzytelnianie dla tego użykownika, serwer
+wyświetli drugi formularz, w którym użytkownik musi podać token jaki mu zostanie
+dostarczony po pierwszym etapie logowania albo jednorazowy token awaryjny, jaki
+otrzymał wcześniej. Uwierzytelnienia następuje wówczas po poprawnym wprowadzeniu
+takiego tokenu. 
+
+[[image @///image/two_factor_steps.png center]]
+
+##### Włączanie weryfikacji dwuetapowej osobno dla każdego użytkownika
+
+Ten przypadek ma zastosowanie dla aplikacji, w której poszczególni użytkownicy
+mogą dla siebie włączać lub wyłączać tą dwuetapową weryfikację.
+
+W naszym przykładzie posłużymy się formularzem który wymagać będzie wprowadzenia
+6-cyfrowego kodu, który zostanie przesłany na skrzynkę e-mail użytkownika po
+prawidłowym przejściu przez pierwszy etap uwierzytelniania.
+
+Domyślnie użytkownik bedzie mógł wykonać 3 próby wprowadzenia kodu. Po trzech nieudanych
+próbach, użytkownik będzie musiał powtórzyć logowanie od pierwszego etapu.
+
++. Utwórz grupę (rolę) dla weryfikacji dwuetapowej. W tym przykładzie nazwiemy ją
+   ``auth2step`` i opiszemy jako ``Weryfikacja dwuetapowa``.
++. Nadaj prawa członkowskie użytkownikowi.
++. Dodaj następujące ustawienie w modelu, w którym utworzony i skonfigurowany
+   został obiekt ``auth`` (zwykle jest to model ''db.py''):
+``
+auth.settings.two_factor_authentication_group = "auth2step"
+``   
+--------
+Nie zapomnij skonfigurować w ''db.py'' serwera e-mail!
+--------
+
+##### Włączanie weryfikacji dwuetapowej dla całej aplikacji
+
+W tym przykładzie drugi etap weryfikacji działa tak samo jak poprzednio, ale
+dotyczy wszystkich użytkowników aplikacji (nie ma wybotu metody przez użytkownika).
+
+W modelu, w którym utworzony i skonfigurowany jest obiekt ``auth`` (''db.py'')
+dodaj to ustawienie:
+
+``
+auth.settings.auth_two_factor_enabled = True
+``
+
+W takim przypadku można wyłączyć dwuetapową weryfikację dla określonego adresu IP.
+Na przykład, jeśli zewnętrzne IP sieci biura to 93.56.854.54 i nie potrzeba dla
+niej dwuetapowej weryfikacji, to w modelu trzeba wprowadzić nastęþujące ustawienie:
+
+``
+if request.env.remote_addr != '93.56.854.54':
+    auth.settings.auth_two_factor_enabled = True
+``
+
+##### Przykłady innych rozwiązań
+
+###### Przykład 1: Wysyłanie kodu przez SMS zamiast e-mail.
+
+W modelu stwórz kod wedłu tego wzorca:
+
+``
+def _sendsms(user, auth_two_factor):
+    #napisz tu kod procesu wysyłania kodu auth_two_factor przez SMS
+    return  auth_two_factor
+
+auth.settings.auth_two_factor_enabled = True
+auth.messages.two_factor_comment = "Your code have been sent by SMS"
+auth.settings.two_factor_methods = [lambda user, auth_two_factor: _sendsms(user, auth_two_factor)]
+``
+
+Metoda ``_sendsms(...)`` przyjmuje dwie wartości: ``user`` i ``auth_two_factor``:
+
+- ``user``: jest to wiersz ze wszystkimi parametrami. Można do nich uzyskać dostęp
+  przez: ``user.email``, ``user.first_name`` itd;
+- ``auth_two_factor``: łańcuch zawierający kod uwierzytelniający(token).
+
+W przypadku wysyłania tokenów poprzez SMS trzeba do tabelu ``auth_user`` dodać
+dodatkowe pole, np, ``phone``. Wówczas dostęp do wartości tego pola uzyskuje się
+przez ``user.phone``. Więcej informacji o wysyłaniu wiadomości SMS ppprzez web2py
+znajdziesz w rozdziale [[Poczta elektroniczna i SMS ../08/]]. 
+
+##### Przykład  2: Wysyłanie kodu przez SMS z wygenerowaniem własnego kodu
+
+``
+def _sendsms(user):
+    auth_two_factor = #napisz własny algorytm generowania kodu.
+    #napisz tu kod procesu wysyłania kodu auth_two_factor przez SMS
+    return  auth_two_factor
+
+auth.settings.two_factor_methods = [lambda user, auth_two_factor: _sendsms(user, auth_two_factor)]
+``
+
+##### Przykład 3: Kod jest generowany przez zewnętrznego klienta, na przykład Mobile OTP Client
+
+MOTP (Mobile one time password) umożliwia logowanie hasłem jednorazowym (OTP)
+generowanym na kliencie MOTP. Klienci MOTP są praktycznie dostęþni na wszystkich
+platformach. Więcej o OTP można się dowiedzieć w artykule wiki
+[[One-time-password <http://en.wikipedia.org/wiki/One-time_password>]] i odwiedzając
+stronę [[MOTP <http://motp.sourceforge.net/>]].
+
+W następnym przykładzie użyjemy DroidOTP. Jest to darmowa aplikacja dostępna
+w ''Play Store for Android''. Po zainstalowaniu:
+
+- Utwórz nowy profil, na przykład ''test'';
+- Inicjuj tajny klucz wstrząśnięciem telefonu.
+
+Skopiuj poniższy kod i wklej go do swojego modelu:
+
+``
+#Przed zdefiniowaniem tabel, dodajemy kilka dodatkowych pól do auth_user
+auth.settings.extra_fields['auth_user'] = [
+    Field('motp_secret', 'password', length=512, default='', label='MOTP Secret'),
+    Field('motp_pin', 'string', length=128, default='', label='MOTP PIN')]
+
+OFFSET = 60 #To ma być ta sama wartość co w kliencie OTP
+
+#Ustawienie session.auth_two_factor na None, ponieważ kod jest generowany przez aplikację zewnętrzną. 
+# Pozwala to uniknąć ustawienia domyśłnego i wysyłania kodu pocztą e-mail.
+def _set_two_factor(user, auth_two_factor):
+    return None
+
+def verify_otp(user, otp):
+  import time
+  from hashlib import md5
+  epoch_time = int(time.time())
+  time_start = int(str(epoch_time - OFFSET)[:-1])
+  time_end = int(str(epoch_time + OFFSET)[:-1])
+  for t in range(time_start - 1, time_end + 1):
+     to_hash = str(t) + user.motp_secret + user.motp_pin
+     hash = md5(to_hash).hexdigest()[:6]
+     if otp == hash:
+       return hash
+
+auth.settings.auth_two_factor_enabled = True
+auth.messages.two_factor_comment = "Verify your OTP Client for the code."
+auth.settings.two_factor_methods = [lambda user, auth_two_factor: _set_two_factor(user, auth_two_factor)]
+auth.settings.two_factor_onvalidation = [lambda user, otp: verify_otp(user, otp)]
+
+``
+
+Tajny klucz wygenerowany wcześniej w telefonie musi być wprowadzony do pola motp_secret.
+Klucz ten nie powinien być uzywany ponownie ze wzgledów bezpieczeństwa. Wybierz
+jeden PIN. Mogą byc to same cyfry, litery lub ich mieszanka. Weź telefon, wybierz
+swój profil i wpisz PIN, który został wcześniej wprowadzony do formularza.
+Po małej chwili, dostaniesz SMS z kodem uwierzytelniającym dla swojej aplikacji.
+
+[[image @///image/motp.png center]]
+
+----------
+Proszę mieź na uwadze, że dla tego sposobu dwuskładnikowego uwierzytelniania,
+telefon i serwer (gdzie aplikacja web2py jest hostem) muszą być czasowo zsynchronizowane,
+choć mogą się znajdować w różnych strefach czasowych. Jest tak dlatego, że OTP
+używa znacznika czasowego Unix. Śledzony jest czas od wygenerowania kodu w sekundach.
+----------
+
+#### Kilka dodatkowych parametrów konfiguracyjnych
+
+Ustawienie ilości prób logowania:
+
+``
+auth.setting.auth_two_factor_tries_left = 3
+`` 
+
+Komunikat zwracany w razie nieprawidłowego kodu:
+
+``
+auth.messages.invalid_two_factor_code = T('Incorrect code. {0} more attempt(s) remaining.')
+``
+
+Dostosowanie szablony wiadomości e-mail:
+
+``
+auth.messages.retrieve_two_factor_code=T('Your temporary login code is {0}')
+auth.messages.retrieve_two_factor_code_subject=T('Your temporary login code is {0}')
+``
+
+Dostosowanie formularza dwuskładnikowego uwierzytelniania:
+
+``
+auth.messages.label_two_factor = T('Authentication code')
+auth.messages.two_factor_comment = T('The code was emailed to you and is required for login.')
+``
+
+[[authorization]]
 ### Autoryzacja
+``autoryzacja``:inxx
 
 Gdy rejestrowany jest nowy użytkownik, tworzona jest nowa grupa zawierająca tego
 użytkownika. Rola nowego użytkownika, to konwencjonalnie ``user_[id]`` gdzie ``[id]``
@@ -1230,6 +1425,8 @@ False
 ``:code
 
 #### Dekoratory
+[[decorators]]
+``dekoratory``:inxx
 
 Najbardziej popularnym sposobem sprawdzania uprawnień nie jest jawne wywoływanie
 powyższych metod, ale dekorowanie funkcji, tak że uprawnienia są sprawdzane w
