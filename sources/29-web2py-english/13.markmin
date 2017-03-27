@@ -939,6 +939,95 @@ sudo restart web2py-scheduler
 sudo status web2py-scheduler
 ``:code
 
+#### Initial Queuing of a Repeating Task
+
+Task definition is done in a model file.  But the initial
+queuing of a repeating task is most easily done from a non-exposed
+controller function.  By doing this in a controller
+rather than in a model file, you remove unnecessary database accesses
+that would occur on every request to your website.
+
+[The function could also be in a module or a private file,
+but in the controller, the web2py API and environment is readily
+accessible.]
+
+A non-exposed function is any controller function that has an argument,
+so writing something like the following in a controller (e.g. default.py)
+gives you 
+
+``
+def reinit_sched(protect=None):
+    # put any preparatory code here
+    #
+    # schedule 2 tasks:
+    sched.queue_task(foo)
+    sched.queue_task(bar)
+    #
+    # put any afters code here
+    db.commit()
+``:code
+
+and you can then easily call it with ``web2py.py -M -S appname/default/reinit_sched``
+(a similar function can be used to stop a repeating task, perhaps for
+maintenance reasons)
+
+#### Populating a Database on Deployment
+
+Your application may have a need for a pre-populated database table.
+A simple example might be a table of color names, or the names of the
+months (perhaps in a special format not used in Python datetime
+routines).  More complicated examples might include an initial inventory
+of parts, or the initial pages of a wiki.
+
+The simple examples might be done via ``db.mycolors.insert()``;
+the more complex examples might use a CSV file to fill in the values.
+As in the task queuing section above, this should be done
+using non-exposed controller functions.
+Table definition for a database is done in model files, but model files
+are read on every request, so one-time actions should not be in the
+model files where they would lower the responsiveness of your site.
+
+[The function could also be in a module or a private file,
+but in the controller, the web2py API and environment is readily
+accessible.]
+
+Again, a non-exposed function is any controller function that has an argument,
+so writing something like the following in a controller (e.g. default.py)
+gives you 
+
+``
+def populate_colors(protected=None)
+    collist = ["lime","#00FF00", "olive","#808000",
+                "fuchsia","#FF00FF","maroon","#800000"]:
+    for i in range(0,len(collist),2):
+        k,v = collist[i:i+2]
+        db.mycolors.insert(name=k, code=v)
+    db.commit()
+``:code
+
+you can then easily call it with ``web2py.py -M -S appname/default/populate_colors``
+
+For the complex example using a CSV file,
+your function might look like:
+
+``
+def populate_colors(exposed=False):
+  db.mycolors.import_from_csv_file( 
+    open(os.path.join(request.folder,
+                      os.path.join('private', db_colors.csv')
+                     ),
+         'r') 
+    )
+  db.commit()
+``:code
+
+and this would be called with ``web2py.py -M -S appname/default/populate_colors``
+
+See also Chapter 14,
+[[Populating database with dummy data@chapter/14#Populating-database-with-dummy-data]]
+
+
+
 ### Windows
 
 #### IIS
