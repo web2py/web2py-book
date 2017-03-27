@@ -1,4 +1,51 @@
-## Recepty wdrożeniowe
+## Wdrożenie: Tworzenie i eksploatacja
+``appconfig``:inxx
+[[appconfig]]
+### Moduł AppConfig
+
+Środowisko programistyczne i produkcyjne prawie zawsze mają inną konfigurację
+bazy danych, różne serwery pocztowe i ewentualnie inne różnice.
+
+W web2py stosuje się prywatny katalog do przechowywania informacji, które nie są
+replikowane w typowym wdrożeniu produkcyjnym (trzeba zwrócić uwagę, aby nie
+przekazywać tego katalogu na serwer produkcyjny). 
+
+``AppConfig`` jest społecznościowym modułem, który umożliwia przechowywanie prostego
+tekstowego pliku konfiguracyjnego ze zdefiniowanymi ustawieniami, różnicującymi
+środowisko programistyczne i produkcyjne, takie jak połączenie z bazą danych.
+Domyślnie jest to plik "pythonowy", ale obsługiwany jest też format JSON.
+
+Aplikacja "welcome" wykorzystuje teraz ten moduł w ``db.py`` do odczytywania
+konfiguracji z pliku umieszczonego w prywatnym katalogu aplikacji. Domyślna
+ścieżka do tego pliku, to ``private/appconfig.ini``.
+
+Plik ``appconfig.ini`` umożliwia definiowanie konfiguracji połączenia z bazą
+danych i konfigurację SMTP. Gdy aplikacja jest już stabilna, moduł ten można ustawić
+na tryb buforowania w celu zmniejszenia obciążenia.
+``
+from gluon.contrib.appconfig import AppConfig
+...
+myconf = AppConfig(reload=False)``:code
+
+Aplikacje utworzone w nowej wersji web2py mają już domyślnie zdefiniowane połączenie
+z bazą danych w AppConfig. 
+
+Wartości w app_config.ini są pobierane i zrzucane z wartości łańcuchowej, w ten sposb:
+``
+myconf = AppConfig()
+...
+a_config_value = myconf.take('example_section.example_key',cast=int)
+``:code
+
+Ponieważ zrzucanie następuje z łańcucha a niepusty łańcuch zrzuca True, to
+najbezpieczniejszym sposobem reprezentowania logicznego fałszu jest pusty
+łańcuch:
+``
+[example_section]
+example_key = 
+``:code
+
+## Recepty wdrożeniowe: Infrastruktura
 
 Istnieje wiele sposobów na wdrożenie web2py w środowisku produkcyjnym. Szczegóły
 zależą od konfiguracji i usług dostarczanych przez host.
@@ -27,7 +74,7 @@ pomiędzy serwerem internetowym a aplikacjami internetowymi był CGI (Common Gat
 Interface``cgi``:cite . Głównym problemem z CGI jest to, że tworzy on nowe procesy
 dla każdego żądania HTTP. Jeśli aplikacja jest napisana w języku interpretowanym,
 każde żądanie HTTP obsługiwane przez skrypty CGI rozpoczyna nową instancje interpretera.
-Jest to wolne i nalezy tego unikać w środowisku produkcyjnym. Ponadto CGI może
+Jest to wolne i należy tego unikać w środowisku produkcyjnym. Ponadto CGI może
 obsługiwać tylko proste odpowiedzi. Nie może obsługiwać, na przykład, strumieniowania
 plików.
 
@@ -85,16 +132,16 @@ Platforma web2py zawiera również plik ``gaehandler.py`` do sprzężenia z Goog
 App Engine (GAE). Aplikacje internetowe na GAE są uruchamiane "w chmurze".
 Oznacza to, że framework całkowicie abstrahuje szczegóły sprzętowe. Aplikacja
 internetowa jest automatycznie replikowana, tyle razy jak to jest konieczne do
-obsłuzenia wszystkich jednoczesnych żądań. Replikowanie w tym przypadku znaczy
+obsłużenia wszystkich jednoczesnych żądań. Replikowanie w tym przypadku znaczy
 więcej niż wielowątkowość na pojedynczym serwerze, oznacza to też wiele procesów
-na róznych serwerach. GAE osiaga ten poziom skalowalności przez blokowanie zapisu
+na różnych serwerach. GAE osiąga ten poziom skalowalności przez blokowanie zapisu
 do systemu plików i wymóg przechowywania informacji w magazynie danych Google
 BigTable lub w memcache.
 
 Na platformach innych niż GAE, skalowalność jest problemem, który trzeba rozwiązać
-samemu, co może wymagać jakichś usprawnień w wplikacjach web2py. Najpopularniejszym
-sposobem osiagania skalowalnosci jest użycie wielu serwerów internetowych za
-load-balancerem (prosty "round robin" lub coś bardziej zaawansowanego, odbieranie
+samemu, co może wymagać jakichś usprawnień w aplikacjach web2py. Najpopularniejszym
+sposobem osiągania skalowalności jest użycie wielu serwerów internetowych za
+load-balancerem (prosty "round robin" lub coś bardziej zaawansowanego: odbieranie
 informacji zwrotnej "pulsu" z serwerów).
 
 Nawet jeśli istnieje wiele serwerów internetowych, to musi istnieć jeden i tylko
@@ -112,7 +159,7 @@ zaawansowanym podejściem do tego zagadnienia, w tym:
 - użycie memcache zamiast cache.ram i cache.disk;
 - przechowywanie plików w bazie danych zamiast we współdzielonym systemie plików.
 
-Chociaż trzy pierwsze receptury są zalecane, to czwarta może przynieść korzyści
+Chociaż trzy pierwsze receptury są zalecane, to czwarta może przynieść korzyści,
 głównie w przypadku małych plików, ale przy dużych plikach może przynieść odwrotny
 skutek.
 
@@ -125,7 +172,7 @@ dla następujących popularnych serwerów: bjoern, cgi, cherrypy, diesel, eventl
 fapws, flup, gevent, gunicorn, mongrel2, paste,
 rocket, tornado,  twisted, wsgiref.
 
-Można zastosować każdy z tych serwerów, na przykład Tornado, po prostu robiąc:
+Można zastosować każdy z tych serwerów, na przykład Tornado, po prostu robiąc tak:
 
 ``
 python anyserver.py -s tornado -i 127.0.0.1 -p 8000 -l -P
@@ -140,7 +187,7 @@ python anyserver.py -h
 
 ### Linux i Unix
 
-#### Wdrożenie produkcyjne
+#### Pierwsze kroki wdrożenia produkcyjnego
 
 Oto kilka kroków do zainstalowania od podstaw apache+python+mod_wsgi+web2py+postgresql.
 
@@ -159,7 +206,7 @@ sudo ./setup-web2py-fedora.sh
 Oba skrypty powinny działać zaraz po ich pobraniu, ale każda instalacja Linux
 jest trochę inna, więc przed ich uruchomieniem trzeba sprawdzić kod źródłowy.
 W przypadku Ubuntu, wiekszość tego co skrypty te robią, jest opisane poniżej.
-Nie implementuja one optymalizacji skalowalności, co jest opisane w tym rozdziale.
+Nie implementują one optymalizacji skalowalności, co jest opisane dalej.
 
 #### Konfiguracja Apache
 
@@ -184,8 +231,7 @@ sudo apt-get -y install libapache2-mod-proxy-html
 
 Włącz w Apache moduły SSL, proxy i WSGI:
 ``
-sudo ln -s /etc/apache2/mods-available/proxy_http.load \
-           /etc/apache2/mods-enabled/proxy_http.load
+sudo ln -s /etc/apache2/mods-available/proxy_http.load /etc/apache2/mods-enabled/proxy_http.load
 sudo a2enmod ssl
 sudo a2enmod proxy
 sudo a2enmod proxy_http
@@ -199,7 +245,7 @@ sudo mkdir /etc/apache2/ssl
 
 Należy uzyskać swoje certyfikaty SSL od zaufanego Certificate Authority, takiego
 jak verisign.com, ale dla celów testowych wystarczy wygenerować certyfikaty z
-własnym podpisem, zgodnie z instrukcją ref.``openssl``:cite
+własnym podpisem, zgodnie z instrukcją``openssl``:cite.
 
 Zrestartuj serwer Apache:
 ``
@@ -218,23 +264,24 @@ a pliki dzienników Apache w:
 
 #### Moduł mod_wsgi
 
-Pobierz źródło web2py i rozpakuj ten pakiet na komputerze na którym została wykonana
-powyżej omówiona instalacja serwera internetowego.
+Najpierw pobierz źródło web2py i rozpakuj ten pakiet na komputerze na którym
+została wykonana popoprzednio omówiona instalacja serwera internetowego.
 
-Pakiet źródłowy web2py trzeba umieścić w katalogu dokumentów serwera Apache
-(w UBUNTU jest to ``/var/www/html``) z nadanymi uprawnieniami dla właściciela
-procesu serwera Apache (np. dla użytkownika www-data i grupy www-data).
+Pakiet źródłowy web2py trzeba umieścić gdzieś poza katalogiem głównym dokumentów
+serwera Apache, na przykład w katalogu ``/home/www-data/`` i ustawić własność
+tego katalogu dla dla właściciela procesu serwera Apache (w dystrybucjach Debiana
+i Ubuntu jest to użytkownik www-data i grupa www-data).
 Czynności te mogą być wykonane przez następujące polecania powłoki:
 ``
-cd /var/www/html/
+cd /home/www-data/
 sudo wget http://web2py.com/examples/static/web2py_src.zip
 sudo unzip web2py_src.zip
-sudo chown -R www-data:www-data /var/www/html/web2py
+sudo chown -R www-data:www-data /home/www-data/web2py
 ``:code
 
-W celu ustawienia web2py z modułem mod_wsgi, utwórz nowy plik knfiguracyjny Apache:
+W celu ustawienia web2py z modułem mod_wsgi, utwórz nowy plik konfiguracyjny Apache:
 ``
-/etc/apache2/sites-available/web2py
+/etc/apache2/sites-available/web2py.conf
 ``:code
 
 i wstaw w nim następujący kod:
@@ -243,12 +290,12 @@ i wstaw w nim następujący kod:
   ServerName web2py.example.com
   WSGIDaemonProcess web2py user=www-data group=www-data display-name=%{GROUP}
   WSGIProcessGroup web2py
-  WSGIScriptAlias / /var/www/html/web2py/wsgihandler.py
+  WSGIScriptAlias / /home/www-data/web2py/wsgihandler.py
 
 #This is Apache 2.2.x permission syntax. See Apache docs for 2.4 syntax
 # http://httpd.apache.org/docs/2.4/upgrading.html#run-time
 
-  <Directory /var/www/html/web2py>
+  <Directory /home/www-data/web2py>
     AllowOverride None
     Order Allow,Deny
     Deny from all
@@ -257,9 +304,9 @@ i wstaw w nim następujący kod:
     </Files>
   </Directory>
 
-  AliasMatch ^/([^/]+)/static/(.*) \
-           /var/www/html/web2py/applications/$1/static/$2
-  <Directory /var/www/html/web2py/applications/*/static/>
+  AliasMatch ^/([^/]+)/static/(?:_[\d]+.[\d]+.[\d]+/)?(.*) \
+  /home/www-data/web2py/applications/$1/static/$2
+  <Directory /home/www-data/web2py/applications/*/static/>
     Order Allow,Deny
     Allow from all
   </Directory>
@@ -272,8 +319,8 @@ i wstaw w nim następujący kod:
   Deny from all
   </LocationMatch>
 
-  CustomLog /var/log/apache2/access.log common
-  ErrorLog /var/log/apache2/error.log
+  CustomLog /private/var/log/apache2/access.log common
+  ErrorLog /private/var/log/apache2/error.log
 </VirtualHost>
 ``:code
 
@@ -282,7 +329,7 @@ do web2py bez wykorzystywania serwera WSGI Rocket.
 
 ##### Przeniesienie skryptu handlera
 
-Na koniec trzeba zmienić lokalizację skryptu handlera ``web2py/handlers/wsgihandler.py``.
+Na koniec, trzeba zmienić lokalizację skryptu handlera ``web2py/handlers/wsgihandler.py``.
 Tak jak udokumentowano w katalogu handlerów, skrypt ten powinien zostać przeniesiony
 lub skopiowany do katalogu nadrzędnego (czyli do tego samego katalogu, gdzie znajduje
 się skrypt ``web2py.py``). Odwołanie symboliczne może spowodować problemy z uprawnieniami
@@ -297,7 +344,7 @@ WSGIDaemonProcess web2py user=www-data group=www-data display-name=%{GROUP}
 określa grupę procesu demona w kontekście "web2py.example.com". Definiując to
 wewnątrz wirtualnego hosta umożliwia się, że host ten uzyskuje dostęp do
 stosowania WSGIProcessGroup - dotyczy to każdego wirtualnego hosta z tą sama nazwą
-serwera, ale innym porcie.
+serwera, ale na innym porcie.
 
 Opcje "user" i "group" należy ustawić na użytkownika i grupę majace prawa dostępu
 do katalogu, w którym skonfigurowany został web2py. Nie trzeba ustawiać opcji
@@ -318,7 +365,7 @@ się wszystkie narzędzia debugowania WSGI w przeglądarce, które sprawdzają f
 powoduje, że flaga ta jest ustawiana na ``True``, nawet dla pojedynczego procesu
 a wspomniane narzędzia oczekują ustawienia tej flagi na ``False``.
 
-Uwaga: jeśli kod aplikacji lub zewnetrzengo modułu rozszerzajacego nie jest wątkowo
+Uwaga: jeśli kod aplikacji lub zewnętrzengo modułu rozszerzajacego nie jest wątkowo
 bezpieczny, trzeba zamiast tego użyć opcji ``processes=5 threads=1``. Tworzy to pięć
 grup procesów, gdzie każdy proces jest pojedynczym wątkiem. Można rozważyć użycie
 ``maximum-requests=1000``, jeśli aplikacja ujawnia obiekty Pythona, ponieważ nie
@@ -330,20 +377,22 @@ WSGIProcessGroup web2py
 deleguje uruchamianie wszystkich aplikacji WSGI do demona grupy procesów, który
 został skonfigurowany przy użyciu dyrektywy WSGIDaemonProcess.
 ``
-WSGIScriptAlias / /var/www/html/web2py/wsgihandler.py
+WSGIScriptAlias / /home/www-data/web2py/wsgihandler.py
 ``:code
 
 montuje aplikację web2py. W tym przypadku jest ona montowana w katalogu głównym
 witryny internetowej.
+
+Fragment:
 ``
-<Directory /var/www/html/web2py>
+<Directory /home/www-data/web2py>
   ...
 </Directory>
 ``:code
 
 nadaje uprawnienia dostępu dla Apache do pliku skryptu WSGI.
 ``
-<Directory /var/www/html/web2py/applications/*/static/>
+<Directory /home/www-data/web2py/applications/*/static/>
   Order Allow,Deny
   Allow from all
 </Directory>
@@ -356,7 +405,7 @@ instruuje Apache aby ominął web2py podczas wyszukiwania plików statycznych.
 </Location>
 ``:code
 
-a
+i
 ``
 <LocationMatch ^/([^/]+)/appadmin>
   Deny from all
@@ -368,10 +417,11 @@ blokuje publiczny dostęp do **admin** i **appadmin**
 Zwykle chcemy po prostu nadać uprawnienia do całego katalogu, gdzie są zlokalizowane
 pliki skryptów WSGI, ale web2py umieszcza plik skryptu WSGI w katalogu, w którym
 zawarty jest też inny kod żródłowy, w tym hasło interfejsu administracyjnego.
-Otwarcie całego tego katalogu będzie stwarza problemy bezpieczeństwa, ponieważ
+Otwarcie całego tego katalogu będzie stwarzać problemy bezpieczeństwa, ponieważ
 technicznie Apache będzie udzielał uprawnień do obsługi wszystkich plików przez
 każdego użytkownika, który dostanie się do tego katalogu poprzez odwzorowany adres
 URL.
+
 Dla uniknięcia tych problemów, trzeba jawnie zabronić dostępu do zawartości tego
 katalogu, z wyjatkiem pliku skryptu WSGI i zabronić użytkownikowi wykonywania
 jakiego kolwiek przesłaniania konfiguracji poprzez plik .htaccess, co podniesie
@@ -414,9 +464,9 @@ oraz edytuj plik konfiguracyjny ``web2py.conf`` i dodaj tam:
 
   WSGIProcessGroup web2py
 
-  WSGIScriptAlias / /var/www/html/web2py/wsgihandler.py
+  WSGIScriptAlias / /home/www-data/web2py/wsgihandler.py
 
-  <Directory /var/www/html/web2py>
+  <Directory /home/www-data/web2py>
     AllowOverride None
     Order Allow,Deny
     Deny from all
@@ -426,9 +476,9 @@ oraz edytuj plik konfiguracyjny ``web2py.conf`` i dodaj tam:
   </Directory>
 
   AliasMatch ^/([^/]+)/static/(.*) \
-        /var/www/html/web2py/applications/$1/static/$2
+        /home/www-data/web2py/applications/$1/static/$2
 
-  <Directory /var/www/html/web2py/applications/*/static/>
+  <Directory /home/www-data/web2py/applications/*/static/>
     Order Allow,Deny
     Allow from all
   </Directory>
@@ -465,7 +515,7 @@ Oto minimalna konfiguracja Apache:
 NameVirtualHost *:80
 #### deal with requests on port 80
 <VirtualHost *:80>
-   Alias / /var/www/html/web2py/applications
+   Alias / /home/www-data/web2py/applications
    ### serve static files directly
    <LocationMatch "^/welcome/static/.*">
     Order Allow, Deny
@@ -512,7 +562,7 @@ NameVirtualHost *:80
 NameVirtualHost *:443
 #### deal with requests on port 80
 <VirtualHost *:80>
-   Alias / /var/www/html/web2py/applications
+   Alias / /home/www-data/web2py/applications
    ### admin requires SSL
    <LocationMatch "^/admin">
      SSLRequireSSL
@@ -558,8 +608,8 @@ z mod_proxy, w przeciwnym razie będzie dostępny dla innych użytkowników.
 
 #### Uruchamianie web2py jako demona Linux
 
-Jeżeli korzysta sięz mod_wsgi, można skonfigurować serwer web2py, tak aby mógł
-być uruchamiany, zatrzymywany i uruchamiany ponownie  jako demon Linux daemon
+Jeżeli korzysta się z mod_wsgi, można skonfigurować serwer web2py, tak aby mógł
+być uruchamiany, zatrzymywany i uruchamiany ponownie  jako demon Linuxa
 a więc mógłby być uruchamiany automatycznie na etapie rozruchu komputera.
 
 Procedura takiej konfiguracji zależy od dystrybucji systemu Linux/Unix.
@@ -621,11 +671,11 @@ server {
         server_name     $hostname;
         #to enable correct use of response.static_version
         #location ~* /(\w+)/static(?:/_[\d]+\.[\d]+\.[\d]+)?/(.*)$ {
-        #    alias /var/www/html/web2py/applications/$1/static/$2;
+        #    alias /home/www-data/web2py/applications/$1/static/$2;
         #    expires max;
         #}
         location ~* /(\w+)/static/ {
-            root /var/www/home/web2py/applications/;
+            root /home/www-data/web2py/applications/;
             #remove next comment on production
             #expires max;
         }
@@ -681,12 +731,11 @@ sudo mkdir /etc/uwsgi
 sudo mkdir /var/log/uwsgi
 ``:code
 
-oraz utworzyć plik kpnfiguracyjny "/etc/uwsgi/web2py.xml":
-
+oraz utworzyć plik konfiguracyjny "/etc/uwsgi/web2py.xml":
 ``
 <uwsgi>
     <socket>/tmp/web2py.socket</socket>
-    <pythonpath>/var/www/home/web2py/</pythonpath>
+    <pythonpath>/home/www-data/web2py/</pythonpath>
     <mount>/=wsgihandler:application</mount>
     <master/>
     <processes>4</processes>
@@ -704,7 +753,7 @@ oraz utworzyć plik kpnfiguracyjny "/etc/uwsgi/web2py.xml":
 </uwsgi>
 ``:code
 
-Zakładamy tu, że web2py jest zainstalowany w katalogu "/var/www/html/web2py",
+Zakładamy tu, że web2py jest zainstalowany w katalogu "/home/www-data/web2py",
 tak jak miało to miejsce w przypadku Apache.
 
 Trzeba też edytować drugi plik konfiguracyjny "/etc/init/uwsgi-emperor.conf":
@@ -783,7 +832,7 @@ server.port = 80
 server.bind = "0.0.0.0"
 server.event-handler = "freebsd-kqueue"
 server.error-handler-404 = "/test.fcgi"
-server.document-root = "/var/www/html/web2py/"
+server.document-root = "/home/www-data/web2py/"
 server.errorlog      = "/tmp/error.log"
 
 fastcgi.server = (
@@ -796,7 +845,7 @@ fastcgi.server = (
 )
 
 $HTTP["host"] = "(^|\.)example\.com$" {
- server.document-root="/var/www/html/web2py"
+ server.document-root="/home/www-data/web2py"
     url.rewrite-once = (
       "^(/.+?/static/.+)$" => "/applications$1",
       "(^|/.*)$" => "/handler_web2py.fcgi$1",
@@ -1052,7 +1101,7 @@ description "web2py task scheduler"
 start on (local-filesystems and net-device-up IFACE=eth0)
 stop on shutdown
 respawn limit 8 60 # Give up if restart occurs 8 times in 60 seconds.
-exec sudo -u <user> python /var/www/html/web2py/web2py.py -K <myapp>
+exec sudo -u <user> python /home/www-data/web2py/web2py.py -K <myapp>
 respawn
 ``:code
 
@@ -1348,8 +1397,8 @@ się o zminimalizowanie ilość wykonywanego kodu. Oto jak można to zrobić:
 
 #### Sesje w bazie danych
 
-Mozliwe jest poinstruowanie web2py, aby przechowywał sesje w bazie danych a nie
-w folderze ''sessions''. Trzeba to zrobić odrębie dla kazdej aplikacji web2py,
+Możliwe jest poinstruowanie web2py, aby przechowywał sesje w bazie danych a nie
+w folderze ''sessions''. Trzeba to zrobić odrębie dla każdej aplikacji web2py,
 choć wszystkie one mogą wykorzystywać do przechowywania sesji tą samą bazę danych.
 
 Biorąc pod uwagę połączenie z bazą danych
@@ -1399,7 +1448,7 @@ do ``form.accepts`` i nie można używać ``session.flash`` ani CRUD.
 
 Jeśli zajdzie potrzeba uruchamiania wielu procesów na wielu komputerach, zamiast
 przechowywania sesji w bazie danych lub w pamięci podręcznej, można zastosowania
-load balancer z przyłaczanymi sesjami.
+load balancer z przyłączanymi sesjami.
 
 Pound``pound``:cite  i HAProxy``haproxy``:cite, to dwa load balancery HTTP i
 odwrotne serwery pośredniczący (''ang. reverse proxy''), które dostarczają
@@ -1540,12 +1589,12 @@ konieczności definiowania pola ''blob'', ponieważ jest ono tworzone automatycz
 
 #### Gromadzenie biletów
 
-Domyślnie web2py przechowuje bilety (komunikaty błedów) w lokalnym systemie plików.
-Nie ma sensu przechowywać biletów bezposrednio w bazie danych, ponieważ wiekszość
-błędów w środowisku produkcyjnym, to błędy bazy danych.
+Domyślnie web2py przechowuje bilety (dla komunikatów błędów) w lokalnym systemie
+plików. Nie ma sensu przechowywać biletów bezposrednio w bazie danych, ponieważ
+wiekszość błędów w środowisku produkcyjnym, to błędy bazy danych.
 
 Przechowywanie biletów nigdy nie stanowi wąskiego gardła, ponieważ zazwyczaj następuje
-rzadko. Dlatego w srodowisku produkcyjnym z wieloma współbieżnymi serwerami jest
+rzadko. Dlatego w środowisku produkcyjnym z wieloma współbieżnymi serwerami jest
 wystarczające przechowywanie biletów we współdzielonym folderze. Niemniej jednak,
 ponieważ tylko administrator potrzebuje mieć dostęp do biletów, dobrym rozwiązaniem
 jest przechowywanie biletów w lokalnym nie współdzielonym folderze "errors" i
@@ -1616,7 +1665,7 @@ Pierwsza linia importuj Memcache. Druga linia jest lista gniazd Memcache (serwer
 Trzecia linia definiuje ``cache.memcache``. Czwarta linia redefiniowuje ``cache.ram``
 i ``cache.disk`` w zakresie Memcache.
 
-można wybrać redefiniowanie tylko jednego obiektu pamięci, definiując zupełnie nowy
+Można wybrać redefiniowanie tylko jednego obiektu pamięci, definiując zupełnie nowy
 obiekt wskazujący na obiekt Memcache.
 
 W tym rozwiązaniu folder "cache" nie musi byc współdzielony, ponieważ nie będzie
@@ -1628,7 +1677,7 @@ tych serwerów.
 
 #### Sesje w Memcache
 
-Jeśli potrzebuje się sesji i nie chce się używać load balancera z przyłaczanymi
+Jeśli potrzebuje się sesji i nie chce się używać load balancera z przyłączanymi
 sesjami, można przechowywać sesje w Memcache:
 ``
 from gluon.contrib.memdb import MEMDB
@@ -1726,7 +1775,7 @@ db = DAL(sample(['mysql://...1','mysql://...2','mysql://...3'], 3))
 ``:code
 
 W tym przypadku, różne żądania HTTP będą obsługiwane przez różne bazy danych
-w sposób losowy a kazda baza danych będzie trafiana prawie z tym samym
+w sposób losowy a każda baza danych będzie trafiana prawie z tym samym
 prawdopodobieństwem.
 
 Można również zaimplementować prosty Round-Robin:
@@ -1787,7 +1836,7 @@ tych plików moduł ``apache-content-negotiation``:cite albo ``nginx-gzipstatic`
 Aplikację web2py najprościej jest wdrożyć na PythonAnywhere``PythonAnywhere``:cite.
 
 PythonAnywhere to programistyczne i hostingowe środowisko, które jest wyświetlane
-w przeglądarce internetowej i działa w chmurze serwerowej. Jest tma wszystko, co
+w przeglądarce internetowej i działa w chmurze serwerowej. Jest tam wszystko, co
 jest potrzebne do uruchomienia Pythona i wspiera ono specjalnie platformę web2py.
 Z naszego doświadczenia wynika, że PythonAnywhere jest łatwy w użyciu, szybki
 i silny. Zapewnia również dostęp do baz danych MySQL, powłok Pythona i integrację
@@ -1980,7 +2029,7 @@ można zarządzać nim (backup/restore/copy) poprzez interfejs internetowy Amazo
 Możliwe jest uruchomienie kodu web2py na Google App Engine (GAE)``gae``:cite ,
 właczając w to kod DAL.
 
-GAE obsługuje dwie wersje Pythona: 2.5 and 2.7, które obsługiwane sa też przez
+GAE obsługuje dwie wersje Pythona: 2.5 and 2.7, które obsługiwane są też przez
 web2py, ale wersja 2.5 jest wersją domyślną (może to się zmienić w przyszłości).
 Proszę zaglądnąć do pliku "app.yaml" opisanym poniżej w celu poznania szczegółów
 konfiguracyjnych.
