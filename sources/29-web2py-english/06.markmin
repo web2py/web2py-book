@@ -320,7 +320,7 @@ You can also use explicit quoting of SQL entities at DAL level.  It works transp
 ``entity_quoting = True``
 Here is an example:
 ``
-db = DAL('postgres://...', ...,ignore_field_case=False, entity_quoting=True)
+db = DAL('postgres://...', ..., ignore_field_case=False, entity_quoting=True)
 
 db.define_table('table1', Field('column'), Field('COLUMN'))
 
@@ -470,17 +470,19 @@ Example:
 db = DAL(lazy_tables=True)
 db.define_table('person',
                 Field('name'),
-                Field('age', 'integer'))
-
-on_define=lambda table: [table.name.set_attributes(requires=IS_NOT_EMPTY(), default=''),
-                         table.age.set_attributes(requires=IS_INT_IN_RANGE(0, 120), default=30)]
+                Field('age', 'integer'),
+                on_define=lambda table: [
+                    table.name.set_attributes(requires=IS_NOT_EMPTY(), default=''),
+                    table.age.set_attributes(requires=IS_INT_IN_RANGE(0, 120), default=30)
+                    ]
+                )
 ``:code
 Note this example shows how to use ``on_define`` but it is not actually necessary. The simple ``requires`` values could be added to the Field definitions and the table would still be lazy. However, ``requires`` which take a Set object as the first argument, such as IS_IN_DB, will make a query like ``db.sometable.somefield == some_value``:code which would cause ``sometable`` to be defined early. This is the situation saved by ``on_define``.
 
 [[lazy_tables]]
 #### Lazy Tables, a major performance boost
 ``lazy tables``:inxx
-web2py models are executed before controllers, so all tables are defined at every request. Not all tables are needed to handle each request, so it is possible that some of the time spent defining tables is wasted. Conditional models ([[conditional models, chapter 4 ../04#conditional_models]]) can help, but web2py offers a big performance boost via lazy_tables. This feature means that table creation is deferred until the table is actually referenced. Enabling lazy tables is made when initialising a database via the DAL constructor. It requires setting the ``DAL(...,lazy_tables=True)``  parameter. This is one of the most significant response-time performance boosts in web2py.
+web2py models are executed before controllers, so all tables are defined at every request. Not all tables are needed to handle each request, so it is possible that some of the time spent defining tables is wasted. Conditional models ([[conditional models, chapter 4 ../04#conditional_models]]) can help, but web2py offers a big performance boost via lazy_tables. This feature means that table creation is deferred until the table is actually referenced. Enabling lazy tables is made when initialising a database via the DAL constructor. It requires setting the ``DAL(..., lazy_tables=True)``  parameter. This is one of the most significant response-time performance boosts in web2py.
 
 #### Adding attributes to fields and tables
 If you need to add custom attributes to fields, you can simply do this:
@@ -525,7 +527,7 @@ Notice that ``requires=...`` is enforced at the level of forms, ``required=True`
 -------
 For example,
 ``
-Field(...,uploadfolder=os.path.join(request.folder,'static/temp'))
+Field(..., uploadfolder=os.path.join(request.folder, 'static/temp'))
 ``:code
 will upload files to the "web2py/applications/myapp/static/temp" folder.
 -------
@@ -955,17 +957,17 @@ The easiest way is when these conditions are met:
 
 When accessing an existing table, i.e., a table not created by web2py in the current application, always set ``migrate=False``.
 
-If the legacy table has an auto-increment integer field but it is not called "id", web2py can still access it but the table definition must contain explicitly as ``Field('....','id')`` where ... is the name of the auto-increment integer field.
+If the legacy table has an auto-increment integer field but it is not called "id", web2py can still access it but the table definition must contain explicitly as ``Field('...', 'id')`` where ... is the name of the auto-increment integer field.
 
 ``keyed table``:inxx
 
 Finally if the legacy table uses a primary key that is not an auto-increment id field it is possible to use a "keyed table", for example:
 ``
 db.define_table('account',
-                Field('accnum','integer'),
+                Field('accnum', 'integer'),
                 Field('acctype'),
                 Field('accdesc'),
-                primarykey=['accnum','acctype'],
+                primarykey=['accnum', 'acctype'],
                 migrate=False)
 ``:code
 
@@ -1961,8 +1963,8 @@ In the smartquery search string, a field can be identified by fieldname only and
 DAL fields may have a ``compute`` attribute. This must be a function (or lambda) that takes a Row object and returns a value for the field. When a new record is modified, including both insertions and updates, if a value for the field is not provided, web2py tries to compute from the other field values using the ``compute`` function. Here is an example:
 ``
 >>> db.define_table('item',
-                    Field('unit_price','double'),
-                    Field('quantity','integer'),
+                    Field('unit_price', 'double'),
+                    Field('quantity', 'integer'),
                     Field('total_price',
                           compute=lambda r: r['unit_price'] * r['quantity']))
 
@@ -2406,7 +2408,7 @@ list:reference <table>
 
 They can contain lists of strings, of integers and of references respectively.
 
-On Google App Engine NoSQL ``list:string`` is mapped into ``StringListProperty``, the other two are mapped into ``ListProperty(int)``. On relational databases they are mapped into text fields which contain the list of items separated by ``|``. For example ``[1,2,3]`` is mapped into ``|1|2|3|``.
+On Google App Engine NoSQL ``list:string`` is mapped into ``StringListProperty``, the other two are mapped into ``ListProperty(int)``. On relational databases they are mapped into text fields which contain the list of items separated by ``|``. For example ``[1, 2, 3]`` is mapped into ``|1|2|3|``.
 
 For lists of string the items are escaped so that any ``|`` in the item is replaced by a ``||``. Anyway this is an internal representation and it is transparent to the user.
 
@@ -2862,7 +2864,7 @@ db.define_table('thing',
                 Field('name'),
                 format='%(name)s')
 
-db.thing.owner_id.requires = IS_IN_DB(db,'person.uuid','%(name)s')
+db.thing.owner_id.requires = IS_IN_DB(db, 'person.uuid', '%(name)s')
 
 if not db(db.person.id).count():
     id = uuid.uuid4()
@@ -2890,7 +2892,7 @@ Create a controller action to import a saved copy of the other database and sync
 def import_and_sync():
     form = FORM(INPUT(_type='file', _name='data'), INPUT(_type='submit'))
     if form.process().accepted:
-        db.import_from_csv_file(form.vars.data.file,unique=False)
+        db.import_from_csv_file(form.vars.data.file, unique=False)
         # for every table
         for table in db.tables:
             # for every uuid, delete all but the latest
@@ -3018,7 +3020,7 @@ rows = db(query).select(cacheable=True)
 When the ``cache`` argument is set but ``cacheable=False`` (default) only the database results are cached, not the actual Rows object. When the ``cache`` argument is used in conjunction with ``cacheable=True`` the entire Rows object is cached and this results in much faster caching:
 
 ``
-rows = db(query).select(cache=(cache.ram,3600),cacheable=True)
+rows = db(query).select(cache=(cache.ram, 3600), cacheable=True)
 ``:code
 
 ### Self-Reference and aliases
@@ -3372,7 +3374,7 @@ The DAL can be used from any Python program simply by doing this:
 
 ``
 from gluon import DAL, Field
-db = DAL('sqlite://storage.sqlite',folder='path/to/app/databases')
+db = DAL('sqlite://storage.sqlite', folder='path/to/app/databases')
 ``:code
 
 i.e. import the DAL, Field, connect and specify the folder which contains the .table files (the app/databases folder).
@@ -3726,7 +3728,7 @@ Google SQL has the same problems as MySQL and more. In particular table metadata
 
 #### MSSQL (Microsoft SQL Server)
 ``limitby``:inxx
-MSSQL < 2012 does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a,b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
+MSSQL < 2012 does not support the SQL OFFSET keyword. Therefore the database cannot do pagination. When doing a ``limitby=(a, b)`` web2py will fetch the first ``b`` rows and discard the first ``a``. This may result in a considerable overhead when compared with other database engines.
 If you're using MSSQL >= 2005, the recommended prefix to use is ``mssql3://`` which provides a method to avoid the issue of fetching the entire non-paginated resultset. If you're on MSSQL >= 2012, use ``mssql4://`` that uses the ``OFFSET ... ROWS ... FETCH NEXT ... ROWS ONLY`` construct to support natively pagination without performance hits like other backends.
 The ``mssql://`` uri also enforces (for historical reasons) the use of ``text`` columns, that are superseeded in more recent versions (from 2005 onwards) by ``varchar(max)``. ``mssql3://`` and ``mssql4://`` should be used if you don't want to face some limitations of the - officially deprecated - ``text`` columns
 
@@ -3754,7 +3756,7 @@ db(query).select(distinct=db.mytable.myfield)
 
 #### Oracle
 
-Oracle also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a,b))`` into a complex three-way nested select (as suggested by official Oracle documentation). 
+Oracle also does not support pagination. It does not support neither the OFFSET nor the LIMIT keywords. Web2py achieves pagination by translating a ``db(...).select(limitby=(a, b))`` into a complex three-way nested select (as suggested by official Oracle documentation).
 This works for simple select but may break for complex selects involving aliased fields and or joins.
 
 #### Google NoSQL (Datastore)
