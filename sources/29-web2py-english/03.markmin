@@ -691,14 +691,14 @@ def show():
     form = SQLFORM(db.post)
     if form.process().accepted:
         response.flash = 'your comment is posted'
-    comments = db(db.post.image_id == image.id).select()
+    comments = db(db.post.image_id == image.id).select(orderby=db.post.id)
     return dict(image=image, comments=comments, form=form)
 
 def download():
     return response.download(request, db)
 ``:code
 
-The controller contains two actions: "show" and "download".
+The controller contains two new actions: "show" and "download".
 The "show" action selects the image with the ``id`` parsed from the request args and all comments related to the image. "show" then passes everything to the view "default/show.html".
 
 The image id referenced by:
@@ -723,11 +723,11 @@ db(db.image.id == ...).select().first()
 The "download" action expects a filename in ``request.args(0)``, builds a path to the location where that file is supposed to be, and sends it back to the client. If the file is too large, it streams the file without incurring any memory overhead.
 
 Notice the following statements:
-- Line 7 sets the value for the reference field, which is not part of the input form because it is not in the list of fields specified above.
-- Line 8 creates an insert form SQLFORM for the ``db.post`` table using only the specified fields.
+- Line 7 sets the value for the reference field, which is not part of the input form because of the ``db.post`` table model.
+- Line 8 creates an insert form SQLFORM for the ``db.post`` table.
 - Line 9 processes the submitted form (the submitted form variables are in ``request.vars``) within the current session (the session is used to prevent double submissions, and to enforce navigation). If the submitted form variables are validated, the new comment is inserted in the ``db.post`` table; otherwise the form is modified to include error messages (for example, if the author's email address is invalid). This is all done in line 9!.
 - Line 10 is only executed if the form is accepted, after the record is inserted into the database table. ``response.flash`` is a web2py variable that is displayed in the views and used to notify the visitor that something happened.
-- Line 11 selects all comments that reference the current image.
+- Line 11 selects all comments that reference the current image, the ``.select(orderby=db.post.id)`` keeps comments history sorted.
 
 -------
 The "download" action is already defined in the "default.py" controller of the scaffolding application.
@@ -959,7 +959,7 @@ def show():
     this_page = db.page(request.args(0, cast=int)) or redirect(URL('index'))
     db.post.page_id.default = this_page.id
     form = SQLFORM(db.post).process() if auth.user else None
-    pagecomments = db(db.post.page_id == this_page.id).select()
+    pagecomments = db(db.post.page_id == this_page.id).select(orderby=db.post.id)
     return dict(page=this_page, comments=pagecomments, form=form)
 
 @auth.requires_login()
@@ -975,7 +975,6 @@ def documents():
     """browser, edit all documents attached to a certain page"""
     page = db.page(request.args(0, cast=int)) or redirect(URL('index'))
     db.document.page_id.default = page.id
-    db.document.page_id.writable = False
     grid = SQLFORM.grid(db.document.page_id == page.id, args=[page.id])
     return dict(page=page, grid=grid)
 
@@ -991,7 +990,7 @@ def search():
     return dict(form=FORM(INPUT(_id='keyword',
                                 _name='keyword',
                                 _onkeyup="ajax('callback', ['keyword'], 'target');")),
-                                target_div=DIV(_id='target'))
+                target_div=DIV(_id='target'))
 
 def callback():
     """an ajax callback that returns a <ul> of links to wiki pages"""
@@ -1011,7 +1010,7 @@ Lines 13, 20 define and process create forms for a new page and a new comment an
 
 Line 28 defines and processes an update form for a wiki page.
 
-Line 38 creates a ``grid`` object that allows to view, add and update the comments linked to a page.
+Line 37 creates a ``grid`` object that allows to view, add and update the comments linked to a page.
 
 Some magic happens in line 51. The ``onkeyup`` attribute of the INPUT tag "keyword" is set. Every time the visitor releases a key, the JavaScript code inside the ``onkeyup`` attribute is executed, client-side. Here is the JavaScript code:
 ``
@@ -1019,7 +1018,7 @@ ajax('callback', ['keyword'], 'target');
 ``:code
 ``ajax`` is a JavaScript function defined in the file "web2py.js" which is included by the default "layout.html". It takes three parameters: the URL of the action that performs the synchronous callback, a list of the IDs of variables to be sent to the callback (["keyword"]), and the ID where the response has to be inserted ("target").
 
-As soon as you type something in the search box and release a key, the client calls the server and sends the content of the 'keyword' field, and, when the sever responds, the response is embedded in the page itself as the innerHTML of the 'target' tag.
+As soon as you type something in the search box and release a key, the client calls the server and sends the content of the 'keyword' field, and, when the server responds, the response is embedded in the page itself as the innerHTML of the 'target' tag.
 
 The 'target' tag is a DIV defined in line 52. It could have been defined in the view as well.
 
@@ -1135,12 +1134,12 @@ which generates the following Ajax search form:
 
 You can also try to call the callback action directly by visiting, for example, the following URL:
 ``
-http://127.0.0.1:8000/mywiki/default/callback?keyword=wiki
+http://127.0.0.1:8000/mywiki/default/callback?keyword=main
 ``:code
 
 If you look at the page source you see the HTML returned by the callback:
 ``
-<ul><li><a href="/mywiki/default/show/4">I made a Wiki</a></li></ul>
+<ul><li><a href="/mywiki/default/show/4">My Main Page</a></li></ul>
 ``:code
 
 ``rss``:inxx
@@ -1194,14 +1193,14 @@ def call():
     return service()
 ``:code
 
-Here, the handler action simply publishes (via XML-RPC), the functions specified in the list. In this case, ``find_by``. ``find_by`` is not an action (because it takes an argument). It queries the database with ``.select()`` and then extracts the records as a list with ``.response`` and returns the list.
+Here, the handler action simply publishes (via XML-RPC), the functions decorated by ``@ervice.xmlrpc``. In this case, ``find_by``. ``find_by`` is not an action (because it takes an argument). It queries the database with ``.select()`` and then extracts the records as a list with ``.as_list()`` and returns the list.
 
 Here is an example of how to access the XML-RPC handler from an external
 Python program.
 ``
 >>> import xmlrpclib
 >>> server = xmlrpclib.ServerProxy('http://127.0.0.1:8000/mywiki/default/call/xmlrpc')
->>> for item in server.find_by('wiki'):
+>>> for item in server.find_by('main'):
         print item['created_on'], item['title']
 ``:code
 
@@ -1218,7 +1217,7 @@ The database representation is an internal issue and does not affect the code. I
 
 ``
 for page in db(db.page).select():
-    print page.title, page.day, page.month, page.year
+    print page.title, page.created_on.day, page.created_on.month, page.created_on.year
 ``
 
 When dates are converted to strings in forms they are converted using the ISO representation
@@ -1320,7 +1319,7 @@ The ``wiki`` method has some additional parameters which will be explained later
 
 #### MARKMIN basics
 
-The MARKMIN syntax allows you to markup **bold** text using ``**bold**``, ''italic'' text with ``''italic''``, and ``code`` text should be delimited by double inverted quotes. Titles must be prefixed by a #, sections by ##, and sub-sections by ###. Use a minus(-) to prefix an un-ordered item and plus(+) to prefix an ordered item. URLs are automatically converted into links. Here is an example of markmin text:
+The MARKMIN syntax allows you to markup **bold** text using ``**bold**``, ''italic'' text with ``''italic''``, and ``code`` text should be delimited by double inverted quotes. Titles must be prefixed by a #, sections by ##, and sub-sections by ###. Use a minus (-) to prefix an un-ordered item and plus (+) to prefix an ordered item. URLs are automatically converted into links. Here is an example of markmin text:
 
 ``
 # This is a title
@@ -1350,10 +1349,10 @@ auth.wiki(env=dict(join=lambda a:"-".join(a.split(","))))
 allows you to use the markup syntax:
 
 ``
-@(join:1,2,3)
+@{join:1,2,3}
 ``
 
-This calls the join function passed to env with parameters ``a,b,c=1,2,3`` and will be rendered as ``1-2-3``.
+This calls the join function passed to env with argument ``"1,2,3"`` and will be rendered as ``1-2-3``.
 
 #### Oembed protocol
 
@@ -1585,12 +1584,12 @@ http://web2py.com/appliances
 ``
 
 ------
-Web2py files are packages as ``.w2p`` files. These are tar gzipped files. Web2py uses the ``.w2p`` extension instead of the ``.tgz`` extension to prevent the browser from unzipping on download. They can be uncompressed manually with ``tar zxvf [filename]`` although this is never necessary.
+Web2py files are packages as ``.w2p`` files. These are tar gzipped files. Web2py uses the ``.w2p`` extension instead of the ``.tgz`` extension to prevent the browser from unzipping on download. They can be uncompressed manually with ``tar xzvf [filename]`` although this is never necessary.
 ------
 
 [[image @///image/en4100.png center 444px]]
 
-Upon successful upload, web2py displays the MD5 checksum of the uploaded file. You can use it to verify that the file was not corrupted during upload. The InstantPress name will appear in the list of installed applications.
+Upon successful upload, web2py displays the MD5 checksum of the uploaded file. You can use it to verify that the file was not corrupted during upload. The application name will appear in the list of installed applications.
 
 If you run web2py from source and you have ``gitpython`` installed (if necessary, set it up with 'easy_install gitpython'), you can install applications directly from git repositories
 using the ``.git`` URL in the upload form. In this case you will also be enabled to use the admin interface to push changes back into the repository, but this is an experimental feature.
@@ -1686,11 +1685,11 @@ dbg.set_trace()
 
 The debugger app has a breakpoint manager.
 
-``Notes:
+------
+Notes:
 web2py does not know whether you actually have a debug window open in your browser; execution suspends regardless.
-
 IDEs usually have their own inter-process debugger, e.g. PyCharm or PyDev. They may complain if you include the gluon library.
-``
+------
 
 
 #### Web-based Python shell
@@ -1807,7 +1806,7 @@ You can pull and push apps from the default remote repository.
 #### Application Wizard (experimental)
 
 The **admin** interface includes a Wizard that can help you create a new applications.
-You can access the wizard from the "sites" page as shown in the image below.
+You can access the wizard from the "site" page as shown in the image below.
 
 [[image @///image/en5400.png center 480px]]
 
@@ -1897,7 +1896,7 @@ where string values must be enclosed in single quotes. Multiple fields can be se
 
 To delete a record, click the corresponding checkbox to confirm that you are sure.
 
-**appadmin** can also perform joins if the SQL FILTER contains a SQL condition that involves two or more tables. For example, try:
+**appadmin** can also perform joins if the query contains a SQL condition that involves two or more tables. For example, try:
 ``
 db.image.id == db.post.image_id
 ``:code
