@@ -16,6 +16,7 @@ FORCE_RENDER = False
 # this is for checking new content instantly in development
 if request.is_local:
     TIME_EXPIRE = -1
+    CACHE_EXPIRE = -1
     FORCE_RENDER = True
 
 if request.global_settings.web2py_runtime_gae:
