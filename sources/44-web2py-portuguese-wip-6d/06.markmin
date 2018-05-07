@@ -1197,118 +1197,116 @@ e
 row.update_record(name="new value")
 ``
 
-#### Using an iterator-based select for lower memory use
+#### Usando uma seleção baseada em iterador para menor uso de memória
 
-Python "iterators" are a type of "lazy-evaluation". They 'feed' data one step at time; traditional python loops create the entrire set of data in memory before looping. 
+Os "iteradores" do Python são um tipo de "avaliação lenta". Eles 'alimentam' dados um passo no tempo; loops tradicionais de python criam o conjunto de dados na memória antes de fazer o loop.
 
-The traditional use of select is:
+O uso tradicional de select é:
 ``
 for row in db(db.table.id > 0).select():
     rtn = row
 ``:code
 
-but for large numbers of rows, using an iterator-based alternative has dramatically lower memory use:
+mas para um grande número de linhas, o uso de uma alternativa baseada em iterador reduz drasticamente o uso de memória:
 ``
 for row in db(db.table.id > 0).iterselect():
     rtn = row
 ``:code
-Testing shows this is around 10% faster as well, even on machines with large RAM.
+Testes mostram que isso também é 10% mais rápido, mesmo em máquinas com grande RAM.
 
-
-#### Rendering rows using represent
-You may wish to rewrite rows returned by select to take advantage of formatting information contained in the represents setting of the fields. 
+#### Renderização de linhas usando representar
+Você pode desejar reescrever as linhas retornadas por select para aproveitar as informações de formatação contidas na configuração representa dos campos.
 
 ``
 rows = db(query).select()  
 repr_row = rows.render(0)
 ``:code
 
-If you don't specify an index, you get a generator to iterate over all the rows:
+Se você não especificar um índice, você receberá um gerador para iterar todas as linhas:
 
 ``
 for row in rows.render():
     print row.myfield
 ``:code
 
-Can also be applied to slices:
+Também pode ser aplicado a fatias:
 
 ``
 for row in rows[0:10].render():
     print row.myfield
 ``:code
 
-If you only want to transform selected fields via their "represent" attribute, you can list them in the "fields" argument:
+Se você quiser transformar apenas campos selecionados através do atributo "representar", você pode listá-los no argumento "campos":
 
 ``
 repr_row = row.render(0, fields=[db.mytable.myfield])
 ``:code
 
-Note, it returns a transformed copy of the original Row, so there's no update_record (which you wouldn't want anyway) or delete_record.
+Note que ele retorna uma cópia transformada do Row original, portanto, não há update_record (que você não deseja de qualquer maneira) ou delete_record.
 
 
-#### Shortcuts
+#### Atalhos do DAL
 ``DAL shortcuts``:inxx
 
-The DAL supports various code-simplifying shortcuts.
-In particular:
+O DAL suporta vários atalhos de simplificação de código.
+Em particular:
 ``
 myrecord = db.mytable[id]
 ``:code
 
-returns the record with the given ``id`` if it exists. If the ``id`` does not exist, it returns ``None``. The above statement is equivalent to
-
+retorna o registro com o dado `` id`` se ele existir. Se o `` id`` não existe, ele retorna `` None``. A declaração acima é equivalente a
 ``
 myrecord = db(db.mytable.id == id).select().first()
 ``:code
 
 
-You can delete records by id:
+Você pode excluir registros por id:
 
 ``
 del db.mytable[id]
 ``:code
 
-and this is equivalent to
+e isso é equivalente a
 
 ``
 db(db.mytable.id == id).delete()
 ``:code
 
-and deletes the record with the given ``id``, if it exists.
+e apaga o registro com o dado `` id``, se existir.
 
-Note: This delete shortcut syntax does not currently work if [[versioning #versioning]] is activated
+Nota: Esta sintaxe de atalho de exclusão não funciona atualmente se [[versioning #versioning]] estiver ativado
 
-You can insert records:
+Você pode inserir registros:
 
 ``
 db.mytable[0] = dict(myfield='somevalue')
 ``:code
 
-It is equivalent to
+É equivalente a
 
 ``
 db.mytable.insert(myfield='somevalue')
 ``:code
 
-and it creates a new record with field values specified by the dictionary on the right hand side.
+e cria um novo registro com valores de campo especificados pelo dicionário no lado direito.
 
-You can update records:
+Você pode atualizar registros:
 
 ``
 db.mytable[id] = dict(myfield='somevalue')
 ``:code
 
-which is equivalent to
+que é equivalente a
 
 ``
 db(db.mytable.id == id).update(myfield='somevalue')
 ``:code
 
-and it updates an existing record with field values specified by the dictionary on the right hand side.
+e atualiza um registro existente com valores de campo especificados pelo dicionário no lado direito.
 
-#### Fetching a ``Row``
+#### Buscando uma `` Row``
 
-Yet another convenient syntax is the following:
+Ainda outra sintaxe conveniente é a seguinte:
 
 ``
 record = db.mytable(id)
@@ -1316,40 +1314,39 @@ record = db.mytable(db.mytable.id == id)
 record = db.mytable(id, myfield='somevalue')
 ``:code
 
-Apparently similar to ``db.mytable[id]`` the above syntax is more flexible and safer. First of all it checks whether ``id`` is an int (or ``str(id)`` is an int) and returns ``None`` if not (it never raises an exception). It also allows to specify multiple conditions that the record must meet. If they are not met, it also returns ``None``.
-
-#### Recursive ``select``s
+Aparentemente semelhante a `` db.mytable [id] `` a sintaxe acima é mais flexível e segura. Primeiro, ele verifica se `` id`` é int (ou `` str (id) `` é int) e retorna `` None`` se não (nunca gera uma exceção). Ele também permite especificar várias condições que o registro deve atender. Se eles não forem atendidos, ele também retorna `` None``.
+#### ``select``s recursivos
 ``recursive selects``:inxx
 
-Consider the previous table person and a new table "thing" referencing a "person":
+Considere a pessoa da tabela anterior e uma nova tabela "coisa" referenciando uma "pessoa":
 ``
 >>> db.define_table('thing',
                     Field('name'),
                     Field('owner_id', 'reference person'))
 ``:code
 
-and a simple select from this table:
+e uma simples seleção desta tabela:
 ``
 >>> things = db(db.thing).select()
 ``:code
 
-which is equivalent to
+que é equivalente a
 
 ``
 >>> things = db(db.thing._id > 0).select()
 ``:code
 
-where ``._id`` is a reference to the primary key of the table. Normally ``db.thing._id`` is the same as ``db.thing.id`` and we will assume that in most of this book. ``_id``:inxx
+onde `` ._id`` é uma referência para a chave primária da tabela. Normalmente, `` db.thing._id`` é o mesmo que `` db.thing.id`` e vamos supor que na maior parte deste livro. `` _id``: inxx
 
 
-For each Row of things it is possible to fetch not just fields from the selected table (thing) but also from linked tables (recursively):
+Para cada linha de coisas, é possível buscar não apenas campos da tabela selecionada (coisa), mas também de tabelas vinculadas (recursivamente):
 ``
 >>> for thing in things: print thing.name, thing.owner_id.name
 ``:code
 
-Here ``thing.owner_id.name`` requires one database select for each thing in things and it is therefore inefficient. We suggest using joins whenever possible instead of recursive selects, nevertheless this is convenient and practical when accessing individual records.
+Aqui `` thing.owner_id.name`` requer uma seleção de banco de dados para cada coisa e, portanto, é ineficiente. Sugerimos usar joins sempre que possível ao invés de selects recursivos, mas isso é conveniente e prático ao acessar registros individuais.
 
-You can also do it backwards, by selecting the things referenced by a person:
+Você também pode fazer isso de trás para frente, selecionando as coisas referenciadas por uma pessoa:
 
 ``
 person =  db.person(id)
@@ -1357,18 +1354,18 @@ for thing in person.thing.select(orderby=db.thing.name):
     print person.name, 'owns', thing.name
 ``:code
 
-In this last expression ``person.thing`` is a shortcut for
+Nesta última expressão, `` person.thing`` é um atalho para
 
 ``
 db(db.thing.owner_id == person.id)
 ``:code
 
-i.e. the Set of ``thing``s referenced by the current ``person``. This syntax breaks down if the referencing table has multiple references to the referenced table. In this case one needs to be more explicit and use a full Query.
+isto é, o Conjunto de `` thing``s referenciado pela `` person`` atual. Essa sintaxe é quebrada se a tabela de referência tiver várias referências à tabela referenciada. Nesse caso, é preciso ser mais explícito e usar uma consulta completa.
 
 [[sqltable]]
-#### Serializing ``Rows`` in views
+#### Serializando `` Rows`` em views
 
-Given the following action containing a query
+Dada a seguinte ação contendo uma consulta
 ``SQLTABLE``:inxx
 
 ``
@@ -1376,43 +1373,44 @@ def index():
     return dict(rows = db(query).select())
 ``:code
 
-The result of a select can be displayed in a view with the following syntax:
+O resultado de uma seleção pode ser exibido em uma visualização com a seguinte sintaxe:
 ``
 {{extend 'layout.html'}}
 <h1>Records</h1>
 {{=rows}}
 ``:code
 
-Which is equivalent to:
+Qual é equivalente a:
+
 ``
 {{extend 'layout.html'}}
 <h1>Records</h1>
 {{=SQLTABLE(rows)}}
 ``:code
 
-``SQLTABLE`` converts the rows into an HTML table with a header containing the column names and one row per record. The rows are marked as alternating class "even" and class "odd". Under the hood, Rows is first converted into a SQLTABLE object (not to be confused with Table) and then serialized. The values extracted from the database are also formatted by the validators associated to the field and then escaped.
+O `` SQLTABLE`` converte as linhas em uma tabela HTML com um cabeçalho contendo os nomes das colunas e uma linha por registro. As linhas são marcadas como alternando classe "par" e class "ímpar". Sob o capô, as linhas primeiro são convertidas em um objeto SQLTABLE (não confundir com a tabela) e depois serializadas. Os valores extraídos do banco de dados também são formatados pelos validadores associados ao campo e, em seguida, escaparam.
 
-Yet it is possible and sometimes convenient to call SQLTABLE explicitly.
+No entanto, é possível e, às vezes, conveniente chamar o SQLTABLE explicitamente.
 
-The SQLTABLE constructor takes the following optional arguments:
+O construtor SQLTABLE usa os seguintes argumentos opcionais:
 
-- ``linkto`` lambda function or an action to be used to link reference fields (default to None).
-If you assign it a string with the name of an action, it will generate a link to that function passing it, as args, the name of the table and the id of each record (in this order). Example:
+- `` linkto`` lambda função ou uma ação a ser usada para vincular campos de referência (padrão para Nenhum).
+Se você atribuir a ela uma string com o nome de uma ação, ela gerará um link para essa função passando-a, como args, o nome da tabela e o id de cada registro (nesta ordem). Exemplo:
 ``
 linkto = 'pointed_function' # generates something like <a href="pointed_function/table_name/id_value">
 ``:code
-If you want a different link to be generated, you can specify a lambda, wich will receive as parameters, the value of the id, the type of the object (e.g. table), and the name of the object. For example, if you want to receive the args in reverse order:
+Se você quiser que um link diferente seja gerado, você pode especificar um lambda, que receberá como parâmetros, o valor do id, o tipo do objeto (por exemplo, a tabela) e o nome do objeto. Por exemplo, se você deseja receber os argumentos na ordem reversa:
 ``
-linkto = lambda id, type, name: URL(f='pointed_function', args=[id, name])
+linkto = lambda id, tipo, nome: URL (f = 'pointed_function', args = [id, name])
 ``:code
-- ``upload`` the URL or the download action to allow downloading of uploaded files (default to None)
-- ``headers`` a dictionary mapping field names to their labels to be used as headers (default to ``{}``). It can also be an instruction. Currently we support ``headers='fieldname:capitalize'``.
-- ``truncate`` the number of characters for truncating long values in the table (default is 16)
-- ``columns`` the list of fieldnames to be shown as columns (in tablename.fieldname format).
-   Those not listed are not displayed (defaults to all).
-- ``**attributes`` generic helper attributes to be passed to the most external TABLE object.
+- `` upload`` o URL ou a ação de download para permitir o download de arquivos enviados (padrão para Nenhum)
+- `` headers`` um dicionário mapeando nomes de campos para seus rótulos para serem usados como cabeçalhos (padrão para `` {} ``). Também pode ser uma instrução. Atualmente suportamos `` headers = 'fieldname: capitalize'``.
+- `` truncate`` o número de caracteres para truncar valores longos na tabela (o padrão é 16)
+- `` columns`` a lista de nomes de campos a serem mostrados como colunas (no formato tablename.fieldname).
+    Aqueles que não estão listados não são exibidos (padrão para todos).
+- Atributos auxiliares genéricos `` ** atributos`` a serem passados para o objeto TABELA mais externo.
 
-Here is an example:
+Aqui está um exemplo:
 ``
 {{extend 'layout.html'}}
 <h1>Records</h1>
@@ -1426,32 +1424,32 @@ Here is an example:
 ``SQLFORM.grid``:inxx ``SQLFORM.smartgrid``:inxx
 
 ------
-``SQLTABLE`` is useful but there are times when one needs more. ``SQLFORM.grid`` is an extension of SQLTABLE that creates a table with search features and pagination, as well as ability to open detailed records, create, edit and delete records. ``SQLFORM.smartgrid`` is a further generalization that allows all of the above but also creates buttons to access referencing records.
+`` SQLTABLE`` é útil, mas há momentos em que é necessário mais. `` SQLFORM.grid`` é uma extensão do SQLTABLE que cria uma tabela com recursos de pesquisa e paginação, bem como a capacidade de abrir registros detalhados, criar, editar e excluir registros. `` SQLFORM.smartgrid`` é uma generalização adicional que permite todas as opções acima, mas também cria botões para acessar registros de referência.
 ------
 
-Here is an example of usage of ``SQLFORM.grid``:
+Aqui está um exemplo de uso de `` SQLFORM.grid``:
 
 ``
 def index():
     return dict(grid=SQLFORM.grid(query))
 ``:code
 
-and the corresponding view:
+e a visão correspondente:
 
 ``
 {{extend 'layout.html'}}
 {{=grid}}
-``
+``:code
 
-For working with multiple rows, ``SQLFORM.grid`` and ``SQLFORM.smartgrid`` are preferred to ``SQLTABLE`` because they are more powerful. Please see chapter 7.
+Para trabalhar com múltiplas linhas, `` SQLFORM.grid`` e `` SQLFORM.smartgrid`` são preferíveis a `` SQLTABLE`` porque são mais poderosas. Por favor, veja o capítulo 7.
 
 [[orderby]] [[limitby]] [[distinct]]
 #### ``orderby``, ``groupby``, ``limitby``, ``distinct``, ``having``,``orderby_on_limitby``,``left``,``cache``
 
-The ``select`` command takes a number of optional arguments.
+O comando `` select`` recebe vários argumentos opcionais.
 
 ##### orderby
-You can fetch the records sorted by name:
+Você pode buscar os registros classificados por nome:
 
 ``orderby``:inxx ``groupby``:inxx ``having``:inxx
 ``
@@ -1463,7 +1461,7 @@ Bob
 Carl
 ``:code
 
-You can fetch the records sorted by name in reverse order (notice the tilde):
+Você pode buscar os registros classificados por nome na ordem inversa (observe o til):
 ``
 >>> for row in db().select(db.person.ALL, orderby=~db.person.name):
         print row.name
@@ -1472,7 +1470,8 @@ Bob
 Alex
 ``:code
 
-You can have the fetched records appear in random order:
+Você pode ter os registros buscados aparecem em ordem aleatória:
+
 ``
 >>> for row in db().select(db.person.ALL, orderby='<random>'):
         print row.name
@@ -1482,14 +1481,14 @@ Bob
 ``:code
 
 -----
-The use of ``orderby='<random>'`` is not supported on Google NoSQL.  However, in this situation and likewise in many others where built-ins are insufficient, imports can be used:
+O uso de `` orderby = '<random>' `` não é suportado no Google NoSQL. No entanto, nessa situação e da mesma forma em muitos outros, onde os built-ins são insuficientes, as importações podem ser usadas:
 ``
 import random
 rows=db(...).select().sort(lambda row: random.random())
 ``:code
 -----
 
-You can sort the records according to multiple fields by concatenating them with a "|":
+Você pode classificar os registros de acordo com vários campos, concatenando-os com um "|":
 ``
 >>> for row in db().select(db.person.ALL, orderby=db.person.name|db.person.id):
         print row.name
@@ -1499,7 +1498,7 @@ Alex
 ``:code
 
 ##### groupby, having
-Using ``groupby`` together with ``orderby``, you can group records with the same value for the specified field (this is back-end specific, and is not on the Google NoSQL):
+Usando `` groupby`` juntamente com `` orderby``, você pode agrupar registros com o mesmo valor para o campo especificado (isso é específico de back-end e não está no Google NoSQL):
 ``
 >>> for row in db().select(db.person.ALL,
                            orderby=db.person.name,
@@ -1510,20 +1509,19 @@ Bob
 Carl
 ``:code
 
-You can use ``having`` in conjunction with ``groupby`` to group conditionally (only those ``having`` the condition are grouped.
-
+Você pode usar `` having`` em conjunto com `` groupby`` para agrupar condicionalmente (somente aqueles `` having`` - que tem -  a condição são agrupados.
 ``
 >>> print db(query1).select(db.person.ALL, groupby=db.person.name, having=query2)
-``
+``:code
 
-Notice that query1 filters records to be displayed, query2 filters records to be grouped.
+Observe que query1 filtra os registros a serem exibidos, query2 filtra os registros a serem agrupados.
 
 ##### distinct
 ``distinct``:inxx
 
-With the argument ``distinct=True``, you can specify that you only want to select distinct records. This has the same effect as grouping using all specified fields except that it does not require sorting. When using distinct it is important not to select ALL fields, and in particular not to select the "id" field, else all records will always be distinct.
+Com o argumento `` distinct = True``, você pode especificar que deseja apenas selecionar registros distintos. Isso tem o mesmo efeito que o agrupamento usando todos os campos especificados, exceto que não requer classificação. Ao usar distintas, é importante não selecionar TODOS os campos e, em particular, não selecionar o campo "id". Caso contrário, todos os registros sempre serão distintos.
 
-Here is an example:
+Aqui está um exemplo:
 ``
 >>> for row in db().select(db.person.name, distinct=True):
         print row.name
@@ -1532,7 +1530,7 @@ Bob
 Carl
 ``:code
 
-Notice that ``distinct`` can also be an expression for example:
+Note que `` distinct`` também pode ser uma expressão por exemplo:
 ``
 >>> for row in db().select(db.person.name, distinct=db.person.name):
         print row.name
@@ -1541,8 +1539,7 @@ Bob
 Carl
 ``:code
 ##### limitby
-With limitby=(min, max), you can select a subset of the records from offset=min to but not including offset=max (in this case, the first two starting at zero):
-
+Com limitby = (min, max), você pode selecionar um subconjunto de registros de offset = min para, mas não incluindo offset = max (neste caso, os dois primeiros começando em zero):
 ``limitby``:inxx
 ``
 >>> for row in db().select(db.person.ALL, limitby=(0, 2)):
@@ -1553,23 +1550,24 @@ Bob
 
 ##### orderby_on_limitby
 ``orderby_on_limitby``:inxx
-Note that the DAL defaults to implicitly adding an orderby when using a limitby.
-This ensures the same query returns the same results each time, important for pagination.
-But it can cause performance problems. 
-use ``orderby_on_limitby = False`` to change this (this defaults to True). 
+
+Observe que o padrão DAL é implicitamente adicionar um orderby ao usar um limitby.
+Isso garante que a mesma consulta retorne os mesmos resultados a cada vez, importante para a paginação.
+Mas isso pode causar problemas de desempenho.
+use `` orderby_on_limitby = False`` para mudar isso (o valor padrão é True).
 
 ##### left
-Discussed below in the section on joins
+Discutido abaixo na seção sobre joins (junções)
 
 ##### cache, cacheable
-An example use which gives much faster selects is:
+Um exemplo de uso que fornece seleções muito mais rápidas é:
 ``rows = db(query).select(cache=(cache.ram, 3600), cacheable=True)``:code
 See discussion on 'caching selects', below, to understand what the trade-offs are.
 
 
-#### Logical operators
+#### Operadores lógicos
 
-Queries can be combined using the binary AND operator "``&``":
+As consultas podem ser combinadas usando o operador binário E "``&``":
 
 ``and``:inxx ``or``:inxx ``not``:inxx
 ``
@@ -1578,7 +1576,7 @@ Queries can be combined using the binary AND operator "``&``":
 4 Alex
 ``:code
 
-and the binary OR operator "``|``":
+e o operador  binário OU "``|``":
 ``
 >>> rows = db((db.person.name == 'Alex') | (db.person.id > 3)).select()
 >>> for row in rows:
@@ -1586,7 +1584,7 @@ and the binary OR operator "``|``":
 1 Alex
 ``:code
 
-You can negate a query (or sub-query) with the "``!=``" binary operator:
+Você pode negar uma consulta (ou subconsulta) com o operador binário "``!=``":
 ``
 >>> rows = db((db.person.name != 'Alex') | (db.person.id > 3)).select()
 >>> for row in rows:
@@ -1595,7 +1593,7 @@ You can negate a query (or sub-query) with the "``!=``" binary operator:
 3 Carl
 ``:code
 
-or by explicit negation with the "``~``" unary operator:
+ou por negação explícita com o operador unário `` ~ `` `:
 ``
 >>> rows = db(~(db.person.name == 'Alex') | (db.person.id > 3)).select()
 >>> for row in rows:
@@ -1605,7 +1603,7 @@ or by explicit negation with the "``~``" unary operator:
 ``:code
 
 ------
-Due to Python restrictions in overloading "``and``" and "``or``" operators, these cannot be used in forming queries.  The binary operators "``&``" and "``|``" must be used instead. Note that these operators (unlike "``and``" and "``or``") have higher precedence than comparison operators, so the "extra" parentheses in the above examples are mandatory. Similarly, the unary operator "``~``" has higher precedence than comparison operators, so ``~``-negated comparisons must also be parenthesized.
+Devido às restrições do Python em sobrecarregar os operadores "``e``" e "``or``", estes não podem ser usados na formação de consultas. Os operadores binários "``&``" e "``|``" devem ser usados em seu lugar. Note que estes operadores (diferentemente de ``e`` "e" ``or``") têm precedência mais alta que os operadores de comparação, então os parênteses" extras "nos exemplos acima são obrigatórios. Similarmente, o operador unário "``~``" tem precedência mais alta que os operadores de comparação, então as comparações ``~`` -negadas também devem ser entre parênteses.
 ------
 
 It is also possible to build queries using in-place logical operators:
@@ -1614,7 +1612,7 @@ It is also possible to build queries using in-place logical operators:
 >>> query = db.person.name != 'Alex'
 >>> query &= db.person.id > 3
 >>> query |= db.person.name == 'John'
-``
+``:code
 
 #### ``count``, ``isempty``, ``delete``, ``update``
 
