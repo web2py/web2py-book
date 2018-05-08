@@ -96,7 +96,7 @@ def main():
     #parser.add_argument("--fromlang", "-f", default="nl", help="From language, default to nl")
     parser.add_argument("--tolang", "-t", help="To language, default to pt")
     parser.add_argument("--file", "-f", default=None, help="file to translate, default to *.markmin + chapters.txt")
-    parser.add_argument("--outputdir", "-o", default='99-web2py-test-translation/',help="Output dir, default to 99-web2py-test")
+    parser.add_argument("--outputdir", "-d", default='99-web2py-test-translation/',help="Output dir, default to 99-web2py-test")
     args = parser.parse_args()
 
     if not args.tolang:
@@ -106,7 +106,7 @@ optional arguments:
   -h, --help                            show this help message and exit
   --file FILE, -i FILE                  file to translate, default to *.markmin + chapters.txt
   --tolang TOLANG, -t TOLANG            To language code, like 'pt'
-  --outputdir OUTPUTDIR, -o OUTPUTDIR   Output dir, default to 99-web2py-test-translation 
+  --outputdir OUTPUTDIR, -d OUTPUTDIR   Output dir, default to 99-web2py-test-translation 
                         
 REMINDER: the info.txt file still need to be altered manually""")
     else:
@@ -123,7 +123,7 @@ REMINDER: the info.txt file still need to be altered manually""")
                 if file.endswith(".markmin") or file == 'chapters.txt':
                     #print(os.path.join(".", file))
                     c += count_chars(file)
-                    t += translate_file(file,language=args.tolang)
+                    ct += translate_file(file,args.outputdir,language=args.tolang)
         else:
             if not os.path.isdir(args.outputdir):
                 os.system('cp -r 29-web2py-english {}'.format(args.outputdir))
