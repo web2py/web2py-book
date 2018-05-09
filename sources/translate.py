@@ -159,7 +159,7 @@ REMINDER: the info.txt file still need to be altered manually""")
         c = 0
         ct = 0
         if not args.file:
-            os.system('cp -r 29-web2py-english {}'.format(args.outputdir))
+            #os.system('cp -r 29-web2py-english {}'.format(args.outputdir))
             os.system('cp info.py {}/info.txt'.format(args.outputdir))
             for file in os.listdir(args.outputdir):
                 if file.endswith(".markmin") or file == 'chapters.txt':

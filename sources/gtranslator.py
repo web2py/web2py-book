@@ -63,12 +63,13 @@ class Translator:
                 webpage = urllib.request.urlopen(request).read()
                 soup = BeautifulSoup(webpage,'lxml')
                 res = soup.find_all("div", class_="t0")[0].string
+                if verbose:
+                    print(res)
             except:
                 print('error in translate',self.orig_str)
-                #res = "Failed to fetch translation from google."
+                return self.orig_str
 
-            if verbose:
-                print(res)
+
             return res
         else:
             return ''
