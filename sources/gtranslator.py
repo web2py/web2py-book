@@ -27,18 +27,9 @@ class Translator:
         self.agent = {'User-Agent': "Mozilla/4.0"}
         self.linkroot = "http://translate.google.com/m?sl=%s&hl=%s&q=" % (self.from_lang, self.to_lang)
 
-        if orig_str != None:
-            self.orig_str = str(orig_str)
-        elif filename != None:
-            with open(filename) as fh:
-                self.orig_str = fh.read()
-        else:
-            raise Exception("You must provide orig_str or filename")
-        #self.orig_str = self.orig_str.replace("\n", "  ").replace("\r", "")
-        self.orig_str = self.orig_str.split('\n')
-        self.orig_str = [x.strip() for x in self.orig_str]
-        self.orig_str = [x for x in self.orig_str if x]
-        self.n_sentences = len(self.orig_str)
+
+        self.orig_str = str(orig_str)
+
 
     @property
     def from_lang(self):
@@ -64,11 +55,8 @@ class Translator:
         self._to_lang = new_lang
 
     def translate(self, verbose=False):
-        self.trans_str = []
-        for i, sentence in enumerate(self.orig_str):
-            if verbose:
-                print("\rTranslating %d/%d sentences..." % (i+1, self.n_sentences), end="")
-            query = urllib.parse.quote(sentence)
+        if len(self.orig_str) > 0:
+            query = urllib.parse.quote(self.orig_str)
             link = self.linkroot + query
             try:
                 request = urllib.request.Request(link, headers=self.agent)
@@ -76,28 +64,18 @@ class Translator:
                 soup = BeautifulSoup(webpage,'lxml')
                 res = soup.find_all("div", class_="t0")[0].string
             except:
-                res = "Failed to fetch translation from google."
-
-            self.trans_str.append(res)
+                print('error in translate',self.orig_str)
+                #res = "Failed to fetch translation from google."
 
             if verbose:
                 print(res)
-        return "\n".join(self.trans_str)
+            return res
+        else:
+            return ''
 
-    def contrast(self):
-        return zip(self.orig_str, self.trans_str)
 
-    def __str__(self):
-        res = ""
-        for i, o in self.contrast():
-            res += i + "\n" + o + "\n\n"
-        return res
 
-    def prettify(self):
-        res = ""
-        for i, o in self.contrast():
-            res += "<div>\n<p>\n" + i + "\n</p>\n<p>\n<i>\n" + o + "\n</i></p>\n</div>\n\n"
-        return res
+
 
 
 

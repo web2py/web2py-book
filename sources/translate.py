@@ -2,11 +2,21 @@
 
 from gtranslator import Translator
 import os
+import sqlite3
+conn = sqlite3.connect("translations.sqlite") # ou use :memory: para botá-lo na memória RAM
+
+cursor = conn.cursor()
+
+def execute_sql(sql,parameters=None):
+    cursor.execute(sql,parameters)
+    conn.commit()
+    return cursor.fetchone()
 chuncks = []
 
 #filename = "06.markmin"
 
 def t(text,language='pt'):
+
     return call_translator_api(text,language)
 
 def call_translator_api(text,language='pt'):
@@ -16,8 +26,8 @@ def call_translator_api(text,language='pt'):
     '''
 
     trans = Translator('en', language, text)
-    t = trans.translate(verbose=False)
-    #print(t)
+    t = trans.translate(verbose=True)
+
     return t
 
 def count_chars(filename):
@@ -30,23 +40,53 @@ def count_chars(filename):
     return len(chars)
 
 
-def check_markmin(tt,language):
+def check_markmin(chunck, language):
     # exceptions, need break down
-    ex = [':inxx', ':code', ':cite']
+    ignores_5 = [':inxx', ':code', ':cite']
+    replaces = {" ** ":"**",
+                " **,": "**,",
+                '** "': '**"',
+                ": **":":**",
+                " / ":"/"}
+    if language == 'pt':
+        replaces["Chapter"] = "Capítulo"
+
     s = ''
+    l = []
+    row = execute_sql("""select translation 
+            from translation 
+            where original=?
+            and language=?""",(chunck,language))
+    if row:
+        return row[0]
+    else:
+        original = chunck
+        if chunck[:5] in ignores_5:
+            s = chunck[:5]
+            chunck = chunck[5:]
+        lines = chunck.split('\n')
+        for line in lines:
+            if '[[' in line:
+                cks = line.split(']]')
+                tt = cks[0] + ']] ' + t(cks[1], language)
+            else:
+                tt = t(line,language)
 
-    if tt[:5] in ex:
-        s = tt[:5]
-        tt = tt[5:]
-    brute = s + " " +t(tt, language)
-
-    return brute
+            for b,a in replaces.items():
+                tt = tt.replace(b,a)
+            l.append(tt)
+        brute = s + " " + "\n".join(l)
+        execute_sql("""insert into translation 
+                (language,original,translation)
+                VALUES (?,?,?)""", (language, original, brute))
+        return brute
 
 def translate_file(filename, outputdir,language ='pt'):
 
         file = os.path.join("29-web2py-english/", filename)
         with open(file, "r") as f:
             text = f.read()
+        tchars = len(text)
         chuncks = text.split('``')
         chars = 0
         cs = len(chuncks)
@@ -66,18 +106,20 @@ def translate_file(filename, outputdir,language ='pt'):
                 else:
                     brute = check_markmin(tt,language)
                 chars += len(brute)
-                print(chars,brute)
 
+                #print('translated:',brute)
                 fh.write(brute)
                 #translated = translated + '\n\n' + brute
 
                 l +=1
             else:
                 code = "``{}``".format(tt)
+
+                print('escaped: ',code)
                 chars +=len(code)
                 fh.write("``{}``".format(tt))
 
-
+            print('{:10.4f}'.format(chars / tchars*100),'%')
 
 
         fh.close()
@@ -129,7 +171,7 @@ REMINDER: the info.txt file still need to be altered manually""")
                 os.system('cp -r 29-web2py-english {}'.format(args.outputdir))
             c += count_chars(args.file)
             ct += translate_file(args.file,args.outputdir,language=args.tolang)
-        os.system('rm -rf __pycache__')
+        #os.system('rm -rf __pycache__')
         print(c, 'characters in files > ', ct, 'translated')
 
 
