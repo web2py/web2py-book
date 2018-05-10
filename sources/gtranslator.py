@@ -56,8 +56,19 @@ class Translator:
 
     def translate(self, verbose=False):
         if len(self.orig_str) > 0:
+            #print(self.orig_str)
             query = urllib.parse.quote(self.orig_str)
             link = self.linkroot + query
+
+            """
+            request = urllib.request.Request(link, headers=self.agent)
+            webpage = urllib.request.urlopen(request).read()
+            soup = BeautifulSoup(webpage, 'lxml')
+            res = soup.find_all("div", class_="t0")[0].string
+            if verbose:
+                print(res)
+
+            """
             try:
                 request = urllib.request.Request(link, headers=self.agent)
                 webpage = urllib.request.urlopen(request).read()
@@ -73,13 +84,6 @@ class Translator:
             return res
         else:
             return ''
-
-
-
-
-
-
-
 
 
 # mystring = """

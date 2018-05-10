@@ -15,6 +15,7 @@ FORCE_RENDER = False
 
 # this is for checking new content instantly in development
 if request.is_local:
+    CACHE_EXPIRE = 1
     TIME_EXPIRE = -1
     FORCE_RENDER = True
 
@@ -42,8 +43,12 @@ def splitter_urlify(x):
 @cache('folders', CACHE_EXPIRE)
 def get_folders(dummy=None):
     folder = os.path.join(request.folder, 'sources')
-    return folder, [f for f in os.listdir(folder)
-                    if os.path.isdir(os.path.join(folder, f))]
+    folders = []
+    for f in os.listdir(folder):
+        if f != '__pycache__' and os.path.isdir(os.path.join(folder, f)):
+            folders.append(f)
+    return folder,folders
+    #return folder, [f for f in os.listdir(folder)  if os.path.isdir(os.path.join(folder, f))]
 
 
 FOLDER, FOLDERS = get_folders()
@@ -80,6 +85,7 @@ def get_chapters(subfolder):
 def build_menu(dummy=None):
     menu = []
     submenu = []
+    #print(FOLDERS)
     for subfolder in FOLDERS:
         info = get_info(subfolder)
         book_id = subfolder.split('-')[0]
@@ -294,3 +300,4 @@ def batch_static_chaps():
         return 'completed'
     else:
         return
+

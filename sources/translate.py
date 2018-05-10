@@ -2,10 +2,13 @@
 
 from gtranslator import Translator
 import os
+
 import sqlite3
 conn = sqlite3.connect("translations.sqlite") # ou use :memory: para botá-lo na memória RAM
-
 cursor = conn.cursor()
+
+from datetime import datetime
+start_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
 def execute_sql(sql,parameters=None):
     cursor.execute(sql,parameters)
@@ -40,25 +43,58 @@ def count_chars(filename):
     return len(chars)
 
 
-def check_markmin(chunck, language):
+def check_bold(chunck,language):
+    #chunck = "**teste**:"
+
+    lines = chunck.split('**')
+    #print(lines)
+    l = len(lines)
+    i = 0
+    tt = ''
+    if l > 1:
+        for line in lines:
+
+            if i > 0 and len(lines[i - 1]) > 0 and lines[i - 1][-1:] == " ":
+                b = " "
+            else:
+                b = ''
+            #print(i,l,lines[i])
+            if i < l and len(lines[i]) > 0 and lines[i][:1] == " ":
+                a = " "
+            else:
+                a = ''
+            tt = tt + b + t(line,language) + a
+            i +=1
+        print(tt)
+    else:
+        tt = t(chunck,language)
+
+    return tt
+
+def check_markmin(chunck, language,language_code,filename):
     # exceptions, need break down
     ignores_5 = [':inxx', ':code', ':cite']
-    replaces = {" ** ":"**",
-                " **,": "**,",
-                '** "': '**"',
-                ": **":":**",
-                " / ":"/"}
+    replaces = {" / ":"/"}
     if language == 'pt':
         replaces["Chapter"] = "Capítulo"
 
     s = ''
     l = []
-    row = execute_sql("""select translation 
+    row = execute_sql("""select translation,rowid 
             from translation 
             where original=?
-            and language=?""",(chunck,language))
+            and language=?
+            and filename=?""",(chunck,language,filename))
     if row:
+        # Coment/Uncoment to disable/use clean up feature
+        '''
+        execute_sql("""update translation
+                    set last_checked = ?
+                    where rowid = ?
+                    """, (start_time,row[1]))
+        '''
         return row[0]
+
     else:
         original = chunck
         if chunck[:5] in ignores_5:
@@ -68,22 +104,42 @@ def check_markmin(chunck, language):
         for line in lines:
             if '[[' in line:
                 cks = line.split(']]')
-                tt = cks[0] + ']] ' + t(cks[1], language)
+                chk = cks[0].split('[[')
+                tt = check_bold(chk[0],language) + ' [[' + chk[1] + ']] ' + check_bold(cks[1], language)
+            elif '#####' in line:
+                tt = line.split('#####')
+                tt = "##### " + check_bold(tt[1],language)
+            elif '####' in line:
+                tt = line.split('####')
+                tt = "#### " + check_bold(tt[1],language)
+            elif '###' in line:
+                tt = line.split('###')
+                tt = "### " + check_bold(tt[1], language)
+            elif '##' in line:
+                #print(tt)
+                tt = line.split('##')
+                tt = "## " + check_bold(tt[1], language)
+            elif '#' in line:
+                tt = line.split('#')
+                tt = "# " + check_bold(tt[1], language)
+
             else:
-                tt = t(line,language)
+                tt = check_bold(line,language)
 
             for b,a in replaces.items():
                 tt = tt.replace(b,a)
             l.append(tt)
         brute = s + " " + "\n".join(l)
         execute_sql("""insert into translation 
-                (language,original,translation)
-                VALUES (?,?,?)""", (language, original, brute))
+                (language_code,language,filename, original,translation,last_checked)
+                VALUES (?,?,?,?,?,?)""", (language_code,language,
+                filename, original, brute,start_time))
         return brute
 
 def translate_file(filename, outputdir,language ='pt'):
 
         file = os.path.join("29-web2py-english/", filename)
+        language_code=outputdir[:2]
         with open(file, "r") as f:
             text = f.read()
         tchars = len(text)
@@ -99,12 +155,9 @@ def translate_file(filename, outputdir,language ='pt'):
             tt = chuncks[i]
             #print('test', tt[:5])
             if i%2 == 0: # text to translate
+                #print(tt)
 
-                if '\n###' in tt:
-                    tt = tt.split('\n###')
-                    brute = check_markmin(tt[0],language) + "\n### " + check_markmin(tt[1],language)
-                else:
-                    brute = check_markmin(tt,language)
+                brute = check_markmin(tt,language,language_code,filename)
                 chars += len(brute)
 
                 #print('translated:',brute)
@@ -113,18 +166,24 @@ def translate_file(filename, outputdir,language ='pt'):
 
                 l +=1
             else:
-                code = "``{}``".format(tt)
+                code = " ``{}``".format(tt)
 
                 print('escaped: ',code)
                 chars +=len(code)
-                fh.write("``{}``".format(tt))
+                fh.write(" ``{}``".format(tt))
 
-            print('{:10.4f}'.format(chars / tchars*100),'%')
+            print(filename,'{:10.4f}'.format(chars / tchars*100),'%')
 
 
         fh.close()
-
-
+        # Coment/Uncoment to disable/use clean up feature
+        '''
+        execute_sql("""delete from translation 
+                    where filename=?
+                    and language_code=?
+                    and last_checked < ?""",(filename,language_code,start_time))
+        '''
+        execute_sql("""VACUUM""",())
         return chars
              
 
@@ -159,8 +218,10 @@ REMINDER: the info.txt file still need to be altered manually""")
         c = 0
         ct = 0
         if not args.file:
-            #os.system('cp -r 29-web2py-english {}'.format(args.outputdir))
-            os.system('cp info.py {}/info.txt'.format(args.outputdir))
+            if not os.path.isdir(args.outputdir):
+                os.system('cp -r 29-web2py-english {}'.format(args.outputdir))
+                #os.system('cp -r 29-web2py-english {}'.format(args.outputdir))
+                os.system('cp info.py {}/info.txt'.format(args.outputdir))
             for file in os.listdir(args.outputdir):
                 if file.endswith(".markmin") or file == 'chapters.txt':
                     #print(os.path.join(".", file))
@@ -171,7 +232,7 @@ REMINDER: the info.txt file still need to be altered manually""")
                 os.system('cp -r 29-web2py-english {}'.format(args.outputdir))
             c += count_chars(args.file)
             ct += translate_file(args.file,args.outputdir,language=args.tolang)
-        #os.system('rm -rf __pycache__')
+        os.system('rm -rf __pycache__')
         print(c, 'characters in files > ', ct, 'translated')
 
 
