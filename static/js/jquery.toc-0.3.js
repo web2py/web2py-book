@@ -39,7 +39,7 @@
     $elements.each(function() {
       var $e = $(this);
       var text = $e.text();
-      var anchor = text.replace(/['()\. /<>!?,:-]/g,'-');
+      var anchor = text.replace(/[^\w]+/g,'-');
 
       $e.before('<a name="' + anchor + '"></a>');
 
@@ -55,7 +55,8 @@
 
       var className = 'jquery-toc-' + level;
 
-      var li = '<li><a href="#' + anchor + '">' + text + '</a></li>';
+      var etxt = text.replace(/&/g,'&amp;').replace(/>/g,'&gt;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;')
+      var li = '<li><a href="#' + anchor + '">' + etxt + '</a></li>';
 
       if (level == lastLevel) {
         $('ul.' + className + ':last',$toc).append(li);
