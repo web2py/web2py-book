@@ -22,6 +22,7 @@
 'Cache Keys': 'Cache Keys',
 'Cannot be empty': 'Não pode ser vazio',
 'change password': 'modificar senha',
+'Chapter':'Capítulo',
 'Check to delete': 'Marque para apagar',
 'Clear CACHE?': 'Clear CACHE?',
 'Clear DISK': 'Clear DISK',
