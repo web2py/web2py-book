@@ -129,7 +129,10 @@ def check_markmin(chunck, language,language_code,filename):
             for b,a in replaces.items():
                 tt = tt.replace(b,a)
             l.append(tt)
-        brute = s + " " + "\n".join(l)
+        if not '\n' in chunck:
+            brute = s + " " + " ".join(l)
+        else:
+            brute = s + " " + "\n".join(l)
         execute_sql("""insert into translation 
                 (language_code,language,filename, original,translation,last_checked)
                 VALUES (?,?,?,?,?,?)""", (language_code,language,
