@@ -1,0 +1,3781 @@
+ ##  A camada de abstração do banco de dados
+ ``DAL``:inxx 
+
+###  Dependências
+
+O web2py vem com uma Camada de Abstração de Banco de Dados (DAL), uma API que mapeia objetos Python em objetos de banco de dados, como consultas, tabelas e registros. O DAL gera dinamicamente o SQL em tempo real usando o dialeto especificado para o back end do banco de dados, para que você não precise escrever código SQL ou aprender diferentes dialetos SQL (o termo SQL é usado genericamente), e o aplicativo será portável entre diferentes tipos de bases de dados. Uma lista parcial de bancos de dados suportados é mostrada na tabela abaixo. Por favor, verifique no web2py site e lista de discussão para adaptadores mais recentes. O Google NoSQL é tratado como um caso particular no Capítulo 13.
+
+A seção Gotchas no final deste capítulo contém mais algumas informações sobre bancos de dados específicos.
+
+A distribuição binária do Windows funciona fora da caixa com SQLite, MSSQL, Postgresql e MySQL. A distribuição binária do Mac funciona fora da caixa com o SQLite.
+Para usar qualquer outro back-end de banco de dados, execute a partir da distribuição de origem e instale o driver apropriado para o back end necessário.
+ ``database drivers``:inxx 
+
+Uma vez instalado o driver correto, inicie o web2py a partir da fonte e ele encontrará o driver. Aqui está uma lista dos drivers que o web2py pode usar:
+
+ ``DAL``:inxx   ``SQLite``:inxx   ``MySQL``:inxx   ``PostgresSQL``:inxx   ``Oracle``:inxx   ``MSSQL``:inxx   ``FireBird``:inxx   ``DB2``:inxx   ``Informix``:inxx   ``Sybase``:inxx   ``Teradata``:inxx   ``MongoDB``:inxx   ``CouchDB``:inxx   ``SAPDB``:inxx   ``Cubrid``:inxx 
+
+----------
+banco de dados | drivers (fonte)
+SQLite | sqlite3 ou pysqlite2 ou zxJDBC ``zxjdbc``:cite   (no Jython)
+PostgreSQL | psycopg2 ``psycopg2``:cite  ou zxJDBC ``zxjdbc``:cite   (no Jython)
+MySQL | pymysql ``pymysql``:cite  ou MySQLdb ``mysqldb``:cite 
+Oracle | cx_Oracle ``cxoracle``:cite 
+MSSQL | pyodbc ``pyodbc``:cite  ou pypyodbc ``pypyodbc``:cite 
+FireBird | kinterbasdb ``kinterbasdb``:cite  ou fdb ou pyodbc
+DB2 | pyodbc ``pyodbc``:cite 
+Informix | informixdb ``informixdb``:cite 
+Ingres | ingresdbi ``ingresdbi``:cite 
+Cubrid | cubriddb ``cubridb``:cite   ``cubridb``:cite 
+Sybase | Sybase ``Sybase``:cite 
+Teradata | pyodbc ``Teradata``:cite 
+SAPDB | sapdb ``SAPDB``:cite 
+MongoDB | pymongo ``pymongo``:cite 
+IMAP | imaplib ``IMAP``:cite 
+---------
+
+ ``sqlite3`` , ``pymysql`` e ``imaplib``  navio com web2py. O suporte do MongoDB é experimental. A opção IMAP permite usar o DAL para acessar o IMAP.
+
+###  The DAL: Um tour rápido
+web2py define as seguintes classes que compõem o DAL:
+
+o DAL objeto representa uma conexão com o banco de dados. Por exemplo: 
+ ``sqlite``:inxx 
+ ``
+db = DAL('sqlite://storage.sqlite')
+``:code 
+
+ ``define_table``:inxx 
+Mesa representa uma tabela de banco de dados. Você não instancia diretamente tabela; em vez de,  ``DAL.define_table``  instancia isso.
+ ``
+db.define_table('mytable', Field('myfield'))
+``:code 
+
+Os métodos mais importantes de uma tabela são:
+ ``insert``:inxx 
+ ``truncate``:inxx 
+ ``drop``:inxx 
+ ``import_from_csv_file``:inxx 
+ ``count``:inxx 
+ ``.insert`` , ``.truncate`` , ``.drop`` e ``.import_from_csv_file`` .
+
+ ``Field``:inxx 
+Campo representa um campo de banco de dados. Pode ser instanciado e passado como um argumento para  ``DAL.define_table`` .
+
+ ``Rows``:inxx 
+Linhas DAL   ``Row``:inxx   é o objeto retornado por um banco de dados select. Pode ser pensado como uma lista de ``Row``  linhas:
+ ``
+rows = db(db.mytable.myfield != None).select()
+``:code 
+
+ ``Row``:inxx 
+Linha contém valores de campo. 
+ ``
+for row in rows:
+    print row.myfield
+``:code 
+
+ ``Query``:inxx 
+Inquerir é um objeto que representa uma cláusula SQL "where": 
+ ``
+myquery = (db.mytable.myfield != None) | (db.mytable.myfield > 'A')
+``:code 
+
+ ``Set``:inxx 
+Conjunto é um objeto que representa um conjunto de registros. Seus métodos mais importantes são  ``count`` , ``select`` , ``update`` e ``delete`` . Por exemplo:
+ ``
+myset = db(myquery)
+rows = myset.select()
+myset.update(myfield='somevalue')
+myset.delete()
+``:code 
+
+ ``Expression``:inxx 
+
+Expressão é algo como um  ``orderby``  ou ``groupby``  expressão. A classe Field é derivada da expressão. Aqui está um exemplo.
+ ``
+myorder = db.mytable.myfield.upper() | db.mytable.id
+db().select(db.table.ALL, orderby=myorder)
+``:code 
+
+###  Usando o DAL "autônomo"
+O web2py DAL pode ser usado em um ambiente que não seja web2py via
+ ``
+from gluon import DAL, Field
+# also consider: from gluon.validators import *
+``:code 
+
+ [[dal_constructor]] 
+###  Construtor DAL
+Uso básico:
+ ``
+>>> db = DAL('sqlite://storage.sqlite')
+``:code 
+
+O banco de dados agora está conectado e a conexão é armazenada na variável global ``db`` .
+
+A qualquer momento, você pode recuperar a string de conexão.
+ ``_uri``:inxx 
+ ``
+>>> print db._uri
+sqlite://storage.sqlite
+``:code 
+
+e o nome do banco de dados
+ ``_dbname``:inxx 
+ ``
+>>> print db._dbname
+sqlite
+``:code 
+
+A cadeia de conexão é chamada de ``_uri``  porque é uma instância de um identificador de recurso uniforme.
+
+O DAL permite múltiplas conexões com o mesmo banco de dados ou com diferentes bancos de dados, até bancos de dados de diferentes tipos. Por enquanto, vamos assumir a presença de um único banco de dados, já que esta é a situação mais comum.
+
+####  Assinatura DAL
+ ``
+DAL(uri='sqlite://dummy.db',
+    pool_size=0,
+    folder=None,
+    db_codec='UTF-8',
+    check_reserved=None,
+    migrate=True,
+    fake_migrate=False,
+    migrate_enabled=True,
+    fake_migrate_all=False,
+    decode_credentials=False,
+    driver_args=None,
+    adapter_args=None,
+    attempts=5,
+    auto_import=False,
+    bigint_id=False,
+    debug=False,
+    lazy_tables=False,
+    db_uid=None,
+    do_connect=True,
+    after_connection=None,
+    tables=None,
+    ignore_field_case=True,
+    entity_quoting=False,
+    table_hash=None)
+``:code 
+
+ [[connection_strings]] 
+####  Strings de conexão (o parâmetro uri)
+ ``connection strings``:inxx 
+
+Uma conexão com o banco de dados é estabelecida criando uma instância do objeto DAL:
+ ``
+>>> db = DAL('sqlite://storage.sqlite', pool_size=0)
+``:code 
+ ``db``  não é uma palavra-chave; é uma variável local que armazena o objeto de conexão ``DAL`` . Você é livre para dar um nome diferente. O construtor de ``DAL``  requer um único argumento, a string de conexão. A cadeia de conexão é o único código web2py que depende de um banco de dados back-end específico. Aqui estão exemplos de strings de conexão para tipos específicos de bancos de dados back-end suportados (em todos os casos, assumimos que o banco de dados está sendo executado a partir do localhost em sua porta padrão e é chamado de "test"):
+
+ ``ndb`` :índice
+
+-------------
+SQLite     |  ``sqlite://storage.sqlite`` 
+MySQL      |  ``mysql://username:password@localhost/test`` 
+PostgreSQL |  ``postgres://username:password@localhost/test`` 
+MSSQL (legado)      |  ``mssql://username:password@localhost/test`` 
+MSSQL (> = 2005)      |  ``mssql3://username:password@localhost/test`` 
+MSSQL (> = 2012)      |  ``mssql4://username:password@localhost/test`` 
+FireBird   |  ``firebird://username:password@localhost/test`` 
+Oráculo     |  ``oracle://username/password@test`` 
+DB2        |  ``db2://username:password@test`` 
+Ingres     |  ``ingres://username:password@localhost/test`` 
+Sybase     |  ``sybase://username:password@localhost/test`` 
+Informix   |  ``informix://username:password@test`` 
+Teradata   |  ``teradata://DSN=dsn;UID=user;PWD=pass;DATABASE=test`` 
+Cubrid     |  ``cubrid://username:password@localhost/test`` 
+SAPDB      |  ``sapdb://username:password@localhost/test`` 
+IMAP       |  ``imap://user:password@server:port`` 
+MongoDB    |  ``mongodb://username:password@localhost/test`` 
+Google/SQL |  ``google:sql://project:instance/database`` 
+Google/NoSQL |  ``google:datastore`` 
+Google/NoSQL/NDB |  ``google:datastore+ndb`` 
+-------------
+
+Observe que no SQLite o banco de dados consiste em um único arquivo. Se não existir, é criado. Este arquivo é bloqueado toda vez que é acessado. No caso do MySQL, PostgreSQL, MSSQL, FireBird, Oracle, DB2, Ingres e Informix, o banco de dados "teste" deve ser criado fora do web2py. Uma vez estabelecida a conexão, o web2py criará, alterará e soltará as tabelas apropriadamente.
+
+No caso do Google/NoSQL, o ``+ndb``  opção ativa o NDB. O NDB usa um buffer do Memcache para ler dados que são acessados com freqüência. Isso é completamente automático e feito no nível do armazenamento de dados, não no nível web2py.
+
+Também é possível definir a string de conexão para ``None`` . Nesse caso, o DAL não se conectará a nenhum banco de dados de back-end, mas a API ainda poderá ser acessada para testes. Exemplos disso serão discutidos no Capítulo 7.
+
+Algumas vezes, você pode precisar gerar o SQL como se tivesse uma conexão, mas sem realmente se conectar ao banco de dados. Isso pode ser feito com
+
+ ``
+db = DAL('...', do_connect=False)
+``:code 
+
+Neste caso, você será capaz de ligar ``_select`` , ``_insert`` , ``_update`` e ``_delete``  para gerar SQL, mas não chamar ``select`` , ``insert`` , ``update`` e ``delete`` . Na maioria dos casos, você pode usar ``do_connect=False``  mesmo sem ter os drivers de banco de dados necessários.
+
+Observe que, por padrão, o web2py usa a codificação de caracteres utf8 para bancos de dados. Se você trabalha com bancos de dados existentes que se comportam de maneira diferente, você precisa alterá-lo com o parâmetro opcional ``db_codec``  gostar
+
+ ``
+db = DAL('...', db_codec='latin1')
+``:code 
+
+Caso contrário, você obterá tickets UnicodeDecodeError.
+
+
+####  Pool de conexão
+ ``connection pooling``:inxx 
+
+Um argumento comum do construtor DAL é o ``pool_size`` ; o padrão é zero.
+
+Como é lento estabelecer uma nova conexão de banco de dados para cada solicitação, o web2py implementa um mecanismo para o pool de conexões. Quando uma conexão é estabelecida e a página é veiculada e a transação é concluída, a conexão não é fechada, mas entra em um pool. Quando a próxima solicitação http chegar, o web2py tentará reciclar uma conexão do pool e usá-la para a nova transação. Se não houver conexões disponíveis no pool, uma nova conexão será estabelecida.
+
+Quando o web2py é iniciado, o pool está sempre vazio. A piscina cresce até o mínimo entre o valor de ``pool_size``  e o número máximo de solicitações simultâneas. Isso significa que se ``pool_size=10``  mas o nosso servidor nunca recebe mais de 5 solicitações simultâneas, então o tamanho real do pool só aumentará para 5. Se ``pool_size=0``  então o pool de conexão não é usado.
+
+As conexões nos conjuntos são compartilhadas seqüencialmente entre os encadeamentos, no sentido de que podem ser usadas por dois encadeamentos diferentes, mas não simultâneos. Existe apenas um pool para cada processo web2py.
+
+o ``pool_size``  O parâmetro é ignorado pelo SQLite e pelo Google App Engine.
+O pool de conexões é ignorado pelo SQLite, pois não produziria nenhum benefício.
+
+####  Falhas de conexão (parâmetro de tentativas)
+
+Se o web2py não conseguir se conectar ao banco de dados, ele aguardará 1 segundo e, por padrão, tentará novamente até 5 vezes antes de declarar uma falha. No caso de pool de conexão, é possível que uma conexão em pool que permaneça aberta, mas não usada por algum tempo, seja fechada pelo final do banco de dados. Graças ao recurso de repetição, o web2py tenta restabelecer essas conexões descartadas.
+O número de tentativas é definido por meio do parâmetro de tentativas.
+
+####  Tabelas Preguiçosas
+configuração ``lazy_tables = True``  fornece um grande aumento de desempenho. Ver abaixo: [[lazy tables #lazy_tables]] 
+
+####  Aplicações sem modelo
+Usar o diretório de modelos do web2py para seus modelos de aplicativos é muito conveniente e produtivo. Com tabelas preguiçosas e modelos condicionais, o desempenho é geralmente aceitável mesmo para grandes aplicações. Muitos desenvolvedores experientes usam esses ambientes de produção.
+
+No entanto, é possível definir tabelas DAL sob demanda dentro das funções ou módulos do controlador. Isso pode fazer sentido quando o número ou a complexidade das definições de tabela sobrecarregar o uso de tabelas preguiçosas e modelos condicionais.
+
+Isso é chamado de desenvolvimento "sem modelo" pela comunidade web2py.
+ Isso significa menos uso da execução automática de arquivos python no diretório do modelo.
+Isso não implica abandonar o conceito de modelos, visualizações e controladores.
+
+A execução automática do código python pelo Web2py dentro do diretório do modelo faz isso por você:
+
++ os modelos são executados automaticamente sempre que uma solicitação é processada
++ modelos acessam o escopo global do web2py.
+
+Os modelos também oferecem sessões de shell interativas úteis quando o web2py é iniciado com a opção de linha de comando -M.
+
+Além disso, lembre-se de manutenção: outros desenvolvedores web2py esperam encontrar definições de modelo no diretório do modelo.
+
+Para usar a abordagem "sem modelo", você assume a responsabilidade por executar essas duas tarefas domésticas.
+Você chama as definições de tabela quando precisa delas e fornece o acesso necessário ao escopo global por meio do objeto atual. (conforme documentado no capítulo 4 [[sharing global with the current object ../04#current_object]]  )
+
+Por exemplo, um aplicativo sem modelo típico pode deixar as definições dos objetos de conexão do banco de dados no arquivo de modelo, mas definir as tabelas sob demanda por função do controlador.
+
+O caso típico é mover as definições da tabela para um arquivo de módulo (um arquivo python salvo no diretório modules).
+
+Se a função para definir um conjunto de tabelas for chamada ``define_employee_tables()``  em um módulo chamado "table_setup.py", o controlador que deseja se referir às tabelas relacionadas aos registros do funcionário para fazer com que um SQLFORM precise chamar o ``define_employee_tables()``  função antes de acessar qualquer tabela. o ``define_employee_tables()``  A função precisa acessar o objeto de conexão do banco de dados para definir as tabelas. É por isso que você precisa usar corretamente o ``current``  objeto no arquivo de módulo contendo ``define_employee_tables()``  (como acima mencionado).
+
+####  Bancos de Dados Replicados
+
+O primeiro argumento de ``DAL(...)``  pode ser uma lista de URIs. Neste caso, o web2py tenta se conectar a cada um deles. O principal objetivo para isso é lidar com vários servidores de banco de dados e distribuir a carga de trabalho entre eles). Aqui está um caso de uso típico:
+
+ ``
+db = DAL(['mysql://...1', 'mysql://...2', 'mysql://...3'])
+``:code 
+
+Neste caso, o DAL tenta se conectar ao primeiro e, em caso de falha,
+vai tentar o segundo e o terceiro. Isso também pode ser usado para distribuir carga
+em uma configuração mestre-escravo do banco de dados. Nós falaremos mais sobre isso
+no Capítulo 13, no contexto da escalabilidade.
+
+####  Palavras-chave reservadas
+ ``reserved Keywords``:inxx 
+
+ ``check_reserved``  informa ao construtor para verificar nomes de tabelas e nomes de colunas em relação a palavras-chave SQL reservadas em bancos de dados de backend de destino. ``check_reserved``  O padrão é Nenhum.
+
+Esta é uma lista de sequências que contêm os nomes do adaptador de backend do banco de dados.
+
+O nome do adaptador é o mesmo usado na cadeia de conexão do DAL. Portanto, se você quiser verificar o PostgreSQL e o MSSQL, sua string de conexão será a seguinte:
+ ``
+db = DAL('sqlite://storage.sqlite',
+         check_reserved=['postgres', 'mssql'])
+``:code 
+
+O DAL varrerá as palavras-chave na mesma ordem da lista.
+
+Existem duas opções extras "all" e "common". Se você especificar all, ele verificará todas as palavras-chave SQL conhecidas. Se você especificar comum, ele verificará somente as palavras-chave comuns do SQL, como ``SELECT`` , ``INSERT`` , ``UPDATE`` etc.
+
+Para back-ends suportados, você também pode especificar se deseja verificar também as palavras-chave SQL não reservadas. Neste caso você adicionaria ``_nonreserved``  para o nome. Por exemplo:
+ ``
+check_reserved=['postgres', 'postgres_nonreserved']
+``:code 
+
+Os seguintes backends de banco de dados suportam a verificação de palavras reservadas.
+
+-----
+PostgreSQL |  ``postgres(_nonreserved)`` 
+MySQL |  ``mysql`` 
+FireBird |  ``firebird(_nonreserved)`` 
+MSSQL |  ``mssql`` 
+Oráculo |  ``oracle`` 
+-----
+
+####  Citação de banco de dados e configurações de caso (entity_quoting, ignore_field)
+
+Você também pode usar a referência explícita de entidades SQL no nível DAL. Ele funciona de forma transparente para que você possa usar os mesmos nomes em python e no esquema do banco de dados.
+
+ ``ignore_field_case = True`` 
+ ``entity_quoting = True`` 
+Aqui está um exemplo:
+ ``
+db = DAL('postgres://...', ..., ignore_field_case=False, entity_quoting=True)
+
+db.define_table('table1', Field('column'), Field('COLUMN'))
+
+print db(db.table1.COLUMN != db.table1.column).select()
+``:code 
+
+####  Fazendo uma conexão segura
+
+Às vezes é necessário (e aconselhado) conectar-se ao seu banco de dados usando conexão segura, especialmente se o seu banco de dados não estiver no mesmo servidor que o seu aplicativo. Nesse caso, você precisa passar parâmetros adicionais para o driver do banco de dados. Você deve consultar a documentação do driver do banco de dados para obter detalhes.
+
+Para o Postgresql com o psycopg2, deve ficar assim:
+
+ ``
+DAL('postgres://user_name:user_password@server_addr/db_name', driver_args={"sslmode":"require", "sslrootcert":"root.crt", "sslcert":"postgresql.crt", "sslkey":"postgresql.key"})
+``:code 
+
+onde parâmetros ``sslrootcert`` , ``sslcert``  e ``sslkey``  deve conter o caminho completo para os arquivos. Você deve consultar a documentação do Postgresql sobre como configurar o servidor Postgresql para aceitar conexões seguras.
+
+####  Outros parâmetros do construtor DAL
+
+#####  Localização da pasta de banco de dados
+
+ ``folder``  - onde os arquivos .table serão criados. Definir automaticamente no web2py. Use um caminho explícito ao usar o DAL fora do web2py
+
+#####  Configurações de migração padrão
+
+A migração é detalhada abaixo nas Tabelas [[table migrations #table_migrations]] . As configurações de migração do construtor DAL são booleanas que afetam os padrões e o comportamento global.
+
+ ``migrate = True``  define o comportamento de migração padrão para todas as tabelas
+
+ ``fake_migrate = False``  define o comportamento padrão do fake_migrate para todas as tabelas
+
+ ``migrate_enabled = True``  Se definido como False, desativa todas as migrações
+
+ ``fake_migrate_all = False``  Se definido como True false, migra todas as tabelas
+
+
+####  Experimente com o shell web2py
+
+Você pode experimentar a API DAL usando o shell web2py (-S [[command line option ../04#CommandLineOptions]] ).
+
+Comece criando uma conexão. Por exemplo, você pode usar o SQLite. Nada nesta discussão muda quando você altera o mecanismo de back-end.
+
+
+ [[table_constructor]] 
+###  Construtor de tabela
+
+ ``define_table``:inxx   ``Field``:inxx 
+
+####  assinatura de define_table
+A assinatura de define_table:
+
+Tabelas são definidas no DAL via ``define_table`` :
+ ``
+>>> db.define_table('person',
+                    Field('name'),
+                    id=id,
+                    rname=None,
+                    redefine=True
+                    common_filter,
+                    fake_migrate,
+                    fields,
+                    format,
+                    migrate,
+                    on_define,
+                    plural,
+                    polymodel,
+                    primarykey,
+                    redefine,
+                    sequence_name,
+                    singular,
+                    table_class,
+                    trigger_name)
+``:code 
+
+Ele define, armazena e retorna um ``Table``  objeto chamado "pessoa" contendo um campo (coluna) "nome". Este objeto também pode ser acessado via ``db.person`` , então você não precisa pegar o valor de retorno.
+
+####   ``id`` : Notas sobre a chave primária
+Não declare um campo chamado "id", porque um é criado pelo web2py mesmo assim. Cada tabela tem um campo chamado "id" por padrão. É um campo inteiro de auto-incremento (começando em 1) usado para referência cruzada e para tornar cada registro único, então "id" é uma chave primária. (Observação: o contador de ID começando em 1 é específico de back-end. Por exemplo, isso não se aplica ao NoSQL do Google App Engine.)
+
+ ``named id field``:inxx 
+Opcionalmente, você pode definir um campo de ``type='id'``  e o web2py usará esse campo como campo de ID de incremento automático. Isso não é recomendado, exceto ao acessar tabelas de banco de dados herdadas que possuem uma chave primária com um nome diferente.
+Com alguma limitação, você também pode usar chaves primárias diferentes usando o ``primarykey``  parâmetro. [[primarykey #primarykey]]  é explicado logo abaixo.
+
+####   ``plural``  e ``singular`` 
+Objetos Smartgrid podem precisar saber o nome singular e plural da tabela. Os padrões são inteligentes, mas esses parâmetros permitem que você seja específico. Veja smartgrid para mais informações.
+####   ``redefine`` 
+As tabelas podem ser definidas apenas uma vez, mas você pode forçar o web2py a redefinir uma tabela existente:
+
+ ``
+db.define_table('person', Field('name'))
+db.define_table('person', Field('name'), redefine=True)
+``:code 
+
+A redefinição pode acionar uma migração se o conteúdo do campo for diferente.
+
+ [[record_representation]] 
+####   ``format`` : Registro de representação
+
+É opcional, mas é recomendável especificar uma representação de formato para registros com ``format``  parâmetro.
+ ``
+>>> db.define_table('person', Field('name'), format='%(name)s')
+``:code 
+
+ou
+ ``
+>>> db.define_table('person', Field('name'), format='%(name)s %(id)s')
+``:code 
+
+ou ainda mais complexos usando uma função:
+ ``
+>>> db.define_table('person',
+                    Field('name'),
+                    format=lambda r: r.name or 'anonymous')
+``:code 
+
+O atributo de formato será usado para dois propósitos:
+- Para representar registros referenciados em drop-downs de seleção/opção.
+- Para definir o ``db.othertable.person.represent``  atributo para todos os campos que fazem referência a essa tabela. Isso significa que o SQLTABLE não mostrará referências por id, mas usará a representação preferencial de formato.
+
+####   ``rname`` : Registro de representação
+
+ ``rname``  define um nome de backend de banco de dados para a tabela. Isso torna o nome da tabela web2py um alias e ``rname``  é o nome real usado ao construir a consulta para o backend.
+Para ilustrar apenas um uso, ``rname``  pode ser usado para fornecer nomes de tabela MSSQL qualificados acessando tabelas pertencentes a outros bancos de dados no servidor: ``rname = 'db1.dbo.table1'``:code 
+
+ [[primarykey]] 
+####   ``primarykey`` : Suporte para tabelas legadas
+
+ ``primarykey``  ajuda a suportar tabelas legadas com chaves primárias existentes, mesmo com várias partes.
+Vejo [[Legacy Databases #LegacyDatabases]]  abaixo.
+
+####   ``migrate`` , ``fake_migrate`` 
+
+ ``migrate``  define opções de migração para a tabela. Vejo [[Table Migrations #table_migrations]]  abaixo
+
+####   ``table_class`` 
+Se você definir sua própria classe Table como uma subclasse de gluon.dal.Table, você pode fornecê-la aqui; isso permite estender e substituir métodos. Exemplo: ``table_class=MyTable``:code 
+
+####   ``sequence_name`` 
+
+(Opcional) O nome de uma sequência de tabela customizada (se suportada pelo banco de dados). Pode criar uma SEQUÊNCIA (começando em 1 e incrementando por 1) ou usar isto para tabelas legadas com seqüências customizadas. Observe que, quando necessário, o web2py criará sequências automaticamente por padrão (começando em 1).
+
+#### ``trigger_name``
+
+(opcional) Refere-se a ``sequence_name`` . Relevante para alguns back-ends que não suportam campos numéricos de incremento automático.
+
+####   ``polymodel`` 
+
+Para o Google App Engine
+
+#### ``on_define``
+
+``on_define``  é um retorno de chamada acionado quando um lazy_table é instanciado, embora seja chamado de qualquer maneira se a tabela não for preguiçosa. Isso permite alterações dinâmicas na tabela sem perder as vantagens da instanciação atrasada.
+
+Exemplo:
+ ``
+db = DAL(lazy_tables=True)
+db.define_table('person',
+                Field('name'),
+                Field('age', 'integer'),
+                on_define=lambda table: [
+                    table.name.set_attributes(requires=IS_NOT_EMPTY(), default=''),
+                    table.age.set_attributes(requires=IS_INT_IN_RANGE(0, 120), default=30)
+                    ]
+                )
+``:code 
+Observe que este exemplo mostra como usar ``on_define``  mas não é realmente necessário. O simples ``requires``  valores poderiam ser adicionados às definições de campo e a tabela ainda seria preguiçosa. Contudo, ``requires``  que tomam um objeto Set como o primeiro argumento, como IS_IN_DB, fará uma consulta como ``db.sometable.somefield == some_value``:code  o que causaria ``sometable``  a ser definido cedo. Esta é a situação salva por ``on_define`` .
+
+ [[lazy_tables]] 
+####  Lazy Tables, um grande aumento no desempenho
+
+
+ ``lazy tables``:inxx 
+Os modelos web2py são executados antes dos controladores, portanto, todas as tabelas são definidas em todas as solicitações. Nem todas as tabelas são necessárias para lidar com cada solicitação, portanto, é possível que algum tempo gasto na definição de tabelas seja desperdiçado. Modelos condicionais ( [[conditional models, chapter 4 ../04#conditional_models]] ) pode ajudar, mas o web2py oferece um grande aumento de desempenho via lazy_tables. Esse recurso significa que a criação da tabela é adiada até que a tabela seja realmente referenciada. A ativação de tabelas lazy é feita ao inicializar um banco de dados por meio do construtor DAL. Requer a configuração do ``DAL(..., lazy_tables=True)``   parâmetro. Este é um dos impulsos de desempenho de tempo de resposta mais significativos no web2py.
+
+####  Adicionando atributos a campos e tabelas
+Se você precisar adicionar atributos personalizados aos campos, basta fazer isso:
+ ``db.table.field.extra = {}``:code  
+
+"extra" não é uma palavra-chave; Agora, são atributos personalizados anexados ao objeto de campo. Você pode fazê-lo com tabelas também, mas elas devem ser precedidas por um
+sublinhado para evitar conflitos de nomenclatura com campos:
+
+ ``db.table._extra = {} ``:code 
+
+
+ [[field_constructor]] 
+###  Construtor de campo
+ ``Field constructor``:inxx 
+Estes são os valores padrão de um construtor de campo:
+ ``
+Field(fieldname, type='string', length=None, default=None,
+      required=False, requires='<default>',
+      ondelete='CASCADE', notnull=False, unique=False,
+      uploadfield=True, widget=None, label=None, comment=None,
+      writable=True, readable=True, update=None, authorize=None,
+      autodelete=False, represent=None, compute=None,
+      uploadfolder=None, uploadseparate=None, uploadfs=None, rname=None)
+``:code 
+
+Nem todos eles são relevantes para todos os campos. "length" é relevante apenas para campos do tipo "string". "uploadfield" e "authorize" são relevantes apenas para campos do tipo "upload". "ondelete" é relevante apenas para os campos do tipo "reference" e "upload".
+- ``length``  define o tamanho máximo de um campo "string", "password" ou "upload". E se ``length``  não é especificado um valor padrão é usado, mas o valor padrão não é garantido para ser compatível com versões anteriores. "Para evitar migrações indesejadas nas atualizações, recomendamos que você sempre especifique o tamanho dos campos de string, senha e upload".
+- ``default``  define o valor padrão para o campo. O valor padrão é usado ao executar uma inserção se um valor não for especificado explicitamente. Ele também é usado para preencher previamente formulários criados a partir da tabela usando o SQLFORM. Note, em vez de ser um valor fixo, o padrão pode ser uma função (incluindo uma função lambda) que retorna um valor do tipo apropriado para o campo. Nesse caso, a função é chamada uma vez para cada registro inserido, mesmo quando vários registros são inseridos em uma única transação.
+- ``required``  informa ao DAL que nenhuma inserção deve ser permitida nesta tabela se um valor para este campo não for especificado explicitamente.
+- ``requires``  é um validador ou uma lista de validadores. Isso não é usado pelo DAL, mas é usado pelo SQLFORM. Os validadores padrão para os tipos fornecidos são mostrados na próxima seção.
+-------
+Notar que ``requires=...``  é aplicado ao nível de formulários, ``required=True``  é aplicada ao nível do DAL (inserir), enquanto ``notnull`` , ``unique``  e ``ondelete``  são aplicadas no nível do banco de dados. Embora às vezes possam parecer redundantes, é importante manter a distinção ao programar com o DAL.
+-------
+- ``uploadfolder``  enquanto o padrão é ``None`` , a maioria dos adaptadores de banco de dados usará como padrão o upload de arquivos em os.path.join (request.folder, 'uploads'). O MongoAdapter não parece estar fazendo isso no momento.
+- ``rname``  fornece o campo era um "nome real", um nome para o campo conhecido pelo adaptador de banco de dados; quando o campo é usado, é o valor do rname que é enviado para o banco de dados. O nome do web2py para o campo é efetivamente um alias.
+ ``ondelete``:inxx 
+- ``ondelete``  traduz na instrução SQL "ON DELETE". Por padrão, é definido como "CASCADE". Isso informa ao banco de dados que, ao excluir um registro, ele também deve excluir todos os registros que se referem a ele. Para desativar esse recurso, defina ``ondelete``  para "NO ACTION" ou "SET NULL".
+- ``notnull=True``  traduz na instrução SQL "NOT NULL". Isso evita que o banco de dados insira valores nulos para o campo.
+- ``unique=True``  se traduz na instrução SQL "UNIQUE" e garante que os valores desse campo sejam exclusivos na tabela. É aplicado no nível do banco de dados.
+- ``uploadfield``  aplica-se apenas aos campos do tipo "upload". Um campo do tipo "upload" armazena o nome de um arquivo salvo em outro lugar, por padrão no sistema de arquivos sob a pasta "uploads /" do aplicativo. E se ``uploadfield``  está definido como True, o arquivo é armazenado em um campo de blob dentro da mesma tabela e o valor de ``uploadfield``  é o nome do campo blob. Isso será discutido em mais detalhes posteriormente no contexto do SQLFORM.
+- ``uploadfolder``  O padrão é a pasta "uploads /" do aplicativo. Se definido para um caminho diferente, os arquivos serão enviados para uma pasta diferente.
+-------
+Por exemplo,
+ ``
+Field(..., uploadfolder=os.path.join(request.folder, 'static/temp'))
+``:code 
+fará upload de arquivos para a pasta "web2py/applications/myapp/static/temp".
+-------
+- ``uploadseparate``  Se definido como True, o upload de arquivos será feito em diferentes subpastas da pasta "uploadfolder". Isso é otimizado para evitar muitos arquivos na mesma pasta/subpasta. ATENÇÃO: Você não pode alterar o valor de ``uploadseparate``  de True para False sem interromper os links para os envios existentes. O web2py usa as subpastas separadas ou não. A alteração do comportamento após o upload dos arquivos impedirá que o web2py recupere esses arquivos. Se isso acontecer, é possível mover arquivos e corrigir o problema, mas isso não é descrito aqui.
+- ``uploadfs``  permite especificar um sistema de arquivos diferente para o qual carregar arquivos, incluindo um armazenamento do Amazon S3 ou um armazenamento SFTP remoto. Esta opção requer o PyFileSystem instalado. ``uploadfs``  deve apontar para ``PyFileSystem`` . ``PyFileSystem``:inxx   ``uploadfs`` : idxx
+- ``widget``  deve ser um dos objetos de widget disponíveis, incluindo widgets customizados, por exemplo: ``SQLFORM.widgets.string.widget`` . Uma lista de widgets disponíveis será discutida posteriormente. Cada tipo de campo tem um widget padrão.
+- ``label``  é uma string (ou um auxiliar ou algo que pode ser serializado para uma string) que contém o rótulo a ser usado para este campo em formulários gerados automaticamente.
+- ``comment``   é uma cadeia de caracteres (ou um auxiliar ou algo que pode ser serializado para uma cadeia) que contém um comentário associado a esse campo e será exibido à direita do campo de entrada nos formulários gerados automaticamente.
+- ``writable``  declara se um campo é gravável em formulários.
+- ``readable``  declara se um campo é legível em formulários. Se um campo não for legível nem gravável, ele não será exibido nos formulários de criação e atualização.
+- ``update``  contém o valor padrão para este campo quando o registro é atualizado.
+- ``compute``  é uma função opcional. Se um registro for inserido ou atualizado, a função de cálculo será executada e o campo será preenchido com o resultado da função. O registro é passado para a função computacional como um ``dict`` e o dict não incluirá o valor atual disso, ou qualquer outro campo de computação.
+- ``authorize``  pode ser usado para exigir o controle de acesso no campo correspondente, somente para campos "upload". Será discutido mais detalhadamente no contexto de Autenticação e Autorização.
+- ``autodelete``  determina se o arquivo enviado por upload correspondente deve ser excluído quando o registro que referencia o arquivo for excluído. Apenas para campos "upload". No entanto, os registros excluídos pelo próprio banco de dados devido a uma operação CASCADE não acionarão o autodelete do web2py. O grupo do Web2py Google tem discussões sobre soluções alternativas.
+- ``represent``  pode ser Nenhum ou pode apontar para uma função que recebe um valor de campo e retorna uma representação alternativa para o valor do campo.
+-------
+Exemplos:
+ ``
+db.mytable.name.represent = lambda name, row: name.capitalize()
+db.mytable.other_id.represent = lambda id, row: row.myfield
+db.mytable.some_uploadfield.represent = lambda value, row: A('get it', _href=URL('download', args=value))
+``:code 
+-------
+
+
+ [[field_types]] 
+####  Tipos de campo
+ ``field types``:inxx 
+
+----------
+tipo de campo |  validadores de campo padrão
+ ``string``  | ``IS_LENGTH(length)``  o comprimento padrão é 512
+ ``text``  | ``IS_LENGTH(65536)`` 
+ ``blob``  | ``None`` 
+ ``boolean``  | ``None`` 
+ ``integer``  | ``IS_INT_IN_RANGE(-1e100, 1e100)`` 
+ ``double``  | ``IS_FLOAT_IN_RANGE(-1e100, 1e100)`` 
+ ``decimal(n,m)``  | ``IS_DECIMAL_IN_RANGE(-1e100, 1e100)`` 
+ ``date``  | ``IS_DATE()`` 
+ ``time``  | ``IS_TIME()`` 
+ ``datetime``  | ``IS_DATETIME()`` 
+ ``password``  | ``None`` 
+ ``upload``  | ``None`` 
+ ``reference <table>``   | ``IS_IN_DB(db, table.field, format)`` 
+ ``list:string``  | ``None`` 
+ ``list:integer``  | ``None`` 
+ ``list:reference <table>``  | ``IS_IN_DB(db, table.field, format, multiple=True)`` 
+ ``json``  | ``IS_JSON()`` 
+ ``bigint``  | ``None`` 
+ ``big-id``  | ``None`` 
+ ``big-reference``  | ``None`` 
+---------
+
+Decimal requer e retorna valores como ``Decimal``  objetos, conforme definido no Python ``decimal``  módulo. SQLite não manipula o ``decimal``  tipo tão internamente nós tratamos como um ``double`` . O (n, m) é o número de dígitos no total e o número de dígitos após o ponto decimal, respectivamente.
+
+o ``big-id``  e, ``big-reference``  são suportados apenas por alguns dos mecanismos de banco de dados e são experimentais. Eles não são normalmente usados como tipos de campo, a menos que para tabelas legadas, no entanto, o construtor DAL tem um ``bigint_id``  argumento que quando definido para ``True``  faz o ``id``  campos e ``reference``  Campos ``big-id``  e ``big-reference``  respectivamente.
+
+o ``list:<type>``  Os campos são especiais porque são projetados para aproveitar certos recursos de desnormalização no NoSQL (no caso do NoSQL do Google App Engine, os tipos de campo ``ListProperty``  e ``StringListProperty`` ) e back-port-los todos os outros bancos de dados relacionais suportados. Em bancos de dados relacionais, as listas são armazenadas como ``text``  campo. Os itens são separados por um ``|``  e cada ``|``  no item string é escapado como um ``||`` . Eles são discutidos em sua própria seção.
+
+o ``json``  tipo de campo é praticamente explicativo. Pode armazenar qualquer objeto serializável json. Ele foi projetado para funcionar especificamente para o MongoDB e backported para outros adaptadores de banco de dados para portabilidade.
+
+
+ ``blob``:inxx 
+ ``blob``  campos também são especiais. Por padrão, os dados binários são codificados em base64 antes de serem armazenados no campo real do banco de dados e são decodificados quando extraídos. Isso tem o efeito negativo de usar 33% mais espaço de armazenamento do que o necessário em campos de blob, mas tem a vantagem de tornar a comunicação independente de convenções de escape específicas de backend.
+
+####  Campo de tempo de execução e modificação de tabela
+
+A maioria dos atributos de campos e tabelas pode ser modificada depois de serem definidos:
+
+ ``
+db.define_table('person',
+                Field('name', default=''),
+                format='%(name)s')
+
+db.person._format = '%(name)s/%(id)s'
+db.person.name.default = 'anonymous'
+`` 
+(observe que os atributos das tabelas geralmente são prefixados por um sublinhado para evitar conflitos com possíveis nomes de campos).
+
+Você pode listar as tabelas que foram definidas para uma determinada conexão de banco de dados:
+
+ ``tables``:inxx 
+ ``
+>>> print db.tables
+['person']
+``:code 
+
+Você também pode listar os campos que foram definidos para uma determinada tabela:
+
+ ``fields``:inxx 
+ ``
+>>> print db.person.fields
+['id', 'name']
+``:code 
+
+
+Você pode consultar o tipo de uma tabela:
+
+ ``Table``:inxx 
+ ``
+>>> print type(db.person)
+<class 'pydal.objects.Table'>
+``:code 
+
+e você pode acessar uma tabela da conexão DAL usando:
+ ``
+>>> print type(db['person'])
+<class 'pydal.objects.Table'>
+``:code 
+
+Da mesma forma, você pode acessar campos de seu nome de várias maneiras equivalentes:
+ ``
+>>> print type(db.person.name)
+<class 'pydal.objects.Field'>
+>>> print type(db.person['name'])
+<class 'pydal.objects.Field'>
+>>> print type(db['person']['name'])
+<class 'pydal.objects.Field'>
+``:code 
+
+Dado um campo, você pode acessar os atributos definidos em sua definição:
+ ``
+>>> print db.person.name.type
+string
+>>> print db.person.name.unique
+False
+>>> print db.person.name.notnull
+False
+>>> print db.person.name.length
+32
+``:code 
+
+incluindo sua tabela pai, tablename e conexão pai:
+ ``
+>>> db.person.name._table == db.person
+True
+>>> db.person.name._tablename == 'person'
+True
+>>> db.person.name._db == db
+True
+``:code 
+
+Um campo também tem métodos. Alguns deles são usados para criar consultas e as veremos mais tarde.
+Um método especial do objeto de campo é ``validate``  e chama os validadores para o campo.
+
+ ``
+print db.person.name.validate('John')
+`` 
+
+que retorna uma tupla ``(value, error)`` . ``error``  é ``None``  se a entrada passar pela validação.
+
+
+
+ [[table_migrations]] 
+###  Migrações
+
+ ``migrations``:inxx 
+
+ ``define_table``  verifica se a tabela correspondente existe ou não. Caso contrário, gera o SQL para criá-lo e executa o SQL. Se a tabela existe, mas difere da que está sendo definida, ela gera o SQL para alterar a tabela e executá-la. Se um campo tiver alterado o tipo mas não o nome, ele tentará converter os dados (se você não quiser isso, precisará redefinir a tabela duas vezes, pela primeira vez, deixando o web2py soltar o campo removendo-o e a segunda vez adicionando o campo recém-definido para que o web2py possa criá-lo.). Se a tabela existir e corresponder à definição atual, ela será deixada sozinha. Em todos os casos, criará o ``db.person``  objeto que representa a tabela.
+
+Nós nos referimos a esse comportamento como uma "migração". O web2py registra todas as migrações e tentativas de migração no arquivo "databases/sql.log".
+
+O primeiro argumento de ``define_table``  é sempre o nome da tabela. Os outros argumentos sem nome são os campos (campo). A função também recebe um argumento de palavra-chave opcional chamado "migrate":
+ ``
+>>> db.define_table('person', Field('name'), migrate='person.table')
+``:code 
+
+O valor da migração é o nome do arquivo (na pasta "databases" do aplicativo), em que o web2py armazena informações de migração interna para essa tabela.
+Esses arquivos são muito importantes e nunca devem ser removidos enquanto as tabelas correspondentes existirem. Nos casos em que uma tabela foi descartada e o arquivo correspondente ainda existe, ela pode ser removida manualmente. Por padrão, a migração é definida como True. Isso faz com que o web2py gere o nome do arquivo a partir de um hash da string de conexão. Se migrate estiver definido como False, a migração não será executada e web2py assumirá que a tabela existe no armazenamento de dados e conterá (pelo menos) os campos listados em ``define_table`` .
+A melhor prática é fornecer um nome explícito para a tabela de migração.
+
+Pode não haver duas tabelas no mesmo aplicativo com o mesmo nome de arquivo de migração.
+
+A classe DAL também recebe um argumento "migrate", que determina o valor padrão da migração para chamadas para ``define_table`` . Por exemplo,
+ ``
+>>> db = DAL('sqlite://storage.sqlite', migrate=False)
+``:code 
+
+irá definir o valor padrão de migrar para False sempre ``db.define_table``  é chamado sem um argumento migrar.
+
+------
+Observe que o web2py migra apenas novas colunas, colunas removidas e alterações no tipo de coluna (exceto no sqlite). O web2py não migra alterações em atributos como mudanças nos valores de ``default`` , ``unique`` , ``notnull`` e ``ondelete`` .
+------
+
+As migrações podem ser desativadas para todas as tabelas de uma só vez:
+
+ ``
+db = DAL(..., migrate_enabled=False)
+`` 
+
+Esse é o comportamento recomendado quando dois aplicativos compartilham o mesmo banco de dados. Apenas um dos dois aplicativos deve realizar migrações, o outro deve desativá-los.
+
+###  Corrigindo migrações quebradas
+ ``fake_migrate``:inxx 
+
+Existem dois problemas comuns com as migrações e há maneiras de recuperá-los.
+
+Um problema é específico com o SQLite. O SQLite não impõe tipos de colunas e não pode descartar colunas. Isso significa que, se você tiver uma coluna do tipo string e removê-la, ela não será realmente removida. Se você adicionar a coluna novamente com um tipo diferente (por exemplo, datetime), você acabará com uma coluna datetime que contenha strings (lixo para propósitos práticos). web2py não se queixa disso porque não sabe o que está no banco de dados, até tentar recuperar registros e falhar.
+
+Se web2py retornar um erro na função gluon.sql.parse ao selecionar registros, esse é o problema: dados corrompidos em uma coluna devido ao problema acima.
+
+A solução consiste em atualizar todos os registros da tabela e atualizar os valores na coluna em questão com Nenhum.
+
+O outro problema é mais genérico, mas típico do MySQL. O MySQL não permite mais de um ALTER TABLE em uma transação. Isso significa que o web2py deve quebrar transações complexas em transações menores (uma ALTER TABLE no momento) e confirmar uma parte no momento. Portanto, é possível que parte de uma transação complexa seja confirmada e uma parte falhe, deixando o web2py em um estado corrompido. Por que parte de uma transação falharia? Como, por exemplo, envolve a alteração de uma tabela e a conversão de uma coluna de string em uma coluna datetime, o web2py tenta converter os dados, mas os dados não podem ser convertidos. O que acontece com o web2py? Ele fica confuso sobre o que exatamente é a estrutura da tabela realmente armazenada no banco de dados.
+
+A solução consiste em permitir migrações falsas:
+ ``
+db.define_table(...., migrate=True, fake_migrate=True)
+``:code 
+
+Isso reconstruirá os metadados web2py sobre a tabela de acordo com a definição da tabela. Tente várias definições de tabela para ver qual delas funciona (aquela antes da migração com falha e a que ocorreu após a migração com falha). Uma vez bem sucedido, remova o ``fake_migrate=True``  parâmetro.
+
+Antes de tentar consertar os problemas de migração, é prudente fazer uma cópia dos arquivos "applications/yourapp/databases/*. Table".
+
+Os problemas de migração também podem ser corrigidos para todas as tabelas de uma só vez:
+
+ ``
+db = DAL(..., fake_migrate_all=True)
+``:code 
+
+Isso também falhará se o modelo descrever tabelas que não existem no banco de dados,
+mas pode ajudar a reduzir o problema.
+
+###  Resumo do controle de migração
+
+A lógica dos vários argumentos de migração está resumida neste pseudo-código:
+ ``
+if DAL.migrate_enabled and table.migrate:
+   if DAL.fake_migrate_all or table.fake_migrate:
+       perform fake migration
+   else:
+       perform migration
+``:code 
+
+###   ``insert`` 
+
+Dada uma tabela, você pode inserir registros
+
+ ``insert``:inxx 
+ ``
+>>> db.person.insert(name="Alex")
+1
+>>> db.person.insert(name="Bob")
+2
+``:code 
+
+Insert retorna o valor "id" exclusivo de cada registro inserido.
+
+Você pode truncar a tabela, ou seja, excluir todos os registros e redefinir o contador do ID.
+
+ ``truncate``:inxx 
+ ``
+>>> db.person.truncate()
+``:code 
+
+Agora, se você inserir um registro novamente, o contador começa novamente em 1 (isso é específico do back-end e não se aplica ao Google NoSQL):
+ ``
+>>> db.person.insert(name="Alex")
+1
+``:code 
+
+Observe que você pode passar parâmetros para ``truncate`` Por exemplo, você pode dizer ao SQLITE para reiniciar o contador de IDs.
+
+ ``
+db.person.truncate('RESTART IDENTITY CASCADE')
+``:code 
+
+O argumento está no SQL bruto e, portanto, específico do mecanismo.
+
+ ``bulk_insert``:inxx 
+O web2py também fornece um método bulk_insert
+ ``
+>>> db.person.bulk_insert([{'name': 'Alex'}, {'name': 'John'}, {'name': 'Tim'}])
+[3, 4, 5]
+``:code 
+
+Ele pega uma lista de dicionários de campos a serem inseridos e executa várias inserções de uma só vez. Retorna os IDs dos registros inseridos. Nos bancos de dados relacionais suportados, não há vantagem em usar essa função, em vez de fazer o loop e executar inserções individuais, mas no NoSQL do Google App Engine, há uma grande vantagem de velocidade.
+
+###   ``commit``  e ``rollback`` 
+
+As operações de inserção, truncamento, exclusão e atualização não são realmente consolidadas até que o web2py emita o comando commit. As operações de criação e eliminação podem ser executadas imediatamente, dependendo do mecanismo do banco de dados. Chamadas para ações da web2py são automaticamente agrupadas em transações. Se você executou comandos através do shell, você é obrigado a confirmar manualmente:
+
+ ``commit``:inxx 
+ ``
+>>> db.commit()
+``:code 
+
+Para verificar isso, vamos inserir um novo registro:
+ ``
+>>> db.person.insert(name="Bob")
+2
+``:code 
+
+e reverter, ou seja, ignorar todas as operações desde o último commit:
+
+ ``rollback``:inxx 
+ ``
+>>> db.rollback()
+``:code 
+
+Se você agora inserir novamente, o contador será novamente definido como 2, pois a inserção anterior foi revertida.
+ ``
+>>> db.person.insert(name="Bob")
+2
+``:code 
+
+O código em modelos, visualizações e controladores é incluído no código web2py que se parece com isso (pseudo código):
+ ``
+try:
+    execute models, controller function and view
+except:
+    rollback all connections
+    log the traceback
+    send a ticket to the visitor
+else:
+    commit all connections
+    save cookies, sessions and return the page
+``:code 
+
+Portanto, em modelos, visualizações e controladores, não há necessidade de chamar ``commit``   ou ``rollback``  explicitamente em web2py, a menos que você precise de um controle mais granular.
+No entanto, nos módulos, você precisará usar ``commit()`` .
+###  SQL bruto
+
+####  Consultas de tempo
+
+Todas as consultas são programadas automaticamente pelo web2py. A variável ``db._timings``  é uma lista de tuplas. Cada tupla contém a consulta SQL bruta conforme passada para o driver do banco de dados e o tempo que levou para executar em segundos. Essa variável pode ser exibida em visualizações usando a barra de ferramentas:
+
+ ``
+{{=response.toolbar()}}
+`` 
+
+####   ``executesql`` 
+
+O DAL permite que você emita explicitamente instruções SQL.
+
+ ``executesql``:inxx 
+ ``
+>>> print db.executesql('SELECT * FROM person;')
+[(1, u'Massimo'), (2, u'Massimo')]
+``:code 
+
+Nesse caso, os valores de retorno não são analisados ou transformados pelo DAL e o formato depende do driver de banco de dados específico. Esse uso com selects normalmente não é necessário, mas é mais comum com índices.
+ ``executesql``  leva quatro argumentos opcionais: ``placeholders`` , ``as_dict`` , ``fields``  e ``colnames`` .
+ ``placeholders``  é um opcional
+seqüência de valores a serem substituídos
+ou, se suportado pelo driver DB, um dicionário com chaves
+correspondência de espaços reservados nomeados no seu SQL.
+
+E se ``as_dict``  está definido como True, o cursor de resultados retornado pelo driver de banco de dados será convertido em uma seqüência de dicionários codificados com os nomes de campo de banco de dados. Resultados retornados com ``as_dict = True``  são os mesmos que os retornados ao aplicar  .as_list () para uma seleção normal. 
+ ``
+[{field1: value1, field2: value2}, {field1: value1b, field2: value2b}]
+``:code 
+
+o ``fields``  argumento é uma lista de objetos DAL Field que correspondem ao
+campos retornados do banco de dados. Os objetos de campo devem fazer parte de um ou
+mais objetos de tabela definidos no objeto DAL. o ``fields``  lista pode
+incluir um ou mais objetos da Tabela DAL além ou em vez de
+incluindo objetos Field, ou pode ser apenas uma única tabela (não em um
+Lista). Nesse caso, os objetos Field serão extraídos do
+tabela (s).
+
+Em vez de especificar o ``fields``  argumento, o ``colnames``  argumento
+pode ser especificado como uma lista de nomes de campos no formato tablename.fieldname.
+Novamente, estes devem representar tabelas e campos definidos no DAL
+objeto.
+
+Também é possível especificar ``fields``  e o associado
+ ``colnames`` . Nesse caso, ``fields``  também pode incluir a expressão DAL
+objetos além dos objetos Field. Para objetos de campo em "campos",
+o associado ``colnames``  ainda deve estar no formato tablename.fieldname.
+Para objetos Expressão em ``fields`` , o associado ``colnames``  posso
+quaisquer rótulos arbitrários.
+
+Observe, os objetos da Tabela DAL referidos por ``fields``  ou ``colnames``  posso
+ser tabelas fictícias e não tem que representar quaisquer tabelas reais no
+base de dados. Além disso, observe que ``fields``  e ``colnames``  deve estar no
+mesma ordem que os campos no cursor de resultados retornados do banco de dados.
+
+
+####   ``_lastsql`` 
+
+Se o SQL foi executado manualmente usando executesql ou foi gerado pelo SQL DAL, você pode sempre encontrar o código SQL em ``db._lastsql`` . Isso é útil para fins de depuração:
+
+ ``_lastdb``:inxx 
+ ``
+>>> rows = db().select(db.person.ALL)
+>>> print db._lastsql
+SELECT person.id, person.name FROM person;
+``:code 
+
+-------
+O web2py nunca gera consultas usando o operador "*". O web2py é sempre explícito ao selecionar campos.
+-------
+
+###   ``drop`` 
+
+Finalmente, você pode descartar tabelas e todos os dados serão perdidos:
+
+ ``drop``:inxx 
+ ``
+>>> db.person.drop()
+``:code 
+
+Nota para o sqlite: o web2py não recriará a tabela removida até que você navegue no sistema de arquivos para o diretório de bancos de dados do seu aplicativo e exclua o arquivo associado à tabela eliminada.
+
+###  Índices
+
+Atualmente, a API do DAL não fornece um comando para criar índices em tabelas, mas isso pode ser feito ``executesql``  comando. Isso ocorre porque a existência de índices pode tornar as migrações complexas e é melhor lidar com elas explicitamente. Os índices podem ser necessários para os campos usados em consultas recorrentes.
+
+Aqui está um exemplo de como [[create an index using SQL in SQLite http://www.sqlite.org/lang_createindex.html]] :
+ ``
+>>> db = DAL('sqlite://storage.sqlite')
+>>> db.define_table('person', Field('name'))
+>>> db.executesql('CREATE INDEX IF NOT EXISTS myidx ON person (name);')
+``:code 
+
+Outros dialetos de banco de dados têm sintaxes muito semelhantes, mas podem não suportar a diretiva "IF NOT EXISTS" opcional.
+
+ [[LegacyDatabases]] 
+###  Bancos de dados legados e tabelas com chaves
+
+O web2py pode se conectar a bancos de dados legados sob algumas condições.
+
+A maneira mais fácil é quando essas condições são atendidas:
+- Cada tabela deve ter um campo inteiro de incremento automático exclusivo chamado "id"
+- Os registros devem ser referenciados exclusivamente usando o campo "id".
+
+Ao acessar uma tabela existente, ou seja, uma tabela não criada pelo web2py no aplicativo atual, sempre ``migrate=False`` .
+
+Se a tabela legada tem um campo inteiro de auto-incremento, mas não é chamado de "id", o web2py ainda pode acessá-lo, mas a definição da tabela deve conter explicitamente como ``Field('...', 'id')``  onde ... é o nome do campo inteiro de incremento automático.
+
+ ``keyed table``:inxx 
+
+Finalmente, se a tabela legada usar uma chave primária que não seja um campo de ID de incremento automático, é possível usar uma "tabela com chave", por exemplo:
+ ``
+db.define_table('account',
+                Field('accnum', 'integer'),
+                Field('acctype'),
+                Field('accdesc'),
+                primarykey=['accnum', 'acctype'],
+                migrate=False)
+``:code 
+
+- ``primarykey``  é uma lista dos nomes de campos que compõem a chave primária.
+- Todos os campos de chave primária têm ``NOT NULL``  definido mesmo se não especificado.
+- Tabelas com chave só podem referenciar outras tabelas com chave.
+- Os campos de referência devem usar o ``reference tablename.fieldname``  formato.
+- O ``update_record``  função não está disponível para linhas de tabelas com chave.
+
+-------
+Atualmente, tabelas com chave são suportadas apenas para DB2, MS-SQL, Ingres e Informix, mas outros mecanismos serão incluídos.
+-------
+
+No momento da escrita, não podemos garantir que o ``primarykey``  O atributo funciona com todas as tabelas legadas existentes e com todos os back-ends do banco de dados suportados.
+Para simplificar, recomendamos, se possível, criar uma exibição de banco de dados que tenha um campo de ID de incremento automático.
+
+
+###  Transação Distribuída
+ ``distributed transactions``:inxx 
+
+------
+No momento de escrever este recurso só é suportado
+pelo PostgreSQL, MySQL e Firebird, já que expõem API para commits de duas fases.
+------
+
+Supondo que você tenha duas (ou mais) conexões com bancos de dados PostgreSQL distintos, por exemplo:
+ ``
+db_a = DAL('postgres://...')
+db_b = DAL('postgres://...')
+``:code 
+
+Em seus modelos ou controladores, você pode cometê-los simultaneamente com:
+ ``
+DAL.distributed_transaction_commit(db_a, db_b)
+``:code 
+
+Em caso de falha, esta função reverte e gera ``Exception`` .
+
+Nos controladores, quando uma ação é retornada, se você tiver duas conexões distintas e não chamar a função acima, o web2py as submete separadamente. Isso significa que existe a possibilidade de um dos commits ser bem-sucedido e um deles falhar. A transação distribuída impede que isso aconteça.
+
+###  Mais sobre uploads
+
+Considere o seguinte modelo:
+ ``
+>>> db.define_table('myfile',
+                    Field('image', 'upload', default='path/'))
+``:code 
+
+No caso de um campo 'upload', o valor padrão pode opcionalmente ser definido para um caminho (um caminho absoluto ou um caminho relativo à pasta do aplicativo atual) e a imagem padrão será definida para uma cópia do arquivo no caminho . Uma nova cópia é feita para cada novo registro que não especifica uma imagem.
+
+Normalmente, uma inserção é manipulada automaticamente por meio de um formulário SQLFORM ou crud (que é um SQLFORM), mas ocasionalmente você já tem o arquivo no sistema de arquivos e deseja carregá-lo programaticamente. Isso pode ser feito desta maneira:
+ ``
+>>> stream = open(filename, 'rb')
+>>> db.myfile.insert(image=db.myfile.image.store(stream, filename))
+``:code 
+
+Também é possível inserir um arquivo de maneira mais simples e ter o armazenamento de chamadas do método insert automaticamente:
+
+ ``
+>>> stream = open(filename, 'rb')
+>>> db.myfile.insert(image=stream)
+``:code 
+
+Nesse caso, o nome do arquivo é obtido do objeto de fluxo, se disponível.
+
+o ``store``  método do objeto de campo de upload leva um fluxo de arquivos e um nome de arquivo. Ele usa o nome do arquivo para determinar a extensão (tipo) do arquivo, cria um novo nome temporário para o arquivo (de acordo com o mecanismo de upload web2py) e carrega o conteúdo do arquivo nesse novo arquivo temporário (na pasta uploads, a menos que especificado de outra forma). Ele retorna o novo nome temp, que é então armazenado no ``image``  campo do ``db.myfile``  mesa.
+
+Observe que, se o arquivo for armazenado em um campo de blob associado, e não no sistema de arquivos, ``store()``  método não irá inserir o arquivo no campo blob (porque ``store()``  é chamado antes da inserção), então o arquivo deve ser explicitamente inserido no campo blob:
+ ``
+>>> db.define_table('myfile',
+                    Field('image', 'upload', uploadfield='image_file'),
+                    Field('image_file', 'blob'))
+>>> stream = open(filename, 'rb')
+>>> db.myfile.insert(image=db.myfile.image.store(stream, filename),
+                     image_file=stream.read())
+``:code 
+
+
+O oposto de ``.store``  é ``.retrieve`` :
+
+ ``
+>>> row = db(db.myfile).select().first()
+>>> (filename, stream) = db.myfile.image.retrieve(row.image)
+>>> import shutil
+>>> shutil.copyfileobj(stream, open(filename, 'wb'))
+`` 
+
+###   ``Query`` , ``Set`` , ``Rows`` 
+
+Vamos considerar novamente a tabela definida (e descartada) anteriormente e inserir três registros:
+ ``
+>>> db.define_table('person', Field('name'))
+>>> db.person.insert(name="Alex")
+1
+>>> db.person.insert(name="Bob")
+2
+>>> db.person.insert(name="Carl")
+3
+``:code 
+
+Você pode armazenar a tabela em uma variável. Por exemplo, com variável ``person`` , você poderia fazer:
+
+ ``Table``:inxx 
+ ``
+>>> person = db.person
+``:code 
+
+Você também pode armazenar um campo em uma variável como ``name`` . Por exemplo, você também pode fazer:
+
+ ``Field``:inxx 
+ ``
+>>> name = person.name
+``:code 
+
+Você pode até criar uma consulta (usando operadores como ==,! =, <,>, <=,> =, Como, pertence) e armazenar a consulta em uma variável ``q``  como em:
+
+ ``Query``:inxx 
+ ``
+>>> q = name == 'Alex'
+``:code 
+
+Quando Você ligar ``db``  com uma consulta, você define um conjunto de registros. Você pode armazená-lo em uma variável ``s``  e escreva:
+
+ ``Set``:inxx 
+ ``
+>>> s = db(q)
+``:code 
+
+Observe que nenhuma consulta de banco de dados foi realizada até o momento. DAL + Query simplesmente define um conjunto de registros neste banco de dados que corresponde à consulta.
+O web2py determina a partir da consulta quais tabelas (ou tabelas) estão envolvidas e, de fato, não há necessidade de especificar isso.
+
+###   ``select`` 
+
+Dado um conjunto, ``s`` , você pode buscar os registros com o comando ``select`` :
+
+ ``Rows``:inxx   ``select``:inxx 
+ ``
+>>> rows = s.select()
+``:code 
+
+ ``Row``:inxx 
+Retorna um objeto iterável de classe ``pydal.objects.Rows``  cujos elementos são objetos Row. ``pydal.objects.Row``  objetos atuam como dicionários, mas seus elementos também podem ser acessados como atributos, como ``gluon.storage.Storage`` Os primeiros diferem dos últimos porque seus valores são somente leitura.
+
+O objeto Rows permite efetuar o loop sobre o resultado da seleção e imprimir os valores de campo selecionados para cada linha:
+ ``
+>>> for row in rows:
+        print row.id, row.name
+1 Alex
+``:code 
+
+Você pode fazer todos os passos em uma declaração:
+ ``
+>>> for row in db(db.person.name == 'Alex').select():
+        print row.name
+Alex
+``:code 
+
+ ``ALL``:inxx 
+
+O comando select pode receber argumentos. Todos os argumentos sem nome são interpretados como os nomes dos campos que você deseja buscar. Por exemplo, você pode ser explícito ao buscar o campo "id" e o campo "name":
+ ``
+>>> for row in db().select(db.person.id, db.person.name):
+        print row.name
+Alex
+Bob
+Carl
+``:code 
+
+O atributo table ALL permite especificar todos os campos:
+ ``
+>>> for row in db().select(db.person.ALL):
+        print row.name
+Alex
+Bob
+Carl
+``:code 
+
+Observe que não há nenhuma string de consulta passada para o db. web2py entende que se você quiser todos os campos da pessoa da tabela sem informações adicionais, então você quer todos os registros da pessoa da tabela.
+
+Uma sintaxe alternativa equivalente é a seguinte:
+ ``
+>>> for row in db(db.person.id > 0).select():
+        print row.name
+Alex
+Bob
+Carl
+``:code 
+
+e web2py entende que se você pedir todos os registros da pessoa da tabela (id> 0) sem informações adicionais, então você quer todos os campos da pessoa da tabela.
+
+Dada uma linha
+
+ ``
+row = rows[0]
+`` 
+
+você pode extrair seus valores usando várias expressões equivalentes:
+
+ ``
+>>> row.name
+Alex
+>>> row['name']
+Alex
+>>> row('person.name')
+Alex
+`` 
+
+A última sintaxe é particularmente útil ao selecionar a expressão en em vez de uma coluna. Nós vamos mostrar isso mais tarde.
+
+Você também pode fazer
+ ``
+rows.compact = False
+`` 
+desativar a notação
+ ``
+row[i].name
+`` 
+e habilitar, em vez disso, a notação menos compacta:
+ ``
+row[i].person.name
+`` 
+Sim, isso é incomum e raramente é necessário.
+
+Objetos de linha também possuem dois métodos importantes:
+ ``
+row.delete_record()
+`` 
+e
+ ``
+row.update_record(name="new value")
+`` 
+
+####  Usando uma seleção baseada em iterador para menor uso de memória
+
+Os "iteradores" do Python são um tipo de "avaliação lenta". Eles 'alimentam' dados um passo no tempo; loops tradicionais de python criam o conjunto de dados na memória antes de fazer o loop.
+
+O uso tradicional de select é:
+ ``
+for row in db(db.table.id > 0).select():
+    rtn = row
+``:code 
+
+mas para um grande número de linhas, o uso de uma alternativa baseada em iterador reduz drasticamente o uso de memória:
+ ``
+for row in db(db.table.id > 0).iterselect():
+    rtn = row
+``:code 
+Testes mostram que isso também é 10% mais rápido, mesmo em máquinas com grande RAM.
+
+
+####  Renderização de linhas usando representar
+Você pode desejar reescrever as linhas retornadas por select para aproveitar as informações de formatação contidas na configuração representa dos campos.
+
+ ``
+rows = db(query).select()  
+repr_row = rows.render(0)
+``:code 
+
+Se você não especificar um índice, você receberá um gerador para iterar todas as linhas:
+
+ ``
+for row in rows.render():
+    print row.myfield
+``:code 
+
+Também pode ser aplicado a fatias:
+
+ ``
+for row in rows[0:10].render():
+    print row.myfield
+``:code 
+
+Se você quiser transformar apenas campos selecionados através do atributo "representar", você pode listá-los no argumento "campos":
+
+ ``
+repr_row = row.render(0, fields=[db.mytable.myfield])
+``:code 
+
+Note que ele retorna uma cópia transformada do Row original, portanto, não há update_record (que você não deseja de qualquer maneira) ou delete_record.
+
+
+####  Atalhos
+ ``DAL shortcuts``:inxx 
+
+O DAL suporta vários atalhos de simplificação de código.
+Em particular:
+ ``
+myrecord = db.mytable[id]
+``:code 
+
+retorna o registro com o dado ``id``  se existir. Se o ``id``  não existe, retorna ``None`` . A declaração acima é equivalente a
+
+ ``
+myrecord = db(db.mytable.id == id).select().first()
+``:code 
+
+
+Você pode excluir registros por id:
+
+ ``
+del db.mytable[id]
+``:code 
+
+e isso é equivalente a
+
+ ``
+db(db.mytable.id == id).delete()
+``:code 
+
+e elimina o registro com o dado ``id`` , se existir.
+
+Nota: Esta sintaxe de atalho de exclusão não funciona atualmente se [[versioning #versioning]]  está ativado
+
+Você pode inserir registros:
+
+ ``
+db.mytable[0] = dict(myfield='somevalue')
+``:code 
+
+É equivalente a
+
+ ``
+db.mytable.insert(myfield='somevalue')
+``:code 
+
+e cria um novo registro com valores de campo especificados pelo dicionário no lado direito.
+
+Você pode atualizar registros:
+
+ ``
+db.mytable[id] = dict(myfield='somevalue')
+``:code 
+
+que é equivalente a
+
+ ``
+db(db.mytable.id == id).update(myfield='somevalue')
+``:code 
+
+e atualiza um registro existente com valores de campo especificados pelo dicionário no lado direito.
+
+####  Buscando um ``Row`` 
+
+Ainda outra sintaxe conveniente é a seguinte:
+
+ ``
+record = db.mytable(id)
+record = db.mytable(db.mytable.id == id)
+record = db.mytable(id, myfield='somevalue')
+``:code 
+
+Aparentemente semelhante a ``db.mytable[id]``  a sintaxe acima é mais flexível e segura. Primeiro de tudo, verifica se ``id``  é um int (ou ``str(id)``  é um int) e retorna ``None``  se não (nunca levanta uma exceção). Ele também permite especificar várias condições que o registro deve atender. Se eles não forem atendidos, ele também retorna ``None`` .
+
+####  Recursivo ``select`` s
+ ``recursive selects``:inxx 
+
+Considere a pessoa da tabela anterior e uma nova tabela "coisa" referenciando uma "pessoa":
+ ``
+>>> db.define_table('thing',
+                    Field('name'),
+                    Field('owner_id', 'reference person'))
+``:code 
+
+e uma simples seleção desta tabela:
+ ``
+>>> things = db(db.thing).select()
+``:code 
+
+que é equivalente a
+
+ ``
+>>> things = db(db.thing._id > 0).select()
+``:code 
+
+Onde ``._id``  é uma referência à chave primária da tabela. Normalmente ``db.thing._id``  é o mesmo que ``db.thing.id``  e vamos supor que na maior parte deste livro. ``_id``:inxx 
+
+
+Para cada linha de coisas, é possível buscar não apenas campos da tabela selecionada (coisa), mas também de tabelas vinculadas (recursivamente):
+ ``
+>>> for thing in things: print thing.name, thing.owner_id.name
+``:code 
+
+Aqui ``thing.owner_id.name``  requer uma seleção de banco de dados para cada coisa e, portanto, é ineficiente. Sugerimos usar joins sempre que possível ao invés de selects recursivos, mas isso é conveniente e prático ao acessar registros individuais.
+
+Você também pode fazer isso de trás para frente, selecionando as coisas referenciadas por uma pessoa:
+
+ ``
+person =  db.person(id)
+for thing in person.thing.select(orderby=db.thing.name):
+    print person.name, 'owns', thing.name
+``:code 
+
+Nesta última expressão ``person.thing``  é um atalho para
+
+ ``
+db(db.thing.owner_id == person.id)
+``:code 
+
+isto é, o conjunto de ``thing`` s referenciada pela corrente ``person`` . Essa sintaxe é quebrada se a tabela de referência tiver várias referências à tabela referenciada. Nesse caso, é preciso ser mais explícito e usar uma consulta completa.
+
+ [[sqltable]] 
+####  Serializando ``Rows``  em vistas
+
+Dada a seguinte ação contendo uma consulta
+ ``SQLTABLE``:inxx 
+
+ ``
+def index():
+    return dict(rows = db(query).select())
+``:code 
+
+O resultado de uma seleção pode ser exibido em uma visualização com a seguinte sintaxe:
+ ``
+{{extend 'layout.html'}}
+<h1>Records</h1>
+{{=rows}}
+``:code 
+
+Qual é equivalente a:
+ ``
+{{extend 'layout.html'}}
+<h1>Records</h1>
+{{=SQLTABLE(rows)}}
+``:code 
+
+ ``SQLTABLE``  converte as linhas em uma tabela HTML com um cabeçalho contendo os nomes das colunas e uma linha por registro. As linhas são marcadas como alternando classe "par" e class "ímpar". Sob o capô, as linhas primeiro são convertidas em um objeto SQLTABLE (não confundir com a tabela) e depois serializadas. Os valores extraídos do banco de dados também são formatados pelos validadores associados ao campo e, em seguida, escaparam.
+
+No entanto, é possível e, às vezes, conveniente chamar o SQLTABLE explicitamente.
+
+O construtor SQLTABLE usa os seguintes argumentos opcionais:
+
+- ``linkto``  função lambda ou uma ação a ser usada para vincular campos de referência (padrão para Nenhum).
+Se você atribuir a ela uma string com o nome de uma ação, ela gerará um link para essa função passando-a, como args, o nome da tabela e o id de cada registro (nesta ordem). Exemplo:
+ ``
+linkto = 'pointed_function' # generates something like <a href="pointed_function/table_name/id_value">
+``:code 
+Se você quiser que um link diferente seja gerado, você pode especificar um lambda, que receberá como parâmetros, o valor do id, o tipo do objeto (por exemplo, a tabela) e o nome do objeto. Por exemplo, se você deseja receber os argumentos na ordem reversa:
+ ``
+linkto = lambda id, type, name: URL(f='pointed_function', args=[id, name])
+``:code 
+- ``upload``  a URL ou a ação de download para permitir o download de arquivos enviados (padrão para Nenhum)
+- ``headers``  um dicionário mapeando nomes de campos para seus rótulos para serem usados como cabeçalhos (padrão para ``{}`` ). Também pode ser uma instrução. Atualmente suportamos ``headers='fieldname:capitalize'`` .
+- ``truncate``  o número de caracteres para truncar valores longos na tabela (o padrão é 16)
+- ``columns``  a lista de nomes de campos a serem mostrados como colunas (no formato tablename.fieldname).
+   Aqueles que não estão listados não são exibidos (padrão para todos).
+- ``**attributes``  atributos auxiliares genéricos a serem passados para o objeto TABLE mais externo.
+
+Aqui está um exemplo:
+ ``
+{{extend 'layout.html'}}
+<h1>Records</h1>
+{{=SQLTABLE(rows,
+            headers='fieldname:capitalize',
+            truncate=100,
+            upload=URL('download'))
+}}
+``:code 
+
+ ``SQLFORM.grid``:inxx   ``SQLFORM.smartgrid``:inxx 
+
+------
+ ``SQLTABLE``  é útil, mas há momentos em que alguém precisa de mais. ``SQLFORM.grid``  é uma extensão do SQLTABLE que cria uma tabela com recursos de pesquisa e paginação, bem como a capacidade de abrir registros detalhados, criar, editar e excluir registros. ``SQLFORM.smartgrid``  é uma generalização adicional que permite todas as opções acima, mas também cria botões para acessar registros de referência.
+------
+
+Aqui está um exemplo de uso de ``SQLFORM.grid`` :
+
+ ``
+def index():
+    return dict(grid=SQLFORM.grid(query))
+``:code 
+
+e a visão correspondente:
+
+ ``
+{{extend 'layout.html'}}
+{{=grid}}
+`` 
+
+Para trabalhar com várias linhas, ``SQLFORM.grid``  e ``SQLFORM.smartgrid``  são preferidos a ``SQLTABLE``  porque eles são mais poderosos. Por favor, veja o capítulo 7.
+
+ [[orderby]]  [[limite
+####   ``orderby`` , ``groupby`` , ``limitby`` , ``distinct`` , ``having`` , ``orderby_on_limitby`` , ``left`` , ``cache`` 
+
+o ``select``  comando leva um número de argumentos opcionais.
+
+#####  ordenar por
+Você pode buscar os registros classificados por nome:
+
+ ``orderby``:inxx   ``groupby``:inxx   ``having``:inxx 
+ ``
+>>> for row in db().select(
+        db.person.ALL, orderby=db.person.name):
+        print row.name
+Alex
+Bob
+Carl
+``:code 
+
+Você pode buscar os registros classificados por nome na ordem inversa (observe o til):
+ ``
+>>> for row in db().select(db.person.ALL, orderby=~db.person.name):
+        print row.name
+Carl
+Bob
+Alex
+``:code 
+
+Você pode ter os registros buscados aparecem em ordem aleatória:
+ ``
+>>> for row in db().select(db.person.ALL, orderby='<random>'):
+        print row.name
+Carl
+Alex
+Bob
+``:code 
+
+-----
+O uso de ``orderby='<random>'``  não é suportado no Google NoSQL. No entanto, nessa situação e da mesma forma em muitos outros, onde os built-ins são insuficientes, as importações podem ser usadas:
+ ``
+import random
+rows=db(...).select().sort(lambda row: random.random())
+``:code 
+-----
+
+Você pode classificar os registros de acordo com vários campos, concatenando-os com um "|":
+ ``
+>>> for row in db().select(db.person.ALL, orderby=db.person.name|db.person.id):
+        print row.name
+Carl
+Bob
+Alex
+``:code 
+
+#####  groupby, tendo
+Usando ``groupby``  junto com ``orderby`` , você pode agrupar registros com o mesmo valor para o campo especificado (isso é específico de back-end e não está no Google NoSQL):
+ ``
+>>> for row in db().select(db.person.ALL,
+                           orderby=db.person.name,
+                           groupby=db.person.name):
+        print row.name
+Alex
+Bob
+Carl
+``:code 
+
+Você pode usar ``having``  em conjunção com ``groupby``  para agrupar condicionalmente ``having``  a condição é agrupada.
+
+ ``
+>>> print db(query1).select(db.person.ALL, groupby=db.person.name, having=query2)
+`` 
+
+Observe que query1 filtra os registros a serem exibidos, query2 filtra os registros a serem agrupados.
+
+#####  distinto
+ ``distinct``:inxx 
+
+Com o argumento ``distinct=True`` , você pode especificar que deseja apenas selecionar registros distintos. Isso tem o mesmo efeito que o agrupamento usando todos os campos especificados, exceto que não requer classificação. Ao usar distintas, é importante não selecionar TODOS os campos e, em particular, não selecionar o campo "id". Caso contrário, todos os registros sempre serão distintos.
+
+Aqui está um exemplo:
+ ``
+>>> for row in db().select(db.person.name, distinct=True):
+        print row.name
+Alex
+Bob
+Carl
+``:code 
+
+Notar que ``distinct``  também pode ser uma expressão por exemplo:
+ ``
+>>> for row in db().select(db.person.name, distinct=db.person.name):
+        print row.name
+Alex
+Bob
+Carl
+``:code 
+#####  limite
+Com limitby = (min, max), você pode selecionar um subconjunto de registros de offset = min para, mas não incluindo offset = max (neste caso, os dois primeiros começando em zero):
+
+ ``limitby``:inxx 
+ ``
+>>> for row in db().select(db.person.ALL, limitby=(0, 2)):
+        print row.name
+Alex
+Bob
+``:code 
+
+#####  orderby_on_limitby
+ ``orderby_on_limitby``:inxx 
+Observe que o padrão DAL é implicitamente adicionar um orderby ao usar um limitby.
+Isso garante que a mesma consulta retorne os mesmos resultados a cada vez, importante para a paginação.
+Mas isso pode causar problemas de desempenho.
+usar ``orderby_on_limitby = False``  para mudar isso (o padrão é True).
+
+#####  esquerda
+Discutido abaixo na seção sobre junções
+
+#####  cache, em cache
+Um exemplo de uso que fornece seleções muito mais rápidas é:
+ ``rows = db(query).select(cache=(cache.ram, 3600), cacheable=True)``:code 
+Veja a discussão sobre 'caching selects', abaixo, para entender quais são os trade-offs.
+
+
+####  Operadores lógicos
+
+As consultas podem ser combinadas usando o operador binário AND " ``&`` ":
+
+ ``and``:inxx   ``or``:inxx   ``not``:inxx 
+ ``
+>>> rows = db((db.person.name=='Alex') & (db.person.id>3)).select()
+>>> for row in rows: print row.id, row.name
+4 Alex
+``:code 
+
+e o operador OR binário " ``|`` ":
+ ``
+>>> rows = db((db.person.name == 'Alex') | (db.person.id > 3)).select()
+>>> for row in rows:
+        print row.id, row.name
+1 Alex
+``:code 
+
+Você pode negar uma consulta (ou subconsulta) com o " ``!=`` "operador binário:
+ ``
+>>> rows = db((db.person.name != 'Alex') | (db.person.id > 3)).select()
+>>> for row in rows:
+        print row.id, row.name
+2 Bob
+3 Carl
+``:code 
+
+ou por negação explícita com o " ``~`` "operador unário:
+ ``
+>>> rows = db(~(db.person.name == 'Alex') | (db.person.id > 3)).select()
+>>> for row in rows:
+        print row.id, row.name
+2 Bob
+3 Carl
+``:code 
+
+------
+Devido às restrições do Python na sobrecarga " ``and`` "e" ``or`` "operadores, estes não podem ser usados na formação de consultas. Os operadores binários" ``&`` "e" ``|`` "deve ser usado em vez disso. Observe que esses operadores (ao contrário de" ``and`` "e" ``or`` ") têm precedência mais alta que os operadores de comparação, então os parênteses" extras "nos exemplos acima são obrigatórios. Da mesma forma, o operador unário" ``~`` "tem maior precedência que os operadores de comparação, ``~`` Comparações negativas também devem ser entre parênteses.
+------
+
+Também é possível construir consultas usando operadores lógicos no local:
+
+ ``
+>>> query = db.person.name != 'Alex'
+>>> query &= db.person.id > 3
+>>> query |= db.person.name == 'John'
+`` 
+
+####   ``count`` , ``isempty`` , ``delete`` , ``update`` 
+
+Você pode contar registros em um conjunto:
+
+ ``count``:inxx   ``isempty``:inxx 
+
+ ``
+>>> print db(db.person.id > 0).count()
+3
+``:code 
+
+Notar que ``count``  leva um opcional ``distinct``  argumento que padrão para False, e funciona muito bem como o mesmo argumento para ``select`` . ``count``  tem também um ``cache``  argumento que funciona muito parecido com o argumento equivalente do ``select``  método.
+
+Às vezes você pode precisar verificar se uma tabela está vazia. Uma maneira mais eficiente do que a contagem é usar o ``isempty``  método:
+
+ ``
+>>> print db(db.person.id > 0).isempty()
+False
+``:code 
+
+ou equivalente:
+
+ ``
+>>> print db(db.person).isempty()
+False
+``:code 
+
+Você pode excluir registros em um conjunto:
+
+ ``delete``:inxx 
+ ``
+>>> db(db.person.id > 3).delete()
+``:code 
+
+E você pode atualizar todos os registros em um conjunto passando argumentos nomeados correspondentes aos campos que precisam ser atualizados:
+
+ ``update``:inxx 
+ ``
+>>> db(db.person.id > 3).update(name='Ken')
+``:code 
+
+o ``update``  método retorna o número de registros que foram atualizados (0 se nenhum registro foi atualizado).
+
+####  Expressões
+
+O valor atribuído a uma instrução de atualização pode ser uma expressão. Por exemplo, considere este modelo
+ ``
+>>> db.define_table('person',
+                    Field('name'),
+                    Field('visits', 'integer', default=0))
+
+>>> db(db.person.name == 'Massimo').update(visits = db.person.visits + 1)
+``:code 
+
+Os valores usados nas consultas também podem ser expressões
+ ``
+>>> db.define_table('person',
+                    Field('name'),
+                    Field('visits', 'integer', default=0),
+                    Field('clicks', 'integer', default=0))
+
+>>> db(db.person.visits == db.person.clicks + 1).delete()
+``:code 
+
+####   ``case``   ``case``:inxx 
+
+Uma expressão pode conter uma cláusula case por exemplo:
+
+ ``
+>>> db.define_table('person', Field('name'))
+>>> condition = db.person.name.startswith('M')
+>>> yes_or_no = condition.case('Yes', 'No')
+>>> for row in db().select(db.person.name, yes_or_no):
+...     print row.person.name,  row(yes_or_no)
+Max Yes
+John No
+``:code 
+
+####   ``update_record`` 
+
+ ``update_record``:inxx 
+O web2py também permite atualizar um único registro que já está na memória usando ``update_record`` 
+
+ ``
+>>> row = db(db.person.id == 2).select().first()
+>>> row.update_record(name='Curt')
+``:code 
+
+ ``update_record``  não deve ser confundido com
+
+ ``
+>>> row.update(name='Curt')
+``:code 
+
+porque para uma única linha, o método ``update``  atualiza o objeto de linha, mas não o registro do banco de dados, como no caso de ``update_record`` .
+
+Também é possível alterar os atributos de uma linha (um de cada vez) e, em seguida, chamar ``update_record()``  sem argumentos para salvar as alterações:
+
+ ``
+>>> row = db(db.person.id > 2).select().first()
+>>> row.name = 'Curt'
+>>> row.update_record() # saves above change
+``:code 
+
+-------
+Note, você deve evitar usar ``row.update_record()``  sem argumentos quando o ``row``  objeto contém campos que têm um ``update``  atributo (por exemplo, ``Field('modified_on', update=request.now)`` ). Chamando ``row.update_record()``  irá reter '' all '' dos valores existentes no ``row``  objeto, portanto, quaisquer campos com ``update``  os atributos não terão efeito nesse caso. Esteja particularmente atento a isso com tabelas que incluem ``auth.signature`` .
+-------
+
+o ``update_record``  método está disponível somente se a tabela ``id``  campo está incluído no select, e ``cacheable``  não está definido para ``True`` .
+
+####  Inserindo e atualizando de um dicionário
+
+Um problema comum consiste na necessidade de inserir ou atualizar registros em uma tabela na qual o nome da tabela, o campo a ser atualizado e o valor do campo são todos armazenados em variáveis. Por exemplo: ``tablename`` , ``fieldname`` e ``value`` .
+
+A inserção pode ser feita usando a seguinte sintaxe:
+
+ ``
+db[tablename].insert(**{fieldname:value})
+``:code 
+
+A atualização do registro com o ID fornecido pode ser feita com: ``_id``:inxx 
+
+ ``
+db(db[tablename]._id == id).update(**{fieldname:value})
+``:code 
+
+Observe que usamos ``table._id``  ao invés de ``table.id`` . Desta forma, a consulta funciona mesmo para tabelas com um campo do tipo "id" que tenha um nome diferente de "id".
+
+
+####   ``first``  e ``last`` 
+ ``first``:inxx   ``last``:inxx 
+
+Dado um objeto Rows contendo registros:
+
+ ``
+>>> rows = db(query).select()
+>>> first_row = rows.first()
+>>> last_row = rows.last()
+``:code 
+
+são equivalentes a
+ ``
+>>> first_row = rows[0] if len(rows)>0 else None
+>>> last_row = rows[-1] if len(rows)>0 else None
+``:code 
+
+Aviso prévio, ``first()``  e ``last()``  permitem obter obviamente o primeiro e último registro presente em sua consulta, mas isso não significa que esses registros serão os primeiros ou últimos registros inseridos. Caso você queira o primeiro ou último registro inserido em uma determinada tabela, não esqueça de usar ``orderby=db.table_name.id`` . Se você esquecer, receberá apenas o primeiro e o último registros retornados por sua consulta, que geralmente estão em uma ordem aleatória determinada pelo otimizador de consulta de back-end.
+
+####   ``as_dict``  e ``as_list`` 
+ ``as_list``:inxx   ``as_dict``:inxx 
+
+Um objeto Row pode ser serializado em um dicionário comum usando o ``as_dict()``  método e um objeto Rows pode ser serializado em uma lista de dicionários usando o ``as_list()``  método. aqui estão alguns exemplos:
+ ``
+>>> rows = db(query).select()
+>>> rows_list = rows.as_list()
+>>> first_row_dict = rows.first().as_dict()
+``:code 
+
+Esses métodos são convenientes para passar linhas para exibições genéricas e/ou para armazenar linhas em sessões (como os próprios objetos Rows não podem ser serializados, pois contêm uma referência a uma conexão de banco de dados aberta):
+ ``
+>>> rows = db(query).select()
+>>> session.rows = rows  # not allowed!
+>>> session.rows = rows.as_list()  # allowed!
+``:code 
+
+####  Combinando Linhas
+
+Objetos de linha podem ser combinados no nível do Python. Aqui nós assumimos:
+
+ ``
+>>> print rows1
+person.name
+Max
+Tim
+>>> print rows2
+person.name
+John
+Tim
+`` 
+
+
+Você pode fazer a união dos registros em dois conjuntos de linhas:
+
+ ``
+>>> rows3 = rows1 & rows2
+>>> print rows3
+name
+Max
+Tim
+John
+Tim
+``:code 
+
+Você pode fazer uma união dos registros removendo duplicatas:
+
+ ``
+>>> rows3 = rows1 | rows2
+>>> print rows3
+name
+Max
+Tim
+John
+``:code 
+
+####   ``find`` , ``exclude`` , ``sort`` 
+ ``find``:inxx   ``exclude``:inxx   ``sort``:inxx 
+
+Algumas vezes você precisa realizar duas seleções e uma contém um subconjunto de uma seleção anterior. Neste caso, é inútil acessar o banco de dados novamente. o ``find`` , ``exclude``  e ``sort``  objetos permitem que você manipule um objeto Rows e gere outro sem acessar o banco de dados. Mais especificamente:
+- ``find``  retorna um novo conjunto de linhas filtradas por uma condição e deixa o original inalterado.
+- ``exclude``  retorna um novo conjunto de linhas filtradas por uma condição e as remove das linhas originais.
+- ``sort``  retorna um novo conjunto de linhas classificadas por uma condição e deixa o original inalterado.
+
+Todos esses métodos usam um único argumento, uma função que atua em cada linha individual.
+
+Aqui está um exemplo de uso:
+ ``
+>>> db.define_table('person', Field('name'))
+>>> db.person.insert(name='John')
+>>> db.person.insert(name='Max')
+>>> db.person.insert(name='Alex')
+>>> rows = db(db.person).select()
+>>> for row in rows.find(lambda row: row.name[0]=='M'):
+        print row.name
+Max
+>>> print len(rows)
+3
+>>> for row in rows.exclude(lambda row: row.name[0]=='M'):
+        print row.name
+Max
+>>> print len(rows)
+2
+>>> for row in rows.sort(lambda row: row.name):
+        print row.name
+Alex
+John
+``:code 
+
+Eles podem ser combinados:
+ ``
+>>> rows = db(db.person).select()
+>>> rows = rows.find(lambda row: 'x' in row.name
+                     ).sort(lambda row: row.name)
+>>> for row in rows:
+        print row.name
+Alex
+Max
+``:code 
+
+Ordenar leva um argumento opcional ``reverse=True``  com o significado óbvio.
+
+o ``find``  O método tem um argumento limitby opcional com a mesma sintaxe e funcionalidade que a opção Set ``method`` .
+
+
+
+###  Outros métodos
+
+####   ``update_or_insert`` 
+ ``update_or_insert``:inxx 
+
+Algumas vezes você precisa executar uma inserção somente se não houver registro com os mesmos valores que os inseridos.
+Isso pode ser feito com
+
+ ``
+db.define_table('person',
+                Field('name'),
+                Field('birthplace'))
+
+db.person.update_or_insert(name='John', birthplace='Chicago')
+``:code 
+
+O registro será inserido somente se não houver outro usuário chamado John nascido em Chicago.
+
+Você pode especificar quais valores usar como chave para determinar se o registro existe. Por exemplo:
+ ``
+db.person.update_or_insert(db.person.name == 'John',
+                           name='John',
+                           birthplace='Chicago')
+``:code 
+
+e se houver John, sua cidade natal será atualizada, caso contrário, um novo registro será criado.
+
+Os critérios de seleção no exemplo acima são um único campo.
+Também pode ser uma consulta, como
+ ``
+db.person.update_or_insert((db.person.name == 'John') & (db.person.birthplace == 'Chicago'),
+                           name='John',
+                           birthplace='Chicago',
+                           pet='Rover')
+``:code 
+
+####   ``validate_and_insert`` , ``validate_and_update`` 
+
+ ``validate_and_insert``:inxx   ``validate_and_update``:inxx 
+
+A função
+
+ ``
+ret = db.mytable.validate_and_insert(field='value')
+``:code 
+
+funciona muito bem
+
+ ``
+id = db.mytable.insert(field='value')
+``:code 
+
+exceto que ele chama os validadores para os campos antes de executar a inserção e libera se a validação não passar. Se a validação não passar, os erros podem ser encontrados em ``ret.errors`` . ``ret.errors``  contém um mapeamento de valor-chave em que cada chave é o nome do campo cuja validação falhou, e o valor da chave é o resultado do erro de validação (muito parecido com ``form.errors`` ). Se passar, o id do novo registro está em ``ret.id`` . Lembre-se de que normalmente a validação é feita pela lógica de processamento de formulários, portanto essa função raramente é necessária.
+
+similarmente
+
+ ``
+ret = db(query).validate_and_update(field='value')
+``:code 
+
+funciona muito bem o mesmo que
+
+ ``
+num = db(query).update(field='value')
+``:code 
+
+exceto que ele chama os validadores para os campos antes de executar a atualização. Observe que isso só funciona se a consulta envolver uma única tabela. O número de registros atualizados pode ser encontrado em ``ret.updated``  e os erros serão ``ret.errors`` .
+
+####   ``smart_query``  (experimental)
+
+Há momentos em que você precisa analisar uma consulta usando linguagem natural, como
+
+ ``
+name contain m and age greater than 18
+`` 
+
+O DAL fornece um método para analisar esse tipo de consulta:
+
+ ``
+search = 'name contain m and age greater than 18'
+rows = db.smart_query([db.person], search).select()
+`` 
+
+O primeiro argumento deve ser uma lista de tabelas ou campos que devem ser permitidos na pesquisa. Isso levanta ``RuntimeError``  se a cadeia de pesquisa for inválida. Essa funcionalidade pode ser usada para construir interfaces RESTful (consulte o capítulo 10) e é usada internamente pelo ``SQLFORM.grid``  e ``SQLFORM.smartgrid`` .
+
+Na cadeia de pesquisa smartquery, um campo pode ser identificado apenas pelo nome do campo e ou por nome de tabela.nome do campo. Seqüências de caracteres podem ser delimitadas por aspas duplas se contiverem espaços.
+
+###  Campos computados
+ ``compute``:inxx 
+
+Campos DAL podem ter um ``compute``  atributo. Essa deve ser uma função (ou lambda) que usa um objeto Row e retorna um valor para o campo. Quando um novo registro é modificado, incluindo inserções e atualizações, se um valor para o campo não for fornecido, o web2py tentará calcular a partir dos outros valores de campo usando o ``compute``  função. Aqui está um exemplo:
+ ``
+>>> db.define_table('item',
+                    Field('unit_price', 'double'),
+                    Field('quantity', 'integer'),
+                    Field('total_price',
+                          compute=lambda r: r['unit_price'] * r['quantity']))
+
+>>> r = db.item.insert(unit_price=1.99, quantity=5)
+>>> print r.total_price
+9.95
+``:code 
+
+Observe que o valor calculado é armazenado no banco de dados e não é calculado na recuperação, como no caso dos campos virtuais, descritos posteriormente. Duas aplicações típicas de campos computados são:
+- em aplicativos wiki, para armazenar o texto do wiki de entrada processado como HTML, para evitar o reprocessamento em todas as solicitações
+- para pesquisar, calcular valores normalizados para um campo, a ser usado para pesquisa.
+
+Os campos calculados são avaliados na ordem em que são definidos na definição da tabela. Um campo computado pode referir-se a campos computados previamente definidos (novo após v 2.5.1)
+
+###  Campos virtuais
+
+ ``virtual fields``:inxx 
+
+Os campos virtuais também são campos computados (como na subseção anterior), mas diferem daqueles porque são "virtuais" no sentido de que não são armazenados no banco de dados e são computados a cada vez que os registros são extraídos do banco de dados. Eles podem ser usados para simplificar o código do usuário sem usar armazenamento adicional, mas não podem ser usados para pesquisa.
+
+####  Novos campos virtuais de estilo
+
+O web2py fornece uma maneira nova e mais fácil de definir campos virtuais e campos virtuais preguiçosos. Esta seção está marcada como experimental porque as APIs ainda podem mudar um pouco do que é descrito aqui.
+
+Aqui vamos considerar o mesmo exemplo da subseção anterior. Em particular, consideramos o seguinte modelo:
+
+ ``
+>>> db.define_table('item',
+                    Field('unit_price', 'double'),
+                    Field('quantity', 'integer'))
+``:code 
+
+Pode-se definir um ``total_price``  campo virtual como
+
+ ``
+>>> db.item.total_price = \
+        Field.Virtual('total_price',
+                      lambda row: row.item.unit_price * row.item.quantity)
+``:code 
+
+isto é, simplesmente definindo um novo campo ``total_price``  ser um ``Field.Virtual`` . O único argumento do construtor é uma função que recebe uma linha e retorna os valores computados.
+
+Um campo virtual definido como o acima é calculado automaticamente para todos os registros quando os registros são selecionados:
+
+ ``
+>>> for row in db(db.item).select():
+        print row.total_price
+`` 
+
+Também é possível definir campos de método que são calculados sob demanda, quando chamados.
+Por exemplo:
+
+ ``
+>>> db.item.discounted_total = \
+        Field.Method(lambda row, discount=0.0:
+                     row.item.unit_price * row.item.quantity * (1.0 - discount / 100))
+``:code 
+
+Nesse caso ``row.discounted_total``  não é um valor, mas uma função. A função usa os mesmos argumentos que a função passada para o ``Method``  construtor, exceto para ``row``  que é implícito (pense nisso como ``self``  para objetos de linhas).
+
+O campo preguiçoso no exemplo acima permite calcular o preço total de cada ``item`` :
+
+ ``
+>>> for row in db(db.item).select(): print row.discounted_total()
+`` 
+
+E também permite passar um opcional ``discount``  percentagem (15%):
+
+ ``
+>>> for row in db(db.item).select():
+        print row.discounted_total(15)
+`` 
+
+Os campos Virtual e Method também podem ser definidos no local quando uma tabela é definida:
+
+ ``
+>>> db.define_table('item',
+                    Field('unit_price', 'double'),
+                    Field('quantity', 'integer'),
+                    Field.Virtual('total_price',
+                                  lambda row: ...),
+                    Field.Method('discounted_total',
+                                 lambda row, discount=0.0: ...))
+``:code 
+
+
+------
+Tenha em mente que os campos virtuais não possuem os mesmos atributos que os outros campos (padrão, legível, requer, etc). Em versões mais antigas do web2py elas não aparecem na lista de ``db.table.fields``  e eles requerem uma abordagem especial para exibir em SQLFORM.grid e SQLFORM.smartgrid. Veja a discussão sobre grades e campos virtuais no capítulo Formulários.
+------
+
+####  Campos virtuais de estilo antigo
+
+Para definir um ou mais campos virtuais, você também pode definir uma classe de contêiner, instanciá-la e vinculá-la a uma tabela ou a uma seleção. Por exemplo, considere a seguinte tabela:
+
+ ``
+>>> db.define_table('item',
+                    Field('unit_price', 'double'),
+                    Field('quantity', 'integer'))
+``:code 
+
+Pode-se definir um ``total_price``  campo virtual como
+ ``
+>>> class MyVirtualFields(object):
+        def total_price(self):
+            return self.item.unit_price*self.item.quantity
+>>> db.item.virtualfields.append(MyVirtualFields())
+``:code 
+
+Observe que cada método da classe que usa um único argumento (self) é um novo campo virtual. ``self``  refere-se a cada linha do select. Valores de campo são referenciados por caminho completo como em ``self.item.unit_price`` . A tabela está vinculada aos campos virtuais, anexando uma instância da classe à tabela. ``virtualfields``  atributo.
+
+Campos virtuais também podem acessar campos recursivos como em
+ ``
+>>> db.define_table('item',
+                    Field('unit_price', 'double'))
+
+>>> db.define_table('order_item',
+                    Field('item', 'reference item'),
+                    Field('quantity', 'integer'))
+>>> class MyVirtualFields(object):
+        def total_price(self):
+            return self.order_item.item.unit_price * self.order_item.quantity
+
+>>> db.order_item.virtualfields.append(MyVirtualFields())
+``:code 
+
+Observe o acesso recursivo ao campo ``self.order_item.item.unit_price``  Onde ``self``  é o registro de loop.
+
+Eles também podem agir sobre o resultado de um JOIN
+ ``
+>>> db.define_table('item',
+                    Field('unit_price', 'double'))
+
+>>> db.define_table('order_item',
+                    Field('item', 'reference item'),
+                    Field('quantity', 'integer'))
+
+>>> rows = db(db.order_item.item == db.item.id).select()
+>>> class MyVirtualFields(object):
+        def total_price(self):
+            return self.item.unit_price * self.order_item.quantity
+
+>>> rows.setvirtualfields(order_item=MyVirtualFields())
+
+>>> for row in rows:
+        print row.order_item.total_price
+``:code 
+
+Observe como neste caso a sintaxe é diferente. O campo virtual acessa os dois ``self.item.unit_price``  e ``self.order_item.quantity``  que pertencem à seleção de junção. O campo virtual é anexado às linhas da tabela usando o ``setvirtualfields``  método do objeto de linhas. Esse método usa um número arbitrário de argumentos nomeados e pode ser usado para definir vários campos virtuais, definidos em várias classes, e anexá-los a várias tabelas:
+ ``
+>>> class MyVirtualFields1(object):
+        def discounted_unit_price(self):
+            return self.item.unit_price * 0.90
+>>> class MyVirtualFields2(object):
+        def total_price(self):
+            return self.item.unit_price * self.order_item.quantity
+
+        def discounted_total_price(self):
+            return self.item.discounted_unit_price * self.order_item.quantity
+
+>>> rows.setvirtualfields(item=MyVirtualFields1(),
+                          order_item=MyVirtualFields2())
+
+>>> for row in rows:
+        print row.order_item.discounted_total_price
+``:code 
+
+Campos virtuais podem ser "preguiçosos"; tudo o que eles precisam fazer é retornar uma função e acessá-la chamando a função:
+ ``
+>>> db.define_table('item',
+                    Field('unit_price', 'double'),
+                    Field('quantity', 'integer'))
+
+>>> class MyVirtualFields(object):
+        def lazy_total_price(self):
+            def lazy(self=self):
+                return self.item.unit_price * self.item.quantity
+            return lazy
+
+>>> db.item.virtualfields.append(MyVirtualFields())
+
+>>> for item in db(db.item).select():
+        print item.lazy_total_price()
+``:code 
+
+ou mais curto usando uma função lambda:
+ ``
+>>> class MyVirtualFields(object):
+        def lazy_total_price(self):
+            return lambda self=self: self.item.unit_price * self.item.quantity
+``:code 
+
+###  Um para muitos relação
+ ``one to many``:inxx 
+
+Para ilustrar como implementar uma ou várias relações com o web2py DAL, defina outra tabela "coisa" que se refere à tabela "pessoa" que redefinimos aqui:
+ ``
+>>> db.define_table('person',
+                    Field('name'),
+                    format='%(name)s')
+
+>>> db.define_table('thing',
+                    Field('name'),
+                    Field('owner_id', 'reference person'),
+                    format='%(name)s')
+``:code 
+
+A tabela "coisa" tem dois campos, o nome da coisa e o dono da coisa. O campo "owner_id" identifica um campo de referência. Um tipo de referência pode ser especificado de duas formas equivalentes:
+
+ ``
+Field('owner_id', 'reference person')
+Field('owner_id', db.person)
+``:code 
+
+Este último é sempre convertido para o primeiro. Eles são equivalentes, exceto no caso de tabelas preguiçosas, referências próprias ou outros tipos de referências cíclicas, em que a notação anterior é a única notação permitida.
+
+Quando um tipo de campo é outra tabela, pretende-se que o campo faça referência à outra tabela pelo seu id. Na verdade, você pode imprimir o valor real do tipo e obter:
+ ``
+>>> print db.thing.owner_id.type
+reference person
+``:code 
+
+Agora, insira três coisas, duas de propriedade de Alex e uma de Bob:
+ ``
+>>> db.thing.insert(name='Boat', owner_id=1)
+1
+>>> db.thing.insert(name='Chair', owner_id=1)
+2
+>>> db.thing.insert(name='Shoes', owner_id=2)
+3
+``:code 
+
+Você pode selecionar como você fez para qualquer outra tabela:
+ ``
+>>> for row in db(db.thing.owner_id == 1).select():
+        print row.name
+Boat
+Chair
+``:code 
+
+Porque uma coisa tem uma referência a uma pessoa, uma pessoa pode ter muitas coisas, então um registro de pessoa de mesa agora adquire uma nova coisa de atributo, que é um conjunto, que define as coisas dessa pessoa. Isso permite fazer o loop de todas as pessoas e buscar suas coisas facilmente:
+
+ ``referencing``:inxx 
+ ``
+>>> for person in db().select(db.person.ALL):
+        print person.name
+        for thing in person.thing.select():
+            print '    ', thing.name
+Alex
+     Boat
+     Chair
+Bob
+     Shoes
+Carl
+``:code 
+
+####  Junta interna
+
+Outra maneira de obter um resultado semelhante é usando uma junção, especificamente um INNER JOIN. O web2py realiza associações automaticamente e de forma transparente quando a consulta vincula duas ou mais tabelas, como no exemplo a seguir:
+
+ ``Rows``:inxx   ``inner join``:inxx   ``join``:inxx 
+ ``
+>>> rows = db(db.person.id == db.thing.owner_id).select()
+
+>>> for row in rows:
+        print row.person.name, 'has', row.thing.name
+
+Alex has Boat
+Alex has Chair
+Bob has Shoes
+``:code 
+
+Observe que o web2py fez uma junção, então as linhas agora contêm dois registros, um de cada tabela, vinculados. Como os dois registros podem ter campos com nomes conflitantes, é necessário especificar a tabela ao extrair um valor de campo de uma linha. Isso significa que, enquanto antes, você poderia fazer:
+ ``
+row.name
+``:code 
+
+e era óbvio se este era o nome de uma pessoa ou coisa, no resultado de uma junção você tem que ser mais explícito e dizer:
+ ``
+row.person.name
+``:code 
+
+ou:
+ ``
+row.thing.name
+``:code 
+
+Existe uma sintaxe alternativa para INNER JOINS:
+ ``
+>>> rows = db(db.person).select(join=db.thing.on(db.person.id == db.thing.owner_id))
+
+>>> for row in rows:
+    print row.person.name, 'has', row.thing.name
+
+Alex has Boat
+Alex has Chair
+Bob has Shoes
+``:code 
+
+Enquanto a saída é a mesma, o SQL gerado nos dois casos pode ser diferente. A última sintaxe remove possíveis ambigüidades quando a mesma tabela é unida duas vezes e com aliases:
+
+ ``
+>>> db.define_table('thing',
+                    Field('name'),
+                    Field('owner_id1', 'reference person'),
+                    Field('owner_id2', 'reference person'))
+
+>>> rows = \
+        db(db.person).select(join=[db.person.with_alias('owner_id1').on(db.person.id == db.thing.owner_id1),
+                                   db.person.with_alias('owner_id2').on(db.person.id == db.thing.owner_id2)])
+`` 
+
+O valor de ``join``  pode ser uma lista de ``db.table.on(...)``  juntar-se.
+
+####  Junção externa esquerda
+
+Observe que Carl não apareceu na lista acima porque ele não tem nada. Se você pretende selecionar pessoas (se elas têm ou não coisas) e suas coisas (se tiverem alguma), então você precisa executar um LEFT OUTER JOIN. Isso é feito usando o argumento "left" do comando select. Aqui está um exemplo:
+
+ ``Rows``:inxx   ``left outer join``:inxx   ``outer join``:inxx 
+ ``
+>>> rows = db().select(db.person.ALL, db.thing.ALL,
+                       left=db.thing.on(db.person.id == db.thing.owner_id))
+
+>>> for row in rows:
+        print row.person.name, 'has', row.thing.name
+
+Alex has Boat
+Alex has Chair
+Bob has Shoes
+Carl has None
+``:code 
+
+Onde:
+ ``
+left = db.thing.on(...)
+``:code 
+
+faz a consulta de junção esquerda. Aqui o argumento de ``db.thing.on``  é a condição necessária para a junção (a mesma usada acima para a junção interna). No caso de uma junção esquerda, é necessário ser explícito sobre quais campos selecionar.
+
+Várias junções esquerdas podem ser combinadas passando uma lista ou tupla de ``db.mytable.on(...)``  ao ``left``  atributo.
+
+####  Agrupando e contando
+
+Ao fazer junções, às vezes você deseja agrupar linhas de acordo com determinados critérios e contá-las. Por exemplo, conte o número de coisas pertencentes a cada pessoa. web2py permite isso também. Primeiro, você precisa de um operador de contagem. Em segundo lugar, você quer se juntar à mesa de pessoa com a tabela de coisas pelo proprietário. Terceiro, você deseja selecionar todas as linhas (pessoa + coisa), agrupá-las por pessoa e contá-las durante o agrupamento:
+
+ ``grouping``:inxx 
+ ``
+>>> count = db.person.id.count()
+>>> for row in db(db.person.id == db.thing.owner_id
+                  ).select(db.person.name, count, groupby=db.person.name):
+        print row.person.name, row[count]
+
+Alex 2
+Bob 1
+``:code 
+
+Observe o ``count``  operador (que é embutido) é usado como um campo. O único problema aqui é como recuperar as informações. Cada linha contém claramente uma pessoa e a contagem, mas a contagem não é um campo de uma pessoa nem é uma tabela. Então, para onde vai? Ele vai para o objeto de armazenamento que representa o registro com uma chave igual à expressão de consulta em si. O método de contagem do objeto Field tem um opcional ``distinct``  argumento. Quando definido para ``True``  especifica que apenas valores distintos do campo em questão devem ser contados.
+
+###  Muitos para muitos
+ ``many-to-many``:inxx 
+Nos exemplos anteriores, permitimos que uma coisa tivesse um dono, mas uma pessoa poderia ter muitas coisas. E se o barco pertencesse a Alex e Curt? Isso requer uma relação muitos-para-muitos e é realizado por meio de uma tabela intermediária que vincula uma pessoa a uma coisa por meio de uma relação de propriedade.
+
+Aqui está como fazer isso:
+ ``
+>>> db.define_table('person',
+                    Field('name'))
+
+>>> db.define_table('thing',
+                    Field('name'))
+
+>>> db.define_table('ownership',
+                    Field('person', 'reference person'),
+                    Field('thing', 'reference thing'))
+``:code 
+
+a relação de propriedade existente agora pode ser reescrita como:
+ ``
+>>> db.ownership.insert(person=1, thing=1)  # Alex owns Boat
+>>> db.ownership.insert(person=1, thing=2)  # Alex owns Chair
+>>> db.ownership.insert(person=2, thing=3)  # Bob owns Shoes
+
+``:code 
+
+Agora você pode adicionar a nova relação que Curt co-possui Boat:
+ ``
+>>> db.ownership.insert(person=3, thing=1)  # Curt owns Boat too
+
+``:code 
+
+Como agora você tem uma relação de três vias entre as tabelas, pode ser conveniente definir um novo conjunto no qual executar operações:
+ ``
+>>> persons_and_things = db((db.person.id == db.ownership.person) &
+                            (db.thing.id == db.ownership.thing))
+``:code 
+
+Agora é fácil selecionar todas as pessoas e suas coisas do novo conjunto:
+ ``
+>>> for row in persons_and_things.select():
+        print row.person.name, row.thing.name
+
+Alex Boat
+Alex Chair
+Bob Shoes
+Curt Boat
+``:code 
+
+Da mesma forma, você pode procurar por todas as coisas de propriedade de Alex:
+ ``
+>>> for row in persons_and_things(db.person.name == 'Alex').select():
+        print row.thing.name
+
+Boat
+Chair
+``:code 
+
+e todos os proprietários do barco:
+ ``
+>>> for row in persons_and_things(db.thing.name == 'Boat').select():
+        print row.person.name
+
+Alex
+Curt
+``:code 
+
+Uma alternativa mais leve para Many 2 Many relations is tagging. A marcação é discutida no contexto da ``IS_IN_DB``  validador. A marcação funciona até em back-ends de banco de dados que não suportam JOINs, como o NoSQL do Google App Engine.
+
+###   ``list:<type>``  e ``contains`` 
+ ``list:string``:inxx 
+ ``list:integer``:inxx 
+ ``list:reference``:inxx 
+ ``contains``:inxx 
+ ``multiple``:inxx 
+ ``tags``:inxx 
+
+O web2py fornece os seguintes tipos de campos especiais:
+
+ ``
+list:string
+list:integer
+list:reference <table>
+``:code 
+
+Eles podem conter listas de strings, de inteiros e de referências respectivamente.
+
+No NoSQL do Google App Engine ``list:string``  está mapeado ``StringListProperty`` , os outros dois são mapeados em ``ListProperty(int)`` . Em bancos de dados relacionais, eles são mapeados em campos de texto que contêm a lista de itens separados por ``|`` . Por exemplo ``[1, 2, 3]``  está mapeado ``|1|2|3|`` .
+
+Para listas de strings, os itens são escapados para que qualquer ``|``  no item é substituído por um ``||`` . De qualquer forma, esta é uma representação interna e é transparente para o usuário.
+
+Você pode usar ``list:string`` , por exemplo, da seguinte maneira:
+
+ ``
+>>> db.define_table('product',
+                    Field('name'),
+                    Field('colors', 'list:string'))
+
+>>> db.product.colors.requires=IS_IN_SET(('red', 'blue', 'green'))
+
+>>> db.product.insert(name='Toy Car', colors=['red', 'green'])
+
+>>> products = db(db.product.colors.contains('red')).select()
+
+>>> for item in products:
+        print item.name, item.colors
+
+Toy Car ['red', 'green']
+``:code 
+
+ ``list:integer``  funciona da mesma maneira, mas os itens devem ser inteiros.
+
+Como de costume, os requisitos são aplicados no nível dos formulários, não no nível de ``insert`` .
+
+------
+Para ``list:<type>``  coloca o ``contains(value)``  O operador mapeia para uma consulta não trivial que verifica se há listas contendo ``value`` . o ``contains``  operador também trabalha para regular ``string``  e ``text``  campos e mapeia em um ``LIKE '%value%'`` .
+------
+
+o ``list:reference``  e a ``contains(value)``  operador são particularmente úteis para desnormalizar relações muitos-para-muitos. Aqui está um exemplo:
+
+ ``
+>>> db.define_table('tag',
+                    Field('name'),
+                    format='%(name)s')
+
+>>> db.define_table('product',
+                    Field('name'),
+                    Field('tags', 'list:reference tag'))
+
+>>> a = db.tag.insert(name='red')
+
+>>> b = db.tag.insert(name='green')
+
+>>> c = db.tag.insert(name='blue')
+
+>>> db.product.insert(name='Toy Car', tags=[a, b, c])
+
+>>> products = db(db.product.tags.contains(b)).select()
+
+>>> for item in products:
+        print item.name, item.tags
+
+Toy Car [1, 2, 3]
+
+>>> for item in products:
+        print item.name, db.product.tags.represent(item.tags)
+
+Toy Car red, green, blue
+``:code 
+
+Observe que um ``list:reference tag``  campo obter uma restrição padrão
+
+ ``
+requires = IS_IN_DB(db, 'tag.id', db.tag._format, multiple=True)
+``:code 
+
+que produz um ``SELECT/OPTION``  várias drop-box em formulários.
+
+Observe também que esse campo recebe um padrão ``represent``  atributo que representa a lista de referências como uma lista separada por vírgula de referências formatadas. Isso é usado em formulários de leitura e ``SQLTABLE`` s.
+
+-----
+Enquanto ``list:reference``  tem um validador padrão e uma representação padrão, ``list:integer``  e ``list:string``  não. Então, esses dois precisam de um ``IS_IN_SET``  ou um ``IS_IN_DB``  validador se você quiser usá-los em formulários.
+-----
+
+
+###  Outros operadores
+
+O web2py possui outros operadores que fornecem uma API para acessar operadores SQL equivalentes.
+Vamos definir outra tabela "log" para armazenar eventos de segurança, seu event_time e severity, onde a gravidade é um número inteiro.
+
+ ``date``:inxx   ``datetime``:inxx   ``time``:inxx 
+ ``
+>>> db.define_table('log', Field('event'),
+                           Field('event_time', 'datetime'),
+                           Field('severity', 'integer'))
+``:code 
+
+Como antes, insira alguns eventos, uma "varredura de porta", uma "injeção xss" e um "login não autorizado".
+Para o exemplo, você pode registrar eventos com o mesmo event_time, mas com gravidades diferentes (1, 2 e 3, respectivamente).
+ ``
+>>> import datetime
+>>> now = datetime.datetime.now()
+>>> print db.log.insert(
+        event='port scan', event_time=now, severity=1)
+1
+>>> print db.log.insert(
+        event='xss injection', event_time=now, severity=2)
+2
+>>> print db.log.insert(
+        event='unauthorized login', event_time=now, severity=3)
+3
+``:code 
+
+####   ``like`` , ``ilike`` , ``regexp`` , ``startswith`` , ``endswith`` , ``contains`` , ``upper`` , ``lower`` 
+
+ ``like``:inxx   ``ilike``:inxx   ``startswith``:inxx   ``endswith``:inxx   ``regexp``:inxx 
+ ``contains``:inxx   ``upper``:inxx   ``lower``:inxx 
+
+Os campos têm um operador semelhante que você pode usar para corresponder strings:
+
+ ``
+>>> for row in db(db.log.event.like('port%')).select():
+        print row.event
+port scan
+``:code 
+
+Aqui "port%" indica uma string começando com "port". O caractere de sinal de porcentagem, "%", é um caractere curinga que significa "qualquer seqüência de caracteres".
+
+O operador like mapeia para a palavra LIKE em ANSI-SQL. O LIKE faz distinção entre maiúsculas e minúsculas na maioria dos bancos de dados e depende do agrupamento do próprio banco de dados. o ``like``  método é, portanto, sensível a maiúsculas e minúsculas, mas pode ser feito caso insensível com
+
+ ``
+db.mytable.myfield.like('value', case_sensitive=False)
+``:code 
+
+
+O web2py também fornece alguns atalhos:
+
+ ``
+db.mytable.myfield.startswith('value')
+db.mytable.myfield.endswith('value')
+db.mytable.myfield.contains('value')
+``:code 
+
+que são aproximadamente equivalentes, respectivamente, a
+
+ ``
+db.mytable.myfield.like('value%')
+db.mytable.myfield.like('%value')
+db.mytable.myfield.like('%value%')
+``:code 
+
+Notar que ``contains``  tem um significado especial para ``list:<type>``  campos e foi discutido em uma seção anterior.
+
+o ``contains``  método também pode ser passado uma lista de valores e um argumento booleano opcional ``all``  para procurar registros que contenham todos os valores:
+
+ ``
+db.mytable.myfield.contains(['value1', 'value2'], all=True)
+`` 
+ou qualquer valor da lista
+ ``
+db.mytable.myfield.contains(['value1', 'value2'], all=False)
+`` 
+
+Existe também um ``regexp``  método que funciona como o ``like``  método, mas permite a sintaxe da expressão regular para a expressão de pesquisa. É suportado apenas pelo PostgreSQL, MySQL, Oracle e SQLite (com diferentes graus de suporte).
+
+o ``upper``  e ``lower``  Os métodos permitem que você converta o valor do campo para maiúscula ou minúscula, e você também pode combiná-los com o operador similar:
+
+ ``upper``:inxx   ``lower``:inxx 
+ ``
+>>> for row in db(db.log.event.upper().like('PORT%')).select():
+        print row.event
+
+port scan
+``:code 
+
+####   ``year`` , ``month`` , ``day`` , ``hour`` , ``minutes`` , ``seconds`` 
+ ``hour``:inxx   ``minutes``:inxx   ``seconds``:inxx   ``day``:inxx   ``month``:inxx   ``year``:inxx 
+
+Os campos date e datetime possuem métodos dia, mês e ano. Os campos datetime e time possuem métodos de hora, minutos e segundos. Aqui está um exemplo:
+
+ ``
+>>> for row in db(db.log.event_time.year() == 2013).select():
+        print row.event
+
+port scan
+xss injection
+unauthorized login
+``:code 
+
+####   ``belongs`` 
+
+O operador SQL IN é realizado através do método belongs, que retorna true quando o valor do campo pertence ao conjunto especificado (lista ou tuplas):
+
+ ``belongs``:inxx 
+ ``
+>>> for row in db(db.log.severity.belongs((1, 2))).select():
+        print row.event
+
+port scan
+xss injection
+``:code 
+
+O DAL também permite uma seleção aninhada como o argumento do operador pertence. A única ressalva é que a seleção aninhada tem que ser um ``_select`` não é um ``select`` , e apenas um campo deve ser selecionado explicitamente, aquele que define o conjunto.
+
+ ``nested select``:inxx 
+ ``
+>>> bad_days = db(db.log.severity == 3)._select(db.log.event_time)
+
+>>> for row in db(db.log.event_time.belongs(bad_days)).select():
+        print row.event
+
+port scan
+xss injection
+unauthorized login
+``:code 
+
+Nos casos em que uma seleção aninhada é necessária e o campo de pesquisa é uma referência, também podemos usar uma consulta como argumento. Por exemplo:
+
+ ``
+db.define_table('person', Field('name'))
+db.define_table('thing',
+                Field('name'),
+                Field('owner_id', 'reference thing'))
+
+db(db.thing.owner_id.belongs(db.person.name == 'Jonathan')).select()
+``:code 
+
+Neste caso, é óbvio que o próximo select só precisa do campo referenciado pelo ``db.thing.owner_id``  campo por isso não precisamos do mais verboso ``_select``  notação.
+
+ ``nested_select``:inxx 
+
+Uma seleção aninhada também pode ser usada como valor de inserção/atualização, mas neste caso a sintaxe é diferente:
+
+ ``
+lazy = db(db.person.name == 'Jonathan').nested_select(db.person.id)
+
+db(db.thing.id == 1).update(owner_id = lazy)
+``:code 
+
+Nesse caso ``lazy``  é uma expressão aninhada que calcula o ``id``  da pessoa "Jonathan". As duas linhas resultam em uma única consulta SQL.
+
+####   ``sum`` , ``avg`` , ``min`` , ``max``  e ``len`` 
+
+ ``sum``:inxx   ``avg``:inxx   ``min``:inxx   ``max``:inxx 
+Anteriormente, você usou o operador de contagem para contar registros. Da mesma forma, você pode usar o operador sum para adicionar (somar) os valores de um campo específico de um grupo de registros. Como no caso de count, o resultado de uma soma é recuperado por meio do objeto da loja:
+ ``
+>>> sum = db.log.severity.sum()
+>>> print db().select(sum).first()[sum]
+6
+``:code 
+
+Você também pode usar ``avg`` , ``min`` e ``max``  para o valor médio, mínimo e máximo, respectivamente, para os registros selecionados. Por exemplo:
+
+ ``
+>>> max = db.log.severity.max()
+>>> print db().select(max).first()[max]
+3
+``:code 
+
+ ``.len()``  calcula o comprimento de uma string, texto ou campos booleanos.
+
+Expressões podem ser combinadas para formar expressões mais complexas. Por exemplo, aqui estamos computando a soma do comprimento de todas as seqüências de severidade nos registros, aumentada de um:
+
+ ``
+>>> sum = (db.log.severity.len() + 1).sum()
+>>> print db().select(sum).first()[sum]
+``:code 
+
+####  Substrings
+
+Pode-se construir uma expressão para se referir a uma substring. Por exemplo, podemos agrupar coisas cujo nome começa com os mesmos três caracteres e selecionar apenas um de cada grupo:
+
+ ``
+db(db.thing).select(distinct = db.thing.name[:3])
+``:code 
+
+
+####  Valores padrão com ``coalesce``  e ``coalesce_zero`` 
+
+Há momentos em que você precisa extrair um valor do banco de dados, mas também precisa de um valor padrão se o valor de um registro estiver definido como NULL. No SQL existe uma palavra-chave ``COALESCE`` , por esta. web2py tem um equivalente ``coalesce``  método:
+
+ ``
+>>> db.define_table('sysuser', Field('username'), Field('fullname'))
+>>> db.sysuser.insert(username='max', fullname='Max Power')
+>>> db.sysuser.insert(username='tim', fullname=None)
+print db(db.sysuser).select(db.sysuser.fullname.coalesce(db.sysuser.username))
+"COALESCE(sysuser.fullname, sysuser.username)"
+Max Power
+tim
+`` 
+
+Outras vezes, você precisa calcular uma expressão matemática, mas alguns campos têm um valor definido como Nenhum, enquanto deveria ser zero.
+ ``coalesce_zero``  vem para o resgate, por padrão Nenhum a zero na consulta:
+
+ ``
+>>> db.define_table('sysuser', Field('username'), Field('points'))
+>>> db.sysuser.insert(username='max', points=10)
+>>> db.sysuser.insert(username='tim', points=None)
+>>> print db(db.sysuser).select(db.sysuser.points.coalesce_zero().sum())
+"SUM(COALESCE(sysuser.points,0))"
+10
+`` 
+
+###  Gerando SQL Bruto
+ ``raw SQL``:inxx 
+
+Às vezes você precisa gerar o SQL, mas não executá-lo. Isso é fácil de fazer com o web2py, já que todo comando que executa o IO do banco de dados possui um comando equivalente que não o faz, e simplesmente retorna o SQL que teria sido executado. Esses comandos têm os mesmos nomes e sintaxe que os funcionais, mas eles começam com um sublinhado:
+
+Aqui está ``_insert``   ``_insert``:inxx 
+ ``
+>>> print db.person._insert(name='Alex')
+INSERT INTO person(name) VALUES ('Alex');
+``:code 
+
+Aqui está ``_count``   ``_count``:inxx 
+ ``
+>>> print db(db.person.name == 'Alex')._count()
+SELECT count(*) FROM person WHERE person.name='Alex';
+``:code 
+
+Aqui está ``_select``   ``_select``:inxx 
+ ``
+>>> print db(db.person.name == 'Alex')._select()
+SELECT person.id, person.name FROM person WHERE person.name='Alex';
+``:code 
+
+Aqui está ``_delete``   ``_delete``:inxx 
+ ``
+>>> print db(db.person.name == 'Alex')._delete()
+DELETE FROM person WHERE person.name='Alex';
+``:code 
+
+E finalmente, aqui está ``_update``   ``_update``:inxx 
+ ``
+>>> print db(db.person.name == 'Alex')._update()
+UPDATE person SET  WHERE person.name='Alex';
+``:code 
+
+-----
+Além disso, você sempre pode usar ``db._lastsql``  para retornar o mais recente
+Código SQL, se foi executado manualmente usando executesql ou era SQL
+gerado pelo DAL.
+-----
+
+###  Exportando e importando dados
+ ``export``:inxx   ``import``:inxx 
+
+####  CSV (uma tabela de cada vez)
+
+Quando um objeto Rows é convertido em uma string, ele é automaticamente
+serializado em CSV:
+
+ ``csv``:inxx 
+ ``
+>>> rows = db(db.person.id == db.thing.owner_id).select()
+>>> print rows
+
+person.id, person.name, thing.id, thing.name, thing.owner_id
+1, Alex, 1, Boat, 1
+1, Alex, 2, Chair, 1
+2, Bob, 3, Shoes, 2
+``:code 
+
+Você pode serializar uma única tabela em CSV e armazená-la em um arquivo "test.csv":
+ ``
+>>> open('test.csv', 'wb').write(str(db(db.person.id).select()))
+``:code 
+
+Isso é equivalente a
+
+ ``
+>>> rows = db(db.person.id).select()
+>>> rows.export_to_csv_file(open('test.csv', 'wb'))
+``:code 
+
+Você pode ler o arquivo CSV de volta com:
+ ``
+>>> db.person.import_from_csv_file(open('test.csv', 'r'))
+``:code 
+
+Ao importar, o web2py procura os nomes dos campos no cabeçalho CSV. Neste exemplo, ele encontra duas colunas: "person.id" e "person.name". Ele ignora a "pessoa". prefixo, e ignora os campos "id". Em seguida, todos os registros são anexados e atribuídos a novos IDs. Ambas as operações podem ser executadas através da interface web appadmin.
+
+####  CSV (todas as tabelas de uma só vez)
+
+No web2py, você pode fazer backup/restaurar um banco de dados inteiro com dois comandos:
+
+Exportar:
+ ``
+>>> db.export_to_csv_file(open('somefile.csv', 'wb'))
+``:code 
+
+Importar:
+ ``
+>>> db.import_from_csv_file(open('somefile.csv', 'rb'))
+``:code 
+
+Esse mecanismo pode ser usado mesmo se o banco de dados de importação for de um tipo diferente do banco de dados de exportação. Os dados são armazenados em "somefile.csv" como um arquivo CSV, onde cada tabela começa com uma linha que indica o nome da tabela e outra linha com os nomes dos campos:
+ ``
+TABLE tablename
+field1, field2, field3, ...
+``:code 
+
+Duas tabelas são separadas ``\r\n\r\n`` . O arquivo termina com a linha
+ ``
+END
+``:code 
+
+O arquivo não inclui arquivos enviados, se não estiverem armazenados no banco de dados. Em qualquer caso, é fácil fechar a pasta "uploads" separadamente.
+
+Ao importar, os novos registros serão anexados ao banco de dados, se não estiverem vazios. Em geral, os novos registros importados não terão o mesmo id de registro que os registros originais (salvos), mas o web2py restaurará as referências para que elas não sejam quebradas, mesmo que os valores do ID possam ser alterados.
+
+Se uma tabela contiver um campo chamado
+"uuid", este campo será usado para identificar duplicatas. Além disso, se um
+registro importado tem o mesmo "uuid" de um registro existente, o
+registro anterior será atualizado.
+
+####  Sincronização de CSV e banco de dados remoto
+
+Considere o seguinte modelo:
+ ``
+db = DAL('sqlite:memory:')
+db.define_table('person',
+                Field('name'),
+                format='%(name)s')
+db.define_table('thing',
+                Field('owner_id', 'reference person'),
+                Field('name'),
+                format='%(name)s')
+
+if not db(db.person).count():
+    id = db.person.insert(name="Massimo")
+    db.thing.insert(owner_id=id, name="Chair")
+``:code 
+
+Cada registro é identificado por um ID e referenciado por esse ID. Se vocês
+ter duas cópias do banco de dados usado por instalações web2py distintas,
+o ID é exclusivo apenas em cada banco de dados e não nos bancos de dados.
+Este é um problema ao mesclar registros de bancos de dados diferentes.
+
+Para tornar um registro exclusivamente identificável em bancos de dados, eles
+devo:
+- tem um id único (UUID),
+- tem um event_time (para descobrir qual é mais recente se várias cópias),
+- faça referência ao UUID em vez do id.
+
+Isto pode ser conseguido sem modificar o web2py. Aqui está o que fazer:
+
+Altere o modelo acima para:
+
+ ``
+db.define_table('person',
+                Field('uuid', length=64, default=lambda:str(uuid.uuid4())),
+                Field('modified_on', 'datetime', default=request.now),
+                Field('name'),
+                format='%(name)s')
+
+db.define_table('thing',
+                Field('uuid', length=64, default=lambda:str(uuid.uuid4())),
+                Field('modified_on', 'datetime', default=request.now),
+                Field('owner_id', length=64),
+                Field('name'),
+                format='%(name)s')
+
+db.thing.owner_id.requires = IS_IN_DB(db, 'person.uuid', '%(name)s')
+
+if not db(db.person.id).count():
+    id = uuid.uuid4()
+    db.person.insert(name="Massimo", uuid=id)
+    db.thing.insert(owner_id=id, name="Chair")
+``:code 
+
+-------
+Observe que nas definições da tabela acima, o valor padrão para os dois ``uuid``  fields é definido como uma função lambda, que retorna um UUID (convertido em uma string). A função lambda é chamada uma vez para cada registro inserido, garantindo que cada registro obtenha um UUID exclusivo, mesmo que vários registros sejam inseridos em uma única transação.
+-------
+
+Crie uma ação do controlador para exportar o banco de dados:
+
+ ``
+def export():
+    s = StringIO.StringIO()
+    db.export_to_csv_file(s)
+    response.headers['Content-Type'] = 'text/csv'
+    return s.getvalue()
+``:code 
+
+Crie uma ação do controlador para importar uma cópia salva do outro banco de dados e dos registros de sincronização:
+
+ ``
+def import_and_sync():
+    form = FORM(INPUT(_type='file', _name='data'), INPUT(_type='submit'))
+    if form.process().accepted:
+        db.import_from_csv_file(form.vars.data.file, unique=False)
+        # for every table
+        for table in db.tables:
+            # for every uuid, delete all but the latest
+            items = db(db[table]).select(db[table].id,
+                                         db[table].uuid,
+                                         orderby=db[table].modified_on,
+                                         groupby=db[table].uuid)
+            for item in items:
+                db((db[table].uuid==item.uuid) &
+                   (db[table].id!=item.id)).delete()
+    return dict(form=form)
+``:code 
+
+Opcionalmente, você deve criar um índice manualmente para tornar a pesquisa mais rápida.
+
+
+ ``XML-RPC``:inxx 
+Como alternativa, você pode usar o XML-RPC para exportar/importar o arquivo.
+
+Se os registros fizerem referência a arquivos enviados, você também precisará exportar/importar o conteúdo da pasta de uploads. Observe que os arquivos nele já estão rotulados por UUIDs, portanto, você não precisa se preocupar com conflitos de nomenclatura e referências.
+
+####  HTML e XML (uma tabela de cada vez)
+
+ ``Rows objects``:inxx 
+Objetos de linhas também têm um ``xml``  método (como helpers) que serializa para XML/HTML:
+
+ ``HTML``:inxx 
+
+ ``
+>>> rows = db(db.person.id > 0).select()
+>>> print rows.xml()
+<table>
+  <thead>
+    <tr>
+      <th>person.id</th>
+      <th>person.name</th>
+      <th>thing.id</th>
+      <th>thing.name</th>
+      <th>thing.owner_id</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="even">
+      <td>1</td>
+      <td>Alex</td>
+      <td>1</td>
+      <td>Boat</td>
+      <td>1</td>
+    </tr>
+    ...
+  </tbody>
+</table>
+``:code 
+
+ ``Rows custom tags``:inxx 
+Se você precisar serializar as linhas em qualquer outro formato XML com tags personalizadas, poderá fazer isso facilmente usando o auxiliar TAG universal e a notação *:
+ ``XML``:inxx 
+
+ ``
+>>> rows = db(db.person.id > 0).select()
+>>> print TAG.result(*[TAG.row(*[TAG.field(r[f], _name=f) for f in db.person.fields]) for r in rows])
+
+<result>
+  <row>
+    <field name="id">1</field>
+    <field name="name">Alex</field>
+  </row>
+  ...
+</result>
+``:code 
+
+####  Representação de dados
+
+ ``export_to_csv_file``:inxx 
+o ``export_to_csv_file``  função aceita um argumento de palavra-chave chamado ``represent`` . Quando ``True``  ele usará as colunas ``represent``  função enquanto exporta os dados em vez dos dados brutos.
+
+ ``colnames``:inxx 
+A função também aceita um argumento de palavra-chave chamado ``colnames``  que deve conter uma lista de nomes de colunas que você deseja exportar. O padrão é todas as colunas.
+
+Ambos ``export_to_csv_file``  e ``import_from_csv_file``  aceite argumentos de palavra-chave que digam ao analisador csv o formato para salvar/carregar os arquivos:
+- ``delimiter`` : delimitador para separar valores (padrão ',')
+- ``quotechar`` : caractere a ser usado para citar valores de string (padrão para aspas duplas)
+- ``quoting`` : sistema de cotação (padrão ``csv.QUOTE_MINIMAL`` )
+
+Aqui está um exemplo de uso:
+ ``
+>>> import csv
+>>> rows = db(query).select()
+>>> rows.export_to_csv_file(open('/tmp/test.txt', 'w'),
+                            delimiter='|',
+                            quotechar='"',
+                            quoting=csv.QUOTE_NONNUMERIC)
+``:code 
+
+Que renderizaria algo semelhante a
+ ``
+"hello"|35|"this is the text description"|"2013-03-03"
+``:code 
+
+Para mais informações, consulte a documentação oficial do Python. ``quoteall``:cite 
+
+###  O cache seleciona
+
+O método select também recebe um argumento de cache, cujo padrão é Nenhum. Para propósitos de armazenamento em cache, ele deve ser configurado para uma tupla em que o primeiro elemento é o modelo de cache (cache.ram, cache.disk, etc.) e o segundo elemento é o tempo de expiração em segundos.
+
+No exemplo a seguir, você vê um controlador que armazena em cache uma seleção na tabela db.log definida anteriormente. A seleção real busca dados do banco de dados de back-end com menos de uma vez a cada 60 segundos e armazena o resultado em cache.ram. Se a próxima chamada para este controlador ocorrer em menos de 60 segundos desde o último IO do banco de dados, ele simplesmente buscará os dados anteriores do cache.ram.
+
+ ``cache select``:inxx 
+ ``
+def cache_db_select():
+    logs = db().select(db.log.ALL, cache=(cache.ram, 60))
+    return dict(logs=logs)
+``:code 
+
+ ``cacheable``:inxx 
+
+o ``select``  método tem um opcional ``cacheable``  argumento, normalmente definido para ``False`` . Quando ``cacheable=True``  o resultado ``Rows``  é serializável, mas o ``Row`` s falta ``update_record``  e ``delete_record``  métodos.
+
+Se você não precisa desses métodos, você pode acelerar bastante selecionando o atributo armazenável em cache:
+
+ ``
+rows = db(query).select(cacheable=True)
+``:code 
+
+Quando o ``cache``  argumento está definido, mas ``cacheable=False``  (padrão) somente os resultados do banco de dados são armazenados em cache, não o objeto Rows real. Quando o ``cache``  argumento é usado em conjunto com ``cacheable=True``  o objeto Rows inteiro é armazenado em cache e isso resulta em um armazenamento em cache muito mais rápido:
+
+ ``
+rows = db(query).select(cache=(cache.ram, 3600), cacheable=True)
+``:code 
+
+###  Auto-referência e aliases
+
+ ``self reference``:inxx 
+ ``alias``:inxx 
+É possível definir tabelas com campos que se referem a si mesmos, aqui está um exemplo:
+ ``reference table``:inxx 
+ ``
+db.define_table('person',
+                Field('name'),
+                Field('father_id', 'reference person'),
+                Field('mother_id', 'reference person'))
+``:code 
+
+Observe que a notação alternativa de usar um objeto de tabela como tipo de campo falhará nesse caso, porque ele usa uma variável ``db.person``  antes de ser definido:
+ ``
+db.define_table('person',
+                Field('name'),
+                Field('father_id', db.person),  # wrong!
+                Field('mother_id', db.person))  # wrong!
+``:code 
+
+Em geral ``db.tablename``  e ``"reference tablename"``  são tipos de campo equivalentes, mas o último é o único permitido para auto-referência.
+
+ ``with_alias``:inxx 
+Se a tabela se refere a si mesma, então não é possível executar um JOIN para selecionar uma pessoa e seus pais sem usar a palavra-chave SQL "AS". Isto é conseguido no web2py usando o ``with_alias`` . Aqui está um exemplo:
+ ``
+>>> Father = db.person.with_alias('father')
+>>> Mother = db.person.with_alias('mother')
+>>> db.person.insert(name='Massimo')
+1
+>>> db.person.insert(name='Claudia')
+2
+>>> db.person.insert(name='Marco', father_id=1, mother_id=2)
+3
+>>> rows = db().select(db.person.name, Father.name, Mother.name,
+                       left=(Father.on(Father.id == db.person.father_id),
+                             Mother.on(Mother.id == db.person.mother_id)))
+
+>>> for row in rows:
+        print row.person.name, row.father.name, row.mother.name
+
+Massimo None None
+Claudia None None
+Marco Massimo Claudia
+``:code 
+
+Observe que escolhemos fazer uma distinção entre:
+- "father_id": o nome do campo usado na tabela "pessoa";
+- "pai": o alias que queremos usar para a tabela referenciada pelo campo acima; isso é comunicado ao banco de dados;
+- "Pai": a variável usada pelo web2py para se referir a esse alias.
+
+A diferença é sutil e não há nada de errado em usar o mesmo nome para os três:
+ ``
+db.define_table('person',
+                Field('name'),
+                Field('father', 'reference person'),
+                Field('mother', 'reference person'))
+
+>>> father = db.person.with_alias('father')
+>>> mother = db.person.with_alias('mother')
+>>> db.person.insert(name='Massimo')
+1
+>>> db.person.insert(name='Claudia')
+2
+>>> db.person.insert(name='Marco', father=1, mother=2)
+3
+>>> rows = db().select(db.person.name, father.name, mother.name,
+                       left=(father.on(father.id==db.person.father),
+                             mother.on(mother.id==db.person.mother)))
+
+>>> for row in rows:
+        print row.person.name, row.father.name, row.mother.name
+
+Massimo None None
+Claudia None None
+Marco Massimo Claudia
+``:code 
+
+Mas é importante ter a distinção clara para criar consultas corretas.
+
+###  Características avançadas
+
+####  Herança de tabelas
+ ``inheritance``:inxx 
+
+É possível criar uma tabela que contenha todos os campos de outra tabela. É suficiente passar a outra mesa no lugar de um campo para ``define_table`` . Por exemplo
+ ``
+db.define_table('person', Field('name'))
+db.define_table('doctor', db.person, Field('specialization'))
+``:code 
+
+ ``dummy table``:inxx 
+Também é possível definir uma tabela fictícia que não seja armazenada em um banco de dados para reutilizá-la em vários outros locais. Por exemplo:
+
+ ``
+signature = db.Table(db, 'signature',
+                     Field('created_on', 'datetime', default=request.now),
+                     Field('created_by', db.auth_user, default=auth.user_id),
+                     Field('updated_on', 'datetime', update=request.now),
+                     Field('updated_by', db.auth_user, update=auth.user_id))
+
+db.define_table('payment', Field('amount', 'double'), signature)
+``:code 
+
+Este exemplo assume que a autenticação padrão web2py está ativada.
+
+Observe que se você usar ``Auth``  web2py já cria uma tabela para você:
+
+ ``
+auth = Auth(db)
+db.define_table('payment', Field('amount', 'double'), auth.signature)
+`` 
+
+Ao usar a herança de tabelas, se você quiser que a tabela herdada herde validadores, certifique-se de definir os validadores da tabela pai antes de definir a tabela herdada.
+
+####   ``filter_in``  e ``filter_out`` 
+ ``filter_in``:inxx   ``filter_out``:inxx 
+
+É possível definir um filtro para cada campo a ser chamado antes que um valor seja inserido no banco de dados desse campo e depois que um valor seja recuperado do banco de dados.
+
+Imagine, por exemplo, que você queira armazenar uma estrutura de dados serializável do Python em um campo no formato json. Veja como isso pode ser feito:
+
+ ``
+>>> from simplejson import loads, dumps
+>>> db.define_table('anyobj',
+                    Field('name'),
+                    Field('data', 'text'))
+
+>>> db.anyobj.data.filter_in = lambda obj, dumps=dumps: dumps(obj)
+>>> db.anyobj.data.filter_out = lambda txt, loads=loads: loads(txt)
+>>> myobj = ['hello', 'world', 1, {2: 3}]
+>>> id = db.anyobj.insert(name='myobjname', data=myobj)
+>>> row = db.anyobj(id)
+>>> row.data
+['hello', 'world', 1, {2: 3}]
+``:code 
+
+Outra maneira de conseguir o mesmo é usando um campo do tipo ``SQLCustomType`` , como discutido mais adiante.
+
+####  retornos de chamada no registro, excluir e atualizar
+
+ ``_before_insert``:inxx 
+ ``_after_insert``:inxx 
+ ``_before_update``:inxx 
+ ``_after_update``:inxx 
+ ``_before_delete``:inxx 
+ ``_after_delete``:inxx 
+
+O Web2py fornece um mecanismo para registrar retornos de chamada a serem chamados antes e/ou após inserir, atualizar e excluir registros.
+
+Cada tabela armazena seis listas de retornos de chamada:
+
+ ``
+db.mytable._before_insert
+db.mytable._after_insert
+db.mytable._before_update
+db.mytable._after_update
+db.mytable._before_delete
+db.mytable._after_delete
+``:code 
+
+Você pode registrar a função de retorno de chamada anexando a função correspondente a uma dessas listas. A ressalva é que, dependendo da funcionalidade, o retorno de chamada tem uma assinatura diferente.
+
+Isto é melhor explicado através de alguns exemplos.
+
+ ``
+>>> db.define_table('person', Field('name'))
+>>> def pprint(*args): print args
+>>> db.person._before_insert.append(lambda f: pprint(f))
+>>> db.person._after_insert.append(lambda f, id: pprint(f, id))
+>>> db.person._before_update.append(lambda s, f: pprint(s, f))
+>>> db.person._after_update.append(lambda s, f: pprint(s, f))
+>>> db.person._before_delete.append(lambda s: pprint(s))
+>>> db.person._after_delete.append(lambda s: pprint(s))
+``:code 
+
+Aqui ``f``  é um dict de campos passados para inserir ou atualizar, ``id``  é o id do registro recém-inserido ``s``  é o objeto Set usado para atualização ou exclusão.
+
+ ``
+>>> db.person.insert(name='John')
+({'name': 'John'},)
+({'name': 'John'}, 1)
+>>> db(db.person.id==1).update(name='Tim')
+(<Set (person.id = 1)>, {'name': 'Tim'})
+(<Set (person.id = 1)>, {'name': 'Tim'})
+>>> db(db.person.id==1).delete()
+(<Set (person.id = 1)>,)
+(<Set (person.id = 1)>,)
+``:code 
+
+Os valores de retorno desses retornos de chamada devem ser ``None``  ou ``False`` . Se algum dos ``_before_*``  retorno de chamada retorna um ``True``  valor ele abortará a operação real de inserção/atualização/exclusão.
+
+ ``update_naive``:inxx 
+
+Algumas vezes, um retorno de chamada pode precisar executar uma atualização na mesma tabela ou em uma tabela diferente, e uma pessoa deseja evitar que os retornos de chamada se façam recursivamente.
+
+Para este propósito, os objetos Set possuem um ``update_naive``  método que funciona como ``update``  mas ignora antes e depois das chamadas de retorno.
+
+#####  Cascatas de banco de dados
+O esquema do banco de dados pode definir relacionamentos que acionam exclusões de registros relacionados, conhecidos como cascata. O DAL não é informado quando um registro é excluído devido a uma cascata. Então um ``on_delete``  O gatilho não será chamado devido a uma exclusão em cascata.
+
+ [[versioning]] 
+####  Versão de registro
+ ``_enable_record_versioning``:inxx 
+
+É possível pedir ao web2py para salvar cada cópia de um registro quando o registro é modificado individualmente. Existem diferentes maneiras de fazer isso e isso pode ser feito para todas as tabelas de uma só vez usando a sintaxe:
+
+ ``
+auth.enable_record_versioning(db)
+``:code 
+
+isso requer Auth e é discutido no capítulo sobre autenticação.
+Também pode ser feito para cada tabela individual como discutido abaixo.
+
+Considere a seguinte tabela:
+
+ ``
+db.define_table('stored_item',
+                Field('name'),
+                Field('quantity', 'integer'),
+                Field('is_active', 'boolean',
+                      writable=False, readable=False, default=True))
+``:code 
+
+Observe o campo booleano oculto chamado ``is_active``  e padronizando para
+Verdade.
+
+Podemos dizer ao web2py para criar uma nova tabela (no mesmo banco de dados ou em um banco de dados diferente) e armazenar todas as versões anteriores de cada registro na tabela, quando modificadas.
+
+Isso é feito da seguinte maneira:
+ ``
+db.stored_item._enable_record_versioning()
+``:code 
+
+ou em uma sintaxe mais detalhada:
+
+ ``
+db.stored_item._enable_record_versioning(archive_db=db,
+                                         archive_name='stored_item_archive',
+                                         current_record='current_record',
+                                         is_active='is_active')
+`` 
+
+o ``archive_db=db``  diz ao web2py para armazenar a tabela de arquivos no mesmo banco de dados ``stored_item``  mesa. o ``archive_name``  define o nome da tabela de arquivos. A tabela de arquivos tem os mesmos campos que a tabela original ``stored_item``  exceto que campos exclusivos não são mais exclusivos (porque ele precisa armazenar várias versões) e possui um campo extra cujo nome é especificado por ``current_record``  e que é uma referência para o registro atual no ``stored_item``  mesa.
+
+Quando os registros são excluídos, eles não são realmente excluídos. Um registro excluído é copiado no ``stored_item_archive``  tabela (como quando é modificado) eo ``is_active``  campo está definido como Falso. Ao ativar o controle de versão, o web2py define ``custom_filter``  nesta tabela que esconde todos os registros na tabela ``stored_item``  onde o ``is_active``  campo está definido como Falso. o ``is_active``  parâmetro no ``_enable_record_versioning``  método permite especificar o nome do campo usado pelo ``custom_filter``  para determinar se o campo foi excluído ou não.
+
+ ``custom_filter`` s são ignorados pela interface appadmin.
+
+####  Campos comuns e multilocação
+ ``common fields``:inxx 
+ ``multi tenancy``:inxx 
+
+ ``db._common_fields``  é uma lista de campos que devem pertencer a todas as tabelas. Essa lista também pode conter tabelas e é entendida como todos os campos da tabela. Por exemplo, ocasionalmente, você se encontra na necessidade de adicionar uma assinatura a todas as suas mesas, mas a ```auth``  tabelas. Neste caso, depois de você ``db.define_tables()``  mas antes de definir qualquer outra tabela, insira
+
+ ``
+db._common_fields.append(auth.signature)
+`` 
+
+Um campo é especial: "request_tenant".
+Este campo não existe, mas você pode criá-lo e adicioná-lo a qualquer uma das suas tabelas (ou todas elas):
+
+ ``
+db._common_fields.append(Field('request_tenant',
+                               default=request.env.http_host,
+                               writable=False))
+`` 
+
+Para cada mesa com um campo chamado ``db._request_tenant`` , todos os registros de todas as consultas são sempre automaticamente filtrados por:
+
+ ``
+db.table.request_tenant == db.table.request_tenant.default
+``:code 
+
+e para cada registro inserido, esse campo é definido com o valor padrão.
+No exemplo acima nós escolhemos
+ ``
+default = request.env.http_host
+`` 
+Ou seja, optamos por pedir ao nosso aplicativo para filtrar todas as tabelas em todas as consultas com
+ ``
+db.table.request_tenant == request.env.http_host
+`` 
+
+Esse truque simples nos permite transformar qualquer aplicativo em um aplicativo de vários inquilinos. Ou seja, mesmo se executarmos uma instância do aplicativo e usarmos um único banco de dados, se o aplicativo for acessado em dois ou mais domínios (no exemplo, o nome do domínio é recuperado de ``request.env.http_host`` ) os visitantes verão dados diferentes dependendo do domínio. Pense em executar várias lojas da web em diferentes domínios com um aplicativo e um banco de dados.
+
+Você pode desativar os filtros de multilocação usando: ``ignore_common_filters``:inxx 
+ ``
+rows = db(query, ignore_common_filters=True).select()
+``:code 
+
+####  Filtros comuns
+
+Um filtro comum é uma generalização da ideia de multilocação acima.
+Ele fornece uma maneira fácil de evitar a repetição da mesma consulta.
+Considere, por exemplo, a seguinte tabela:
+
+ ``
+db.define_table('blog_post',
+                Field('subject'),
+                Field('post_text', 'text'),
+                Field('is_public', 'boolean'),
+                common_filter = lambda query: db.blog_post.is_public==True)
+`` 
+
+Qualquer seleção, exclusão ou atualização nesta tabela incluirá apenas postagens do blog público. O atributo também pode ser alterado nos controladores:
+
+ ``
+db.blog_post._common_filter = lambda query: db.blog_post.is_public == True
+`` 
+
+Ele serve como uma maneira de evitar a repetição da frase "db.blog_post.is_public == True" em cada pesquisa de postagem de blog e também como um aprimoramento de segurança que impede que você esqueça de impedir a exibição de postagens não públicas.
+
+Caso você realmente queira itens omitidos pelo filtro comum (por exemplo, permitindo que o administrador veja postagens não públicas), você pode remover o filtro:
+ ``
+db.blog_post._common_filter = None
+`` 
+ou ignorá-lo:
+ ``
+db(query, ignore_common_filters=True).select(...)
+`` 
+
+####  personalizadas ``Field``  tipos (experimental)
+
+ ``SQLCustomType``:inxx 
+
+Além de usar ``filter_in``  e ``filter_out`` , é possível definir novos/tipos de campos personalizados.
+Por exemplo, consideramos aqui um campo que contém dados binários em formato compactado:
+
+ ``
+from gluon.dal import SQLCustomType
+import zlib
+
+compressed = SQLCustomType(type ='text',
+                           native='text',
+                           encoder=(lambda x: zlib.compress(x or '')),
+                           decoder=(lambda x: zlib.decompress(x)))
+
+db.define_table('example', Field('data', type=compressed))
+``:code 
+
+ ``SQLCustomType``  é uma fábrica de tipo de campo. Está ``type``  O argumento deve ser um dos tipos padrão de web2py. Diz ao web2py como tratar os valores do campo no nível web2py. ``native``  é o tipo do campo no que diz respeito ao banco de dados. Os nomes permitidos dependem do mecanismo do banco de dados. ``encoder``  é uma função de transformação opcional aplicada quando os dados são armazenados e ``decoder``  é a função de transformação reversa opcional.
+
+Este recurso é marcado como experimental. Na prática, ele está no web2py há muito tempo e funciona, mas pode tornar o código não portátil, por exemplo, quando o tipo nativo é específico do banco de dados. Não funciona no NoSQL do Google App Engine.
+
+####  Usando o DAL sem tabelas de definição
+
+O DAL pode ser usado em qualquer programa Python simplesmente fazendo isso:
+
+ ``
+from gluon import DAL, Field
+db = DAL('sqlite://storage.sqlite', folder='path/to/app/databases')
+``:code 
+
+isto é, importe o DAL, Field, conecte e especifique a pasta que contém os arquivos .table (a pasta app/databases).
+
+Para acessar os dados e seus atributos ainda temos que definir todas as tabelas que vamos acessar com ``db.define_tables(...)`` .
+
+Se apenas precisarmos acessar os dados, mas não os atributos da tabela web2py, sairemos sem redefinir as tabelas, mas simplesmente solicitando que o web2py leia as informações necessárias dos metadados nos arquivos .table:
+
+ ``
+from gluon import DAL, Field
+db = DAL('sqlite://storage.sqlite', folder='path/to/app/databases', auto_import=True))
+``:code 
+
+Isso nos permite acessar qualquer ``db.table``  sem necessidade de redefinir.
+
+####  PostGIS, SpatiaLite e MS Geo (experimental)
+
+ ``PostGIS``:inxx   ``StatiaLite``:inxx   ``Geo Extensions``:inxx 
+ ``geometry``:inxx   ``geoPoint``:inxx   ``geoLine``:inxx   ``geoPolygon``:inxx 
+
+O DAL suporta APIs geográficas usando PostGIS (para PostgreSQL), spatialite (para SQLite) e MSSQL e Spatial Extensions. Este é um recurso patrocinado pelo projeto Sahana e implementado por Denes Lengyel.
+
+O DAL fornece tipos de campos de geometria e geografia e as seguintes funções:
+
+ ``st_asgeojson``:inxx   ``st_astext``:inxx   ``st_contains``:inxx 
+ ``st_distance``:inxx   ``st_equals``:inxx   ``st_intersects``:inxx   ``st_overlaps``:inxx 
+ ``st_simplify``:inxx   ``st_touches``:inxx   ``st_within``:inxx 
+
+ ``
+st_asgeojson (PostGIS only)
+st_astext
+st_contains
+st_distance
+st_equals
+st_intersects
+st_overlaps
+st_simplify (PostGIS only)
+st_touches
+st_within
+st_x
+st_y
+`` 
+
+aqui estão alguns exemplos:
+
+ ``
+from gluon.dal import DAL, Field, geoPoint, geoLine, geoPolygon
+db = DAL("mssql://user:pass@host:db")
+sp = db.define_table('spatial', Field('loc', 'geometry()'))
+``:code 
+
+Abaixo, inserimos um ponto, uma linha e um polígono:
+ ``
+sp.insert(loc=geoPoint(1, 1))
+sp.insert(loc=geoLine((100, 100), (20, 180), (180, 180)))
+sp.insert(loc=geoPolygon((0, 0), (150, 0), (150, 150), (0, 150), (0, 0)))
+``:code 
+
+Notar que
+ ``
+rows = db(sp.id > 0).select()
+``:code 
+
+Sempre retorna os dados de geometria serializados como texto.
+Você também pode fazer o mesmo explicitamente usando ``st_astext()`` :
+
+ ``
+print db(sp.id>0).select(sp.id, sp.loc.st_astext())
+spatial.id,spatial.loc.STAsText()
+1, "POINT (1 2)"
+2, "LINESTRING (100 100, 20 180, 180 180)"
+3, "POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))"
+``:code 
+
+Você pode pedir a representação nativa usando ``st_asgeojson()``  (somente no PostGIS):
+
+ ``
+print db(sp.id>0).select(sp.id, sp.loc.st_asgeojson().with_alias('loc'))
+spatial.id,loc
+1, [1, 2]
+2, [[100, 100], [20 180], [180, 180]]
+3, [[[0, 0], [150, 0], [150, 150], [0, 150], [0, 0]]]
+``:code 
+
+(observe que uma matriz é um ponto, uma matriz de matrizes é uma linha e uma matriz de matriz de matrizes é um polígono).
+
+Aqui estão exemplos de como usar funções geográficas:
+
+ ``
+query = sp.loc.st_intersects(geoLine((20, 120), (60, 160)))
+query = sp.loc.st_overlaps(geoPolygon((1, 1), (11, 1), (11, 11), (11, 1), (1, 1)))
+query = sp.loc.st_contains(geoPoint(1, 1))
+print db(query).select(sp.id, sp.loc)
+spatial.id, spatial.loc
+3,"POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))"
+``:code 
+
+As distâncias calculadas também podem ser recuperadas como números de ponto flutuante:
+
+ ``
+dist = sp.loc.st_distance(geoPoint(-1,2)).with_alias('dist')
+print db(sp.id>0).select(sp.id, dist)
+spatial.id, dist
+1 2.0
+2 140.714249456
+3 1.0
+``:code 
+
+####  Copiar dados de um banco de dados para outro
+
+Considere a situação na qual você está usando o seguinte banco de dados:
+
+ ``
+db = DAL('sqlite://storage.sqlite')
+`` 
+
+e você deseja mover para outro banco de dados usando uma string de conexão diferente:
+
+ ``
+db = DAL('postgres://username:password@localhost/mydb')
+`` 
+
+Antes de alternar, você deseja mover os dados e reconstruir todos os metadados para o novo banco de dados. Assumimos que o novo banco de dados existe, mas também assumimos que ele está vazio.
+
+O Web2py fornece um script que faz este trabalho para você:
+
+ ``
+cd web2py
+python scripts/cpdb.py \\
+   -f applications/app/databases \\
+   -y 'sqlite://storage.sqlite' \\
+   -Y 'postgres://username:password@localhost/mydb' \\
+   -d ../gluon
+`` 
+
+Depois de executar o script, basta alternar a string de conexão no modelo e tudo deve funcionar imediatamente. Os novos dados devem estar lá.
+
+Esse script fornece várias opções de linha de comando que permitem mover dados de um aplicativo para outro, mover todas as tabelas ou apenas algumas tabelas, limpar os dados nas tabelas. Para mais informações, tente:
+
+ ``
+python scripts/cpdb.py -h
+`` 
+
+####  Nota sobre novos DAL e adaptadores
+
+O código-fonte da Camada de Abstração do Banco de Dados foi completamente reescrito em 2010. Embora permaneça compatível, a reescrita tornou-a mais modular e mais fácil de estender. Aqui nós explicamos a lógica principal.
+
+O arquivo "gluon/dal.py" define, entre outras, as seguintes classes.
+
+ ``
+ConnectionPool
+BaseAdapter extends ConnectionPool
+Row
+DAL
+Reference
+Table
+Expression
+Field
+Query
+Set
+Rows
+`` 
+
+Seu uso foi explicado nas seções anteriores, exceto para ``BaseAdapter`` . Quando os métodos de um ``Table``  ou ``Set``  objeto precisa se comunicar com o banco de dados que delegam aos métodos do adaptador a tarefa para gerar o SQL e ou a chamada de função.
+
+Por exemplo:
+
+ ``
+db.mytable.insert(myfield='myvalue')
+`` 
+
+chamadas
+
+ ``
+Table.insert(myfield='myvalue')
+`` 
+
+que delega o adaptador retornando:
+
+ ``
+db._adapter.insert(db.mytable, db.mytable._listify(dict(myfield='myvalue')))
+`` 
+
+Aqui ``db.mytable._listify``  converte o dict de argumentos em uma lista de ``(field,value)``  e chama o ``insert``  método do ``adapter`` . ``db._adapter``  faz mais ou menos o seguinte:
+
+ ``
+query = db._adapter._insert(db.mytable, list_of_fields)
+db._adapter.execute(query)
+`` 
+
+onde a primeira linha constrói a consulta e a segunda a executa.
+
+ ``BaseAdapter``  define a interface para todos os adaptadores.
+
+"gluon/dal.py", no momento de escrever este livro, contém os seguintes adaptadores:
+
+ ``
+SQLiteAdapter extends BaseAdapter
+JDBCSQLiteAdapter extends SQLiteAdapter
+MySQLAdapter extends BaseAdapter
+PostgreSQLAdapter extends BaseAdapter
+JDBCPostgreSQLAdapter extends PostgreSQLAdapter
+OracleAdapter extends BaseAdapter
+MSSQLAdapter extends BaseAdapter
+MSSQL2Adapter extends MSSQLAdapter
+MSSQL3Adapter extends MSSQLAdapter
+MSSQL4Adapter extends MSSQLAdapter
+FireBirdAdapter extends BaseAdapter
+FireBirdEmbeddedAdapter extends FireBirdAdapter
+InformixAdapter extends BaseAdapter
+DB2Adapter extends BaseAdapter
+IngresAdapter extends BaseAdapter
+IngresUnicodeAdapter extends IngresAdapter
+GoogleSQLAdapter extends MySQLAdapter
+NoSQLAdapter extends BaseAdapter
+GoogleDatastoreAdapter extends NoSQLAdapter
+CubridAdapter extends MySQLAdapter (experimental)
+TeradataAdapter extends DB2Adapter (experimental)
+SAPDBAdapter extends BaseAdapter (experimental)
+CouchDBAdapter extends NoSQLAdapter (experimental)
+IMAPAdapter extends NoSQLAdapter (experimental)
+MongoDBAdapter extends NoSQLAdapter (experimental)
+VerticaAdapter extends MSSQLAdapter (experimental)
+SybaseAdapter extends MSSQLAdapter (experimental)
+`` 
+
+que substituem o comportamento do ``BaseAdapter`` .
+
+Cada adaptador tem mais ou menos essa estrutura:
+
+ ``
+class MySQLAdapter(BaseAdapter):
+
+    # specify a diver to use
+    driver = globals().get('pymysql', None)
+
+    # map web2py types into database types
+    types = {
+        'boolean': 'CHAR(1)',
+        'string': 'VARCHAR(%(length)s)',
+        'text': 'LONGTEXT',
+        ...
+        }
+
+    # connect to the database using driver
+    def __init__(self, db, uri, pool_size=0, folder=None, db_codec ='UTF-8',
+                 credential_decoder=lambda x:x, driver_args={},
+                 adapter_args={}):
+        # parse uri string and store parameters in driver_args
+        ...
+        # define a connection function
+        def connect(driver_args=driver_args):
+            return self.driver.connect(**driver_args)
+        # place it in the pool
+        self.pool_connection(connect)
+        # set optional parameters (after connection)
+        self.execute('SET FOREIGN_KEY_CHECKS=1;')
+        self.execute("SET sql_mode='NO_BACKSLASH_ESCAPES';")
+
+   # override BaseAdapter methods as needed
+   def lastrowid(self, table):
+        self.execute('select last_insert_id();')
+        return int(self.cursor.fetchone()[0])
+
+``:code 
+
+Observar os vários adaptadores como exemplo deve ser fácil de escrever novos.
+
+Quando ``db``  instância é criada:
+
+ ``
+db = DAL('mysql://...')
+`` 
+
+o prefixo na string uri define o adaptador. O mapeamento é definido no dicionário a seguir também em "gluon/dal.py":
+
+ ``
+ADAPTERS = {
+    'sqlite': SQLiteAdapter,
+    'spatialite': SpatiaLiteAdapter,
+    'sqlite:memory': SQLiteAdapter,
+    'spatialite:memory': SpatiaLiteAdapter,
+    'mysql': MySQLAdapter,
+    'postgres': PostgreSQLAdapter,
+    'postgres:psycopg2': PostgreSQLAdapter,
+    'postgres2:psycopg2': NewPostgreSQLAdapter,
+    'oracle': OracleAdapter,
+    'mssql': MSSQLAdapter,
+    'mssql2': MSSQL2Adapter,
+    'mssql3': MSSQL3Adapter,
+    'mssql4' : MSSQL4Adapter,
+    'vertica': VerticaAdapter,
+    'sybase': SybaseAdapter,
+    'db2': DB2Adapter,
+    'teradata': TeradataAdapter,
+    'informix': InformixAdapter,
+    'informix-se': InformixSEAdapter,
+    'firebird': FireBirdAdapter,
+    'firebird_embedded': FireBirdAdapter,
+    'ingres': IngresAdapter,
+    'ingresu': IngresUnicodeAdapter,
+    'sapdb': SAPDBAdapter,
+    'cubrid': CubridAdapter,
+    'jdbc:sqlite': JDBCSQLiteAdapter,
+    'jdbc:sqlite:memory': JDBCSQLiteAdapter,
+    'jdbc:postgres': JDBCPostgreSQLAdapter,
+    'gae': GoogleDatastoreAdapter, # discouraged, for backward compatibility
+    'google:datastore': GoogleDatastoreAdapter,
+    'google:datastore+ndb': GoogleDatastoreAdapter,
+    'google:sql': GoogleSQLAdapter,
+    'couchdb': CouchDBAdapter,
+    'mongodb': MongoDBAdapter,
+    'imap': IMAPAdapter
+}
+``:code 
+
+A string uri é então analisada em mais detalhes pelo próprio adaptador.
+
+Para qualquer adaptador, você pode substituir o driver por outro diferente:
+
+ ``
+import MySQLdb as mysqldb
+from gluon.dal import MySQLAdapter
+MySQLAdapter.driver = mysqldb
+`` 
+isto é ``mysqldb``  tem que ser '' aquele módulo '' com um método .connect ().
+Você pode especificar argumentos opcionais do driver e argumentos do adaptador:
+
+ ``
+db =DAL(..., driver_args={}, adapter_args={})
+`` 
+
+
+###  Gotchas
+
+####  SQLite
+O SQLite não suporta descartar e alterar colunas. Isso significa que as migrações do web2py funcionarão até certo ponto. Se você excluir um campo de uma tabela, a coluna permanecerá no banco de dados, mas ficará invisível para o web2py. Se você decidir restabelecer a coluna, o web2py tentará recriá-la e falhar. Neste caso, você deve definir ``fake_migrate=True``  para que os metadados sejam recriados sem tentar adicionar a coluna novamente. Além disso, pela mesma razão,  SQLite não tem conhecimento de nenhuma alteração do tipo de coluna. Se você inserir um número em um campo de string, ele será armazenado como string. Se posteriormente você alterar o modelo e substituir o tipo "string" pelo tipo "integer", o SQLite continuará a manter o número como uma string e isso poderá causar problemas ao tentar extrair os dados. 
+
+O SQLite não possui um tipo booleano. web2py mapeia internamente booleanos para uma cadeia de 1 caractere, com 'T' e 'F' representando True e False. O DAL lida com isso completamente; a abstração de um verdadeiro valor booleano funciona bem.
+Mas se você estiver atualizando a tabela SQLite diretamente com o SQL, esteja ciente da implementação do web2py e evite usar os valores 0 e 1.
+
+####  MySQL
+
+O MySQL não suporta múltiplos ALTER TABLE dentro de uma única transação. Isso significa que qualquer processo de migração é dividido em vários commits. Se algo acontecer que cause uma falha, é possível quebrar uma migração (os metadados web2py não estão mais sincronizados com a estrutura de tabela real no banco de dados). Isso é lamentável, mas pode ser evitado (migrar uma tabela no momento) ou pode ser corrigido a posteriori (reverter o modelo web2py para o que corresponde à estrutura da tabela no banco de dados, definir ``fake_migrate=True``  e depois de os metadados terem sido reconstruídos, defina ``fake_migrate=False``  e migre a tabela novamente).
+
+####  Google SQL
+
+O Google SQL tem os mesmos problemas do MySQL e muito mais. Em particular, os próprios metadados da tabela devem ser armazenados no banco de dados em uma tabela que não é migrada pelo web2py. Isso ocorre porque o Google App Engine tem um sistema de arquivos somente leitura. Migrações de Web2py no Google: o SQL combinado com o problema do MySQL descrito acima pode resultar em corrupção de metadados. Novamente, isso pode ser evitado (migrando a tabela de uma vez e definindo migrate = False para que a tabela de metadados não seja mais acessada) ou pode ser corrigida a posteriori (acessando o banco de dados usando o painel do Google e excluindo qualquer entrada corrompida da mesa chamada ``web2py_filesystem`` .
+
+####  MSSQL (Microsoft SQL Server)
+ ``limitby``:inxx 
+O MSSQL <2012 não suporta a palavra-chave SQL OFFSET. Portanto, o banco de dados não pode fazer paginação. Ao fazer um ``limitby=(a, b)``  web2py irá buscar o primeiro ``b``  linhas e descartar o primeiro ``a`` . Isso pode resultar em uma sobrecarga considerável quando comparado com outros mecanismos de banco de dados.
+Se você estiver usando MSSQL> = 2005, o prefixo recomendado para usar é ``mssql3://``  que fornece um método para evitar o problema de buscar o conjunto de resultados inteiro não paginado. Se você está em MSSQL> = 2012, use ``mssql4://``  que usa o ``OFFSET ... ROWS ... FETCH NEXT ... ROWS ONLY``  construa para suportar paginação nativa sem resultados de desempenho como outros backends.
+o ``mssql://``  uri também impõe (por razões históricas) o uso de ``text``  colunas, que são superadas em versões mais recentes (a partir de 2005) por ``varchar(max)`` . ``mssql3://``  e ``mssql4://``  deve ser usado se você não quiser enfrentar algumas limitações do - oficialmente preterido - ``text``  colunas
+
+MSSQL tem problemas com referências circulares em tabelas que possuem CASCADE ONDELETE. Este é um bug do MSSQL e você pode contorná-lo definindo o atributo ondelete para todos os campos de referência como "NO ACTION".
+Você também pode fazer isso de uma vez por todas antes de definir tabelas:
+
+ ``
+db = DAL('mssql://....')
+for key in ['reference', 'reference FK']:
+    db._adapter.types[key]=db._adapter.types[key].replace('%(on_delete_action)s', 'NO ACTION')
+``:code 
+
+O MSSQL também tem problemas com argumentos passados para a palavra-chave DISTINCT e, portanto,
+ enquanto isso funciona,
+
+ ``
+db(query).select(distinct=True)
+`` 
+
+isso não
+
+ ``
+db(query).select(distinct=db.mytable.myfield)
+`` 
+
+####  Oráculo
+
+O Oracle também não suporta paginação. Não suporta nem as palavras-chave OFFSET nem LIMIT. Web2py consegue paginação traduzindo um ``db(...).select(limitby=(a, b))``  em um select aninhado de três vias complexo (como sugerido pela documentação oficial da Oracle).
+Isso funciona para uma seleção simples, mas pode ser interrompido para seleções complexas envolvendo campos com alias e/ou junções.
+
+####  Google NoSQL (Datastore)
+O Google NoSQL (Datastore) não permite junções, junções à esquerda, agregados, expressões, OR que envolvam mais de uma tabela, o operador "like" pesquisa em campos "text".
+
+As transações são limitadas e não são fornecidas automaticamente pelo web2py (você precisa usar a API do Google ``run_in_transaction``  que você pode pesquisar na documentação do Google App Engine on-line).
+
+O Google também limita o número de registros que você pode recuperar em cada consulta (1000 no momento da gravação). No ID de registro de dados do Google, os IDs são inteiros, mas não são sequenciais.
+Enquanto no SQL o tipo "list: string" é mapeado em um tipo "text", no Google Datastore ele é mapeado em um ``ListStringProperty`` . Da mesma forma, "list: integer" e "list: reference" são mapeados para "ListProperty". Isso faz com que pesquisas por conteúdo dentro desses tipos de campos sejam mais eficientes no Google NoSQL do que em bancos de dados SQL.
