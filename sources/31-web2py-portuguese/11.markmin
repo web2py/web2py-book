@@ -1,0 +1,591 @@
+ ##  jQuery e Ajax
+ ``Ajax``:inxx 
+
+Enquanto web2py é principalmente para o desenvolvimento do lado do servidor, o bem vinda aplicativo de andaimes vem com a biblioteca de base jQuery  ``jquery``:cite , calendários do jQuery (selecionador de data, selecionador de datetime e relógio) e algumas funções JavaScript adicionais baseadas no jQuery.
+
+Nada no web2py impede que você use outros
+Bibliotecas Ajax como Prototype, ExtJS ou YUI, mas decidimos empacotar o jQuery porque achamos que é mais fácil de usar e mais poderoso que outras bibliotecas equivalentes. Nós também descobrimos que ele captura o espírito web2py de ser funcional e conciso.
+
+###  web2py_ajax.html
+
+O aplicativo web2py de scaffolding "welcome" inclui um arquivo chamado
+ ``
+views/web2py_ajax.html
+``:code 
+
+que se parece com isso:
+
+ ``
+{{
+response.files.insert(0, URL('static', 'js/jquery.js'))
+response.files.insert(1, URL('static', 'css/calenadar.css'))
+response.files.insert(2, URL('static', 'js/calendar.js'))
+response.include_meta()
+response.include_files()
+}}
+<script type="text/javascript"><!--
+    // These variables are used by the web2py_ajax_init
+        // function in web2py.js (which is loaded below).
+    var w2p_ajax_confirm_message =
+        "{{=T('Are you sure you want to delete this object?')}}";
+    var w2p_ajax_date_format = "{{=T('%Y-%m-%d')}}";
+    var w2p_ajax_datetime_format = "{{=T('%Y-%m-%d %H:%M:%S')}}";
+//--></script>
+<script src="{{=URL('static', 'js/web2py.js')}}"
+        type="text/javascript"></script>
+``:code 
+
+Este arquivo está incluído no HEAD do "layout.html" padrão e fornece os seguintes serviços:
+- Inclui "static/jquery.js".
+- Inclui "static/calendar.js" e "static/calendar.css", que são usados para o calendário pop-up.
+- Inclui todos ``response.meta``  cabeçalhos
+- Inclui todos ``response.files``  (requer CSS e JS, conforme declarado no código)
+- Define variáveis de formulário e inclui "static/js/web2y.js"
+
+"web2py.js" faz o seguinte:
+- Define um ``ajax``  função (com base em jQuery $ .ajax).
+- Faz qualquer DIV de classe "erro" ou qualquer objeto de tag da classe "flash" deslizar para baixo.
+- Impede a digitação de números inteiros inválidos nos campos INPUT da classe "integer".
+- Impede a digitação de floats inválidos nos campos INPUT da classe "double".
+- Conecta campos INPUT do tipo "data" com um selecionador de data pop-up.
+- Conecta campos INPUT do tipo "datetime" a um selecionador de datetime pop-up.
+- Conecta campos INPUT do tipo "time" com um selecionador de tempo pop-up.
+- define ``web2py_ajax_component`` , uma ferramenta muito importante que será descrita no Capítulo 12.
+- define ``web2py_websocket`` , uma função que pode ser usada para websockets HTML5 (não descritos neste livro, mas leia os exemplos na fonte de "gluon/contrib/websocket__messaging.py"). ``websockets``:inxx 
+- Define funções para o cálculo de entropia e validação de entrada do campo de senha.
+
+Inclui também ``popup`` , ``collapse`` e ``fade``  funções para compatibilidade com versões anteriores.
+
+Aqui está um exemplo de como os outros efeitos tocam bem juntos.
+
+Considere um teste app com o seguinte modelo: 
+ ``
+db = DAL("sqlite://storage.sqlite")
+db.define_table('child',
+     Field('name'),
+     Field('weight', 'double'),
+     Field('birth_date', 'date'),
+     Field('time_of_birth', 'time'))
+
+db.child.name.requires=IS_NOT_EMPTY()
+db.child.weight.requires=IS_FLOAT_IN_RANGE(0, 100)
+db.child.birth_date.requires=IS_DATE()
+db.child.time_of_birth.requires=IS_TIME()
+``:code 
+
+com este controlador "default.py":
+ ``
+def index():
+    form = SQLFORM(db.child)
+    if form.process().accepted:
+        response.flash = 'record inserted'
+    return dict(form=form)
+``:code 
+
+e a seguinte exibição "default/index.html":
+ ``
+{{extend 'layout.html'}}
+{{=form}}
+``:code 
+
+A ação "index" gera o seguinte formato:
+
+ [[image @///image/en7000.png center 480px]] 
+
+Se um formulário inválido for enviado, o servidor retornará a página com um formulário modificado contendo mensagens de erro. As mensagens de erro são DIVs de classe "error" e, devido ao código web2py.js acima, os erros aparecem com um efeito deslizante:
+
+ [[image @///image/en7100.png center 480px]] 
+
+A cor dos erros é dada no código CSS em "layout.html".
+
+O código web2py.js impede que você digite um valor inválido no campo de entrada. Isso é feito antes e além de não como substituto da validação do lado do servidor.
+
+O código web2py.js exibe um selecionador de data quando você insere um campo INPUT da classe "date" e exibe um selecionador datetime ao inserir um campo INPUT da classe "datetime". Aqui está um exemplo:
+
+ [[image @///image/en7200.png center 480px]] 
+
+O código web2py.js também exibe o seguinte seletor de tempo quando você tenta editar um campo INPUT da classe "time":
+
+ [[image @///image/en7300.png center 480px]] 
+
+Após o envio, a ação do controlador define a resposta flash para a mensagem "registro inserido". O layout padrão renderiza essa mensagem em um DIV com id = "flash". O código web2py.js é responsável por fazer este DIV aparecer e fazê-lo desaparecer quando você clica nele:
+
+ [[image @///image/en7400.png center 480px]] 
+
+Esses e outros efeitos são acessados programaticamente nas visualizações e por meio de ajudantes nos controladores.
+
+###  efeitos jQuery
+ ``effects``:inxx 
+
+Os efeitos básicos descritos aqui não requerem arquivos adicionais; tudo que você precisa já está incluído no web2py_ajax.html.
+
+Os objetos HTML/XHTML podem ser identificados por seu tipo (por exemplo, um DIV), suas classes ou seu id. Por exemplo:
+ ``
+<div class="one" id="a">Hello</div>
+<div class="two" id="b">World</div>
+``:code 
+
+Eles pertencem à classe "um" e "dois" respectivamente. Eles têm ids iguais a "a" e "b" respectivamente.
+
+No jQuery, você pode se referir ao primeiro com as seguintes notações equivalentes a CSS
+ ``
+jQuery('.one')    // address object by class "one"
+jQuery('#a')      // address object by id "a"
+jQuery('DIV.one') // address by object of type "DIV" with class "one"
+jQuery('DIV #a')  // address by object of type "DIV" with id "a"
+``:code 
+
+e para este último com
+ ``
+jQuery('.two')
+jQuery('#b')
+jQuery('DIV.two')
+jQuery('DIV #b')
+``:code 
+
+ou você pode se referir a ambos com
+ ``
+jQuery('DIV')
+``:code 
+
+Os objetos Tag estão associados a eventos, como "onclick". O jQuery permite vincular esses eventos a efeitos, por exemplo, "slideToggle":
+ ``
+<div class="one" id="a" onclick="jQuery('.two').slideToggle()">Hello</div>
+<div class="two" id="b">World</div>
+``:code 
+
+Agora, se você clicar em "Hello", "World" desaparecerá. Se você clicar novamente, "World" reaparecerá. Você pode tornar uma tag oculta por padrão, dando a ela uma classe oculta:
+
+ ``
+<div class="one" id="a" onclick="jQuery('.two').slideToggle()">Hello</div>
+<div class="two hidden" id="b">World</div>
+``:code 
+
+Você também pode vincular ações a eventos fora da própria tag. O código anterior pode ser reescrito da seguinte forma:
+ ``
+<div class="one" id="a">Hello</div>
+<div class="two" id="b">World</div>
+<script>
+jQuery('.one').click(function(){jQuery('.two').slideToggle()});
+</script>
+``:code 
+
+Os efeitos retornam o objeto de chamada, para que possam ser encadeados.
+
+Quando o ``click``  define a função de retorno de chamada a ser chamada ao clicar. Da mesma forma para ``change`` , ``keyup`` , ``keydown`` , ``mouseover`` etc.
+
+Uma situação comum é a necessidade de executar algum código JavaScript somente após todo o documento ter sido carregado. Isso geralmente é feito pelo ``onload``  atributo do BODY, mas o jQuery fornece uma maneira alternativa que não requer a edição do layout:
+ ``
+<div class="one" id="a">Hello</div>
+<div class="two" id="b">World</div>
+<script>
+jQuery(document).ready(function(){
+   jQuery('.one').click(function(){jQuery('.two').slideToggle()});
+});
+</script>
+``:code 
+
+O corpo da função sem nome é executado somente quando o documento está pronto, depois de ter sido totalmente carregado.
+
+Aqui está uma lista de nomes de eventos úteis:
+
+#####  Eventos de formulário
+- ``onchange`` : Script a ser executado quando o elemento for alterado
+- ``onsubmit`` : Script a ser executado quando o formulário é submetido
+- ``onreset`` : Script a ser executado quando o formulário é redefinido
+- ``onselect`` : Script a ser executado quando o elemento é selecionado
+- ``onblur`` : Script a ser executado quando o elemento perde o foco
+- ``onfocus`` : Script a ser executado quando o elemento recebe o foco
+
+#####  Eventos de teclado
+- ``onkeydown`` : Script a ser executado quando a tecla é pressionada
+- ``onkeypress`` : Script a ser executado quando a tecla é pressionada e liberada
+- ``onkeyup`` : Script a ser executado quando a chave é liberada
+
+#####  Eventos do mouse
+- ``onclick`` : Script para ser executado em um clique do mouse
+- ``ondblclick`` : Script para ser executado em um mouse, clique duas vezes
+- ``onmousedown`` : Script a ser executado quando o botão do mouse é pressionado
+- ``onmousemove`` : Script a ser executado quando o ponteiro do mouse se move
+- ``onmouseout`` : Script a ser executado quando o ponteiro do mouse sai de um elemento
+- ``onmouseover`` : Script a ser executado quando o ponteiro do mouse se move sobre um elemento
+- ``onmouseup`` : Script a ser executado quando o botão do mouse é liberado
+
+Aqui está uma lista de efeitos úteis definidos pelo jQuery:
+
+#####  Efeitos
+- ``jQuery(...).show()`` : Torna o objeto visível
+- ``jQuery(...).hide()`` : Torna o objeto oculto
+- ``jQuery(...).slideToggle(speed, callback)`` : Desliza o objeto para cima ou para baixo
+- ``jQuery(...).slideUp(speed, callback)`` : Faz o objeto deslizar para cima
+- ``jQuery(...).slideDown(speed, callback)`` : Faz o objeto deslizar para baixo
+- ``jQuery(...).fadeIn(speed, callback)`` : Faz o objeto desaparecer
+- ``jQuery(...).fadeOut(speed, callback)`` : Faz o objeto desaparecer
+
+O argumento de velocidade é geralmente "lento", "rápido" ou omitido (o padrão). O retorno de chamada é uma função opcional que é chamada quando o efeito é concluído.
+
+Os efeitos do jQuery também podem ser facilmente incorporados em helpers, por exemplo,
+em uma visão:
+ ``
+{{=DIV('click me!', _onclick="jQuery(this).fadeOut()")}}
+``:code 
+
+Outros métodos e atributos úteis para manipular elementos selecionados
+
+#####  Métodos e atributos
+- ``jQuery(...).prop(name)`` : Retorna o nome do valor do atributo
+- ``jQuery(...).prop(name, value)`` : Define o nome do atributo para o valor
+- ``jQuery(...).html()`` : Sem argumentos, ele retorna o html interno dos elementos selecionados, ele aceita uma string como argumento para substituir o conteúdo da tag.
+- ``jQuery(...).text()`` : Sem argumentos, ele retorna o texto interno do elemento selecionado (sem tags), se uma string é passada como argumento, ela substitui o texto interno pelos novos dados.
+- ``jQuery(...).val()`` : Sem argumentos, retorna o valor atual do primeiro elemento dos elementos selecionados, se uma string é passada como argumento, substitui o valor de cada elemento correspondente.
+- ``jQuery(...).css(name, value)`` : Com um parâmetro, retorna o valor de CSS do atributo de estilo especificado para os elementos selecionados. Com dois parâmetros, define um novo valor para o atributo CSS especificado.
+- ``jQuery(...).each(function)`` : Faz um loop pelo conjunto de elementos selecionados e chama a função com cada item como argumento.
+- ``jQuery(...).index()`` : Sem argumentos, retorna o valor do índice para o primeiro elemento selecionado relacionado aos seus irmãos. (isto é, o índice de um elemento LI). Se um elemento é passado como argumento, ele retorna a posição do elemento relacionada ao conjunto de elementos selecionado.
+- ``jQuery(...).length`` : Este atributo retorna o número de elementos selecionados.
+
+jQuery é uma biblioteca Ajax muito compacta e concisa; portanto, o web2py não precisa de uma camada de abstração adicional sobre o jQuery (exceto para o ``ajax``  função discutida abaixo). As APIs do jQuery estão acessíveis e prontamente disponíveis em sua forma nativa quando necessário.
+
+Consulte a documentação para obter mais informações sobre esses efeitos e outras APIs do jQuery.
+
+A biblioteca jQuery também pode ser estendida usando plugins e widgets da interface do usuário. Este tópico não é coberto aqui; ver ref. ``jquery-ui``:cite  para detalhes.
+
+####  Campos condicionais em formulários
+
+Uma aplicação típica dos efeitos do jQuery é um formulário que altera sua aparência com base no valor de seus campos.
+
+Isso é fácil em web2py porque o auxiliar SQLFORM gera formulários que são "CSS amigáveis". O formulário contém uma tabela com linhas. Cada linha contém um rótulo, um campo de entrada e uma terceira coluna opcional. Os itens possuem ids derivados estritamente do nome da tabela e nomes dos campos.
+
+A convenção é que todo campo INPUT tem um id ``tablename_fieldname``  e está contido em uma linha com id ``tablename_fieldname__row`` .
+
+Como exemplo, crie um formulário de entrada que solicite o nome de um contribuinte e o nome do cônjuge do contribuinte, mas apenas se ele for casado.
+
+Crie um aplicativo de teste com o seguinte modelo:
+ ``
+db = DAL('sqlite://storage.sqlite')
+db.define_table('taxpayer',
+    Field('spouse_name'))
+``:code 
+
+o seguinte controlador "default.py":
+ ``
+def index():
+    form = SQLFORM(db.taxpayer)
+    if form.process().accepted:
+        response.flash = 'record inserted'
+    return dict(form=form)
+``:code 
+
+e a seguinte exibição "default/index.html":
+ ``
+{{extend 'layout.html'}}
+{{=form}}
+<script>
+jQuery(document).ready(function(){
+   if(jQuery('#taxpayer_married').prop('checked'))
+        jQuery('#taxpayer_spouse_name__row').show();
+   else jQuery('#taxpayer_spouse_name__row').hide();
+   jQuery('#taxpayer_married').change(function(){
+        if(jQuery('#taxpayer_married').prop('checked'))
+            jQuery('#taxpayer_spouse_name__row').show();
+        else jQuery('#taxpayer_spouse_name__row').hide();});
+});
+</script>
+``:code 
+
+O script na exibição tem o efeito de ocultar a linha que contém o nome do cônjuge:
+
+ [[image @///image/en7500.png center 480px]] 
+
+Quando o contribuinte verifica a caixa de seleção "casado", o campo de nome do cônjuge reaparece:
+
+ [[image @///image/en7600.png center 480px]] 
+
+Aqui "taxpayer_married" é a caixa de seleção associada ao campo "booleano" "casado" da tabela "contribuinte". "taxpayer_spouse_name__row" é a linha que contém o campo de entrada para "spouse_name" da tabela "contribuinte".
+
+####  Confirmação ao deletar
+ ``confirmation``:inxx 
+
+Outro aplicativo útil está exigindo confirmação ao marcar uma caixa de seleção "excluir", como a caixa de seleção de exclusão que aparece nos formulários de edição.
+
+Considere o exemplo acima e adicione a seguinte ação do controlador:
+ ``
+def edit():
+    row = db.taxpayer[request.args(0)]
+    form = SQLFORM(db.taxpayer, row, deletable=True)
+    if form.process().accepted:
+        response.flash = 'record updated'
+    return dict(form=form)
+``:code 
+
+e a visualização correspondente "default/edit.html"
+ ``
+{{extend 'layout.html'}}
+{{=form}}
+``:code 
+
+ ``deletable``:inxx 
+o ``deletable=True``  O argumento no construtor SQLFORM instrui o web2py a exibir uma caixa de seleção "delete" no formulário de edição. Isto é ``False``  por padrão.
+
+O "web2py.js" do web2py inclui o seguinte código:
+ ``
+jQuery(document).ready(function(){
+   jQuery('input.delete').prop('onclick',
+     'if(this.checked) if(!confirm(
+        "{{=T('Sure you want to delete this object?')}}"))
+      this.checked=False;');
+});
+``:code 
+
+Por convenção, esta caixa de seleção tem uma classe igual a "delete". O código jQuery acima conecta o evento onclick desta caixa de seleção com uma caixa de diálogo de confirmação (padrão em JavaScript) e desmarca a caixa de seleção se o contribuinte não confirmar:
+
+ [[image @///image/en7700.png center 480px]] 
+
+###  o ``ajax``  função
+
+No web2py.js, o web2py define uma função chamada ``ajax``  que é baseado, mas não deve ser confundido com, a função jQuery ``$.ajax`` . O último é muito mais poderoso que o anterior, e para o seu uso, nós o encaminhamos para ref. ``jquery``:cite  e ref. ``jquery-b``:cite . No entanto, a função anterior é suficiente para muitas tarefas complexas e é mais fácil de usar.
+
+o ``ajax``  function é uma função JavaScript que possui a seguinte sintaxe:
+ ``
+ajax(url, [name1, name2, ...], target)
+``:code 
+
+Chama de forma assíncrona o url (primeiro argumento), passa os valores das entradas de campo com o nome igual a um dos nomes na lista (segundo argumento), depois armazena a resposta no innerHTML do tag com o id igual ao target (o terceiro argumento).
+
+Aqui está um exemplo de ``default``  controlador:
+ ``
+def one():
+    return dict()
+
+def echo():
+    return request.vars.name
+``:code 
+
+e a vista "default/one.html" associada:
+ ``
+{{extend 'layout.html'}}
+<form>
+   <input name="name" onkeyup="ajax('{{=URL('default', 'echo')}}', ['name'], 'target')" />
+</form>
+<div id="target"></div>
+``:code 
+
+Quando você digita algo no campo INPUT, assim que solta uma tecla (onkeyup), o ``ajax``  função é chamada, e o valor do ``name="name"``  campo é passado para a ação "echo", que envia o texto de volta para a exibição. o ``ajax``  função recebe a resposta e exibe a resposta de eco no DIV "alvo".
+
+####  Alvo do Eval
+
+O terceiro argumento do ``ajax``  function pode ser a string ": eval". Isso significa que a string retornada pelo servidor não será incorporada no documento, mas será avaliada.
+
+Aqui está um exemplo de ``default``  controlador:
+ ``
+def one():
+    return dict()
+
+def echo():
+    return "jQuery('#target').html(%s);" % repr(request.vars.name)
+``:code 
+
+e a vista "default/one.html" associada:
+ ``
+{{extend 'layout.html'}}
+<form>
+   <input name="name" onkeyup="ajax('{{=URL('default', 'echo')}}', ['name'], ':eval')" />
+</form>
+<div id="target"></div>
+``:code 
+
+Isso permite respostas mais complexas que podem atualizar vários destinos.
+
+####  Preenchimento automático
+
+O Web2py contém um widget de autocompletar integrado, descrito no capítulo Formulários. Aqui vamos construir um mais simples do zero.
+
+Outra aplicação do acima ``ajax``  função é preenchimento automático. Aqui, desejamos criar um campo de entrada que espera um nome de mês e, quando o visitante digita um nome incompleto, executa o preenchimento automático por meio de uma solicitação do Ajax. Em resposta, uma caixa suspensa de preenchimento automático aparece abaixo do campo de entrada.
+
+Isto pode ser conseguido através do seguinte ``default``  controlador:
+ ``
+def month_input():
+    return dict()
+
+def month_selector():
+    if not request.vars.month: return ''
+    months = ['January', 'February', 'March', 'April', 'May',
+              'June', 'July', 'August', 'September' , 'October',
+              'November', 'December']
+    month_start = request.vars.month.capitalize()
+    selected = [m for m in months if m.startswith(month_start)]
+    return DIV(*[DIV(k,
+                     _onclick="jQuery('#month').val('%s')" % k,
+                     _onmouseover="this.style.backgroundColor='yellow'",
+                     _onmouseout="this.style.backgroundColor='white'"
+                     ) for k in selected])
+``:code 
+
+e a visualização "default/month_input.html" correspondente:
+ ``
+{{extend 'layout.html'}}
+<style>
+#suggestions { position: relative; }
+.suggestions { background: white; border: solid 1px #55A6C8; }
+.suggestions DIV { padding: 2px 4px 2px 4px; }
+</style>
+
+<form>
+ <input type="text" id="month" name="month" style="width: 250px" /><br />
+ <div style="position: absolute;" id="suggestions"
+      class="suggestions"></div>
+</form>
+<script>
+jQuery("#month").keyup(function(){
+      ajax('{{=URL('default', 'month_selector')}}', ['month'], 'suggestions')});
+</script>
+``:code 
+
+O script jQuery na exibição aciona a solicitação do Ajax toda vez que o visitante digita algo no campo de entrada "mês". O valor do campo de entrada é enviado com a solicitação do Ajax para a ação "month_selector". Essa ação localiza uma lista de nomes de mês que começam com o texto enviado (selecionado), cria uma lista de DIVs (cada um contendo um nome de mês sugerido) e retorna uma sequência com os DIVs serializados. A visualização exibe a resposta HTML no DIV "sugestões". A ação "month_selector" gera tanto as sugestões quanto o código JavaScript incorporado nos DIVs que devem ser executados quando o visitante clica em cada sugestão. Por exemplo, quando o visitante digitar "M", a ação de retorno de chamada retornará:
+ ``
+<div>
+     <div onclick="jQuery('#month').val('March')"
+          onmouseout="this.style.backgroundColor='white'"
+          onmouseover="this.style.backgroundColor='yellow'">March</div>
+     <div onclick="jQuery('#month').val('May')"
+          onmouseout="this.style.backgroundColor='white'"
+          onmouseover="this.style.backgroundColor='yellow'">May</div>
+</div>
+``:code 
+
+Aqui está o efeito final:
+
+ [[image @///image/en7800.png center 480px]] 
+
+Se os meses forem armazenados em uma tabela de banco de dados, como:
+ ``
+db.define_table('month', Field('name'))
+``:code 
+
+então simplesmente substitua o ``month_selector``  ação com:
+ ``
+def month_input():
+    return dict()
+
+def month_selector():
+    if not request.vars.month:
+        return ''
+    pattern = request.vars.month.capitalize() + '%'
+    selected = [row.name for row in db(db.month.name.like(pattern)).select()]
+    return ''.join([DIV(k,
+                 _onclick="jQuery('#month').val('%s')" % k,
+                 _onmouseover="this.style.backgroundColor='yellow'",
+                 _onmouseout="this.style.backgroundColor='white'"
+                 ).xml() for k in selected])
+``:code 
+
+O jQuery fornece um Plugin de preenchimento automático opcional com funcionalidades adicionais, mas isso não é discutido aqui.
+
+####  Submissão do formulário Ajax
+ ``asynchronous``:inxx 
+
+Aqui consideramos uma página que permite ao visitante enviar mensagens usando o Ajax sem recarregar a página inteira. Usando o auxiliar LOAD, o web2py fornece um mecanismo melhor para fazê-lo do que o descrito aqui, que será descrito no Capítulo 12. Aqui, queremos mostrar como fazer isso simplesmente usando o jQuery.
+
+Ele contém um formulário "myform" e um "alvo" DIV. Quando o formulário é submetido, o servidor pode aceitá-lo (e executar uma inserção de banco de dados) ou rejeitá-lo (porque ele não passou na validação). A notificação correspondente é retornada com a resposta do Ajax e exibida no DIV "de destino".
+
+Construir um ``test``  aplicação com o seguinte modelo:
+ ``
+db = DAL('sqlite://storage.sqlite')
+db.define_table('post', Field('your_message', 'text'))
+db.post.your_message.requires = IS_NOT_EMPTY()
+``:code 
+
+Observe que cada postagem possui um único campo "your_message" que precisa estar vazio.
+
+Edite o ``default.py``  controlador e escrever duas ações:
+ ``
+def index():
+    return dict()
+
+def new_post():
+    form = SQLFORM(db.post)
+    if form.accepts(request, formname=None):
+        return DIV("Message posted")
+    elif form.errors:
+        return TABLE(*[TR(k, v) for k, v in form.errors.items()])
+``:code 
+
+A primeira ação não faz nada além de retornar uma exibição.
+
+A segunda ação é o retorno de chamada do Ajax. Espera que as variáveis de formulário ``request.vars`` , processa-os e retorna ``DIV("Message posted")``  após sucesso ou um ``TABLE``  de mensagens de erro após falha.
+
+Agora edite a visualização "default/index.html":
+ ``
+{{extend 'layout.html'}}
+
+<div id="target"></div>
+
+<form id="myform">
+  <input name="your_message" id="your_message" />
+  <input type="submit" />
+</form>
+
+<script>
+jQuery('#myform').submit(function() {
+  ajax('{{=URL('new_post')}}',
+       ['your_message'], 'target');
+  return false;
+});
+</script>
+``:code 
+
+Observe como neste exemplo o formulário é criado manualmente usando HTML, mas é processado pelo SQLFORM em uma ação diferente daquela que exibe o formulário. O objeto SQLFORM nunca é serializado em HTML. ``SQLFORM.accepts``  neste caso não leva uma sessão e define ``formname=None`` , porque optamos por não definir o nome do formulário e uma chave de formulário no formulário HTML manual.
+
+O script na parte inferior da visualização conecta o botão de envio "myform" a uma função in-line que envia o INPUT com ``id="your_message"``  usando o web2py ``ajax``  função, e exibe a resposta dentro do DIV com ``id="target"`` .
+
+####  Votação e classificação
+
+Outro aplicativo Ajax está votando ou classificando itens em uma página. Aqui nós consideramos uma aplicação que permite aos visitantes votar em imagens postadas. O aplicativo consiste em uma única página que exibe as imagens classificadas de acordo com o seu voto. Permitiremos que os visitantes votem várias vezes, embora seja fácil mudar esse comportamento se os visitantes forem autenticados, acompanhando os votos individuais no banco de dados e associando-os com o ``request.env.remote_addr``  do eleitor.
+
+Aqui está um modelo de amostra:
+ ``
+db = DAL('sqlite://images.db')
+db.define_table('item',
+    Field('image', 'upload'),
+    Field('votes', 'integer', default=0))
+``:code 
+
+Aqui está o ``default``  controlador:
+ ``
+def list_items():
+    items = db().select(db.item.ALL, orderby=db.item.votes)
+    return dict(items=items)
+
+def download():
+    return response.download(request, db)
+
+def vote():
+    item = db.item[request.vars.id]
+    new_votes = item.votes + 1
+    item.update_record(votes=new_votes)
+    return str(new_votes)
+``:code 
+
+A ação de download é necessária para permitir que a visualização list_items faça o download das imagens armazenadas na pasta "uploads". A ação de votos é usada para o retorno de chamada do Ajax.
+
+Aqui está a visualização "default/list_items.html":
+ ``
+{{extend 'layout.html'}}
+
+<form><input type="hidden" id="id" name="id" value="" /></form>
+{{for item in items:}}
+<p>
+<img src="{{=URL('download', args=item.image)}}"
+     width="200px" />
+<br />
+Votes=<span id="item{{=item.id}}">{{=item.votes}}</span>
+[<span onclick="jQuery('#id').val('{{=item.id}}');
+       ajax('{{=URL('default', 'vote')}}', ['id'], 'item{{=item.id}}');">vote up</span>]
+</p>
+{{pass}}
+``:code 
+
+Quando o visitante clica em "[votar]", o código JavaScript armazena o item.id no campo INPUT "id" oculto e envia esse valor para o servidor por meio de uma solicitação Ajax. O servidor aumenta o contador de votos para o registro correspondente e retorna a nova contagem de votos como uma string. Este valor é então inserido no destino ``item{{=item.id}}``  PERÍODO.
+
+-------
+As chamadas de retorno do Ajax podem ser usadas para realizar cálculos em segundo plano, mas recomendamos o uso cron ou um processo em segundo plano (discutido no capítulo 4), uma vez que o servidor web impõe um tempo limite nos encadeamentos. Se o cálculo demorar muito, o servidor da web o mata. Consulte os parâmetros do seu servidor da web para definir o valor de tempo limite. 
+-------
