@@ -75,4 +75,4 @@ class CIDRConv(object):
 if __name__ == "__main__":
     ip = '192.30.252.50'
     a = CIDRConv(['204.232.175.64/27', '192.30.252.0/22'])
-    print a.valid_ip(ip)
+    print(a.valid_ip(ip))
