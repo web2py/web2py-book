@@ -2,6 +2,7 @@
 import os
 import datetime  # Not used
 import re
+from io import open
 
 from gluon.validators import urlify
 from w2p_book_cidr import CIDRConv
@@ -25,7 +26,7 @@ if request.global_settings.web2py_runtime_gae:
 response.logo = A(B('web', SPAN(2), 'py'), XML('&trade;&nbsp;'),
                   _class="brand", _href="http://www.web2py.com/")
 response.title = 'web2py'
-response.subtitle = 'Full Stack Web Framework, 6th Ed (pre-release).\nwritten by Massimo Di Pierro in English'
+response.subtitle = u'Full Stack Web Framework, 6th Ed (pre-release).\nwritten by Massimo Di Pierro in English'
 response.menu = []
 
 
@@ -36,7 +37,7 @@ def splitter(x):
 
 def splitter_urlify(x):
     a, b = x.split(':', 1)
-    return a.strip(), b.strip(), urlify(b)
+    return a.strip(), b.strip(), urlify(to_bytes(b))
 
 
 @cache('folders', CACHE_EXPIRE)
@@ -62,7 +63,7 @@ def get_info(subfolder):
     infofile = os.path.join(FOLDER, subfolder, 'info.txt')
     if os.path.exists(infofile):
         info = dict(splitter(line)
-                    for line in open(infofile).readlines()
+                    for line in open(infofile, 'rt',  encoding='utf-8').readlines()
                     if ':' in line)
         return info
     return {}
@@ -71,7 +72,7 @@ def get_info(subfolder):
 def get_chapters(subfolder):
     filename = os.path.join(FOLDER, subfolder, 'chapters.txt')
     chapters = [splitter_urlify(line)
-                for line in open(filename).readlines()
+                for line in open(filename, 'rt',  encoding='utf-8').readlines()
                 if ':' in line]
     return chapters
 
@@ -85,7 +86,7 @@ def build_menu(dummy=None):
         book_id = subfolder.split('-')[0]
         submenu.append((info['title'] + ' ' + info['language'], None, URL('chapter', args=book_id)))
     menu.append(('Books', None, '#', submenu))
-    menu.append(('Contribute', None, 'https://github.com/mdipierro/web2py-book'))
+    menu.append(('Contribute', None, 'https://github.com/web2py/web2py-book'))
     return menu
 
 
@@ -102,31 +103,36 @@ def convert2html(book_id, text):
     def truncate(x):
         return x[:70] + '...' if len(x) > 70 else x
 
-    extra['verbatim'] = lambda code: cgi.escape(code)
-    extra['cite'] = lambda key: TAG.sup(
+    extra['verbatim'] = lambda code: to_native(cgi.escape(code))
+    extra['cite'] = lambda key: to_native(TAG.sup(
         '[', A(key, _href=URL('reference', args=(book_id, key)),
-               _target='_blank'), ']').xml()
-    extra['inxx'] = lambda code: '<div class="inxx">' + code + '</div>'
-    extra['ref'] = lambda code: '[ref:' + code + ']'
+               _target='_blank'), ']').xml())
+    extra['inxx'] = lambda code: to_native('<div class="inxx">' + code + '</div>')
+    extra['ref'] = lambda code: to_native('[ref:' + code + ']')
     # extra['code'] = lambda code: CODE(code, language='web2py').xml()
     # The comment above line could be replaced by this
-    from pygments import highlight as pygments_highlight
-    from pygments.lexers import PythonLexer as pygments_PythonLexer
-    from pygments.formatters import HtmlFormatter as pygments_HtmlFormatter
-
-    extra['code'] = lambda code: '<div class="highlight_wrapper">' + \
-                                 pygments_highlight(code,
-                                                    pygments_PythonLexer(),
-                                                    pygments_HtmlFormatter(style='friendly',
+    try:
+        from pygments import highlight as pygments_highlight
+        from pygments.lexers import PythonLexer as pygments_PythonLexer
+        from pygments.formatters import HtmlFormatter as pygments_HtmlFormatter
+    except ImportError:
+        redirect(URL('index', vars=dict(FLASH_MSG = ImportError)))
+        
+    extra['code'] = lambda code: to_native('<div class="highlight_wrapper">' + \
+                                                pygments_highlight(code,
+                                                pygments_PythonLexer(),
+                                                pygments_HtmlFormatter(style='friendly',
                                                                            linenos=True
-                                                                           )).encode('utf8') + \
-                                 '</div>'
+                                                                           )) + \
+                                            '</div>')
     rtn = MARKMIN(text.replace('\r', ''), extra=extra, url=url2)
     return rtn
 
 
 def index():
     books = {}
+    if request.vars['FLASH_MSG']=="ImportError":
+        response.flash = T('ImportError: Requires pygments module, but it is not available!')
     for subfolder in FOLDERS:
         books[subfolder] = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
     return locals()
@@ -155,15 +161,15 @@ def chapter():
         response.headers['Expires'] = calc_date()
         response.headers['Pragma'] = None
     if (not os.path.isfile(dest)) or FORCE_RENDER:
-        content = open(filename).read()
+        content = open(filename, 'rt', encoding='utf-8').read()
         content = convert2html(book_id, content).xml()
         if not os.path.exists(os.path.dirname(dest)):
             os.makedirs(os.path.dirname(dest))
-        open(dest, 'w').write(content)
+        open(dest, 'wb').write(content)
         content = XML(content)
         return locals()
     else:
-        content = XML(open(dest).read())
+        content = XML(open(dest, 'rt', encoding='utf-8').read())
         return locals()
 
 
@@ -185,7 +191,7 @@ def search():
     for chapter in chapters:
         chapter_id = int(chapter[0])
         filename = os.path.join(FOLDER, subfolder, '%.2i.markmin' % chapter_id)
-        data = open(filename).read().replace('\r', '')
+        data = open(filename, 'rt', encoding='utf-8').read().replace('\r', '')
         k = data.lower().find(search.lower())
         if k >= 0:
             snippet = data[data.rfind('\n\n', 0, k) + 1:data.find('\n\n', k)].strip()
@@ -225,7 +231,7 @@ def reference():
     if not os.path.isfile(filename):
         raise HTTP(404)
     info = dict(splitter(line)
-                for line in open(filename).readlines()
+                for line in open(filename, 'rt', encoding='utf-8').readlines()
                 if ':' in line)
     if info['source_url']:
         redirect(info['source_url'])
@@ -254,7 +260,7 @@ def rebuild_sources():
     if not rebuild:
         raise HTTP(200)
     dest = os.path.join(request.folder, 'private', 'rebuild_me')
-    with open(dest, 'w') as g:
+    with open(dest, 'wb') as g:
         g.write('ok')
     return 'ok'
 
@@ -284,11 +290,11 @@ def batch_static_chaps():
                 filename = os.path.join(FOLDER, subfolder, '%.2i.markmin' % chapter_id)
                 dest = os.path.join(request.folder, 'static_chaps', subfolder, '%.2i.html' % chapter_id)
                 try:
-                    content = open(filename).read()
+                    content = open(filename, 'rt', encoding='utf-8').read()
                     content = convert2html(book_id, content).xml()
                     if not os.path.exists(os.path.dirname(dest)):
                         os.makedirs(os.path.dirname(dest))
-                    open(dest, 'w').write(content)
+                    open(dest, 'wb').write(content)
                 except:
                     continue
         return 'completed'
