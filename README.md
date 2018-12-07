@@ -4,20 +4,34 @@ License: [Creative Commons  BY-NC-ND](http://creativecommons.org/licenses/by-nc-
 
 [Read the book online](http://web2py.com/books)
 
-The github repo includes code and sources. The book sources are in the sources folder. You can contribute to the book by submitting patches.
+This web2py book github repository consists of:
+
+ - the book sources (in English, translated in many languages), in the source folder
+ - a full working web2py application (python 3 compatible) for generating the HTML output. This is the same one used for generating the web pages on the main web2py site
+ - the python code used to produce the LaTeX output, in the private folder. This is used to obtain the PDF and also the printed version 
+
+The web2py book application can also be installed locally for offline use, editing or testing. In this case you need the full web2py framework with the pygments Python module installed for HTML output.
+
+You can easily contribute to the book by submitting patches related to the english version, or its translations.
 
 ## Notes to translators
 
-Install GIT with
+Install with GIT:
 
-    git clone https://github.com/mdipierro/web2py-book.git
+    git clone https://github.com/web2py/web2py-book.git
 
-Check what has changed since verison 4 of the book:
+Check what has changed since version 5 of the book:
+    
+    cd web2py-book
+    git diff --relative 4b0feb3dac1c448c6752450d810b227fd325d454 sources/29-web2py-english/
 
-    git diff -r 5a78edad03160fff97836b8a8d93d185b34d378d sources/29-web2py-english/
+(or git diff -r 5a78edad03160fff97836b8a8d93d185b34d378d sources/29-web2py-english/ for changes since version 4 of the book)
 
 Implement the changes under the proper book source.
-The book is in the markmin syntax. Images are incuded with the sytnax
+
+## Syntax
+
+The book is in the markmin syntax. Images are incuded with the syntax
 
     [[image @///image/key width:200px]]
 
@@ -35,8 +49,11 @@ Index entries are added with
 
 They are used to build the printable book index.
 
-Once done submit  patch as a pull request on github or email the author.
+You can also add internal anchors (i.e. links) that will be automatically numbered and trasformed to hyperlinks on the Web and PDF output.
+You can find all the markmin syntax reference on this page http://web2py.com/examples/static/markmin.html
+
+Once done submit  patch as a pull request on github, or email the author.
 
 ### Translator agreement
 
-If you plan to help with the book translation please contact me we can reach an agreement about copyright and distribution.
+If you plan to help with the book translation please contact the author in order to reach an agreement about copyright and distribution.
