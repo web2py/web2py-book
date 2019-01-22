@@ -116,7 +116,7 @@ def convert2html(book_id, text):
         from pygments.lexers import PythonLexer as pygments_PythonLexer
         from pygments.formatters import HtmlFormatter as pygments_HtmlFormatter
     except ImportError:
-        redirect(URL('index', vars=dict(FLASH_MSG = ImportError)))
+        redirect(URL('index', vars=dict(FLASH_MSG = 'ImportError')))
         
     extra['code'] = lambda code: to_native('<div class="highlight_wrapper">' + \
                                                 pygments_highlight(code,
@@ -131,8 +131,10 @@ def convert2html(book_id, text):
 
 def index():
     books = {}
-    if request.vars['FLASH_MSG']=="ImportError":
+    if request.vars['FLASH_MSG'] == "ImportError":
         response.flash = T('ImportError: Requires pygments module, but it is not available!')
+    if request.vars['FLASH_MSG'] == "CompatError":
+        response.flash = T('ImportError: Requires web2py version 2.15.3 or newer - you have v. %s' % request.env.web2py_version.split('-')[0])
     for subfolder in FOLDERS:
         books[subfolder] = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
     return locals()
@@ -148,6 +150,10 @@ def calc_date(now=request.utcnow.date()):
 
 
 def chapter():
+    try:
+        from gluon._compat import to_bytes, to_native, to_unicode
+    except ImportError:
+        redirect(URL('index', vars=dict(FLASH_MSG = "CompatError")))
     book_id, chapter_id = request.args(0), request.args(1, cast=int, default=0)
     subfolder = get_subfolder(book_id)
     info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
@@ -180,6 +186,10 @@ def search():
                              book_id,
                              match.group(3))  # link rewritten to be relative to the search URL
 
+    try:
+        from gluon._compat import to_bytes, to_native, to_unicode
+    except ImportError:
+        redirect(URL('index', vars=dict(FLASH_MSG = "CompatError")))
     book_id = request.args(0) or redirect(URL('index'))
     search = request.vars.search or redirect(URL('chapter', args=book_id))
     subfolder = get_subfolder(book_id)
@@ -192,7 +202,7 @@ def search():
         chapter_id = int(chapter[0])
         filename = os.path.join(FOLDER, subfolder, '%.2i.markmin' % chapter_id)
         data = open(filename, 'rt', encoding='utf-8').read().replace('\r', '')
-        k = data.lower().find(search.lower())
+        k = data.lower().find(to_unicode(search).lower())
         if k >= 0:
             snippet = data[data.rfind('\n\n', 0, k) + 1:data.find('\n\n', k)].strip()
             snippet = relative_link_re.sub(fix_relative_link, snippet)
