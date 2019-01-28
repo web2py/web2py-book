@@ -1,15 +1,30 @@
+""" 
+************************************
+           convert_book.py
+************************************
+Function for getting LaTeX output from markmin-formatted book sources.
+Created by Massimo Di Pierro - License BSD
+Usage:
+Install the web2py-book as a standard web2py application, with the name of 'book' in this example.
+Open a shell in the directory where web2py is installed and run (from Linux or Windows):
+python web2py.py --no-banner -S book -M -R applications/book/private/convert_book.py -A applications/book/sources/29-web2py-english > book.tex
+the resulting file book.tex is the LaTeX output of the English version, or the errors found.
+The LaTeX output can later be used in order to obtain the printed version, or the PDF hypertext file with markmin2pdf from web2py.
+Notes: 
+- python 2.7 and 3.5+ compatible.
+- it needs web2py >= 2.15.3 for the the to_native() calls. But if you're using python 3, you could safely remove all of them
+- apart from PY2 compatibility, it needs only gluon.contrib.markmin.markmin2latex from web2py;
+     so you don't strictly need the full web2py framework
+"""
 import glob
 import sys
 import re
-import shutil
 import os
-
-
-sys.path.append('/Users/massimodipierro/Dropbox/web2py')
+from io import open
 
 HEADER = r"""
 \documentclass[justified,sixbynine,notoc]{tufte-book}
-\title{web2py\\{\small Complete Reference Manual, 5th Edition}}
+\title{web2py\\{\small Complete Reference Manual, 6th Edition (pre-release)}}
 \author{Massimo Di Pierro}
 \publisher{Experts4Solutions}
 
@@ -147,7 +162,16 @@ FOOTER = r"""
 from gluon.contrib.markmin.markmin2latex import render
 
 def getreference(path):
-    data = open(path).read().split('\n')
+    try:
+        data = open(path,'rt',encoding="utf-8").read().split('\n')
+    except IOError:
+        print("""
+        ************************************
+        ** Missing Reference fatal error ***
+        ************************************
+        """)
+        print("Check missing reference for %s \n" % path)
+        exit()   
     d = {}
     for line in data:
         if ':' in line and not line.startswith('#'):
@@ -158,25 +182,47 @@ def getreference(path):
 def assemble(path):
     path = os.path.abspath(path)
     path1 = os.path.join(path,'??.markmin')
-    text = '\n\n'.join(open(f,'r').read() for f in glob.glob(path1))
+    text = '\n\n'.join(open(f,'rt',encoding="utf-8").read() for f in sorted(glob.glob(path1)))
     text = text.replace('@///image',os.path.join(path,'images'))
 
-    body, title, authors = render(text)
+    # remove wrong non-breaking spaces
+    text = re.sub(u'\xa0{2,}', u'\xa0', text) # remove nbs repetitions
+    text = text.replace(u"\xa0|",u'|')
+    text = text.replace(u"|\xa0",u'|')  
+    text = text.replace(u" \xa0",' ')
+    text = text.replace(u"\xa0 ",' ')
+    text = text.replace(u"{\xa0",'{')
+    text = text.replace(u"\n\xa0",'\n')
+
+    try:    
+        body, title, authors = render(to_native(text))
+    except NameError:
+        print("""
+        ************************************
+        ** Missing Module fatal error ***
+        ************************************
+        """)
+        print("Missing to_native() module from web2py/gluon/__init__.py . Are you using web2py version >= 2.15.3 ?\n")
+        exit() 
     body = body.replace('\\section{','\\chapter{'
                         ).replace('subsection{','section{')
     bibitems = []
-    for item in re.compile('\\cite\{(.*?)\}').findall(body):
+    for item in re.compile('\\\\cite\{(.*?)\}').findall(body):
         for part in item.split(','):
             if not part in bibitems: bibitems.append(part)
     bibliography = []
     for item in bibitems:
         reference = getreference(os.path.join(path,'references',item))
         bibliography.append((item,reference['source_url']))
-    txtitems = '\n'.join('\\bibitem{%s} \\url{%s}' % item for item in bibliography)
+    txtitems = to_native('\n'.join('\\bibitem{%s} \\url{%s}' % item for item in bibliography))
     body = body.replace('\@/','@/')
     body = body.replace('{\\textbackslash}@/','@/')
     body = body.replace('\\begin{center}','\\goodbreak\\begin{center}')
     return HEADER + body + FOOTER.replace('@BIBITEMS',txtitems)
 
 if __name__=='__main__':
-    print assemble(sys.argv[1])
+    if len(sys.argv) < 2:
+       print(__doc__)
+       sys.exit(0)
+    else:
+        print(assemble(sys.argv[1]))
