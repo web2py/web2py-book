@@ -100,8 +100,8 @@ def convert2html(book_id, text):
         b['args'] = [book_id] + b.get('args', [])
         return URL(*a, **b)
 
-    def truncate(x):
-        return x[:70] + '...' if len(x) > 70 else x
+    #def truncate(x):
+    #    return x[:70] + '...' if len(x) > 70 else x
 
     extra['verbatim'] = lambda code: to_native(cgi.escape(code))
     extra['cite'] = lambda key: to_native(TAG.sup(
@@ -110,21 +110,12 @@ def convert2html(book_id, text):
     extra['inxx'] = lambda code: to_native('<div class="inxx">' + code + '</div>')
     extra['ref'] = lambda code: to_native('[ref:' + code + ']')
     # extra['code'] = lambda code: CODE(code, language='web2py').xml()
-    # The comment above line could be replaced by this
     try:
-        from pygments import highlight as pygments_highlight
-        from pygments.lexers import PythonLexer as pygments_PythonLexer
-        from pygments.formatters import HtmlFormatter as pygments_HtmlFormatter
+        from hladapter import hladapter
     except ImportError:
         redirect(URL('index', vars=dict(FLASH_MSG = 'ImportError')))
-        
-    extra['code'] = lambda code: to_native('<div class="highlight_wrapper">' + \
-                                                pygments_highlight(code,
-                                                pygments_PythonLexer(),
-                                                pygments_HtmlFormatter(style='friendly',
-                                                                           linenos=True
-                                                                           )) + \
-                                            '</div>')
+    extra['code'] = hladapter
+
     rtn = MARKMIN(text.replace('\r', ''), extra=extra, url=url2)
     return rtn
 
