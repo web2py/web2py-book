@@ -116,7 +116,9 @@ def convert2html(book_id, text):
         redirect(URL('index', vars=dict(FLASH_MSG = 'ImportError')))
     extra['code'] = hladapter
 
-    rtn = MARKMIN(text.replace('\r', ''), extra=extra, url=url2)
+    # NOTE: pass id_prefix='' to preserve anchor names in urls,
+    #       is there any reason to have the insane 'markmin_' default value ?
+    rtn = MARKMIN(text.replace('\r', ''), extra=extra, url=url2, id_prefix='')
     return rtn
 
 
