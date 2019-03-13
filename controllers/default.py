@@ -4,7 +4,7 @@ import datetime  # Not used
 import re
 from io import open
 
-from gluon.validators import urlify
+from gluon.validators import IS_SLUG
 from w2p_book_cidr import CIDRConv
 from gluon.serializers import loads_json
 
@@ -37,7 +37,7 @@ def splitter(x):
 
 def splitter_urlify(x):
     a, b = x.split(':', 1)
-    return a.strip(), b.strip(), urlify(to_bytes(b))
+    return a.strip(), b.strip(), IS_SLUG()(b)[0]
 
 
 @cache('folders', CACHE_EXPIRE)
