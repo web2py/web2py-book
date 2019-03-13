@@ -4,7 +4,7 @@ import datetime  # Not used
 import re
 from io import open
 
-from gluon.validators import urlify
+from pydal.validators import urlify
 from w2p_book_cidr import CIDRConv
 from gluon.serializers import loads_json
 
