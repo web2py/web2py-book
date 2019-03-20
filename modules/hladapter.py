@@ -2,6 +2,7 @@
 
 from gluon.contrib.markmin.markmin2html import make_dict
 from gluon.html import PRE
+from gluon._compat import to_native
 
 from pygments import highlight
 from pygments.lexers import get_lexer_by_name
@@ -105,7 +106,7 @@ def hladapter(txt, clsid='',
         #         </pre></div>
         formatter = HtmlFormatter(**formatter_opts)
         return ''.join(('<div class="highlight_wrapper">',
-                        highlight(txt, lexer, formatter).encode('utf8'),
+                        to_native(highlight(txt, lexer, formatter)),
                         '</div>'))
     except:
         return PRE(format_exception_only(*(sys.exc_info()[:2]))).xml()
