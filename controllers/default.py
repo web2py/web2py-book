@@ -128,6 +128,8 @@ def index():
         response.flash = T('ImportError: Requires pygments module, but it is not available!')
     if request.vars['FLASH_MSG'] == "CompatError":
         response.flash = T('ImportError: Requires web2py version 2.15.3 or newer - you have v. %s' % request.env.web2py_version.split('-')[0])
+    if request.vars['FLASH_MSG'] == "FileNotFoundError":
+        response.flash = T('FileNotFoundError: Requested chapter is missing')
     for subfolder in FOLDERS:
         books[subfolder] = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
     return locals()
@@ -160,7 +162,10 @@ def chapter():
         response.headers['Expires'] = calc_date()
         response.headers['Pragma'] = None
     if (not os.path.isfile(dest)) or FORCE_RENDER:
-        content = open(filename, 'rt', encoding='utf-8').read()
+        try:
+            content = open(filename, 'rt', encoding='utf-8').read()
+        except FileNotFoundError:
+            redirect(URL('index', vars=dict(FLASH_MSG = 'FileNotFoundError')))
         content = convert2html(book_id, content).xml()
         if not os.path.exists(os.path.dirname(dest)):
             os.makedirs(os.path.dirname(dest))
