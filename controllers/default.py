@@ -36,6 +36,7 @@ def splitter(x):
 
 
 def splitter_urlify(x):
+    x = to_native(x)
     a, b = x.split(':', 1)
     return a.strip(), b.strip(), IS_SLUG()(b)[0]
 
@@ -154,7 +155,7 @@ def chapter():
     info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
     chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=TIME_EXPIRE)
     chapter_title = chapters[chapter_id][1]
-    response.title = '%s - %s' % (info['title'], chapter_title)
+    response.title = '%s - %s' % (info['title'], to_unicode(chapter_title))
     filename = os.path.join(FOLDER, subfolder, '%.2i.markmin' % chapter_id)
     dest = os.path.join(request.folder, 'static_chaps', subfolder, '%.2i.html' % chapter_id)
     if not FORCE_RENDER:
