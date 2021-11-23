@@ -31,7 +31,7 @@ Implement the changes under the proper book source.
 
 ## Syntax
 
-The book is in the markmin syntax. Images are incuded with the syntax
+The book is in the markmin syntax. Images are included with the syntax
 
     [[image @///image/key width:200px]]
 
@@ -49,7 +49,7 @@ Index entries are added with
 
 They are used to build the printable book index.
 
-You can also add internal anchors (i.e. links) that will be automatically numbered and trasformed to hyperlinks on the Web and PDF output.
+You can also add internal anchors (i.e. links) that will be automatically numbered and transformed to hyperlinks on the Web and PDF output.
 You can find all the markmin syntax reference on this page http://web2py.com/examples/static/markmin.html
 
 Once done submit  patch as a pull request on github, or email the author.
