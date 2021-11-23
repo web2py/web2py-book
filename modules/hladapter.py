@@ -82,7 +82,7 @@ def hladapter(txt, clsid='',
             if k.startswith('lexer_'):
                 lexer_opts[k[6:]] = kwargs[k]
             elif k == 'hl_lines' and not isinstance(kwargs[k], tuple):
-                # alllow single value (not a tuple)
+                # allow single value (not a tuple)
                 formatter_opts[k] = (kwargs[k],)
             else:
                 formatter_opts[k] = kwargs[k]
