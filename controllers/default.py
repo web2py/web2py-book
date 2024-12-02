@@ -2,6 +2,7 @@
 import os
 import datetime  # Not used
 import re
+import html
 from io import open
 
 from gluon.validators import IS_SLUG
@@ -36,7 +37,6 @@ def splitter(x):
 
 
 def splitter_urlify(x):
-    x = to_native(x)
     a, b = x.split(':', 1)
     return a.strip(), b.strip(), IS_SLUG()(b)[0]
 
@@ -104,12 +104,12 @@ def convert2html(book_id, text):
     #def truncate(x):
     #    return x[:70] + '...' if len(x) > 70 else x
 
-    extra['verbatim'] = lambda code: to_native(cgi.escape(code))
-    extra['cite'] = lambda key: to_native(TAG.sup(
+    extra['verbatim'] = lambda code: html.escape(code)
+    extra['cite'] = lambda key: str(TAG.sup(
         '[', A(key, _href=URL('reference', args=(book_id, key)),
                _target='_blank'), ']').xml())
-    extra['inxx'] = lambda code: to_native('<div class="inxx">' + code + '</div>')
-    extra['ref'] = lambda code: to_native('[ref:' + code + ']')
+    extra['inxx'] = lambda code: '<div class="inxx">' + code + '</div>')
+    extra['ref'] = lambda code: '[ref:' + code + ']'
     # extra['code'] = lambda code: CODE(code, language='web2py').xml()
     try:
         from hladapter import hladapter
@@ -146,16 +146,12 @@ def calc_date(now=request.utcnow.date()):
 
 
 def chapter():
-    try:
-        from gluon._compat import to_bytes, to_native, to_unicode
-    except ImportError:
-        redirect(URL('index', vars=dict(FLASH_MSG = "CompatError")))
     book_id, chapter_id = request.args(0), request.args(1, cast=int, default=0)
     subfolder = get_subfolder(book_id)
     info = cache.ram('info_%s' % subfolder, lambda: get_info(subfolder), time_expire=TIME_EXPIRE)
     chapters = cache.ram('chapters_%s' % subfolder, lambda: get_chapters(subfolder), time_expire=TIME_EXPIRE)
     chapter_title = chapters[chapter_id][1]
-    response.title = '%s - %s' % (info['title'], to_unicode(chapter_title))
+    response.title = '%s - %s' % (info['title'], chapter_title)
     filename = os.path.join(FOLDER, subfolder, '%.2i.markmin' % chapter_id)
     dest = os.path.join(request.folder, 'static_chaps', subfolder, '%.2i.html' % chapter_id)
     if not FORCE_RENDER:
@@ -185,10 +181,6 @@ def search():
                              book_id,
                              match.group(3))  # link rewritten to be relative to the search URL
 
-    try:
-        from gluon._compat import to_bytes, to_native, to_unicode
-    except ImportError:
-        redirect(URL('index', vars=dict(FLASH_MSG = "CompatError")))
     book_id = request.args(0) or redirect(URL('index'))
     search = request.vars.search or redirect(URL('chapter', args=book_id))
     subfolder = get_subfolder(book_id)
@@ -201,7 +193,7 @@ def search():
         chapter_id = int(chapter[0])
         filename = os.path.join(FOLDER, subfolder, '%.2i.markmin' % chapter_id)
         data = open(filename, 'rt', encoding='utf-8').read().replace('\r', '')
-        k = data.lower().find(to_unicode(search).lower())
+        k = data.lower().find(search.lower())
         if k >= 0:
             snippet = data[data.rfind('\n\n', 0, k) + 1:data.find('\n\n', k)].strip()
             snippet = relative_link_re.sub(fix_relative_link, snippet)
